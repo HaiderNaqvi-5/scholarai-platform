@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+
+# ML / Data
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
+mlruns/
+mlflow/
+*.csv
+*.parquet
+data/raw/
+data/processed/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+docker-compose.override.yml
+
+# Blockchain
+blockchain/artifacts/
+blockchain/cache/
+blockchain/typechain-types/
+
+# Misc
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
