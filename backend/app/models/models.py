@@ -17,7 +17,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(Enum("student", "mentor", "admin", "university", name="user_role"), nullable=False)
+    role: Mapped[str] = mapped_column(Enum("student", "mentor", "admin", name="user_role"), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

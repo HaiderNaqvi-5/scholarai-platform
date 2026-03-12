@@ -28,15 +28,14 @@ class Settings(BaseSettings):
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "password"
 
-    # MinIO / S3
-    S3_ENDPOINT: str = "http://localhost:9000"
-    S3_ACCESS_KEY: str = "minioadmin"
-    S3_SECRET_KEY: str = "minioadmin"
-    S3_BUCKET: str = "scholarai"
+    # OpenSearch
+    OPENSEARCH_HOST: str = "http://localhost:9200"
 
     # LLM
     OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    HUGGINGFACE_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
