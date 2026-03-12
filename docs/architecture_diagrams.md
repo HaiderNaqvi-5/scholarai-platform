@@ -6,7 +6,7 @@
 
 ## 1. High-Level System Architecture
 
-This diagram illustrates the separation of concerns across the React frontend, FastAPI gateway, and the distinct search/graph/relational data stores. Note the inclusion of OpenSearch for general text querying, Neo4j for the knowledge graph, and PostgreSQL (with pgvector) as the primary relational ML-backing store. The blockchain module has been entirely removed from the MVP.
+This diagram illustrates the separation of concerns across the React frontend, FastAPI gateway, and the distinct search/graph/relational data stores. Note the inclusion of OpenSearch for general text querying, Neo4j for the knowledge graph, and PostgreSQL (with pgvector) as the primary relational ML-backing store.
 
 ```mermaid
 graph TB

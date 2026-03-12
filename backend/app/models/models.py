@@ -54,7 +54,6 @@ class StudentProfile(Base):
     user = relationship("User", back_populates="student_profile")
     applications = relationship("Application", back_populates="student")
     match_scores = relationship("MatchScore", back_populates="student")
-    credentials = relationship("Credential", back_populates="student")
     interview_sessions = relationship("InterviewSession", back_populates="student")
 
 
@@ -189,7 +188,6 @@ class Credential(Base):
     file_url: Mapped[str] = mapped_column(Text, nullable=True)
     institution_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    blockchain_tx_hash: Mapped[str] = mapped_column(String(66), nullable=True)
     verified_at = mapped_column(TIMESTAMP, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP, default=datetime.utcnow)
 

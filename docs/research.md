@@ -1,6 +1,6 @@
 # ScholarAI — Academic Research Contribution
 
-> **Primary Research Areas:** Explainable Artificial Intelligence (XAI), Knowledge Graph-Augmented Recommendation Systems, Decentralized Identity (Web3)
+> **Primary Research Areas:** Explainable Artificial Intelligence (XAI), Knowledge Graph-Augmented Recommendation Systems, AI Interview Simulation
 
 ---
 
@@ -16,7 +16,7 @@ ScholarAI is not merely an engineering application; it is designed to yield publ
 
 ## 2. Primary Research Contributions
 
-The project claims novelty across four intersecting domains:
+The project claims novelty across three intersecting domains:
 
 ### Contribution 1: Explainable Scholarship Recommendations
 Existing scholarship aggreators operate as simple keyword search engines. ScholarAI implements an XGBoost/Random Forest recommendation engine paired with **SHAP (SHapley Additive exPlanations)**.
@@ -28,12 +28,7 @@ Scholarships and student profiles inherently form a network (Student → Degree 
 - **Novelty:** Using a graph database (Neo4j) to inform recommendations, comparing traditional flat tabular models against graph-augmented recommendations.
 - **Evaluation:** Measuring Precision@K, Recall@K, and NDCG against a baseline model.
 
-### Contribution 3: Decentralized Credential Passport (Blockchain)
-Students repeatedly submit the exact same transcripts and language test scores to dozens of universities.
-- **Novelty:** Implementing a Polygon zkEVM smart contract where institutions verify a document hash *once*. Subsequent applications programmatically verify the hash on-chain.
-- **Evaluation:** System latency, gas cost analysis, and reduction in redundant administrative verification time.
-
-### Contribution 4: Domain-Specific AI Interview Simulation
+### Contribution 3: Domain-Specific AI Interview Simulation
 General-purpose LLMs lack the Rubric-based rigor required for strict scholarship interviews.
 - **Novelty:** A multi-stage pipeline utilizing Whisper (Speech-to-Text) and GPT-4 evaluated against a strict multidimensional rubric (Confidence, Relevance, Clarity).
 - **Evaluation:** Correlation studies comparing LLM-generated scores against human expert evaluators.
@@ -64,4 +59,4 @@ All research publications stemming from the initial system must explicitly discl
 ## 5. Security and Ethical Considerations
 
 - **Algorithmic Bias:** Machine learning models trained on historical or synthetic data may inadvertently favor certain demographics or Western-centric educational markers. The research will include an equity audit across demographic cohorts.
-- **Data Privacy:** Storing sensitive academic records requires GDPR compliance. The blockchain component mitigates data exposure by storing only cryptographic hashes on-chain, never the personal identifiable information (PII) itself.
+- **Data Privacy:** Storing sensitive academic records requires GDPR compliance. The system mitigates data exposure by storing only anonymized profile data and never exposing personal identifiable information (PII) in model training.

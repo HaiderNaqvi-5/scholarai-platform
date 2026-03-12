@@ -40,14 +40,12 @@ International scholarship applications are one of the most **informationally asy
 |---|---|---|
 | 1 | **Explainable scholarship recommendation** — SHAP/LIME in a domain where recommendation transparency is unstudied | Explainable AI (XAI) |
 | 2 | **Knowledge-graph-augmented recommendation** — using graph structure to improve matching quality | Knowledge Graphs + RecSys |
-| 3 | **Blockchain credential passport** — reusable, verifiable credential layer using hash verification | Decentralized Identity |
-| 4 | **AI interview simulation** — domain-specific dialogue system for scholarship interview readiness | NLP / Dialogue Systems |
+| 3 | **AI interview simulation** — domain-specific dialogue system for scholarship interview readiness | NLP / Dialogue Systems |
 
 ### 2.2 Novelty Justification
 
 - **XAI for scholarship matching** is largely unexplored. Existing XAI literature focuses on credit scoring, healthcare, and hiring — scholarship recommendations constitute a **novel application domain**.
 - **Knowledge graph recommendations** (KGAT, RippleNet) have been explored in e-commerce but **not in scholarship ecosystems** where entities form natural graph structures.
-- Prior credential verification focuses on degree attestation; this system extends to **per-application document reuse** with on-chain hash verification.
 
 ### 2.3 Honest Assessment
 
@@ -70,13 +68,10 @@ International scholarship applications are one of the most **informationally asy
 │       FastAPI   (REST + WebSocket endpoints)        │
 ├─────────────────────────────────────────────────────┤
 │              AI / ML LAYER                          │
-│  RecSys │ Multi-LLM Orchestration (LangGraph) │ RAG │
+│        RecSys │ LangChain Orchestration │ RAG       │
 ├─────────────────────────────────────────────────────┤
 │              DATA LAYER                             │
-│  PostgreSQL │ Neo4j │ Qdrant (Vector) │ Redis │ MinIO│
-├─────────────────────────────────────────────────────┤
-│              BLOCKCHAIN LAYER                       │
-│       Polygon zkEVM  (Credential Passport)          │
+│ PostgreSQL (pgvector) │ Neo4j │ OpenSearch │ Redis  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -86,7 +81,6 @@ International scholarship applications are one of the most **informationally asy
 |---|---|---|
 | **Presentation** | Next.js 14 (App Router), React 18 | SSR for SEO, mature ecosystem, built-in routing |
 | **API Gateway** | FastAPI (Python 3.11+) | Native async, auto OpenAPI docs, Pydantic validation, same language as ML layer |
-| **AI/ML** | scikit-learn, XGBoost, LightGBM, SHAP, LIME, Whisper, AutoGen/CrewAI/LangGraph | Best-in-class ML libraries; Orchestration frameworks for RAG and multi-agent workflows |
-| **Data** | PostgreSQL, Neo4j, Qdrant/Weaviate, Redis, MinIO | Relational + Graph + Vector + Cache + Object storage |
-| **Blockchain** | Polygon, Ethereum L2, Solidity | Low gas, high-throughput verification |
+| **AI/ML** | scikit-learn, XGBoost, SHAP, LIME, Whisper, LangChain | Best-in-class ML libraries; LangChain for RAG and multi-agent workflows |
+| **Data** | PostgreSQL, Neo4j, OpenSearch, Redis | Relational + Vector + Graph + Text Search + Cache |
 | **DevOps** | Docker, GitHub Actions, MLflow | Containerization, CI/CD, experiment tracking |

@@ -42,12 +42,9 @@
 | Data modeling | Advanced | Schema design, ETL |
 | Redis | Intermediate | Deduplication cache |
 
-### Blockchain / Frontend Engineer
+### Frontend Engineer
 | Skill | Level | Used In |
 |---|---|---|
-| Solidity (0.8+) | Advanced | Smart contracts |
-| Hardhat | Advanced | Contract testing/deployment |
-| ethers.js | Intermediate | Contract interaction |
 | Next.js 14 | Advanced | Frontend application |
 | React 18 | Advanced | UI components |
 | TypeScript | Advanced | Frontend type safety |
@@ -65,5 +62,3 @@
 | LangChain | [LangChain Docs](https://docs.langchain.com/) |
 | FastAPI | [FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/) |
 | Neo4j | [Neo4j Getting Started](https://neo4j.com/docs/getting-started/) |
-| Solidity | [Solidity by Example](https://solidity-by-example.org/) |
-| Polygon zkEVM | [Polygon zkEVM Docs](https://wiki.polygon.technology/docs/zkevm/) |

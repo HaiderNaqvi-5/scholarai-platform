@@ -77,18 +77,7 @@
 
 ---
 
-## 4. Credentials (Blockchain)
-
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| POST | `/upload-credential` | Upload document for verification | Student |
-| GET | `/credentials` | List student credentials | Student |
-| POST | `/credentials/{id}/verify` | Institution verifies document | University |
-| GET | `/credentials/{id}/blockchain-status` | On-chain verification status | Bearer |
-
----
-
-## 5. Interview Simulator
+## 4. Interview Simulator
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
@@ -125,7 +114,7 @@
 
 ---
 
-## 6. Mentorship
+## 5. Mentorship
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
@@ -136,7 +125,7 @@
 
 ---
 
-## 7. SOP Assistant
+## 6. SOP Assistant
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
@@ -146,7 +135,7 @@
 
 ---
 
-## 8. Admin
+## 7. Admin
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|

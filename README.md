@@ -2,7 +2,7 @@
 
 **AI-Powered Scholarship Discovery and Preparation Platform**
 
-An end-to-end platform that guides students globally through discovering scholarships, generating AI-based eligibility matches, preparing with an AI interview simulator, and verifying their credentials on the blockchain.
+An end-to-end platform that guides students through discovering scholarships, generating AI-based eligibility matches, preparing with an AI interview simulator, and connecting with mentors.
 
 ---
 
