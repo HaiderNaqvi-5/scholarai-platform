@@ -34,10 +34,11 @@
 |---|---|---|---|
 | GET | `/scholarships` | List scholarships (paginated, filterable) | Bearer |
 | GET | `/scholarships/{id}` | Scholarship detail | Bearer |
-| POST | `/scholarships/match` | **AI matching** — ranked list with scores | Student |
-| GET | `/scholarships/{id}/explanation` | SHAP explanation for match | Student |
+| POST | `/match-scholarships` | **AI matching** — ranked list with scores | Student |
+| POST | `/ask-scholarships` | **RAG Pipeline** — Q&A about scholarships | Student |
+| GET | `/scholarships/{id}/explanation` | SHAP/LIME explanation for match | Student |
 
-### `POST /scholarships/match` — Request
+### `POST /match-scholarships` — Request
 
 ```json
 {
@@ -80,7 +81,7 @@
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| POST | `/credentials/upload` | Upload document for verification | Student |
+| POST | `/upload-credential` | Upload document for verification | Student |
 | GET | `/credentials` | List student credentials | Student |
 | POST | `/credentials/{id}/verify` | Institution verifies document | University |
 | GET | `/credentials/{id}/blockchain-status` | On-chain verification status | Bearer |
@@ -91,7 +92,7 @@
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| POST | `/interview/start` | Start interview session | Student |
+| POST | `/start-interview` | Start interview session | Student |
 | POST | `/interview/{id}/submit-audio` | Submit audio response | Student |
 | GET | `/interview/{id}/feedback` | Get AI feedback | Student |
 | GET | `/interview/history` | Past interview sessions | Student |
@@ -128,7 +129,7 @@
 
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| GET | `/mentors` | List available mentors (filterable) | Bearer |
+| GET | `/mentor-list` | List available mentors (filterable) | Bearer |
 | GET | `/mentors/{id}` | Mentor profile | Bearer |
 | POST | `/mentorship/request` | Request session | Student |
 | PUT | `/mentorship/{id}/rate` | Rate completed session | Student |

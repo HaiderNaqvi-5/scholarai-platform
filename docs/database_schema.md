@@ -164,6 +164,26 @@
 | `started_at` | TIMESTAMP | |
 | `completed_at` | TIMESTAMP | |
 
+### `scholarship_embeddings`
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | UUID | PK |
+| `scholarship_id` | UUID | FK → scholarships.id, UNIQUE |
+| `content_chunk` | TEXT | The chunked text of the scholarship policy/description |
+| `embedding` | VECTOR(1536) | pgvector or external reference to Qdrant/Weaviate |
+| `model_used` | VARCHAR(100) | e.g. text-embedding-3-small |
+| `created_at` | TIMESTAMP | DEFAULT NOW() |
+
+### `rag_sessions`
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | UUID | PK |
+| `student_id` | UUID | FK → student_profiles.id |
+| `session_title` | VARCHAR(255) | |
+| `chat_history` | JSONB | Orchestration track (LangGraph/CrewAI) |
+| `created_at` | TIMESTAMP | DEFAULT NOW() |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() |
+
 ---
 
 ## Indexes
@@ -177,6 +197,7 @@ CREATE INDEX idx_match_scores_score ON match_scores(overall_score DESC);
 CREATE INDEX idx_applications_student ON applications(student_id);
 CREATE INDEX idx_credentials_hash ON credentials(document_hash);
 CREATE INDEX idx_credentials_student ON credentials(student_id);
+CREATE INDEX idx_embeddings_scholarship ON scholarship_embeddings(scholarship_id);
 ```
 
 ---
@@ -210,6 +231,8 @@ erDiagram
     STUDENT_PROFILES ||--o{ MENTORSHIP_SESSIONS : "attends"
     STUDENT_PROFILES ||--o{ INTERVIEW_SESSIONS : "takes"
     SCHOLARSHIPS ||--o{ INTERVIEW_SESSIONS : "simulates"
+    SCHOLARSHIPS ||--o| SCHOLARSHIP_EMBEDDINGS : "has embedding"
+    STUDENT_PROFILES ||--o{ RAG_SESSIONS : "asks"
 
     USERS {
         UUID id PK

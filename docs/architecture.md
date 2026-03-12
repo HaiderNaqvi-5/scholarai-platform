@@ -70,10 +70,10 @@ International scholarship applications are one of the most **informationally asy
 │       FastAPI   (REST + WebSocket endpoints)        │
 ├─────────────────────────────────────────────────────┤
 │              AI / ML LAYER                          │
-│  Recommendation │ XAI │ Interview │ SOP Assistant   │
+│  RecSys │ Multi-LLM Orchestration (LangGraph) │ RAG │
 ├─────────────────────────────────────────────────────┤
 │              DATA LAYER                             │
-│  PostgreSQL │ Neo4j │ Redis │ MinIO (object store)  │
+│  PostgreSQL │ Neo4j │ Qdrant (Vector) │ Redis │ MinIO│
 ├─────────────────────────────────────────────────────┤
 │              BLOCKCHAIN LAYER                       │
 │       Polygon zkEVM  (Credential Passport)          │
@@ -86,7 +86,7 @@ International scholarship applications are one of the most **informationally asy
 |---|---|---|
 | **Presentation** | Next.js 14 (App Router), React 18 | SSR for SEO, mature ecosystem, built-in routing |
 | **API Gateway** | FastAPI (Python 3.11+) | Native async, auto OpenAPI docs, Pydantic validation, same language as ML layer |
-| **AI/ML** | scikit-learn, XGBoost, SHAP, LangChain, Whisper | Best-in-class ML libraries; LangChain for multi-LLM orchestration |
-| **Data** | PostgreSQL (Supabase), Neo4j, Redis, MinIO | Relational + Graph + Cache + Object storage — each optimized for its use case |
-| **Blockchain** | Polygon zkEVM, Solidity | Low gas ($0.01–0.05/tx), EVM compatible, production-ready |
+| **AI/ML** | scikit-learn, XGBoost, LightGBM, SHAP, LIME, Whisper, AutoGen/CrewAI/LangGraph | Best-in-class ML libraries; Orchestration frameworks for RAG and multi-agent workflows |
+| **Data** | PostgreSQL, Neo4j, Qdrant/Weaviate, Redis, MinIO | Relational + Graph + Vector + Cache + Object storage |
+| **Blockchain** | Polygon, Ethereum L2, Solidity | Low gas, high-throughput verification |
 | **DevOps** | Docker, GitHub Actions, MLflow | Containerization, CI/CD, experiment tracking |
