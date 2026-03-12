@@ -78,8 +78,9 @@ An AI-powered platform that guides students through the entire scholarship lifec
 |---|---|
 | Frontend | Next.js 14, React 18, TypeScript |
 | Backend | FastAPI, Python 3.11+, Celery, Redis |
-| Database | PostgreSQL (Supabase), Neo4j |
-| AI/ML | scikit-learn, XGBoost, SHAP, LangChain, Whisper |
+| Database | PostgreSQL, Neo4j, Qdrant / Weaviate |
+| AI/ML | scikit-learn, XGBoost, LightGBM, SHAP, LIME, Whisper |
+| Orchestration | LangGraph, CrewAI, AutoGen |
 | LLMs | GPT-4, Claude 3, Gemini 1.5 Pro |
 | Blockchain | Polygon zkEVM, Solidity, Hardhat, ethers.js |
 | DevOps | Docker, GitHub Actions, MLflow |

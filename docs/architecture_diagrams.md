@@ -187,3 +187,63 @@ graph LR
     D --> G["Clarity Score"]
     D --> H["Improvement Tips"]
 ```
+
+---
+
+## 7. RAG Pipeline
+
+```mermaid
+graph TD
+    subgraph "Vector DB Ingestion"
+        DOC["Policy Documents (PDF/HTML)"] --> CHUNK["Text Chunker"]
+        CHUNK --> EMB1["Embedding Model<br/>(text-embedding-3-small)"]
+        EMB1 --> QDR["Qdrant / Weaviate<br/>(Vector DB)"]
+    end
+
+    subgraph "Query Retrieval"
+        UQ["User Query"] --> EMB2["Embedding Model"]
+        EMB2 --> SEARCH["Vector Similarity Search"]
+        SEARCH -->|Nearest Neighbors| QDR
+        QDR --> RET["Retrieved Context Chunks"]
+    end
+
+    subgraph "Generation"
+        RET & UQ --> PRMT["Prompt Formulation"]
+        PRMT --> LLM_GEN["LLM (GPT-4 / Claude)"]
+        LLM_GEN --> ANS["Generated Answer"]
+    end
+```
+
+---
+
+## 8. LLM Orchestration Architecture
+
+```mermaid
+graph TD
+    subgraph "User Interface"
+        USER["Student Query"]
+    end
+
+    subgraph "LangGraph / CrewAI Orchestrator"
+        ROUTER["Intent Router"]
+    end
+
+    subgraph "Specialized Agents"
+        AGT_SOP["SOP Assistant Agent<br/>(GPT-4)"]
+        AGT_POL["Policy Expert Agent<br/>(Claude 3 + RAG)"]
+        AGT_EXT["Extraction Agent<br/>(Gemini 1.5)"]
+        AGT_INT["Interview Coach Agent<br/>(GPT-4 + Whisper)"]
+    end
+
+    USER --> ROUTER
+    ROUTER -->|Document Analysis| AGT_POL
+    ROUTER -->|Data Scraping| AGT_EXT
+    ROUTER -->|Essay Review| AGT_SOP
+    ROUTER -->|Mock Interview| AGT_INT
+
+    AGT_POL --> RDB[("Qdrant Vector DB")]
+    AGT_EXT --> GDB[("Neo4j Knowledge Graph")]
+    
+    AGT_SOP & AGT_POL & AGT_EXT & AGT_INT --> RESP["Synthesized Response"]
+    RESP --> USER
+```
