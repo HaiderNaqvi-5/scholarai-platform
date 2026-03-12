@@ -102,127 +102,38 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 5. Squash merge into `develop`
 6. Release PR `develop` → `main` triggers deploy
 
----
+## 3. Team Structure & Roles (3 Members)
 
-## 3. Implementation Timeline
-
-### 6-Month Plan (Recommended)
-
-| Month | Phase | Key Deliverables |
-|---|---|---|
-| **1** | Research & Design | Literature review, architecture design, DB schema, API design |
-| **2** | Backend Foundation | FastAPI scaffold, auth, DB models, CRUD APIs, Docker |
-| **3** | Data + AI Core | Scrapers (3+ sources), LLM extraction, recommendation engine, SHAP |
-| **4** | Advanced AI | Interview simulator, SOP assistant, knowledge graph |
-| **5** | Blockchain + Frontend | Smart contracts, dashboards, mentorship UI |
-| **6** | Testing + Research | E2E testing, user study, model evaluation, paper draft |
-
-### 4-Month Accelerated
-
-| Month | Phase | Deliverables |
-|---|---|---|
-| **1** | Foundation | DB schema, FastAPI + Next.js scaffold, auth, CRUD |
-| **2** | Core AI + Scraping | Scrapers, LLM pipeline, recommendation engine, SHAP |
-| **3** | Advanced Features | Interview sim, SOP assistant, blockchain PoC, Neo4j graph |
-| **4** | Integration + Polish | Dashboards, analytics, testing, docs, paper draft |
-
----
-
-## 4. Team Role Distribution
-
-| Role | Responsibilities |
+| Role | Core Responsibilities |
 |---|---|
-| **AI/ML Engineer** | Recommendation engine, SHAP/LIME, interview simulator, SOP assistant, MLflow |
-| **Backend Engineer** | FastAPI, database, auth, Celery, Redis, API development |
-| **Data Engineer** | Scrapers, data pipeline, Neo4j knowledge graph, LLM extraction |
-| **Blockchain/Frontend** | Solidity contracts, Next.js dashboards, WebRTC, UI/UX |
-
-> [!NOTE]
-> **Solo FYP priority order:** (1) Recommendation + XAI, (2) Scraper, (3) Student dashboard, (4) Interview sim. Blockchain/KG → proof-of-concept only.
+| **Data/ML Lead** | Synthetic data generation, XGBoost/SHAP models, Python Playwright scrapers, LangChain prompts. |
+| **Backend/Systems Lead** | FastAPI API design, PostgreSQL/Neo4j schemas, pgvector search, Docker orchestration, MLflow. |
+| **Frontend/Product Lead** | Next.js architecture, Tailwind UI, dashboard charting, API integration, user flow. |
 
 ---
 
-## 5. Risks and Mitigation
+## 4. 16-Week Execution Plan
 
-| Risk | Severity | Probability | Mitigation |
-|---|---|---|---|
-| **Data scarcity** | High | High | Synthetic data, documented limitations |
-| **Scraper fragility** | Medium | High | LLM extraction, monitoring alerts |
-| **Model bias** | High | Medium | SHAP auditing, fairness constraints |
-| **Blockchain gas costs** | Low | Low | Polygon L2 ($0.01–0.05/tx) |
-| **LLM cost escalation** | Medium | Medium | Response caching, smaller models |
-| **Whisper accent issues** | Medium | Medium | Document limitation, fine-tuning |
-| **Scope creep** | High | High | Phased delivery, MVP scope defined |
-| **KG cold start** | Medium | High | Seed with scraped scholarship data |
+### Milestone 1: Foundation & Data (Weeks 1-4)
+- **Week 1 (Setup)**: Initialize Mono-repo, Docker compose configs (PostgreSQL, Neo4j, Redis, OpenSearch).
+- **Week 2 (Schemas)**: Implement SQLAlchemy ORM models and Cypher constraints. Setup Next.js boilerplate.
+- **Week 3 (Scraper MVP)**: Playwright scrapers targeting Canada MS DS/AI programs + DAAD.
+- **Week 4 (Ingestion)**: Pipeline pulling scraped JSON, generating Pydantic validations, and writing to Neo4j/Postgres. 
 
----
+### Milestone 2: AI & Retrieval Systems (Weeks 5-8)
+- **Week 5 (ML Models)**: Data/ML Lead generates 50k synthetic profiles and trains Stage 3 XGBoost admission model.
+- **Week 6 (Explainability)**: Integrate SHAP TreeExplainer. Backend exposes `/api/v1/recommend` endpoint.
+- **Week 7 (Stage 1 & 2)**: Complete Neo4j Graph queries (Stage 1 filter) and pgvector semantic search (Stage 2). 
+- **Week 8 (Integration Point 1)**: The 3-stage recommendation pipeline returns end-to-end data via API.
 
-## 6. Security Architecture
+### Milestone 3: Applied AI & Features (Weeks 9-12)
+- **Week 9 (LangChain RAG)**: Build context retriever using PostgreSQL pgvector. Implement SOP critique agent (Claude).
+- **Week 10 (Interview Sim)**: Implement Whisper STT pipeline and GPT-4o evaluation rubrics.
+- **Week 11 (Dashboards)**: Frontend Lead completes Student Dashboard UI and match score visualizations.
+- **Week 12 (Integration Point 2)**: Mentor and Admin role features connected to API. 
 
-### Authentication & Authorization
-
-| Layer | Implementation |
-|---|---|
-| AuthN | JWT (access + refresh), bcrypt password hashing |
-| AuthZ | Role-based middleware: student / mentor / admin / university |
-| Rate Limiting | Redis sliding window: 100 req/min (auth), 20 (anon) |
-| Input Validation | Pydantic schemas on all endpoints |
-
-### Data Security
-
-| Concern | Mitigation |
-|---|---|
-| SQL injection | SQLAlchemy ORM (parameterized queries) |
-| XSS | Next.js auto-escape + CSP headers |
-| File uploads | MIME validation, 10MB limit, virus scan (ClamAV) |
-| Credentials | AES-256 encryption at rest, presigned URLs (1h expiry) |
-| API keys | Environment variables only, never in Git |
-| Blockchain keys | Hardware-backed secret manager |
-
-### RBAC Matrix
-
-| Endpoint Group | Student | Mentor | Admin | University |
-|---|---|---|---|---|
-| Profile management | ✅ Own | ✅ Own | ✅ All | ✅ Own |
-| Scholarship matching | ✅ | ❌ | ✅ | ❌ |
-| Interview simulator | ✅ | ❌ | ✅ | ❌ |
-| Credential upload | ✅ | ❌ | ✅ | ❌ |
-| Credential verify | ❌ | ❌ | ✅ | ✅ |
-| Mentorship | ✅ Request | ✅ Conduct | ✅ Manage | ❌ |
-| Admin panel | ❌ | ❌ | ✅ | ❌ |
-
----
-
-## 7. Research Paper Potential
-
-### Proposed Title
-
-> **"ScholarAI: Explainable Knowledge-Graph-Augmented Scholarship Recommendation with Blockchain Credential Verification"**
-
-### Key Research Questions
-
-1. **RQ1:** Does KG augmentation improve recommendation quality over flat models?  
-   → Compare XGBoost alone vs. XGBoost + Neo4j → report P@K, NDCG
-
-2. **RQ2:** Do SHAP explanations improve user trust?  
-   → A/B user study: with vs. without explanations → Likert scale
-
-3. **RQ3:** How stable are SHAP explanations across retraining?  
-   → 10 retraining runs → report consistency ratio
-
-### Target Venues
-
-| Venue | Type | Fit |
-|---|---|---|
-| ACM RecSys | Conference | Recommendation + explainability |
-| AAAI / IJCAI | Conference | AI in education |
-| IEEE Access | Journal | Open-access system papers |
-| Expert Systems with Applications | Journal | Applied AI |
-| Education and Information Technologies | Journal | EdTech + AI |
-
-### Ethical Considerations
-
-- Bias auditing across demographic groups
-- Open-source codebase for transparency
-- GDPR-like data handling principles
-- AI scores are advisory, not authoritative
+### Milestone 4: Polish, Test & Defense (Weeks 13-16)
+- **Week 13 (Testing Phase)**: Pytest coverage for AI endpoints. Cypress E2E tests for Frontend UI flows.
+- **Week 14 (Optimization)**: Fix OpenSearch indexing bugs. Latency tuning for LangChain calls (Redis caching).
+- **Week 15 (Code Freeze)**: Repository lockdown. Final deployment rehearsal on local Docker swarms.
+- **Week 16 (Documentation)**: Final technical design document polishing and academic defense prep.

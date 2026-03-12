@@ -6,22 +6,17 @@
 
 ## 1. Feature Engineering
 
-### Input Feature Vector
+### Input Feature Vector (Strict MVP Constraints)
 
-| Feature | Type | Source | Preprocessing |
+| Feature | Type | Source | Definition |
 |---|---|---|---|
-| `gpa_normalized` | Float | student_profiles | `gpa / gpa_scale` → [0, 1] |
-| `degree_level` | Categorical | student_profiles | One-hot: bachelor=0, master=1, phd=2 |
-| `field_match` | Binary | Computed | 1 if student field ∈ scholarship fields |
-| `country_match` | Binary | Computed | 1 if scholarship country ∈ student targets |
-| `research_publications` | Integer | student_profiles | Log-transform: `log(1 + pubs)` |
-| `research_experience_months` | Integer | student_profiles | Min-max scale |
-| `leadership_roles` | Integer | student_profiles | Min-max scale |
-| `volunteer_hours` | Integer | student_profiles | Log-transform |
-| `language_score_normalized` | Float | student_profiles | Scale to 0–1 per test type |
-| `meets_min_gpa` | Binary | Computed | 1 if GPA ≥ scholarship min_gpa |
-| `days_to_deadline` | Integer | Computed | deadline − today |
-| `funding_amount_log` | Float | scholarships | Log-transform |
+| `gpa_normalized` | Float | `student_profiles` | `gpa / 4.0` → [0, 1] |
+| `degree_match` | Binary | Computed | 1 if seeking MS |
+| `field_match` | Binary | Computed | 1 if target_field ∈ {Data Science, AI, Analytics} |
+| `country_match` | Binary | Computed | 1 if target_country == 'Canada' |
+| `research_publications` | Integer | `student_profiles` | Count of relevant publications |
+| `volunteer_hours` | Integer | `student_profiles` | Log-transform: `log(1 + hours)` |
+| `meets_mandatory_reqs` | Binary | Computed | 1 if Stage 1 Knowledge Graph filter passed |
 
 ### Text Features (Embeddings)
 
@@ -216,25 +211,24 @@ Output as JSON.
 
 ## 8. LLM Orchestration Strategy
 
-| Task | LLM | Justification |
+| Task | LLM | Orchestration Tier |
 |---|---|---|
-| Scholarship data extraction | Gemini 1.5 Pro | Strong structured output, long context |
-| SOP improvement | GPT-4 | Superior creative writing |
-| Interview evaluation | GPT-4 | Best rubric-based evaluation |
-| Policy summarization | Claude 3 | Excels at long document analysis |
-| Description simplification | GPT-4 | Clear, accessible language |
+| System Orchestration & Router | GPT-4o | LangChain AgentExecutor |
+| SOP Analysis & Critique | Claude 3.5 Sonnet | LangChain RetrievalQA |
+| RAG Context Generation | Gemini 1.5 Pro | LangChain VectorStoreRetriever (pgvector) |
+| Interview Simulation | GPT-4o + Whisper | LangChain ConversationalRetrievalChain |
 
 ### Pipeline Flow
 
 ```
-HTML page → Gemini (extract) → Pydantic validation → PostgreSQL + Neo4j
-         → GPT-4 (simplify description)
-         → Claude 3 (summarize policy, if available)
+HTML page → Pydantic validation → PostgreSQL (pgvector) + Neo4j + OpenSearch
+         → LangChain Router (GPT-4o) 
+             → QA Request → Gemini (RAG)
+             → SOP Request → Claude 3.5 Sonnet
 ```
 
 ### Cost Management
 
-- **Cache** LLM responses in Redis (TTL: 24h extraction, 7d descriptions)
-- **Use smaller models** for simpler tasks (GPT-3.5-turbo for chatbot)
-- **Batch** scraper pipeline processing
+- **Cache** LangChain LLM responses in Redis
+- **Batch** scraper pipeline processing using Celery
 - **Budget alerts** via API billing dashboards

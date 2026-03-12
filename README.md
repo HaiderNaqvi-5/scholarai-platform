@@ -6,18 +6,14 @@ An end-to-end platform that guides students globally through discovering scholar
 
 ---
 
-## 🏗️ 10 Core Modules
+## 🏗️ 6 Core Modules
 
-1. **Scholarship Discovery Engine**: Automated web scraping via Playwright/Gemini.
-2. **Scholarship Knowledge Graph**: Neo4j graph connecting students to opportunities.
-3. **AI Recommendation System**: XGBoost and Random Forest for match scoring.
-4. **Explainable AI**: SHAP and LIME providing transparent recommendation logic.
-5. **Retrieval Augmented Generation (RAG)**: Qdrant/Weaviate for querying PDF policy docs.
-6. **Multi-LLM Orchestration**: LangGraph routing requests answering between Claude, GPT, and Gemini based on task.
-7. **AI Interview Simulation**: Whisper speech-to-text with LLM dynamic rubrics.
-8. **Blockchain Credential Passport**: Polygon zkEVM for reusable, verified document hashes.
-9. **Mentorship System**: Matching students with past winners.
-10. **Role-Based Dashboards**: Portals for Students, Mentors, Admins, and Universities.
+1. **Targeted Discovery Engine**: Playwright scraping for MS DS/AI programs in Canada.
+2. **Hybrid Recommendation Engine**: 3-stage pipeline (Knowledge Graph → Vector Search → XGBoost).
+3. **Explainable AI (XAI)**: SHAP/LIME feature contributions for match transparency.
+4. **RAG Application Assistant**: LangChain-powered SOP/CV critique.
+5. **AI Mock Interview System**: Whisper speech-to-text with GPT-4 evaluation rubrics.
+6. **Role-Based Dashboards**: Portals for Students, Mentors, and Admins.
 
 ---
 
@@ -25,10 +21,9 @@ An end-to-end platform that guides students globally through discovering scholar
 
 - **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
 - **Backend:** FastAPI (Python 3.11+), Celery
-- **Databases:** PostgreSQL (Supabase), Neo4j (Graph), Qdrant (Vector), Redis (Cache)
-- **AI/ML:** scikit-learn, XGBoost, LangGraph, Whisper, MLflow
-- **Blockchain:** Polygon L2, Solidity, Hardhat
-- **DevOps:** Docker, Kubernetes
+- **Databases:** PostgreSQL (pgvector), Neo4j (Graph), OpenSearch (Text Search)
+- **AI/ML:** scikit-learn, XGBoost, LangChain, Whisper, MLflow, HuggingFace
+- **DevOps:** Docker, GitHub Actions
 
 ---
 
@@ -39,10 +34,9 @@ scholarai-platform/
 ├── docs/                    # Architectural Specifications (PRD, API, DB Schema)
 ├── backend/                 # FastAPI REST Services and Application Logic
 ├── frontend/                # Next.js Application UI
-├── ml_models/               # Training pipelines and isolated synthetic datasets
+├── ai_services/             # LangChain agents, MLflow, XGBoost pipelines
 ├── scrapers/                # Core Playwright scraping logic
-├── blockchain/              # Solidity Smart Contracts (Credential Passport)
-└── scripts/                 # Data ingestion, seeding, and DB migration utilities
+└── setup/                   # Docker-compose and seeding scripts
 ```
 
 Complete technical documentation resides in the [docs/](/docs) folder. Please read `docs/PRD.md` and `docs/architecture.md` for in-depth system designs.

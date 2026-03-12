@@ -7,68 +7,49 @@
 
 ## Vision
 
-An AI-powered platform that guides students through the entire scholarship lifecycle — from discovery to preparation to application — while providing explainable recommendations, verified credentials, and mentorship connections.
+An AI-driven platform that helps students prioritize scholarships through an explicitly transparent, 3-stage recommendation pipeline powered by Graph relationships, semantic vector search, and Explainable ML.
 
 ---
 
-## Core Modules
+## Strict MVP Data Constraint
 
-### Module 1: Scholarship Discovery Engine
-- **Status:** To be implemented
-- Automated web scraping via Playwright/Browserless/Scrapy/BeautifulSoup
-- Extracts: scholarship name, host university, country, degree level, field of study, minimum GPA, required documents, funding amount, application deadline
-- Data ingestion methods: web scraping, public APIs, structured data extraction
-- Sourced from DAAD, Erasmus+, Fulbright, university portals, UNESCO, World Bank
+To guarantee high data quality, the MVP is forcefully locked to:
+- **Location:** Canada
+- **Degree:** MS (Master's)
+- **Fields:** Data Science, Artificial Intelligence, Analytics
+- **Providers:** DAAD, Fulbright, and specifically targeted university portals.
 
-### Module 2: Scholarship Knowledge Graph
-- **Status:** To be implemented
-- Neo4j graph connecting students, scholarships, universities, fields, countries
-- Enables semantic scholarship search and relationship inference
+Global scraping is explicitly disabled for the MVP timeline.
 
-### Module 3: AI Recommendation System
-- **Status:** To be implemented (primary FYP deliverable)
-- Random Forest, XGBoost, and LightGBM for match scoring and success probability
-- Input: GPA, research experience, field of study, publications, volunteer work, language test scores
-- Output: match score (e.g., 89%), success probability (e.g., 53%)
+---
 
-### Module 4: Explainable AI Module *(Research Component)*
-- **Status:** To be implemented (primary research contribution)
-- SHAP and LIME for per-feature contribution percentages
-- User-facing explanations: "GPA contributed +32% to your match"
+## 6 Core Modules
 
-### Module 5: Retrieval Augmented Generation (RAG)
-- **Status:** To be implemented
-- Pipeline: User query → embedding generation → vector search → relevant documents retrieved → LLM reasoning
-- Ask questions like: "Which scholarships in Germany fit my GPA?"
-- Vector DBs: Qdrant, Weaviate, or Chroma
+### 1. Targeted Scholarship Discovery Engine
+- **Technology:** Playwright, Browserless, Pandas, Pydantic.
+- **Pipeline:** HTML Extraction → Parsing → Pydantic Schema Validation (prevents DB corruption) → Cleaning → Deduplication → PostgreSQL Insertion.
 
-### Module 6: Multi-LLM Orchestration
-- **Status:** To be implemented
-- GPT: application guidance, interview simulation, SOP improvement
-- Claude: long document analysis, policy summarization
-- Gemini: structured data extraction
-- Orchestration frameworks: LangGraph, CrewAI, AutoGen
+### 2. Hybrid Scholarship Recommendation Engine
+- **Stage 1 (Graph):** Neo4j Knowledge Graph filters out hard ineligibility constraints (GPA, Citizenship).
+- **Stage 2 (Vector Search):** PostgreSQL `pgvector` HuggingFace semantic search.
+- **Stage 3 (Admission Probability):** XGBoost/Random Forest classifying synthetic data distributions to calculate success probability.
 
-### Module 7: AI Interview Simulation System
-- **Status:** To be implemented
-- Voice-based interview practice system (Whisper speech-to-text → LLM evaluation → feedback)
-- Metrics: confidence score, communication clarity, content relevance
+### 3. Explainable AI (XAI) Research Module
+- **Purpose:** Provide transparent features contributions for UI matching.
+- **Tools:** SHAP, LIME.
+- **UX Example:** "GPA Contribution: +32%, Low IELTS penalty: -8%".
 
-### Module 8: Blockchain Credential Passport
-- **Status:** To be implemented
-- Student uploads transcript → institution verifies document → hash stored on blockchain → instant verification
-- Networks: Polygon, Ethereum L2 networks
+### 4. RAG-Powered AI Application Assistant
+- **Purpose:** Critiques SOPs, CVs, and application essays.
+- **Safety Restriction:** Context must be retrieved strictly from `pgvector` to absolutely eliminate generative hallucination.
+- **Framework:** LangChain.
 
-### Module 9: Mentorship System
-- **Status:** To be implemented
-- Past scholarship winners mentor applicants
-- Session types: SOP review, mock interviews, application guidance
-- Mentors earn reputation points
+### 5. AI Mock Interview System
+- **Pipeline:** Speech Input → Whisper STT → LangChain LLM evaluation → Feedback Generation.
+- **Metrics Evaluated:** Answer clarity, content relevance, and confidence.
 
-### Module 10: Role-Based Dashboard System
-- **Status:** To be implemented
-- Dashboards: Student, Mentor, Admin, University
-- Admin capabilities: scraper monitoring, mentor approval, analytics dashboard
+### 6. Role-Based Dashboards
+- **Roles:** Student (discovery, interviews, tracking), Mentor (SOP reviews, feedback), and Admin (scraper health monitors, analytics).
 
 ---
 
@@ -76,36 +57,19 @@ An AI-powered platform that guides students through the entire scholarship lifec
 
 | Category | Technologies |
 |---|---|
-| Frontend | Next.js 14, React 18, TypeScript |
-| Backend | FastAPI, Python 3.11+, Celery, Redis |
-| Database | PostgreSQL, Neo4j, Qdrant / Weaviate |
-| AI/ML | scikit-learn, XGBoost, LightGBM, SHAP, LIME, Whisper |
-| Orchestration | LangGraph, CrewAI, AutoGen |
-| LLMs | GPT-4, Claude 3, Gemini 1.5 Pro |
-| Blockchain | Polygon zkEVM, Solidity, Hardhat, ethers.js |
-| DevOps | Docker, GitHub Actions, MLflow |
+| Frontend | Next.js 14, React 18, TypeScript, TailwindCSS |
+| Backend | FastAPI (Python 3.11+) |
+| Databases | PostgreSQL (primary config), Neo4j (graph), pgvector |
+| Search Engine | OpenSearch |
+| Task Queue | Celery, Redis |
+| AI Processing | HuggingFace, LangChain, SHAP, LIME |
+| Scraping | Playwright, Browserless |
+| Containerization | Docker |
 
 ---
 
-## Non-Functional Requirements
+## LLM Integration Strategy (via LangChain Router)
 
-| Requirement | Target |
-|---|---|
-| API response time | < 500ms (cached), < 3s (ML inference) |
-| Concurrent users | 100+ (MVP), 1000+ (production) |
-| Availability | 99.5% uptime |
-| Security | JWT auth, RBAC, rate limiting, encrypted credentials |
-| Accessibility | WCAG 2.1 AA compliance |
-
----
-
-## Scope Clarification
-
-> [!IMPORTANT]
-> For a solo FYP, the **minimum viable scope** is:
-> 1. Recommendation engine + SHAP explainability
-> 2. Basic scholarship scraper (4+ sources: DAAD, Fulbright, Vanier Canada, Erasmus Mundus)  
-> 3. Student dashboard with match results
-> 4. Interview simulator (basic)
-> 
-> Blockchain, knowledge graph, and mentorship can be proof-of-concept or Phase 2.
+- **Claude 3.5:** Long-form SOP review, deep analysis.
+- **GPT-4o:** Primary LangChain agent routing, complex logical reasoning, API integration.
+- **Gemini 1.5 Pro:** Unstructured data extraction, summarization, context-building.
