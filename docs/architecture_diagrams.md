@@ -1,189 +1,121 @@
 # ScholarAI — Architecture Diagrams
 
-> All diagrams are provided in **Mermaid** syntax for rendering.
+> All diagrams are provided in **Mermaid** syntax for rendering, strictly aligned to the MVP Master Blueprint.
 
 ---
 
 ## 1. High-Level System Architecture
 
+This diagram illustrates the separation of concerns across the React frontend, FastAPI gateway, and the distinct search/graph/relational data stores. Note the inclusion of OpenSearch for general text querying, Neo4j for the knowledge graph, and PostgreSQL (with pgvector) as the primary relational ML-backing store.
+
 ```mermaid
 graph TB
-    subgraph "Presentation Layer"
+    subgraph "Frontend UI (Next.js)"
         STU["Student Dashboard"]
         MEN["Mentor Dashboard"]
         ADM["Admin Dashboard"]
-        UNI["University Dashboard"]
     end
 
-    subgraph "API Gateway"
-        API["FastAPI Server"]
-        AUTH["JWT Auth"]
-        RATE["Rate Limiter"]
+    subgraph "API Gateway Layer (FastAPI)"
+        API["Core REST API"]
+        AUTH["JWT Auth Middleware"]
     end
 
     subgraph "AI / ML Services"
-        REC["Recommendation Engine<br/>(XGBoost + SHAP)"]
+        REC["Hybrid RecSysPipeline"]
         INT["Interview Simulator<br/>(Whisper + LLM)"]
-        SOP["SOP Assistant<br/>(RAG + LLM)"]
-        LLM_O["LLM Orchestrator<br/>(LangChain)"]
+        SOP["SOP Assistant<br/>(LangChain RAG)"]
+        ORCH["LLM Orchestrator<br/>(LangChain)"]
     end
 
-    subgraph "Data Stores"
-        PG["PostgreSQL (Supabase)"]
-        NEO["Neo4j (Knowledge Graph)"]
-        RD["Redis Cache"]
-        OBJ["MinIO (Documents)"]
+    subgraph "Data & Search Stores"
+        PG["PostgreSQL + pgvector<br/>(Profiles & Similarity)"]
+        NEO["Neo4j<br/>(Knowledge Graph Filter)"]
+        OS["OpenSearch<br/>(Text Indexing)"]
+        RD["Redis<br/>(Celery Queue)"]
     end
 
-    subgraph "External Services"
-        SCR["Scrapers (Playwright)"]
-        BC["Polygon zkEVM"]
-        LLM_EXT["LLM APIs"]
+    subgraph "Ingestion Services"
+        PW["Playwright Scrapers"]
+        CEL["Celery Workers"]
     end
 
-    STU & MEN & ADM & UNI --> API
-    API --> AUTH --> RATE
-    API --> REC & INT & SOP & LLM_O
-    API --> PG & NEO & RD & OBJ
-    API --> BC
-    LLM_O --> LLM_EXT
-    SCR --> PG & NEO
+    STU & MEN & ADM --> AUTH --> API
+    API --> REC & INT & SOP & ORCH
+    API --> PG & NEO & OS & RD
+    CEL --> PW -->|Cleaned JSON| PG & NEO & OS
 ```
 
 ---
 
-## 2. AI Pipeline Architecture
+## 2. Hybrid Recommendation Pipeline
+
+This outlines the strict 3-stage recommendation engine. Stage 1 operates purely on Graph relationships to filter out hard eligibility constraints (citizenship, degree). Stage 2 uses `pgvector` HuggingFace embeddings for soft similarity math. Stage 3 applies the XGBoost classifier to generate the final admission probability and SHAP explainability mask.
 
 ```mermaid
-graph LR
+graph TD
     subgraph "Input"
-        SP["Student Profile"]
-        SD["Scholarship Data"]
+        SD["Scraped Scholarships"]
+        SP["Student Profile<br/>(Canada, MS, AI)"]
     end
 
-    subgraph "Feature Engineering"
-        FE["Feature Extractor<br/>GPA normalization<br/>One-hot encoding<br/>Text embeddings"]
+    subgraph "Stage 1: Knowledge Graph Filter (Neo4j)"
+        KG["Cypher Query:<br/>Match Degree, Field, Citizenship"]
     end
 
-    subgraph "Model Layer"
-        XGB["XGBoost<br/>(Match Scoring)"]
-        RF["Random Forest<br/>(Success Probability)"]
+    subgraph "Stage 2: Vector Similarity Search (pgvector)"
+        EMB["HuggingFace Embeddings"]
+        HNSW["HNSW Cosine Similarity"]
     end
 
-    subgraph "Explainability"
-        SHAP_M["SHAP TreeExplainer"]
-        LIME_M["LIME Tabular"]
+    subgraph "Stage 3: ML Admission Predictor"
+        XGB["XGBoost / Random Forest"]
+        SHAP["SHAP Explainer"]
     end
 
     subgraph "Output"
-        MS["Match Score 0-100%"]
-        SUC["Success Probability"]
-        EXP["Feature Contributions"]
+        FINAL["Match Score (87%)<br/>+ Explainability JSON"]
     end
 
-    SP & SD --> FE --> XGB & RF
-    XGB --> SHAP_M --> MS & EXP
-    RF --> SHAP_M --> SUC
-    XGB -.-> LIME_M -.-> EXP
+    SD & SP --> KG
+    KG -->|Filtered Sub-set| EMB --> HNSW
+    HNSW -->|Top K Similar| XGB
+    XGB --> SHAP --> FINAL
 ```
 
 ---
 
-## 3. Data Ingestion Pipeline
+## 3. AI Processing & RAG Pipeline
+
+This diagram showcases the LangChain orchestration flow. It demonstrates how different LLMs are routed based on their specialization, and how the RAG pipeline forces context retrieval directly from PostgreSQL to prevent hallucinations when reviewing SOPs or answering system queries.
 
 ```mermaid
 graph TD
-    subgraph "Sources"
-        UW["University Websites"]
-        SPO["Scholarship Portals"]
-        GP["Government Programs"]
+    subgraph "User Input"
+        REQ["Student Request<br/>(e.g., 'Review my SOP for DAAD')"]
     end
 
-    subgraph "Scraping Layer"
-        PW["Playwright Scrapers"]
-        SC["Celery Beat Scheduler"]
+    subgraph "LangChain Orchestrator"
+        ROUTER["Task Router"]
     end
 
-    subgraph "Extraction"
-        GEM["Gemini LLM<br/>(Structured Extraction)"]
-        VAL["Pydantic Validator"]
+    subgraph "Retrieval Augmented Generation (RAG)"
+        EMB_REQ["Embed Request"]
+        PG_DB[("PostgreSQL (pgvector)<br/>Table: scholarships")]
+        CTX["Retrieve Constraints & Policy Context"]
     end
 
-    subgraph "Storage"
-        PG2["PostgreSQL"]
-        NEO2["Neo4j"]
-        RD2["Redis (Dedup)"]
+    subgraph "Specialized LLM Execution"
+        CLAUDE["Claude 3.5 Sonnet<br/>(Long-form SOP Review)"]
+        GPT4["GPT-4o<br/>(System Orchestration/Reasoning)"]
+        GEMINI["Gemini 1.5 Pro<br/>(Data Extraction/Summarization)"]
     end
 
-    subgraph "Post-Processing"
-        GPT2["GPT (Description Simplification)"]
-        CL["Claude (Policy Summarization)"]
-    end
-
-    SC --> PW
-    UW & SPO & GP --> PW --> GEM --> VAL
-    VAL --> RD2
-    RD2 -->|"New"| PG2 & NEO2
-    PG2 --> GPT2 & CL
-```
-
----
-
-## 4. Blockchain Verification Flow
-
-```mermaid
-sequenceDiagram
-    participant S as Student
-    participant P as Platform API
-    participant I as Institution
-    participant SC as Smart Contract (Polygon)
-    participant C as Scholarship Committee
-
-    S->>P: Upload transcript (PDF)
-    P->>P: Generate SHA-256 hash
-    P->>I: Request verification
-    I->>P: Confirm authenticity
-    P->>SC: storeCredentialHash(studentId, docHash, institutionId)
-    SC-->>P: Transaction receipt (txHash)
-    P-->>S: Credential verified
-
-    Note over S,C: Later during application
-
-    C->>P: Verify credential
-    P->>SC: verifyCredential(studentId, docHash)
-    SC-->>P: verified: true, institution, timestamp
-    P-->>C: Credential authentic
-```
-
----
-
-## 5. User Journey Flow
-
-```mermaid
-graph TD
-    A["1. Sign Up / Login"] --> B["2. Complete Profile"]
-    B --> C["3. Upload Credentials"]
-    C --> D["4. Get AI Recommendations"]
-    D --> E["5. View SHAP Explanations"]
-    E --> F["6. Prepare Application"]
-    F --> G["6a. AI SOP Assistant"]
-    F --> H["6b. Interview Simulator"]
-    F --> I["6c. Connect with Mentor"]
-    G & H & I --> J["7. Submit Application"]
-    J --> K["8. Track Status"]
-```
-
----
-
-## 6. AI Interview System Pipeline
-
-```mermaid
-graph LR
-    A["Student Audio"] --> B["Whisper STT"]
-    B --> C["Timestamped Transcript"]
-    C --> D["LLM Evaluator (GPT-4)"]
-    D --> E["Relevance Score"]
-    D --> F["Confidence Score"]
-    D --> G["Clarity Score"]
-    D --> H["Improvement Tips"]
+    REQ --> ROUTER
+    ROUTER -->|SOP/Document Request| EMB_REQ
+    EMB_REQ --> PG_DB --> CTX
+    CTX --> CLAUDE
+    ROUTER -->|General QA| GPT4
+    ROUTER -->|Ingestion Parsing| GEMINI
+    CLAUDE & GPT4 & GEMINI --> RESP["Synthesized Output"]
 ```

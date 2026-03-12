@@ -1,79 +1,42 @@
-# ScholarAI
+# ScholarAI Platform — Technical Blueprint
 
 **AI-Powered Scholarship Discovery and Preparation Platform**
 
+An end-to-end platform that guides students through discovering scholarships, generating AI-based eligibility matches, preparing with an AI interview simulator, and connecting with mentors.
+
 ---
 
-## Overview
+## 🏗️ 6 Core Modules
 
-ScholarAI assists students through the entire scholarship journey: discovering opportunities globally, receiving AI-powered matches with explainable recommendations, preparing applications with AI-based SOP assistance and interview simulation, verifying credentials via blockchain, and connecting with past scholarship winners.
+1. **Targeted Discovery Engine**: Playwright scraping for MS DS/AI programs in Canada.
+2. **Hybrid Recommendation Engine**: 3-stage pipeline (Knowledge Graph → Vector Search → XGBoost).
+3. **Explainable AI (XAI)**: SHAP/LIME feature contributions for match transparency.
+4. **RAG Application Assistant**: LangChain-powered SOP/CV critique.
+5. **AI Mock Interview System**: Whisper speech-to-text with GPT-4 evaluation rubrics.
+6. **Role-Based Dashboards**: Portals for Students, Mentors, and Admins.
 
-## Architecture
+---
 
-- **Frontend:** Next.js 14 + React 18
-- **Backend:** FastAPI (Python 3.11+)
-- **Database:** PostgreSQL (Supabase) + Neo4j (Knowledge Graph) + Redis
-- **AI/ML:** XGBoost, SHAP, LangChain, Whisper
-- **LLMs:** GPT-4, Claude 3, Gemini 1.5 Pro
-- **Blockchain:** Polygon zkEVM (Solidity)
-- **DevOps:** Docker, GitHub Actions, MLflow
+## 🛠️ Technology Stack (2025-2026)
 
-## Project Structure
+- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Backend:** FastAPI (Python 3.11+), Celery
+- **Databases:** PostgreSQL (pgvector), Neo4j (Graph), OpenSearch (Text Search)
+- **AI/ML:** scikit-learn, XGBoost, LangChain, Whisper, MLflow, HuggingFace
+- **DevOps:** Docker, GitHub Actions
 
-```
+---
+
+## 📁 Repository Structure
+
+```text
 scholarai-platform/
-├── docs/                    # Technical documentation
-│   ├── PRD.md               # Product requirements
-│   ├── architecture.md      # System architecture
-│   ├── architecture_diagrams.md  # Mermaid diagrams
-│   ├── database_schema.md   # Full DB schema + ER diagram
-│   ├── api_design.md        # REST API endpoints
-│   ├── ai_models.md         # ML models + explainability
-│   ├── blockchain_design.md # Smart contract design
-│   ├── deployment.md        # Deployment, timeline, risks
-│   └── skills.md            # Team skills matrix
-├── backend/                 # FastAPI application
-├── frontend/                # Next.js application
-├── ml_models/               # Training, evaluation, datasets
-├── blockchain/              # Smart contracts (Hardhat)
-└── scripts/                 # Scrapers + data pipeline
+├── docs/                    # Architectural Specifications (PRD, API, DB Schema)
+├── backend/                 # FastAPI REST Services and Application Logic
+├── frontend/                # Next.js Application UI
+├── ai_services/             # LangChain agents, MLflow, XGBoost pipelines
+├── scrapers/                # Core Playwright scraping logic
+└── setup/                   # Docker-compose and seeding scripts
 ```
 
-## Core Modules
-
-| # | Module | Key Technology |
-|---|---|---|
-| 1 | Scholarship Discovery Engine | Playwright, Gemini |
-| 2 | AI Recommendation System | XGBoost, Random Forest |
-| 3 | Explainable AI (Research) | SHAP, LIME |
-| 4 | Interview Simulator | Whisper, GPT-4 |
-| 5 | Blockchain Credential Passport | Polygon zkEVM, Solidity |
-| 6 | Mentorship System | Neo4j, reputation scoring |
-| 7 | Knowledge Graph | Neo4j, Cypher |
-| 8 | Role-Based Dashboards | Next.js (Student/Mentor/Admin/University) |
-| 9 | Analytics Dashboard | Platform metrics |
-
-## Quick Start
-
-```bash
-# Clone
-git clone https://github.com/your-org/scholarai-platform.git
-cd scholarai-platform
-
-# Start services
-docker-compose up -d
-
-# Backend
-cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
-
-# Frontend
-cd frontend && npm install && npm run dev
-```
-
-## Documentation
-
-See the `docs/` directory for complete technical documentation including architecture diagrams, database schema, API design, AI model specifications, and deployment guides.
-
-## License
-
-MIT
+Complete technical documentation resides in the [docs/](/docs) folder. Please read `docs/PRD.md` and `docs/architecture.md` for in-depth system designs.

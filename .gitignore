@@ -51,10 +51,6 @@ desktop.ini
 # Docker
 docker-compose.override.yml
 
-# Blockchain
-blockchain/artifacts/
-blockchain/cache/
-blockchain/typechain-types/
 
 # Misc
 *.log
