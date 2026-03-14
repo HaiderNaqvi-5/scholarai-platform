@@ -17,7 +17,7 @@ This report describes the current `develop` implementation state.
 
 | Phase | Status | Standing |
 |---|---|---|
-| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, Alembic migration infrastructure, rate limiting, audit hooks, smoke tests, CI, Flower, and backup automation exist; local smoke verification now runs, but live DB migration verification is still incomplete |
+| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, Alembic migration infrastructure, admin audit instrumentation, smoke tests, CI, Flower, backup automation, and a migration entrypoint exist; live DB verification is still incomplete |
 | Phase 2 - Data Pipeline | Early scaffold | Scraper and task files exist, but planned ingestion pipeline is not complete |
 | Phase 3 - AI Core | Early scaffold | Recommendation and AI service wrappers exist, but plan-level functionality is incomplete and partly misaligned |
 | Phase 4 - Frontend + Evaluation | Not started | Frontend is still mostly boilerplate; evaluation assets are absent |
@@ -29,6 +29,7 @@ This report describes the current `develop` implementation state.
 ### What is already present
 
 - Docker services exist in `docker-compose.yml` for backend, frontend, postgres, redis, neo4j, opensearch, Celery workers, Flower, and automated Postgres backups.
+- The backend image now uses `backend/scripts/docker-entrypoint.sh` to wait for Postgres and run `alembic upgrade head` before app startup.
 - FastAPI bootstrap exists in `backend/app/main.py`.
 - Auth routes exist in `backend/app/api/v1/routes/auth.py`.
 - RBAC dependencies exist in `backend/app/core/dependencies.py`.
@@ -38,18 +39,18 @@ This report describes the current `develop` implementation state.
 - Scholarship list/detail endpoints exist in `backend/app/api/v1/routes/scholarships.py`.
 - Applications API exists and is mounted in `backend/app/api/v1/__init__.py`.
 - Celery app and task modules exist in `backend/app/celery_app.py` and `backend/app/tasks/`.
-- Basic backend smoke tests, config guards, migration rendering checks, and ops scaffolding tests exist in `backend/tests/`.
+- Basic backend smoke tests, config guards, migration rendering checks, admin audit helper tests, and ops scaffolding tests exist in `backend/tests/`.
 - Database session exports are normalized across API and task modules.
 - Request rate limiting is wired into FastAPI, with stricter limits on auth endpoints.
-- Admin scholarship mutations and scraper triggers now create `audit_logs` rows.
+- Admin scholarship mutations and scraper triggers now flow through a generic admin audit route handler that writes `audit_logs` rows.
 - A minimal GitHub Actions CI workflow now runs backend smoke checks and frontend linting.
 - Alembic is scaffolded under `backend/alembic/`, with an initial schema migration for the current ORM.
 - App startup schema creation is now gated behind `AUTO_CREATE_SCHEMA_ON_STARTUP` so migrations are the primary path.
 
 ### What is missing or blocking Phase 1 completion
 
-- Audit logging is route-level rather than generic middleware-based.
 - The initial migration is authored and renders correctly in offline Alembic mode, but it has not yet been exercised against a live database in this local environment.
+- Docker Desktop could not be installed from the current host session because the installer requires elevation and WSL still reports that `Virtual Machine Platform` is not enabled.
 
 ### Known implementation inconsistencies
 
@@ -137,7 +138,7 @@ Recommended order:
 1. Run `alembic upgrade head` against a live local Postgres instance and verify the health/auth paths end to end.
 2. Expand backend tests beyond smoke coverage so the project has a stable foundation before Phase 2 work continues.
 3. Remove remaining stale documentation and config mismatches.
-4. Decide whether audit logging should remain route-level for Phase 1 or be generalized into middleware before Phase 2 work continues.
+4. Validate the container startup path on a Docker-capable host and confirm the entrypoint-driven migration flow behaves as expected.
 
 ## Assessment Method
 

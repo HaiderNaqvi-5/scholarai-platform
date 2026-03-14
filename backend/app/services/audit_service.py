@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -10,6 +11,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
 
+from app.core.security import decode_token
 from app.models.models import AuditLog
 
 
@@ -62,6 +64,91 @@ class AuditService:
                 continue
             snapshot[key] = self.serialize(getattr(instance, key))
         return snapshot
+
+    def build_admin_route_metadata(
+        self,
+        path: str,
+        method: str,
+        path_params: dict[str, Any],
+        *,
+        response_payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        if method not in {"POST", "PATCH", "DELETE"}:
+            return None
+
+        if path.endswith("/admin/scholarships") and method == "POST":
+            return {
+                "action": "create_scholarship",
+                "target_table": "scholarships",
+                "target_id": self.serialize((response_payload or {}).get("id")),
+            }
+
+        if "/admin/scholarships/" in path and method in {"PATCH", "DELETE"}:
+            return {
+                "action": f"{'update' if method == 'PATCH' else 'delete'}_scholarship",
+                "target_table": "scholarships",
+                "target_id": self.serialize(path_params.get("scholarship_id")),
+            }
+
+        if path.endswith("/admin/scraper/trigger") and method == "POST":
+            return {
+                "action": "trigger_scraper",
+                "target_table": "scraper_runs",
+                "target_id": self.serialize((response_payload or {}).get("task_id")),
+            }
+
+        return None
+
+    def extract_admin_id(self, request: Request) -> UUID | None:
+        authorization = request.headers.get("Authorization", "")
+        if not authorization.startswith("Bearer "):
+            return None
+
+        token = authorization.removeprefix("Bearer ").strip()
+        if not token:
+            return None
+
+        try:
+            payload = decode_token(token)
+        except Exception:
+            return None
+
+        subject = payload.get("sub")
+        if not subject:
+            return None
+
+        try:
+            return UUID(str(subject))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def coerce_uuid(value: Any) -> UUID | Any:
+        if value is None or isinstance(value, UUID):
+            return value
+
+        try:
+            return UUID(str(value))
+        except ValueError:
+            return value
+
+    @staticmethod
+    def parse_json_bytes(payload: bytes | str | None) -> Any:
+        if not payload:
+            return None
+
+        if isinstance(payload, bytes):
+            text = payload.decode("utf-8", errors="ignore").strip()
+        else:
+            text = payload.strip()
+
+        if not text:
+            return None
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
 
     @staticmethod
     def get_request_ip(request: Request) -> str | None:

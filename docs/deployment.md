@@ -27,6 +27,9 @@ services:
     ports: ["8000:8000"]
     env_file: .env
     depends_on: [postgres, redis, neo4j]
+    environment:
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "1"
 
   frontend:
     build: ./frontend
@@ -62,23 +65,35 @@ services:
     build: ./backend
     command: celery -A app.celery_app worker -l info
     depends_on: [redis, postgres]
+    environment:
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
 
   celery-beat:
     build: ./backend
     command: celery -A app.celery_app beat -l info
     depends_on: [redis]
+    environment:
+      WAIT_FOR_DB: "0"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
 
   flower:
     build: ./backend
     command: celery -A app.celery_app flower --port=5555
     depends_on: [redis]
     ports: ["5555:5555"]
+    environment:
+      WAIT_FOR_DB: "0"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
 
   postgres-backup:
     build: ./backend
     command: python scripts/backup_database.py --loop
     depends_on: [postgres]
     volumes: ["./backups:/backups"]
+    environment:
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
 
 volumes:
   pgdata:
@@ -89,6 +104,8 @@ One-off database backup:
 ```bash
 docker compose run --rm postgres-backup python scripts/backup_database.py
 ```
+
+The backend container now uses `backend/scripts/docker-entrypoint.sh` to wait for Postgres and run `alembic upgrade head` before starting the FastAPI process.
 
 ---
 

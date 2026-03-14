@@ -5,6 +5,13 @@ services:
     ports: ["8000:8000"]
     env_file: .env
     depends_on: [postgres, redis, neo4j]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: scholarai
+      POSTGRES_USER: scholarai
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "1"
     volumes:
       - ./backend:/app
 
@@ -47,6 +54,13 @@ services:
     command: celery -A app.celery_app worker -l info
     env_file: .env
     depends_on: [redis, postgres]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: scholarai
+      POSTGRES_USER: scholarai
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
     restart: unless-stopped
 
   celery-beat:
@@ -54,6 +68,9 @@ services:
     command: celery -A app.celery_app beat -l info
     env_file: .env
     depends_on: [redis]
+    environment:
+      WAIT_FOR_DB: "0"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
     restart: unless-stopped
 
   flower:
@@ -61,6 +78,9 @@ services:
     command: celery -A app.celery_app flower --port=5555
     env_file: .env
     depends_on: [redis]
+    environment:
+      WAIT_FOR_DB: "0"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
     ports: ["5555:5555"]
     restart: unless-stopped
 
@@ -78,6 +98,8 @@ services:
       BACKUP_DIR: /backups
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      WAIT_FOR_DB: "1"
+      RUN_MIGRATIONS_ON_STARTUP: "0"
     volumes:
       - ./backups:/backups
     restart: unless-stopped

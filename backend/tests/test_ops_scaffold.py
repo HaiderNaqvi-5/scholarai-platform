@@ -38,3 +38,18 @@ def test_compose_includes_flower_and_postgres_backup_services():
     assert "flower:" in compose_text
     assert "postgres-backup:" in compose_text
     assert "5555:5555" in compose_text
+
+
+def test_backend_dockerfile_uses_entrypoint_script():
+    backend_root = Path(__file__).resolve().parents[1]
+    dockerfile_text = (backend_root / "Dockerfile").read_text(encoding="utf-8")
+
+    assert 'ENTRYPOINT ["./scripts/docker-entrypoint.sh"]' in dockerfile_text
+
+
+def test_backend_service_runs_migrations_on_startup():
+    repo_root = Path(__file__).resolve().parents[2]
+    compose_text = (repo_root / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert 'RUN_MIGRATIONS_ON_STARTUP: "1"' in compose_text
+    assert "docker-entrypoint.sh" in (repo_root / "backend" / "Dockerfile").read_text(encoding="utf-8")
