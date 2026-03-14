@@ -1,0 +1,562 @@
+# ScholarAI — Complete Implementation Plan
+
+> **Status:** ✅ Understanding Lock Confirmed — Ready for Implementation  
+> **Date:** 2026-03-14  
+> **Team:** 3 developers · 16 weeks  
+> **Architecture:** Modular Monolith
+
+---
+
+## Confirmed Decisions (from Brainstorming)
+
+| # | Question | Decision |
+|---|---|---|
+| Q1 | Embedding dimension | **Migrate schema to 384-dim** (`all-MiniLM-L6-v2`) |
+| Q2 | LLM backend | **Gemini API** (free tier; OpenAI as fallback) |
+| Q3 | Mentorship module | **Deferred** — not in MVP |
+| Q4 | Interview simulator | **Voice-enabled** — Whisper STT + Gemini response |
+| Q5 | Scraper targets | **DAAD, scholarship.com, Fulbright, scholarships.ca** |
+| A6 | Synthetic data | **Regeneratable** — CLI script with seed parameter |
+| A7 | Human trust experiment | **60 students** (not 30) |
+| A8 | Development approach | **Approach A — Phased Modular Monolith** ✅ |
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Dependency on Gemini API key** — The interview and RAG modules require a `GOOGLE_API_KEY`. This must be provisioned before Phase 3 begins. Store it in Docker secrets or [.env](file:///c:/Users/Admin/.gemini/antigravity/scratch/scholarai-platform/.env).
+
+> [!WARNING]
+> **Voice (Whisper) adds infra requirement** — Whisper runs locally. Ensure the Docker host has ~2GB RAM headroom for the `openai-whisper` base model. CPU inference is acceptable for FYP demo.
+
+> [!CAUTION]
+> **Schema migration is destructive** — Changing `VECTOR(768)` → `VECTOR(384)` requires an Alembic migration that drops and recreates affected columns. Any existing vector data will be lost. Back up before running.
+
+---
+
+## Proposed Changes
+
+---
+
+### Component 1: Database Schema Migration
+
+#### [MODIFY] [database_schema.md](file:///c:/Users/Admin/.gemini/antigravity/scratch/scholarai-platform/docs/database_schema.md)
+- Change all `VECTOR(768)` columns to `VECTOR(384)`
+- Remove `mentors` table (deferred)
+- Add `eligibility_requirements` table (per spec)
+- Add `html_snapshots` table (scraper debug storage)
+- Add `audit_logs` table (admin operations)
+
+#### [NEW] Alembic migration file: `backend/alembic/versions/001_init_schema.py`
+- `CREATE EXTENSION IF NOT EXISTS vector`
+- Create all confirmed tables
+- HNSW indexes using `vector_cosine_ops` on 384-dim columns
+
+**Tables (final confirmed list):**
+
+```
+users                   — id, email, password_hash, role, created_at
+student_profiles        — id, user_id, citizenship, gpa, ielts_score,
+                          research_score, volunteer_score, target_field,
+                          target_country, degree_level, profile_embedding VECTOR(384)
+universities            — id, name, country, ranking
+programs                — id, university_id, name, field_of_study, degree_level
+scholarships            — id, name, provider, country, degree_level,
+                          field_of_study, min_gpa, deadline, full_description,
+                          source_url, is_active, scholarship_embedding VECTOR(384)
+eligibility_requirements — id, scholarship_id, requirement_type, value
+applications            — id, student_id, scholarship_id, status,
+                          ai_match_score, shap_explanation JSONB, applied_at
+documents               — id, student_id, application_id, document_type,
+                          storage_url, content_embedding VECTOR(384), uploaded_at
+html_snapshots          — id, source_url, html_content TEXT, scraped_at, job_id
+audit_logs              — id, admin_id, action, target_table, target_id,
+                          old_value JSONB, new_value JSONB, created_at
+embedding_cache         — id, text_hash, embedding VECTOR(384), created_at
+```
+
+---
+
+### Component 2: Backend Modular Monolith Structure
+
+#### [MODIFY] `backend/app/` — Full module structure
+
+```
+backend/app/
+├── main.py                          # FastAPI bootstrap (exists — minor edits)
+├── celery_app.py                    # Celery + Redis (exists — extend)
+├── core/
+│   ├── config.py                    # Settings (pydantic-settings)
+│   ├── security.py                  # JWT, bcrypt, RBAC
+│   ├── database.py                  # SQLAlchemy async engine
+│   └── dependencies.py              # FastAPI dependency injection
+├── models/                          # SQLAlchemy ORM models
+│   ├── user.py
+│   ├── scholarship.py
+│   ├── application.py
+│   ├── document.py
+│   └── audit_log.py
+├── api/v1/
+│   ├── __init__.py                  # Router aggregator
+│   ├── routes/
+│   │   ├── auth.py                  # POST /auth/register, /auth/login, /auth/refresh
+│   │   ├── scholarships.py          # GET /scholarships, GET /scholarships/{id}
+│   │   ├── recommendations.py       # POST /recommendations
+│   │   ├── applications.py          # CRUD /applications
+│   │   ├── documents.py             # POST /documents/upload
+│   │   ├── rag.py                   # POST /rag/ask
+│   │   ├── interview.py             # POST /interview/start, /interview/respond
+│   │   └── admin.py                 # Admin-only audit + scraper control
+├── services/                        # Logical modules (modular monolith)
+│   ├── recommender_service/
+│   │   ├── __init__.py
+│   │   ├── stage1_graph.py          # Neo4j eligibility filter
+│   │   ├── stage2_vector.py         # pgvector top-50 retrieval
+│   │   ├── stage3_rerank.py         # XGBoost ML reranker
+│   │   └── pipeline.py              # Orchestrates stages 1→2→3
+│   ├── rag_service/
+│   │   ├── __init__.py
+│   │   ├── indexer.py               # Chunk + embed knowledge sources
+│   │   ├── retriever.py             # Similarity retrieval from pgvector
+│   │   └── chain.py                 # LangChain RAG chain (Gemini LLM)
+│   ├── interview_service/
+│   │   ├── __init__.py
+│   │   ├── question_generator.py    # Gemini-powered question generation
+│   │   ├── evaluator.py             # Answer scoring + feedback
+│   │   └── transcriber.py           # Whisper STT (audio → text)
+│   ├── strategy_service/
+│   │   ├── __init__.py
+│   │   └── advisor.py               # Gemini-powered application strategy tips
+│   └── embedding_service/
+│       ├── __init__.py
+│       ├── encoder.py               # all-MiniLM-L6-v2 wrapper (384-dim)
+│       └── cache.py                 # embedding_cache table lookup/store
+├── tasks/                           # Celery task definitions
+│   ├── scraper_tasks.py             # Scraping jobs (Playwright)
+│   ├── embedding_tasks.py           # Async embedding generation
+│   ├── graph_sync_tasks.py          # sync_postgres_to_neo4j
+│   └── ml_tasks.py                  # Model retraining triggers
+├── ml/                              # ML pipeline (training + inference)
+│   ├── data_generator.py            # Synthetic dataset generation (with seed)
+│   ├── feature_engineering.py       # gpa_normalized, research_score, etc.
+│   ├── trainer.py                   # XGBoost training + MLflow logging
+│   ├── evaluator.py                 # Precision@K, Recall@K, NDCG, MRR
+│   └── explainer.py                 # SHAP + LIME explanation generation
+└── scraper/
+    ├── __init__.py
+    ├── browser.py                   # Playwright + Browserless setup
+    ├── parsers/
+    │   ├── daad.py                  # DAAD-specific extraction rules
+    │   ├── scholarships_ca.py       # scholarships.ca rules
+    │   ├── fulbright.py             # Fulbright rules
+    │   └── scholarship_com.py       # scholarship.com rules
+    ├── robots.py                    # robots.txt compliance checker
+    └── pipeline.py                  # Full scraping pipeline orchestrator
+```
+
+---
+
+### Component 3: AI Modules Design
+
+#### 3.1 Recommender Pipeline
+
+```
+Student Profile
+      │
+      ▼
+[Stage 1] Neo4j graph query
+  → MATCH (s:Student)-[:ELIGIBLE_FOR]->(sc:Scholarship)
+  → Filter by GPA, citizenship, field_of_study, degree_level
+  → Returns: eligible_scholarship_ids []
+      │
+      ▼
+[Stage 2] pgvector similarity
+  → Embed student profile → 384-dim vector
+  → SELECT id, 1 - (embedding <=> $profile_vec) AS score
+    FROM scholarships WHERE id IN (eligible_ids)
+    ORDER BY score DESC LIMIT 50
+      │
+      ▼
+[Stage 3] XGBoost ML Reranker
+  → Features: gpa_normalized, research_score, language_score,
+              program_match_score, volunteer_score
+  → Predict: success_probability per scholarship
+  → SHAP values computed per prediction
+  → Return top 10 with explanations
+      │
+      ▼
+Response: [{ scholarship, match_score, shap_explanation }]
+```
+
+**Latency targets:**
+
+| Stage | Target |
+|---|---|
+| Stage 1 (graph filter) | < 50ms |
+| Stage 2 (vector retrieval) | < 150ms |
+| Stages 1+2+3 combined | < 500ms |
+
+#### 3.2 RAG Document Assistant
+
+- **Knowledge sources indexed:** SOP writing guides, scholarship guidelines, example SOPs, admissions advice
+- **Chunking:** 512 tokens, 64-token overlap
+- **Embedding:** `all-MiniLM-L6-v2` → stored in `documents.content_embedding`
+- **LLM:** Gemini Flash (`gemini-1.5-flash`) via `langchain-google-genai`
+- **Chain type:** `RetrievalQA` with similarity threshold 0.75
+
+#### 3.3 Interview Simulator (Voice-Enabled)
+
+```
+1. Student initiates interview session (scholarship_id provided)
+2. Gemini generates domain-specific questions (3–5 per session)
+3. Student responds:
+   → Option A: Text input (POST /interview/respond)
+   → Option B: Audio upload → Whisper transcribes → same pipeline
+4. Gemini evaluates answer:
+   → Scores: clarity, relevance, depth (0–10 each)
+   → Provides structured feedback text
+5. Next question generated
+6. Session ends: summary report returned
+```
+
+**Whisper model:** `base` (74M params) — sufficient for FYP demo  
+**Audio format supported:** WAV, MP3, M4A (FFmpeg pre-processing)
+
+#### 3.4 Synthetic Data + Regeneration
+
+```python
+# CLI usage:
+python -m app.ml.data_generator --seed 42 --n 5000 --output data/synthetic_v1.csv
+python -m app.ml.data_generator --seed 99 --n 5000 --output data/synthetic_v2.csv
+```
+
+**Distributions:**
+```
+GPA          ~ Normal(3.2, 0.5), clipped [2.0, 4.0]
+IELTS        ~ Normal(6.8, 0.7), clipped [4.5, 9.0]
+Research     ~ corr(GPA, ρ=0.6) · Normal + noise
+Volunteer    ~ Uniform(0, 5), independent
+ProgMatch    ~ Bernoulli(0.3) × Uniform(0.5, 1.0)
+
+success_prob = 0.35·gpa + 0.25·research + 0.20·language + 0.20·program_match
+label        = Bernoulli(success_prob)
+```
+
+**Versioning:** Each generated CSV is committed to `data/` with filename including seed + version. MLflow logs dataset version alongside model runs.
+
+---
+
+### Component 4: Data Ingestion Pipeline
+
+#### [NEW] Scraper design per target
+
+| Target | URL | Method | Notes |
+|---|---|---|---|
+| DAAD | daad.de/en/scholarships | Playwright (JS-rendered) | Rate limit: 1 req/5s |
+| Fulbright | fulbright.org | Playwright | Robots.txt compliant |
+| scholarships.ca | scholarships.ca | requests + BeautifulSoup fallback | Simpler HTML |
+| scholarship.com | scholarship.com | Playwright | Pagination required |
+
+**Pipeline per source:**
+```
+robots.txt check
+  → skip if disallowed
+  → HTML retrieval (Playwright headless)
+  → DOM parsing (CSS selector → XPath fallback)
+  → Pydantic schema validation
+  → Duplicate detection (url hash)
+  → Insert to scholarships table
+  → Save html_snapshots record
+  → Queue embedding_task (async Celery)
+```
+
+**Schedule:** Celery Beat — weekly per source  
+**Monitoring:** Flower dashboard at `:5555`
+
+---
+
+### Component 5: ML Training Pipeline
+
+```
+data/synthetic_vN.csv
+    │
+    ▼
+feature_engineering.py
+    → gpa_normalized, research_score, language_score,
+       program_match_score, volunteer_score
+    │
+    ▼
+trainer.py
+    → XGBoost classifier
+    → 80/10/10 train/val/test split (stratified)
+    → Hyperparameter sweep: mlflow.autolog()
+    → Log: dataset_version, feature_version, hyperparams,
+            precision@5, recall@5, ndcg@5, mrr
+    │
+    ▼
+MLflow Model Registry
+    → Stage: Staging → Production
+    │
+    ▼
+explainer.py
+    → SHAP TreeExplainer (per prediction)
+    → LIME TabularExplainer (per prediction)
+    → Store shap_explanation JSONB in applications table
+```
+
+**Benchmark framework (3 models):**
+
+| Model | Components |
+|---|---|
+| Model A | Stage 1 only (graph eligibility filter) |
+| Model B | Stage 1 + Stage 2 (+ vector similarity) |
+| Model C | Stage 1 + Stage 2 + Stage 3 (+ ML reranking) |
+
+**Metrics:** Precision@5, Precision@10, Recall@5, Recall@10, NDCG@5, NDCG@10, MRR  
+**Ablation:** Each stage removed independently, metrics re-evaluated
+
+---
+
+### Component 6: Knowledge Graph (Neo4j)
+
+**Sync job:** `sync_postgres_to_neo4j` — Celery Beat, daily
+
+```cypher
+-- Node creation on sync:
+MERGE (s:Student {id: $id}) SET s += {gpa: $gpa, citizenship: $citizenship}
+MERGE (sc:Scholarship {id: $id}) SET sc += {name: $name, min_gpa: $min_gpa}
+MERGE (u:University {id: $id}) SET u += {name: $name}
+MERGE (er:EligibilityRequirement {id: $id})
+
+-- Relationships:
+MERGE (s)-[:ELIGIBLE_FOR]->(sc)   -- when gpa >= min_gpa AND citizenship matches
+MERGE (u)-[:OFFERS]->(p:Program)
+MERGE (p)-[:FUNDED_BY]->(sc)
+MERGE (sc)-[:REQUIRES]->(er)
+```
+
+---
+
+### Component 7: DevOps + Docker
+
+#### [MODIFY] `docker-compose.yml`
+
+```yaml
+services:
+  postgres:      # PostgreSQL 16 + pgvector extension
+  neo4j:         # Neo4j 5.x
+  redis:         # Redis 7
+  backend:       # FastAPI (depends_on: postgres, redis, neo4j)
+  celery_worker: # Celery worker (same image as backend)
+  celery_beat:   # Celery Beat scheduler
+  flower:        # Celery monitoring UI (:5555)
+  frontend:      # Next.js (:3000)
+```
+
+**Secrets:** `.env` file (dev) / Docker secrets (prod)  
+**Migrations:** `alembic upgrade head` runs in a `backend` entrypoint script
+
+---
+
+### Component 8: Security Implementation
+
+| Feature | Implementation |
+|---|---|
+| Auth | JWT (access 15min + refresh 7d) via `python-jose` |
+| Passwords | `bcrypt` via `passlib` |
+| RBAC | `role` enum on `users` table; FastAPI dependency checks |
+| CSRF | CSRF token on state-changing Next.js forms |
+| Rate limiting | `slowapi` on FastAPI (100/min per IP default) |
+| File uploads | 10MB limit; type validation (PDF only for documents) |
+| Antivirus | `clamd` (ClamAV) optional scan on upload |
+| Audit logging | `audit_logs` table; populated by admin route middleware |
+
+---
+
+### Component 9: Frontend (Next.js)
+
+```
+frontend/src/
+├── app/                      # Next.js App Router
+│   ├── (auth)/               # Login, Register pages
+│   ├── dashboard/            # Student dashboard
+│   ├── scholarships/         # Search + detail pages
+│   ├── recommendations/      # AI recommendations + SHAP viz
+│   ├── documents/            # SOP upload + RAG feedback
+│   ├── interview/            # Interview practice UI
+│   └── admin/                # Admin panel
+├── components/
+│   ├── RecommendationCard.tsx
+│   ├── ShapWaterfallChart.tsx  # Recharts/D3 SHAP visualization
+│   ├── EligibilityBadge.tsx
+│   ├── InterviewPlayer.tsx     # Audio recorder + transcript display
+│   └── ...
+└── lib/
+    ├── api.ts                  # Typed API client
+    └── auth.ts                 # JWT handling
+```
+
+---
+
+### Component 10: Research Evaluation
+
+#### Human Trust Experiment
+- **N = 60 students**
+- **Group A:** Recommendations without explanations
+- **Group B:** Recommendations with SHAP explanations
+- **Metrics:** Trust score (Likert 1–7), perceived accuracy, willingness to apply
+- **Analysis:** Paired t-test + Wilcoxon signed-rank test
+- **IRB note:** Requires informed consent form; no personal scholarship outcome data collected
+
+#### Performance Testing
+- **Tool:** Locust or k6
+- **Load targets:** 100, 500, 1000 concurrent users
+- **Metrics collected:** P50/P95/P99 API latency, recommendation pipeline time, CPU %, memory %
+- **Failure test cases:** Neo4j down (fallback to Stage 2), pgvector down, model not loaded
+
+---
+
+## 16-Week Roadmap
+
+### Phase 1 — Foundation (Weeks 1–4)
+
+| Week | Tasks |
+|---|---|
+| 1 | Docker compose setup · Alembic init · Schema migration to 384-dim · JWT auth routes |
+| 2 | RBAC middleware · Rate limiting · Celery+Redis setup · Audit log middleware |
+| 3 | Neo4j connection + basic sync job · Student profile CRUD · Applications CRUD |
+| 4 | GitHub Actions CI/CD · Automated DB backup script · Flower dashboard |
+
+**Deliverable:** Working auth-protected API with all tables migrated + async job infrastructure
+
+---
+
+### Phase 2 — Data Pipeline (Weeks 5–8)
+
+| Week | Tasks |
+|---|---|
+| 5 | Scraper: DAAD parser · robots.txt compliance · html_snapshots storage |
+| 6 | Scraper: scholarship.com + Fulbright + scholarships.ca parsers |
+| 7 | Embedding pipeline: encoder + cache + Celery task · pgvector HNSW indexes |
+| 8 | Neo4j full sync job · Synthetic data generator (seed-based) · MLflow setup |
+
+**Deliverable:** Populated scholarship DB, embeddings indexed, graph synchronized, MLflow running
+
+---
+
+### Phase 3 — AI Core (Weeks 9–12)
+
+| Week | Tasks |
+|---|---|
+| 9  | Stage 1 (graph eligibility filter) + Stage 2 (vector retrieval) |
+| 10 | ML training pipeline · XGBoost model · MLflow experiment logging · SHAP/LIME |
+| 11 | Stage 3 (reranker) · Full pipeline orchestration · Recommendation API endpoint |
+| 12 | RAG service (LangChain + Gemini) · Interview service (Gemini + Whisper) |
+
+**Deliverable:** All 3 recommendation stages working · RAG assistant · Voice interview simulator
+
+---
+
+### Phase 4 — Frontend + Evaluation (Weeks 13–16)
+
+| Week | Tasks |
+|---|---|
+| 13 | Next.js scaffolding · Auth flow · Dashboard · Scholarship search UI |
+| 14 | Recommendation UI with SHAP waterfall visualization · Interview practice UI |
+| 15 | Performance testing (Locust 100/500/1000) · Benchmark study (Models A/B/C) · Ablation |
+| 16 | Human trust experiment (60 students) · Failure testing · Final documentation |
+
+**Deliverable:** Complete working system · Evaluation results · FYP documentation
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+```bash
+# Run all backend tests
+cd backend && pytest tests/ -v --cov=app --cov-report=term-missing
+
+# Key test files to write:
+tests/test_auth.py             # JWT issue, refresh, RBAC enforcement
+tests/test_recommendations.py  # All 3 stages with mocked DB
+tests/test_scraper.py          # Parser correctness, robots.txt compliance
+tests/test_embedding.py        # Cache hit/miss, 384-dim output assertion
+tests/test_ml_pipeline.py      # Synthetic data generation, training, metrics
+tests/test_rag.py              # RAG chain returns grounded response
+tests/test_interview.py        # Whisper transcription, Gemini feedback
+```
+
+### Manual Verification Points
+
+1. **Auth flow:** Register → Login → get JWT → call protected endpoint → confirm 401 without token
+2. **Recommendation pipeline:** Create student profile → POST `/recommendations` → confirm 3-stage JSON response with SHAP values
+3. **Scraper:** Run `celery call tasks.scraper_tasks.scrape_daad` → confirm scholarship inserted + html_snapshot saved
+4. **RAG:** POST `/rag/ask` with "How do I write a strong SOP?" → confirm grounded response with source citations
+5. **Interview:** POST audio file → confirm Whisper transcript + Gemini feedback in response
+6. **Admin audit:** Log in as admin → edit scholarship → confirm `audit_logs` row created
+
+### Performance Benchmarks (Locust)
+
+```bash
+# Install locust
+pip install locust
+
+# Run load test
+locust -f tests/locustfile.py --host=http://localhost:8000 \
+       --users=100 --spawn-rate=10 --run-time=2m --headless
+
+# Test at 500 and 1000 users for Phase 4
+```
+
+Targets:
+- Stage 1 < 50ms
+- Stages 1+2 < 200ms
+- Full pipeline (1+2+3) < 500ms
+
+---
+
+## Monorepo Structure (Final)
+
+```
+scholarai-platform/
+├── .github/workflows/
+│   └── ci.yml                 # build → test → lint → docker build → deploy
+├── backend/
+│   ├── app/                   # (detailed above)
+│   ├── alembic/
+│   ├── tests/
+│   ├── data/                  # Synthetic CSVs (versioned)
+│   ├── models/                # ML model artifacts (gitignored, tracked in MLflow)
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── Dockerfile
+├── docs/                      # Technical documentation (existing + updated)
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+---
+
+## Decision Log (Final)
+
+| ID | Decision | Alternatives | Reason |
+|---|---|---|---|
+| D1 | Modular monolith | Microservices | 3 devs, 16 weeks |
+| D2 | PostgreSQL + pgvector 384-dim | Qdrant, Chroma | Single DB; HNSW production-grade; matches all-MiniLM-L6-v2 |
+| D3 | Gemini API (gemini-1.5-flash) | OpenAI GPT-4o, Ollama | Free tier available; avoids cost; generous rate limits |
+| D4 | Whisper base (local) | Deepgram, AssemblyAI | No API cost; offline capable; sufficient quality |
+| D5 | Celery + Redis | APScheduler, Dramatiq | Priority queues + DLQ + Flower monitoring |
+| D6 | MLflow | W&B, DVC | Self-hostable; no account needed; native XGBoost support |
+| D7 | SHAP + LIME both | SHAP only | Two XAI methods = stronger academic contribution |
+| D8 | Mentorship module deferred | Include in MVP | Scope risk; adds auth/privacy complexity with no ML value |
+| D9 | Synthetic data regeneratable | Generated once | Reproducibility + ablation study requires multiple seeds |
+| D10 | 60 students for trust experiment | 30 | Increased statistical power (user decision) |
+| D11 | Scraper targets: DAAD, Fulbright, scholarships.ca, scholarship.com | Broader web crawl | Controlled, curated, robots.txt compliant starting set |
