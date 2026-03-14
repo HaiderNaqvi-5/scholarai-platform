@@ -50,6 +50,7 @@ desktop.ini
 
 # Docker
 docker-compose.override.yml
+backups/
 
 
 # Misc

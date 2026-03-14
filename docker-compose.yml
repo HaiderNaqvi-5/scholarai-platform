@@ -47,12 +47,40 @@ services:
     command: celery -A app.celery_app worker -l info
     env_file: .env
     depends_on: [redis, postgres]
+    restart: unless-stopped
 
   celery-beat:
     build: ./backend
     command: celery -A app.celery_app beat -l info
     env_file: .env
     depends_on: [redis]
+    restart: unless-stopped
+
+  flower:
+    build: ./backend
+    command: celery -A app.celery_app flower --port=5555
+    env_file: .env
+    depends_on: [redis]
+    ports: ["5555:5555"]
+    restart: unless-stopped
+
+  postgres-backup:
+    build: ./backend
+    command: python scripts/backup_database.py --loop
+    env_file: .env
+    depends_on: [postgres]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: scholarai
+      POSTGRES_USER: scholarai
+      DB_PASSWORD: ${DB_PASSWORD}
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+    restart: unless-stopped
 
 volumes:
   pgdata:

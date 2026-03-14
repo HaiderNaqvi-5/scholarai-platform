@@ -68,8 +68,26 @@ services:
     command: celery -A app.celery_app beat -l info
     depends_on: [redis]
 
+  flower:
+    build: ./backend
+    command: celery -A app.celery_app flower --port=5555
+    depends_on: [redis]
+    ports: ["5555:5555"]
+
+  postgres-backup:
+    build: ./backend
+    command: python scripts/backup_database.py --loop
+    depends_on: [postgres]
+    volumes: ["./backups:/backups"]
+
 volumes:
   pgdata:
+```
+
+One-off database backup:
+
+```bash
+docker compose run --rm postgres-backup python scripts/backup_database.py
 ```
 
 ---
