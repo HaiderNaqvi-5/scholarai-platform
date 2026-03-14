@@ -11,7 +11,7 @@ The project is currently in **Phase 1: Foundation**, but that phase is **not yet
 
 The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
 
-The local workspace is currently **ahead of GitHub by one commit** on `develop`.
+The local workspace is currently **ahead of GitHub on `develop`**.
 
 ## Overall Status by Phase
 
@@ -127,7 +127,7 @@ The local workspace is currently **ahead of GitHub by one commit** on `develop`.
 - Active pushed work: `develop`
 - Current pushed implementation checkpoint: `3c0ae03`
 
-At the time of this report, the local workspace is one commit ahead of `origin/develop`.
+At the time of this report, the local workspace is ahead of `origin/develop`.
 
 ## Recommended Immediate Next Step
 
