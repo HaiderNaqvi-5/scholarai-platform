@@ -1,23 +1,7 @@
-from celery import Celery
+"""
+Celery application — root-level import used by workers.
 
-from app.core.config import settings
-
-celery_app = Celery(
-    "scholarai",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
-)
-
-celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-    beat_schedule={
-        "run-scrapers-daily": {
-            "task": "app.tasks.scraper.run_all_scrapers",
-            "schedule": 86400.0,  # 24 hours
-        },
-    },
-)
+Delegates all configuration to app.tasks.celery_app so that concrete
+task modules and beat schedules are centralised in one place.
+"""
+from app.tasks.celery_app import celery_app  # noqa: F401 — re-export
