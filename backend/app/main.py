@@ -28,12 +28,15 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: init DB tables and warm the embedding model if possible."""
-    from app.core.database import engine
-    from app.models.models import Base
+    if settings.AUTO_CREATE_SCHEMA_ON_STARTUP:
+        from app.core.database import engine
+        from app.models.models import Base
 
-    logger.info("ScholarAI starting - creating DB tables if needed")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        logger.info("ScholarAI starting - auto-creating DB tables")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    else:
+        logger.info("ScholarAI starting - schema auto-create disabled; use Alembic migrations")
 
     try:
         from app.services.recommendation_service import RecommendationService
@@ -47,6 +50,8 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("ScholarAI shutting down - closing DB pool")
+    from app.core.database import engine
+
     await engine.dispose()
 
 

@@ -9,15 +9,15 @@
 
 The project is currently in **Phase 1: Foundation**, but that phase is **not yet complete**.
 
-The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, request rate limiting, admin audit logging, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
+The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, request rate limiting, admin audit logging, Alembic migration scaffolding, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
 
-The local workspace is currently **ahead of GitHub on `develop`**.
+This report describes the current `develop` implementation state.
 
 ## Overall Status by Phase
 
 | Phase | Status | Standing |
 |---|---|---|
-| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, rate limiting, audit hooks, smoke tests, and CI exist, but migration and runtime setup are incomplete |
+| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, Alembic migration infrastructure, rate limiting, audit hooks, smoke tests, and CI exist, but runtime verification and remaining ops tasks are incomplete |
 | Phase 2 - Data Pipeline | Early scaffold | Scraper and task files exist, but planned ingestion pipeline is not complete |
 | Phase 3 - AI Core | Early scaffold | Recommendation and AI service wrappers exist, but plan-level functionality is incomplete and partly misaligned |
 | Phase 4 - Frontend + Evaluation | Not started | Frontend is still mostly boilerplate; evaluation assets are absent |
@@ -43,20 +43,21 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 - Request rate limiting is wired into FastAPI, with stricter limits on auth endpoints.
 - Admin scholarship mutations and scraper triggers now create `audit_logs` rows.
 - A minimal GitHub Actions CI workflow now runs backend smoke checks and frontend linting.
+- Alembic is scaffolded under `backend/alembic/`, with an initial schema migration for the current ORM.
+- App startup schema creation is now gated behind `AUTO_CREATE_SCHEMA_ON_STARTUP` so migrations are the primary path.
 
 ### What is missing or blocking Phase 1 completion
 
-- Alembic migrations are not actually present under `backend/alembic/`.
 - Automated backup scripting is not present.
 - Flower dashboard is listed in the plan but not configured in compose.
 - Audit logging is route-level rather than generic middleware-based.
-- Alembic-backed schema migration flow is still absent even though the ORM model has expanded.
 - Backend dependencies are not installed in the current local Python environment, so import-level runtime verification could not be completed.
+- The initial migration is authored but has not been exercised against a live database in this local environment.
 
 ### Known implementation inconsistencies
 
 - The phase report from the previous checkpoint has been partially superseded by the current codebase and should be read alongside the latest commit.
-- AI service configuration remains incomplete for runtime use, including missing `OPENAI_MODEL` settings in `backend/app/core/config.py`.
+- AI runtime integration is still incomplete even though `OPENAI_MODEL` is now defined in `backend/app/core/config.py`; the broader Phase 3 service layer remains only partially wired.
 
 ## Phase 2 - Data Pipeline
 
@@ -126,9 +127,9 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 - Remote repository: `HaiderNaqvi-5/scholarai-platform`
 - Default branch: `main`
 - Active pushed work: `develop`
-- Current pushed implementation checkpoint: `3c0ae03`
+- GitHub should be treated as current after each committed batch.
 
-At the time of this report, the local workspace is ahead of `origin/develop`.
+At the time of this report, verify the branch tip on `develop` for the latest checkpoint.
 
 ## Recommended Immediate Next Step
 
@@ -136,11 +137,10 @@ The next milestone should be to **finish Phase 1 cleanly before expanding furthe
 
 Recommended order:
 
-1. Fix route wiring and remove or isolate deferred legacy routes.
-2. Add real Alembic migration files for the current schema.
-3. Wire rate limiting, audit logging, and basic runtime validation.
-4. Install backend dependencies and run the smoke tests for real runtime verification.
-5. Expand backend tests beyond smoke coverage so the project has a stable foundation before Phase 2 work continues.
+1. Install backend dependencies and run `alembic upgrade head` plus the smoke tests for real runtime verification.
+2. Add the missing operational pieces from late Phase 1, especially Flower and backup automation.
+3. Expand backend tests beyond smoke coverage so the project has a stable foundation before Phase 2 work continues.
+4. Remove remaining stale documentation and config mismatches.
 
 ## Assessment Method
 

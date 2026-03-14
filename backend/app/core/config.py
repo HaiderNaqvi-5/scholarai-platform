@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"  # development | staging | production
+    AUTO_CREATE_SCHEMA_ON_STARTUP: bool = False
 
     # Database (async)
     DATABASE_URL: str = "postgresql+asyncpg://scholarai:password@localhost:5432/scholarai"
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
     # LLM / AI Keys
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""          # optional fallback
+    OPENAI_MODEL: str = "gpt-4o-mini"
     HUGGINGFACE_API_KEY: str = ""
 
     # Embedding
