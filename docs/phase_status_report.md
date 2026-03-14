@@ -17,7 +17,7 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 
 | Phase | Status | Standing |
 |---|---|---|
-| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, rate limiting, audit hooks, and smoke tests exist, but migration, CI, and runtime setup are incomplete |
+| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, rate limiting, audit hooks, smoke tests, and CI exist, but migration and runtime setup are incomplete |
 | Phase 2 - Data Pipeline | Early scaffold | Scraper and task files exist, but planned ingestion pipeline is not complete |
 | Phase 3 - AI Core | Early scaffold | Recommendation and AI service wrappers exist, but plan-level functionality is incomplete and partly misaligned |
 | Phase 4 - Frontend + Evaluation | Not started | Frontend is still mostly boilerplate; evaluation assets are absent |
@@ -42,11 +42,11 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 - Database session exports are normalized across API and task modules.
 - Request rate limiting is wired into FastAPI, with stricter limits on auth endpoints.
 - Admin scholarship mutations and scraper triggers now create `audit_logs` rows.
+- A minimal GitHub Actions CI workflow now runs backend smoke checks and frontend linting.
 
 ### What is missing or blocking Phase 1 completion
 
 - Alembic migrations are not actually present under `backend/alembic/`.
-- `.github/workflows/ci.yml` does not exist.
 - Automated backup scripting is not present.
 - Flower dashboard is listed in the plan but not configured in compose.
 - Audit logging is route-level rather than generic middleware-based.
@@ -140,7 +140,7 @@ Recommended order:
 2. Add real Alembic migration files for the current schema.
 3. Wire rate limiting, audit logging, and basic runtime validation.
 4. Install backend dependencies and run the smoke tests for real runtime verification.
-5. Add CI and expand backend tests so the project has a stable foundation before Phase 2 work continues.
+5. Expand backend tests beyond smoke coverage so the project has a stable foundation before Phase 2 work continues.
 
 ## Assessment Method
 
