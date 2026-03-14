@@ -20,9 +20,16 @@ branch_labels = None
 depends_on = None
 
 
-user_role_enum = postgresql.ENUM("student", "admin", name="user_role")
-degree_level_enum = postgresql.ENUM("bachelor", "master", "phd", name="degree_level_enum")
-funding_type_enum = postgresql.ENUM("full", "partial", "tuition", "stipend", name="funding_type_enum")
+user_role_enum = postgresql.ENUM("student", "admin", name="user_role", create_type=False)
+degree_level_enum = postgresql.ENUM("bachelor", "master", "phd", name="degree_level_enum", create_type=False)
+funding_type_enum = postgresql.ENUM(
+    "full",
+    "partial",
+    "tuition",
+    "stipend",
+    name="funding_type_enum",
+    create_type=False,
+)
 source_name_enum = postgresql.ENUM(
     "daad",
     "fulbright",
@@ -30,6 +37,7 @@ source_name_enum = postgresql.ENUM(
     "scholarship_com",
     "other",
     name="source_name_enum",
+    create_type=False,
 )
 requirement_type_enum = postgresql.ENUM(
     "citizenship",
@@ -40,6 +48,7 @@ requirement_type_enum = postgresql.ENUM(
     "age",
     "other",
     name="requirement_type_enum",
+    create_type=False,
 )
 application_status_enum = postgresql.ENUM(
     "draft",
@@ -48,6 +57,7 @@ application_status_enum = postgresql.ENUM(
     "accepted",
     "rejected",
     name="application_status_enum",
+    create_type=False,
 )
 doc_type_enum = postgresql.ENUM(
     "transcript",
@@ -57,9 +67,21 @@ doc_type_enum = postgresql.ENUM(
     "language_test",
     "other",
     name="doc_type_enum",
+    create_type=False,
 )
-interview_input_mode_enum = postgresql.ENUM("text", "voice", name="interview_input_mode_enum")
-scraper_status_enum = postgresql.ENUM("running", "success", "failed", name="scraper_status_enum")
+interview_input_mode_enum = postgresql.ENUM(
+    "text",
+    "voice",
+    name="interview_input_mode_enum",
+    create_type=False,
+)
+scraper_status_enum = postgresql.ENUM(
+    "running",
+    "success",
+    "failed",
+    name="scraper_status_enum",
+    create_type=False,
+)
 
 
 def upgrade() -> None:
