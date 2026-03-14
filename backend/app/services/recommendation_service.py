@@ -15,16 +15,16 @@ Usage:
 """
 from __future__ import annotations
 
-import uuid
 import logging
-from typing import List, Optional
+import uuid
+from typing import List
 
 import numpy as np
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import StudentProfile, Scholarship, MatchScore, EmbeddingCache
 from app.core.config import settings
+from app.models.models import MatchScore, Scholarship, StudentProfile
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +137,8 @@ class RecommendationService:
         need_compute = []
 
         for s in scholarships:
-            if s.description_embedding is not None:
-                vecs.append((s.id, np.array(s.description_embedding)))
+            if s.scholarship_embedding is not None:
+                vecs.append((s.id, np.array(s.scholarship_embedding)))
             else:
                 need_compute.append(s)
 
@@ -147,7 +147,7 @@ class RecommendationService:
             texts  = [self._scholarship_to_text(s) for s in need_compute]
             new_vecs = encoder.encode(texts, batch_size=32, normalize_embeddings=True)
             for s, v in zip(need_compute, new_vecs):
-                s.description_embedding = v.tolist()
+                s.scholarship_embedding = v.tolist()
                 vecs.append((s.id, v))
             await self.db.commit()
 

@@ -35,10 +35,10 @@ def run_full_scrape(self) -> dict:
 
 async def _async_run_full_scrape() -> dict:
     """Async implementation: opens DB session, delegates to ScraperService."""
-    from app.core.database import AsyncSessionLocal
+    from app.core.database import async_session_factory
     from app.services.scraper_service import ScraperService
 
-    async with AsyncSessionLocal() as db:
+    async with async_session_factory() as db:
         service = ScraperService(db)
         stats = await service.run_all()
         logger.info("Scrape completed: %s", stats)
