@@ -2,22 +2,22 @@
 
 **Date:** 2026-03-14
 **Branch:** `develop`
-**Commit:** `610483b`
+**Commit:** `dd400ed`
 **Reference Plan:** `docs/implementation_plan.md.resolved`
 
 ## Executive Summary
 
 The project is currently in **Phase 1: Foundation**, but that phase is **not yet complete**.
 
-The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, and an expanded database model. However, several planned Phase 1 deliverables are still missing or internally inconsistent, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
+The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
 
-GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
+The local workspace is currently **ahead of GitHub by one commit** on `develop`.
 
 ## Overall Status by Phase
 
 | Phase | Status | Standing |
 |---|---|---|
-| Phase 1 - Foundation | In progress | Core API and schema scaffolding exist, but migration, CI, audit middleware, and some route wiring are incomplete |
+| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, and smoke tests exist, but migration, CI, audit middleware, and runtime setup are incomplete |
 | Phase 2 - Data Pipeline | Early scaffold | Scraper and task files exist, but planned ingestion pipeline is not complete |
 | Phase 3 - AI Core | Early scaffold | Recommendation and AI service wrappers exist, but plan-level functionality is incomplete and partly misaligned |
 | Phase 4 - Frontend + Evaluation | Not started | Frontend is still mostly boilerplate; evaluation assets are absent |
@@ -36,8 +36,10 @@ GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
 - Expanded SQLAlchemy models exist in `backend/app/models/models.py`.
 - Student profile routes exist in `backend/app/api/v1/routes/profile.py`.
 - Scholarship list/detail endpoints exist in `backend/app/api/v1/routes/scholarships.py`.
-- Applications API file exists in `backend/app/api/v1/routes/applications.py`.
+- Applications API exists and is mounted in `backend/app/api/v1/__init__.py`.
 - Celery app and task modules exist in `backend/app/celery_app.py` and `backend/app/tasks/`.
+- Basic backend smoke tests exist in `backend/tests/`.
+- Database session exports are normalized across API and task modules.
 
 ### What is missing or blocking Phase 1 completion
 
@@ -47,14 +49,13 @@ GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
 - Flower dashboard is listed in the plan but not configured in compose.
 - Rate limiting dependency is installed but not wired into the API.
 - Audit logging table exists in the model, but audit log middleware/service behavior is not implemented.
-- `applications.py` exists, but the applications router is not mounted in `backend/app/api/v1/__init__.py`.
-- Legacy routes for deferred modules are still mounted, including `mentorship` and `credentials`.
+- Alembic-backed schema migration flow is still absent even though the ORM model has expanded.
+- Backend dependencies are not installed in the current local Python environment, so import-level runtime verification could not be completed.
 
 ### Known implementation inconsistencies
 
-- `backend/app/core/database.py` exposes `async_session`, while other files import `async_session_factory` or `AsyncSessionLocal`.
-- `backend/app/services/recommendation_service.py` uses `description_embedding`, but the model defines `scholarship_embedding`.
-- `backend/app/services/scraper_service.py` writes fields such as `amount_value` and `metadata_` that are not defined in the current ORM model.
+- The phase report from the previous checkpoint has been partially superseded by the current codebase and should be read alongside the latest commit.
+- AI service configuration remains incomplete for runtime use, including missing `OPENAI_MODEL` settings in `backend/app/core/config.py`.
 
 ## Phase 2 - Data Pipeline
 
@@ -66,6 +67,7 @@ GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
 - Scraper Celery task exists in `backend/app/tasks/scraper_tasks.py`.
 - HTML snapshot, scraper run, and embedding cache models are defined in `backend/app/models/models.py`.
 - Recommendation code includes embedding-oriented logic and cached score persistence.
+- Scraper persistence now matches the active ORM fields closely enough to avoid the previous model/task mismatch.
 
 ### What is still missing
 
@@ -114,6 +116,7 @@ GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
 ### Missing from this phase
 
 - Benchmark and load-testing assets described in the plan are not present in `backend/tests/`.
+- Only lightweight smoke tests exist at this stage; there is still no broader backend test suite.
 - Human evaluation and failure-testing artifacts are not present.
 - Final documentation is not yet assembled around implemented behavior.
 
@@ -122,9 +125,9 @@ GitHub is now aligned with the local workspace on `develop` at commit `610483b`.
 - Remote repository: `HaiderNaqvi-5/scholarai-platform`
 - Default branch: `main`
 - Active pushed work: `develop`
-- Current pushed implementation checkpoint: `610483b`
+- Current pushed implementation checkpoint: `3c0ae03`
 
-At the time of this report, the local workspace and `origin/develop` are aligned.
+At the time of this report, the local workspace is one commit ahead of `origin/develop`.
 
 ## Recommended Immediate Next Step
 
@@ -133,10 +136,10 @@ The next milestone should be to **finish Phase 1 cleanly before expanding furthe
 Recommended order:
 
 1. Fix route wiring and remove or isolate deferred legacy routes.
-2. Normalize database session naming and service/model field mismatches.
-3. Add real Alembic migration files for the current schema.
-4. Wire rate limiting, audit logging, and basic runtime validation.
-5. Add CI and minimal backend tests so the project has a stable foundation before Phase 2 work continues.
+2. Add real Alembic migration files for the current schema.
+3. Wire rate limiting, audit logging, and basic runtime validation.
+4. Install backend dependencies and run the smoke tests for real runtime verification.
+5. Add CI and expand backend tests so the project has a stable foundation before Phase 2 work continues.
 
 ## Assessment Method
 
