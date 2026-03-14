@@ -36,10 +36,25 @@ RULE_BOOST      = 0.15
 
 
 class RecommendationService:
+    _shared_encoder = None
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self._encoder = None   # lazy-loaded sentence-transformers model
         self._xgb     = None   # lazy-loaded XGBoost model
+
+    @classmethod
+    def _load_encoder(cls):
+        from sentence_transformers import SentenceTransformer
+
+        return SentenceTransformer(settings.EMBEDDING_MODEL)
+
+    @classmethod
+    def _warm_embedding_model(cls):
+        """Best-effort model preloading used during app startup."""
+        if cls._shared_encoder is None:
+            cls._shared_encoder = cls._load_encoder()
+        return cls._shared_encoder
 
     # ── Public entrypoint ─────────────────────────────────────────────────────
 
@@ -113,8 +128,9 @@ class RecommendationService:
 
     def _get_encoder(self):
         if self._encoder is None:
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(settings.EMBEDDING_MODEL)
+            if self.__class__._shared_encoder is None:
+                self.__class__._shared_encoder = self.__class__._load_encoder()
+            self._encoder = self.__class__._shared_encoder
         return self._encoder
 
     async def _get_profile_embedding(self, profile: StudentProfile) -> np.ndarray:

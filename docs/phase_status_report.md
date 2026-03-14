@@ -2,14 +2,14 @@
 
 **Date:** 2026-03-14
 **Branch:** `develop`
-**Commit:** `dd400ed`
+**Checkpoint:** Current `develop` working state
 **Reference Plan:** `docs/implementation_plan.md.resolved`
 
 ## Executive Summary
 
 The project is currently in **Phase 1: Foundation**, but that phase is **not yet complete**.
 
-The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
+The codebase already contains meaningful backend scaffolding for auth, profiles, scholarships, applications, AI service wrappers, Celery tasks, an expanded database model, request rate limiting, admin audit logging, and a small backend smoke-test layer. However, several planned Phase 1 deliverables are still missing, which means the repository is **best described as Phase 1 in progress, with partial Phase 2 and Phase 3 scaffolding started early**.
 
 The local workspace is currently **ahead of GitHub on `develop`**.
 
@@ -17,7 +17,7 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 
 | Phase | Status | Standing |
 |---|---|---|
-| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, and smoke tests exist, but migration, CI, audit middleware, and runtime setup are incomplete |
+| Phase 1 - Foundation | In progress | Core API, applications routing, schema scaffolding, rate limiting, audit hooks, and smoke tests exist, but migration, CI, and runtime setup are incomplete |
 | Phase 2 - Data Pipeline | Early scaffold | Scraper and task files exist, but planned ingestion pipeline is not complete |
 | Phase 3 - AI Core | Early scaffold | Recommendation and AI service wrappers exist, but plan-level functionality is incomplete and partly misaligned |
 | Phase 4 - Frontend + Evaluation | Not started | Frontend is still mostly boilerplate; evaluation assets are absent |
@@ -40,6 +40,8 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 - Celery app and task modules exist in `backend/app/celery_app.py` and `backend/app/tasks/`.
 - Basic backend smoke tests exist in `backend/tests/`.
 - Database session exports are normalized across API and task modules.
+- Request rate limiting is wired into FastAPI, with stricter limits on auth endpoints.
+- Admin scholarship mutations and scraper triggers now create `audit_logs` rows.
 
 ### What is missing or blocking Phase 1 completion
 
@@ -47,8 +49,7 @@ The local workspace is currently **ahead of GitHub on `develop`**.
 - `.github/workflows/ci.yml` does not exist.
 - Automated backup scripting is not present.
 - Flower dashboard is listed in the plan but not configured in compose.
-- Rate limiting dependency is installed but not wired into the API.
-- Audit logging table exists in the model, but audit log middleware/service behavior is not implemented.
+- Audit logging is route-level rather than generic middleware-based.
 - Alembic-backed schema migration flow is still absent even though the ORM model has expanded.
 - Backend dependencies are not installed in the current local Python environment, so import-level runtime verification could not be completed.
 

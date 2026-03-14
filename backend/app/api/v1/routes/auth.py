@@ -1,35 +1,38 @@
 """
-Auth routes: register, login, refresh, me, logout
+Auth routes: register, login, refresh, me.
 """
-from datetime import timedelta
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.security import (
-    hash_password, verify_password,
-    create_access_token, create_refresh_token, decode_token,
-)
+from app.api.v1.schemas import RefreshRequest, TokenResponse, UserCreate, UserLogin, UserResponse
 from app.core.config import settings
+from app.core.database import get_db
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import AUTH_RATE_LIMIT, limiter
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.models.models import User
-from app.api.v1.schemas import UserCreate, UserLogin, UserResponse, TokenResponse, RefreshRequest
 
 router = APIRouter()
 
 
-# ── Register ─────────────────────────────────────────────────────────────────
-
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def register(
+    request: Request,
     payload: UserCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Create a new student account."""
-    # Duplicate-email check
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -50,14 +53,14 @@ async def register(
     return user
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
-
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def login(
+    request: Request,
     payload: UserLogin,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Authenticate and return access + refresh tokens."""
+    """Authenticate and return access and refresh tokens."""
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
@@ -75,25 +78,22 @@ async def login(
         )
 
     token_data = {"sub": str(user.id), "role": user.role}
-    access = create_access_token(token_data)
-    refresh = create_refresh_token(token_data)
-
     return TokenResponse(
-        access_token=access,
-        refresh_token=refresh,
+        access_token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
 
-# ── Refresh ───────────────────────────────────────────────────────────────────
-
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def refresh_tokens(
+    request: Request,
     payload: RefreshRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Issue new token pair using a valid refresh token."""
-    token_payload = decode_token(payload.refresh_token)  # raises 401 if invalid
+    """Issue a new token pair using a valid refresh token."""
+    token_payload = decode_token(payload.refresh_token)
 
     if token_payload.get("type") != "refresh":
         raise HTTPException(
@@ -105,7 +105,10 @@ async def refresh_tokens(
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
 
     token_data = {"sub": str(user.id), "role": user.role}
     return TokenResponse(
@@ -114,8 +117,6 @@ async def refresh_tokens(
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
-
-# ── Me ────────────────────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: CurrentUser):

@@ -1,34 +1,50 @@
 """
 Admin-only routes: scholarship CRUD, scraper control, audit log.
 """
+
 import uuid
-from typing import Annotated, List, Optional
+from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
+from app.api.v1.schemas import (
+    AdminScholarshipCreate,
+    AdminScholarshipUpdate,
+    AuditLogResponse,
+    PaginatedResponse,
+    ScholarshipResponse,
+    ScraperRunResponse,
+)
 from app.core.database import get_db
 from app.core.dependencies import AdminUser
-from app.models.models import Scholarship, ScraperRun, AuditLog
-from app.api.v1.schemas import (
-    AdminScholarshipCreate, AdminScholarshipUpdate, ScholarshipResponse,
-    ScraperRunResponse, AuditLogResponse, PaginatedResponse,
-)
+from app.models.models import AuditLog, Scholarship, ScraperRun
+from app.services.audit_service import AuditService
 
 router = APIRouter()
+audit_service = AuditService()
 
-
-# ── Scholarship CRUD ──────────────────────────────────────────────────────────
 
 @router.post("/scholarships", response_model=ScholarshipResponse, status_code=status.HTTP_201_CREATED)
 async def create_scholarship(
+    request: Request,
     payload: AdminScholarshipCreate,
     admin: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     scholarship = Scholarship(**payload.model_dump())
     db.add(scholarship)
+    await db.flush()
+    await audit_service.log_event(
+        db,
+        admin_id=admin.id,
+        action="create_scholarship",
+        target_table="scholarships",
+        target_id=str(scholarship.id),
+        new_value=audit_service.snapshot(scholarship),
+        ip_address=audit_service.get_request_ip(request),
+    )
     await db.commit()
     await db.refresh(scholarship)
     return scholarship
@@ -36,6 +52,7 @@ async def create_scholarship(
 
 @router.patch("/scholarships/{scholarship_id}", response_model=ScholarshipResponse)
 async def update_scholarship(
+    request: Request,
     scholarship_id: uuid.UUID,
     payload: AdminScholarshipUpdate,
     admin: AdminUser,
@@ -46,10 +63,22 @@ async def update_scholarship(
     if not scholarship:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scholarship not found")
 
+    old_value = audit_service.snapshot(scholarship)
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(scholarship, field, value)
 
+    await db.flush()
+    await audit_service.log_event(
+        db,
+        admin_id=admin.id,
+        action="update_scholarship",
+        target_table="scholarships",
+        target_id=str(scholarship.id),
+        old_value=old_value,
+        new_value=audit_service.snapshot(scholarship),
+        ip_address=audit_service.get_request_ip(request),
+    )
     await db.commit()
     await db.refresh(scholarship)
     return scholarship
@@ -57,6 +86,7 @@ async def update_scholarship(
 
 @router.delete("/scholarships/{scholarship_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scholarship(
+    request: Request,
     scholarship_id: uuid.UUID,
     admin: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -66,11 +96,18 @@ async def delete_scholarship(
     if not scholarship:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scholarship not found")
 
+    await audit_service.log_event(
+        db,
+        admin_id=admin.id,
+        action="delete_scholarship",
+        target_table="scholarships",
+        target_id=str(scholarship.id),
+        old_value=audit_service.snapshot(scholarship),
+        ip_address=audit_service.get_request_ip(request),
+    )
     await db.delete(scholarship)
     await db.commit()
 
-
-# ── Scraper Control ───────────────────────────────────────────────────────────
 
 @router.get("/scraper/runs", response_model=List[ScraperRunResponse])
 async def list_scraper_runs(
@@ -85,14 +122,27 @@ async def list_scraper_runs(
 
 
 @router.post("/scraper/trigger", status_code=status.HTTP_202_ACCEPTED)
-async def trigger_scraper(admin: AdminUser):
+async def trigger_scraper(
+    request: Request,
+    admin: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     """Enqueue a full Playwright scraper run via Celery."""
     from app.tasks.scraper_tasks import run_full_scrape
+
     task = run_full_scrape.delay()
+    await audit_service.log_event(
+        db,
+        admin_id=admin.id,
+        action="trigger_scraper",
+        target_table="scraper_runs",
+        target_id=task.id,
+        new_value={"task_id": task.id, "status": "queued"},
+        ip_address=audit_service.get_request_ip(request),
+    )
+    await db.commit()
     return {"task_id": task.id, "status": "queued"}
 
-
-# ── Audit Log ─────────────────────────────────────────────────────────────────
 
 @router.get("/audit-logs", response_model=PaginatedResponse)
 async def get_audit_logs(
@@ -116,19 +166,17 @@ async def get_audit_logs(
         total=total,
         page=page,
         page_size=page_size,
-        items=[AuditLogResponse.model_validate(l) for l in logs],
+        items=[AuditLogResponse.model_validate(log) for log in logs],
     )
 
-
-# ── Stats ─────────────────────────────────────────────────────────────────────
 
 @router.get("/stats")
 async def get_platform_stats(
     admin: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Quick platform health stats for admin dashboard."""
-    from app.models.models import User, StudentProfile, Application
+    """Quick platform health stats for the admin dashboard."""
+    from app.models.models import Application, StudentProfile, User
 
     stats = {}
     for model, key in [

@@ -1,13 +1,7 @@
 """
 ScholarAI FastAPI application entry point.
-
-Features:
-  - Async lifespan (DB, embedding model warm-up)
-  - CORS middleware
-  - Request-ID middleware for distributed tracing
-  - Structured logging
-  - /health endpoint with DB check
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,39 +10,43 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-from app.core.config import settings
 from app.api.v1 import router as api_v1_router
+from app.core.config import settings
+from app.core.rate_limit import limiter
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: init DB tables + warm embedding model. Shutdown: close pool."""
+    """Startup: init DB tables and warm the embedding model if possible."""
     from app.core.database import engine
     from app.models.models import Base
 
-    logger.info("ScholarAI starting — creating DB tables if needed...")
+    logger.info("ScholarAI starting - creating DB tables if needed")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Warm up the embedding model in the background (non-blocking)
     try:
         from app.services.recommendation_service import RecommendationService
+
         RecommendationService._warm_embedding_model()
         logger.info("Embedding model warm-up complete")
     except Exception:
-        logger.warning("Embedding model warm-up skipped — install sentence-transformers")
+        logger.warning("Embedding model warm-up skipped")
 
-    logger.info("ScholarAI startup complete ✓")
+    logger.info("ScholarAI startup complete")
     yield
 
-    logger.info("ScholarAI shutting down — closing DB pool")
+    logger.info("ScholarAI shutting down - closing DB pool")
     await engine.dispose()
 
 
@@ -61,7 +59,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,9 +69,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*", "X-Request-ID"],
 )
+app.add_middleware(SlowAPIMiddleware)
 
-
-# ── Request-ID middleware (adds X-Request-ID to every response) ───────────────
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
@@ -82,18 +80,15 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
 app.include_router(api_v1_router, prefix="/api/v1")
 
 
-# ── System endpoints ──────────────────────────────────────────────────────────
-
 @app.get("/health", tags=["system"])
 async def health_check():
-    """Liveness probe — returns DB connectivity status."""
-    from app.core.database import async_session_factory
+    """Liveness probe that returns DB connectivity status."""
     from sqlalchemy import text
+
+    from app.core.database import async_session_factory
 
     db_ok = False
     try:
