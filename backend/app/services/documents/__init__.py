@@ -1,5 +1,3 @@
-class DocumentsService:
-    """Reserved for bounded document workflows after the first vertical slice."""
+from app.services.documents.service import DocumentService
 
-
-__all__ = ["DocumentsService"]
+__all__ = ["DocumentService"]

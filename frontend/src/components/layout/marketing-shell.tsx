@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AuthActions } from "@/components/auth/auth-actions";
 import { appRoutes } from "@/lib/routes";
 
 type MarketingShellProps = {
@@ -30,6 +31,7 @@ export function MarketingShell({
               </Link>
             ))}
           </div>
+          <AuthActions />
         </nav>
         <header className="hero-block">
           <p className="section-eyebrow">{eyebrow}</p>

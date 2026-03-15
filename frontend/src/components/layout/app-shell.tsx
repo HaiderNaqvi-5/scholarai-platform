@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AuthActions } from "@/components/auth/auth-actions";
 import { appRoutes } from "@/lib/routes";
 
 type AppShellProps = {
@@ -30,6 +31,7 @@ export function AppShell({
               </Link>
             ))}
           </div>
+          <AuthActions />
         </nav>
         <header className="page-header">
           <p className="section-eyebrow">{eyebrow}</p>
@@ -39,8 +41,9 @@ export function AppShell({
         <div className="mode-banner">
           <span className="mode-banner__label">Foundation phase</span>
           <p className="mode-banner__copy">
-            Structured validated data remains the authority. Placeholder pages
-            reserve workflows without implying shipped functionality.
+            Structured validated data remains the authority. Active MVP slices
+            stay narrow and grounded without implying broader functionality than
+            the product actually supports.
           </p>
         </div>
         {children}

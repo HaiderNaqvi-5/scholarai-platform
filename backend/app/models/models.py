@@ -46,6 +46,30 @@ class RequirementType(enum.StrEnum):
     OTHER = "other"
 
 
+class ApplicationStatus(enum.StrEnum):
+    SAVED = "saved"
+    PLANNING = "planning"
+    SUBMITTED = "submitted"
+    CLOSED = "closed"
+
+
+class DocumentType(enum.StrEnum):
+    SOP = "sop"
+    ESSAY = "essay"
+
+
+class DocumentInputMethod(enum.StrEnum):
+    TEXT = "text"
+    FILE = "file"
+
+
+class DocumentProcessingStatus(enum.StrEnum):
+    SUBMITTED = "submitted"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -79,6 +103,16 @@ class User(Base):
         "StudentProfile",
         back_populates="user",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    applications: Mapped[list["Application"]] = relationship(
+        "Application",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    documents: Mapped[list["DocumentRecord"]] = relationship(
+        "DocumentRecord",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 
@@ -258,6 +292,52 @@ class ScholarshipRequirement(Base):
     __table_args__ = (Index("ix_scholarship_requirements_type", "requirement_type"),)
 
 
+class Application(Base):
+    __tablename__ = "applications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    scholarship_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[ApplicationStatus] = mapped_column(
+        Enum(ApplicationStatus, name="application_status"),
+        nullable=False,
+        default=ApplicationStatus.SAVED,
+    )
+    estimated_fit_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    explanation_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="applications")
+    scholarship: Mapped["Scholarship"] = relationship("Scholarship")
+
+    __table_args__ = (
+        Index("ix_applications_user_status", "user_id", "status"),
+        Index("ix_applications_user_scholarship", "user_id", "scholarship_id", unique=True),
+    )
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
@@ -285,4 +365,105 @@ class AuditLog(Base):
     __table_args__ = (
         Index("ix_audit_logs_entity", "entity_type", "entity_id"),
         Index("ix_audit_logs_created_at", "created_at"),
+    )
+
+
+class DocumentRecord(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    document_type: Mapped[DocumentType] = mapped_column(
+        Enum(DocumentType, name="document_type"),
+        nullable=False,
+    )
+    input_method: Mapped[DocumentInputMethod] = mapped_column(
+        Enum(DocumentInputMethod, name="document_input_method"),
+        nullable=False,
+    )
+    original_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(nullable=True)
+    storage_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    processing_status: Mapped[DocumentProcessingStatus] = mapped_column(
+        Enum(DocumentProcessingStatus, name="document_processing_status"),
+        nullable=False,
+        default=DocumentProcessingStatus.SUBMITTED,
+    )
+    latest_feedback_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="documents")
+    feedback_entries: Mapped[list["DocumentFeedback"]] = relationship(
+        "DocumentFeedback",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_documents_user_created_at", "user_id", "created_at"),
+        Index("ix_documents_processing_status", "processing_status"),
+    )
+
+
+class DocumentFeedback(Base):
+    __tablename__ = "document_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[DocumentProcessingStatus] = mapped_column(
+        Enum(DocumentProcessingStatus, name="document_feedback_status"),
+        nullable=False,
+        default=DocumentProcessingStatus.COMPLETED,
+    )
+    feedback_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    limitation_notice: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    document: Mapped["DocumentRecord"] = relationship(
+        "DocumentRecord",
+        back_populates="feedback_entries",
+    )
+
+    __table_args__ = (
+        Index("ix_document_feedback_document_created_at", "document_id", "created_at"),
     )

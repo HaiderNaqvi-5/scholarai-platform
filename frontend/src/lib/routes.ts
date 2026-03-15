@@ -26,14 +26,14 @@ export const appRoutes = [
   {
     href: "/dashboard",
     label: "Dashboard",
-    description: "Calm navigation surface for readiness and follow-up actions.",
-    status: "reserved",
+    description: "Authenticated workspace for saved opportunities and next actions.",
+    status: "active",
   },
   {
     href: "/document-feedback",
     label: "Document Feedback",
-    description: "Reserved workflow for bounded, grounded writing assistance.",
-    status: "deferred",
+    description: "Text-first SOP and essay feedback with bounded grounded guidance.",
+    status: "active",
   },
   {
     href: "/interview",

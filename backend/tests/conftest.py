@@ -12,5 +12,14 @@ from app.main import create_app
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app())
+def app():
+    application = create_app()
+    try:
+        yield application
+    finally:
+        application.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(app) -> TestClient:
+    return TestClient(app)

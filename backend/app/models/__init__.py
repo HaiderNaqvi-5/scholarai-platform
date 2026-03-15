@@ -1,6 +1,13 @@
 from app.models.models import (
     AuditLog,
+    Application,
+    ApplicationStatus,
     DegreeLevel,
+    DocumentFeedback,
+    DocumentInputMethod,
+    DocumentProcessingStatus,
+    DocumentRecord,
+    DocumentType,
     RecordState,
     RequirementType,
     Scholarship,
@@ -13,7 +20,14 @@ from app.models.models import (
 
 __all__ = [
     "AuditLog",
+    "Application",
+    "ApplicationStatus",
     "DegreeLevel",
+    "DocumentFeedback",
+    "DocumentInputMethod",
+    "DocumentProcessingStatus",
+    "DocumentRecord",
+    "DocumentType",
     "RecordState",
     "RequirementType",
     "Scholarship",

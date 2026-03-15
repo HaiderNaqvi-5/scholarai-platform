@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
 
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 const displayFont = Sora({
@@ -36,7 +37,7 @@ export default function RootLayout({
       <body
         className={`${displayFont.variable} ${uiFont.variable} ${monoFont.variable} app-body`}
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
