@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scholarai-api"
+version = "0.1.0"
+description = "ScholarAI FastAPI application scaffold"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic==1.13.0",
+  "fastapi==0.115.0",
+  "orjson==3.10.7",
+  "pydantic==2.9.0",
+  "pydantic-settings==2.5.0",
+  "sqlalchemy==2.0.35",
+  "structlog==24.4.0",
+  "uvicorn[standard]==0.30.0"
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

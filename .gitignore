@@ -30,11 +30,13 @@ node_modules/
 .next/
 out/
 .turbo/
+*.tsbuildinfo
 
 # Environment
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # IDE
 .vscode/
@@ -42,6 +44,10 @@ out/
 *.swp
 *.swo
 *~
+.agents/
+.codex/*
+!.codex/
+!.codex/AGENTS.md
 
 # OS
 .DS_Store
@@ -59,3 +65,8 @@ backups/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+
+# Monorepo scaffold exceptions
+!infra/env/
+!infra/env/.env.example

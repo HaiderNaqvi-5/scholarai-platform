@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scholarai-workers"
+version = "0.1.0"
+description = "ScholarAI Celery worker scaffold"
+requires-python = ">=3.11"
+dependencies = [
+  "celery[redis]==5.4.0",
+  "pydantic-settings==2.5.0",
+  "redis==5.0.8"
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

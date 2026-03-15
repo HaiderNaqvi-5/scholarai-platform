@@ -1,42 +1,35 @@
-# ScholarAI Platform — Technical Blueprint
+# ScholarAI Platform
 
-**AI-Powered Scholarship Discovery and Preparation Platform**
+This repository contains the initial ScholarAI monorepo scaffold aligned with the documentation pack in `docs/scholarai/`. The documented MVP remains a Canada-first, modular monolith with a Next.js web app, FastAPI API, Celery workers, PostgreSQL, Redis, and low-ops Docker Compose environments.
 
-An end-to-end platform that guides students through discovering scholarships, generating AI-based eligibility matches, preparing with an AI interview simulator, and connecting with mentors.
+## Authoritative Documentation
 
----
+- `docs/scholarai/README.md` is the entrypoint for the ScholarAI documentation pack.
+- `docs/scholarai/WORKPLAN.md` and the numbered docs define the MVP scope, architecture, data-trust rules, and roadmap.
+- Older legacy directories remain in the repo for now, but the new scaffold below is the intended monorepo shape for the documented MVP.
 
-## 🏗️ 6 Core Modules
-
-1. **Targeted Discovery Engine**: Playwright scraping for MS DS/AI programs in Canada.
-2. **Hybrid Recommendation Engine**: 3-stage pipeline (Knowledge Graph → Vector Search → XGBoost).
-3. **Explainable AI (XAI)**: SHAP/LIME feature contributions for match transparency.
-4. **RAG Application Assistant**: LangChain-powered SOP/CV critique.
-5. **AI Mock Interview System**: Whisper speech-to-text with GPT-4 evaluation rubrics.
-6. **Role-Based Dashboards**: Portals for Students, Mentors, and Admins.
-
----
-
-## 🛠️ Technology Stack (2025-2026)
-
-- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
-- **Backend:** FastAPI (Python 3.11+), Celery
-- **Databases:** PostgreSQL (pgvector), Neo4j (Graph), OpenSearch (Text Search)
-- **AI/ML:** scikit-learn, XGBoost, LangChain, Whisper, MLflow, HuggingFace
-- **DevOps:** Docker, GitHub Actions
-
----
-
-## 📁 Repository Structure
+## Monorepo Scaffold
 
 ```text
 scholarai-platform/
-├── docs/                    # Architectural Specifications (PRD, API, DB Schema)
-├── backend/                 # FastAPI REST Services and Application Logic
-├── frontend/                # Next.js Application UI
-├── ai_services/             # LangChain agents, MLflow, XGBoost pipelines
-├── scrapers/                # Core Playwright scraping logic
-└── setup/                   # Docker-compose and seeding scripts
+|-- apps/
+|   |-- api/
+|   \-- web/
+|-- workers/
+|-- shared/
+|-- infra/
+|-- tests/
+|-- docs/
+|   \-- scholarai/
+|-- backend/      # legacy implementation baseline retained during scaffold setup
+|-- frontend/     # legacy implementation baseline retained during scaffold setup
+\-- ai_services/  # legacy experiments retained during scaffold setup
 ```
 
-Complete technical documentation resides in the [docs/](/docs) folder. Please read `docs/PRD.md` and `docs/architecture.md` for in-depth system designs.
+## MVP Guardrails
+
+- Keep the MVP as a modular monolith.
+- Treat structured validated data as the source of truth.
+- Keep scope Canada-first, with `Fulbright-related USA scope` only where explicitly allowed.
+- Keep `DAAD deferred`.
+- Do not treat optional graph or search infrastructure as mandatory day-one runtime dependencies.
