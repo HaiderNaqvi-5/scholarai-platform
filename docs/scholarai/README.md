@@ -26,7 +26,8 @@ docs/scholarai/
 ├── 11_research_and_evaluation.md
 ├── 12_execution_plan.md
 ├── 13_qa_devops_and_risks.md
-└── 14_future_roadmap.md
+├── 14_future_roadmap.md
+└── DEMO_READINESS_AUDIT.md
 ```
 
 ## Section-To-File Mapping

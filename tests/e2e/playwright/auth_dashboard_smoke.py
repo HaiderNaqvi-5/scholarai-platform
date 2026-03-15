@@ -5,8 +5,9 @@ def main() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto("http://localhost:3000/login")
+        page.goto("http://localhost:3000/dashboard")
         page.wait_for_load_state("networkidle")
+        page.wait_for_url("**/login?next=%2Fdashboard")
 
         page.locator('[data-testid="login-form"] input[name="email"]').fill(
             "student@example.com"

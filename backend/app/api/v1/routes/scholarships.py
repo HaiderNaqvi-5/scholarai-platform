@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
 from app.models import RecordState, Scholarship
 from app.schemas import ScholarshipDetailResponse, ScholarshipListItem
 from app.services.recommendations.eligibility import scholarship_in_scope
@@ -17,7 +16,6 @@ router = APIRouter()
 
 @router.get("", response_model=list[ScholarshipListItem])
 async def list_scholarships(
-    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     country_code: str | None = Query(default=None, min_length=2, max_length=2),
     limit: int = Query(default=25, ge=1, le=50),
@@ -44,7 +42,6 @@ async def list_scholarships(
 @router.get("/{scholarship_id}", response_model=ScholarshipDetailResponse)
 async def get_scholarship(
     scholarship_id: uuid.UUID,
-    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ScholarshipDetailResponse:
     result = await db.execute(

@@ -89,3 +89,26 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
     assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
+
+
+async def test_auth_service_refresh_session_returns_new_tokens():
+    user = SimpleNamespace(
+        id="user-1",
+        email="student@example.com",
+        password_hash=hash_password("correct-password"),
+        role=SimpleNamespace(value="student"),
+        is_active=True,
+    )
+    session = FakeSession([ScalarResult(one=user)])
+    service = AuthService(session)
+
+    login_tokens, _ = await service.login(
+        UserLogin(email="student@example.com", password="correct-password")
+    )
+    assert login_tokens is not None
+
+    refreshed = await service.refresh_session(login_tokens.refresh_token)
+
+    assert refreshed.access_token
+    assert refreshed.refresh_token
+    assert refreshed.expires_in > 0

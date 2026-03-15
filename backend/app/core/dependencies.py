@@ -31,7 +31,7 @@ async def get_current_user(
 
     Raises 401 if token is invalid/expired, 403 if user is inactive.
     """
-    payload = decode_token(token)  # raises 401 on bad token
+    payload = decode_token(token, expected_type="access")  # raises 401 on bad token
 
     user_id_raw = payload.get("sub")
     if user_id_raw is None:

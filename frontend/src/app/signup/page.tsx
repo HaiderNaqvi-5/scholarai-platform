@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { isApiError, useAuth } from "@/components/auth/auth-provider";
@@ -10,6 +10,7 @@ import { MarketingShell } from "@/components/layout/marketing-shell";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, register } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -17,11 +18,13 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const nextPath = searchParams.get("next") ?? "/dashboard";
+
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace(nextPath);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, nextPath, router]);
 
   return (
     <MarketingShell
@@ -39,7 +42,7 @@ export default function SignupPage() {
             setIsSubmitting(true);
             try {
               await register({ full_name: fullName, email, password });
-              router.push("/dashboard");
+              router.push(nextPath);
             } catch (caughtError) {
               setError(
                 isApiError(caughtError)

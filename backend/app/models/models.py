@@ -20,6 +20,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
+def enum_values(enum_cls: type[enum.StrEnum]) -> list[str]:
+    return [member.value for member in enum_cls]
+
+
 class UserRole(enum.StrEnum):
     STUDENT = "student"
     ADMIN = "admin"
@@ -92,7 +96,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role"),
+        Enum(UserRole, name="user_role", values_callable=enum_values),
         default=UserRole.STUDENT,
         nullable=False,
     )
@@ -151,7 +155,7 @@ class StudentProfile(Base):
     gpa_scale: Mapped[float] = mapped_column(Numeric(4, 1), nullable=False, default=4.0)
     target_field: Mapped[str] = mapped_column(String(120), nullable=False)
     target_degree_level: Mapped[DegreeLevel] = mapped_column(
-        Enum(DegreeLevel, name="degree_level"),
+        Enum(DegreeLevel, name="degree_level", values_callable=enum_values),
         nullable=False,
         default=DegreeLevel.MS,
     )
@@ -236,7 +240,7 @@ class Scholarship(Base):
     min_gpa_value: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     record_state: Mapped[RecordState] = mapped_column(
-        Enum(RecordState, name="scholarship_record_state"),
+        Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
         default=RecordState.RAW,
     )
@@ -307,7 +311,7 @@ class ScholarshipRequirement(Base):
         nullable=False,
     )
     requirement_type: Mapped[RequirementType] = mapped_column(
-        Enum(RequirementType, name="requirement_type"),
+        Enum(RequirementType, name="requirement_type", values_callable=enum_values),
         nullable=False,
     )
     operator: Mapped[str] = mapped_column(String(16), nullable=False, default="eq")
@@ -346,7 +350,7 @@ class Application(Base):
         nullable=False,
     )
     status: Mapped[ApplicationStatus] = mapped_column(
-        Enum(ApplicationStatus, name="application_status"),
+        Enum(ApplicationStatus, name="application_status", values_callable=enum_values),
         nullable=False,
         default=ApplicationStatus.SAVED,
     )
@@ -418,11 +422,11 @@ class DocumentRecord(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     document_type: Mapped[DocumentType] = mapped_column(
-        Enum(DocumentType, name="document_type"),
+        Enum(DocumentType, name="document_type", values_callable=enum_values),
         nullable=False,
     )
     input_method: Mapped[DocumentInputMethod] = mapped_column(
-        Enum(DocumentInputMethod, name="document_input_method"),
+        Enum(DocumentInputMethod, name="document_input_method", values_callable=enum_values),
         nullable=False,
     )
     original_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -431,7 +435,11 @@ class DocumentRecord(Base):
     storage_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     processing_status: Mapped[DocumentProcessingStatus] = mapped_column(
-        Enum(DocumentProcessingStatus, name="document_processing_status"),
+        Enum(
+            DocumentProcessingStatus,
+            name="document_processing_status",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=DocumentProcessingStatus.SUBMITTED,
     )
@@ -478,7 +486,11 @@ class DocumentFeedback(Base):
         nullable=False,
     )
     status: Mapped[DocumentProcessingStatus] = mapped_column(
-        Enum(DocumentProcessingStatus, name="document_feedback_status"),
+        Enum(
+            DocumentProcessingStatus,
+            name="document_feedback_status",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=DocumentProcessingStatus.COMPLETED,
     )
@@ -518,12 +530,20 @@ class InterviewSession(Base):
         nullable=False,
     )
     practice_mode: Mapped[InterviewPracticeMode] = mapped_column(
-        Enum(InterviewPracticeMode, name="interview_practice_mode"),
+        Enum(
+            InterviewPracticeMode,
+            name="interview_practice_mode",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=InterviewPracticeMode.GENERAL,
     )
     status: Mapped[InterviewSessionStatus] = mapped_column(
-        Enum(InterviewSessionStatus, name="interview_session_status"),
+        Enum(
+            InterviewSessionStatus,
+            name="interview_session_status",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=InterviewSessionStatus.NOT_STARTED,
     )

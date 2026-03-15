@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.models import User
-from app.schemas import TokenResponse, UserCreate, UserLogin, UserResponse
+from app.schemas import (
+    RefreshTokenRequest,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from app.services.auth import AuthService
 
 router = APIRouter()
@@ -51,3 +57,12 @@ async def login(
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: CurrentUser) -> User:
     return current_user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_session(
+    payload: RefreshTokenRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenResponse:
+    service = AuthService(db)
+    return await service.refresh_session(payload.refresh_token)

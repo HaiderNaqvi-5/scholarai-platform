@@ -14,7 +14,7 @@ config.set_main_option(
     settings.DATABASE_URL.replace("+asyncpg", "+psycopg2"),
 )
 
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.get_section("loggers"):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

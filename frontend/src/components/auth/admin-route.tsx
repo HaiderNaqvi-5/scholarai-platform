@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -13,18 +13,21 @@ export function AdminRoute({
   message?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { currentUser, isAuthenticated, isLoading } = useAuth();
+  const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace("/login?next=/curation");
+      router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
       return;
     }
 
     if (!isLoading && isAuthenticated && currentUser?.role !== "admin") {
       router.replace("/dashboard");
     }
-  }, [currentUser?.role, isAuthenticated, isLoading, router]);
+  }, [currentUser?.role, isAuthenticated, isLoading, nextPath, router]);
 
   if (isLoading) {
     return (

@@ -1,4 +1,10 @@
-from app.schemas.auth import TokenResponse, UserCreate, UserLogin, UserResponse
+from app.schemas.auth import (
+    RefreshTokenRequest,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from app.schemas.curation import (
     CurationActionRequest,
     CurationRecordDetail,
@@ -64,6 +70,7 @@ __all__ = [
     "ScholarshipListItem",
     "StudentProfileResponse",
     "StudentProfileUpsertRequest",
+    "RefreshTokenRequest",
     "TokenResponse",
     "UserCreate",
     "UserLogin",

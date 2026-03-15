@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -35,8 +37,8 @@ class StudentProfileUpsertRequest(BaseModel):
 class StudentProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    user_id: str
+    id: UUID
+    user_id: UUID
     citizenship_country_code: str
     gpa_value: float | None
     gpa_scale: float

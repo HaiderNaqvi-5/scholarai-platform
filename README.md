@@ -47,10 +47,32 @@ scholarai-platform/
 ```
 
 ## Implementation Status
-- Repository status: documentation-first migration in progress.
-- Canonical docs `01` through `14` now define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
-- Phase 1 foundation implementation keeps `frontend/` and `backend/` as the active roots while the repo is normalized in place.
-- Advanced features remain deferred until the first vertical slice is implemented against the normalized foundation.
+- Repository status: active MVP implementation with documentation-led scope control.
+- Canonical docs `01` through `14` define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
+- The current implementation includes auth, dashboard, saved opportunities, seeded recommendation flow, document assistance, interview practice, and curator workflow foundations.
+- Fresh local environments now use an Alembic-driven bootstrap path plus seeded demo data for MVP rehearsal.
+
+## Local MVP Run
+### Docker Compose
+1. Run `docker compose up --build`.
+2. If you need custom values, copy `.env.example` to `.env` and adjust it first.
+3. Open `http://localhost:3000`.
+
+### Direct Local Run
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Copy `frontend/.env.local.example` to `frontend/.env.local`.
+3. Start PostgreSQL and Redis locally.
+4. In `backend/`, run `pip install -r requirements.txt`.
+5. In `frontend/`, run `npm ci`.
+6. Run `python scripts/bootstrap_local.py` from `backend/` to apply migrations and seed the demo dataset.
+7. Start the backend with `uvicorn app.main:app --reload`.
+8. Start the frontend with `npm run dev`.
+
+## Demo Readiness
+- Current repo-level audit: `docs/scholarai/DEMO_READINESS_AUDIT.md`
+- Recommended local demo path: login -> dashboard -> profile -> recommendations -> document feedback -> interview -> curation
+- API rehearsal script: `backend/scripts/rehearse_seeded_demo.py`
+- Rehearsal script: `tests/e2e/playwright/rehearse_seeded_demo.py`
 
 ## MVP decision
 ScholarAI implementation will follow a documentation-first path, with `docs/scholarai/` as the active source of truth.

@@ -1,8 +1,15 @@
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.models import User
 from app.schemas import TokenResponse, UserCreate, UserLogin
 
@@ -44,4 +51,36 @@ class AuthService:
                 expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             ),
             None,
+        )
+
+    async def refresh_session(self, refresh_token: str) -> TokenResponse:
+        payload = decode_token(refresh_token, expected_type="refresh")
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token subject is missing",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is disabled",
+            )
+
+        token_data = {"sub": str(user.id), "role": user.role.value}
+        return TokenResponse(
+            access_token=create_access_token(token_data),
+            refresh_token=create_refresh_token(token_data),
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )

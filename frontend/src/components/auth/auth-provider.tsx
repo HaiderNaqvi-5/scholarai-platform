@@ -14,6 +14,7 @@ import type { ApiError, AuthTokens, UserSession } from "@/lib/types";
 
 const ACCESS_TOKEN_KEY = "scholarai.access_token";
 const REFRESH_TOKEN_KEY = "scholarai.refresh_token";
+const ACCESS_TOKEN_EXPIRY_KEY = "scholarai.access_token_expires_at";
 
 type LoginPayload = {
   email: string;
@@ -39,13 +40,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(ACCESS_TOKEN_EXPIRY_KEY);
     setAccessToken(null);
+    setRefreshToken(null);
     setCurrentUser(null);
   }, []);
 
@@ -54,28 +58,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(user);
   }, []);
 
+  const persistTokens = useCallback((tokens: AuthTokens) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+    localStorage.setItem(
+      ACCESS_TOKEN_EXPIRY_KEY,
+      String(Date.now() + tokens.expires_in * 1000),
+    );
+    setAccessToken(tokens.access_token);
+    setRefreshToken(tokens.refresh_token);
+  }, []);
+
+  const refreshSession = useCallback(
+    async (tokenOverride?: string | null) => {
+      const refreshTokenToUse =
+        tokenOverride ??
+        refreshToken ??
+        (typeof window !== "undefined"
+          ? localStorage.getItem(REFRESH_TOKEN_KEY)
+          : null);
+
+      if (!refreshTokenToUse) {
+        clearSession();
+        throw new Error("No refresh token available");
+      }
+
+      const tokens = await apiRequest<AuthTokens>("/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refresh_token: refreshTokenToUse }),
+      });
+      persistTokens(tokens);
+      await loadCurrentUser(tokens.access_token);
+      return tokens.access_token;
+    },
+    [clearSession, loadCurrentUser, persistTokens, refreshToken],
+  );
+
   useEffect(() => {
     const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!storedToken) {
+    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!storedToken && !storedRefreshToken) {
       setIsLoading(false);
       return;
     }
 
     setAccessToken(storedToken);
-    loadCurrentUser(storedToken)
-      .catch(() => {
+    setRefreshToken(storedRefreshToken);
+    const bootstrapSession = async () => {
+      if (!storedToken && storedRefreshToken) {
+        await refreshSession(storedRefreshToken);
+        return;
+      }
+
+      await loadCurrentUser(storedToken as string);
+    };
+
+    bootstrapSession()
+      .catch(async (error) => {
+        if (isApiError(error) && error.status === 401 && storedRefreshToken) {
+          try {
+            await refreshSession(storedRefreshToken);
+            return;
+          } catch {
+            clearSession();
+            return;
+          }
+        }
+
         clearSession();
       })
       .finally(() => {
         setIsLoading(false);
       });
-  }, [clearSession, loadCurrentUser]);
-
-  const persistTokens = useCallback((tokens: AuthTokens) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-    setAccessToken(tokens.access_token);
-  }, []);
+  }, [clearSession, loadCurrentUser, refreshSession]);
 
   const login = useCallback(
     async (payload: LoginPayload) => {
@@ -117,11 +172,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession]);
 
   const refreshUser = useCallback(async () => {
-    if (!accessToken) {
+    if (!accessToken && !refreshToken) {
       throw new Error("No active token");
     }
-    await loadCurrentUser(accessToken);
-  }, [accessToken, loadCurrentUser]);
+    try {
+      if (!accessToken) {
+        await refreshSession();
+        return;
+      }
+      await loadCurrentUser(accessToken);
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        await refreshSession();
+        return;
+      }
+      throw error;
+    }
+  }, [accessToken, loadCurrentUser, refreshSession, refreshToken]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const nextAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      const nextRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+      setAccessToken(nextAccessToken);
+      setRefreshToken(nextRefreshToken);
+
+      if (!nextAccessToken) {
+        setCurrentUser(null);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!refreshToken) {
+      return;
+    }
+
+    const storedExpiry = localStorage.getItem(ACCESS_TOKEN_EXPIRY_KEY);
+    if (!storedExpiry) {
+      return;
+    }
+
+    const expiresAt = Number(storedExpiry);
+    if (!Number.isFinite(expiresAt)) {
+      return;
+    }
+
+    const refreshLeadMs = 60_000;
+    const delay = Math.max(expiresAt - Date.now() - refreshLeadMs, 5_000);
+
+    const timeoutId = window.setTimeout(() => {
+      void refreshSession().catch(() => {
+        clearSession();
+      });
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [clearSession, refreshSession, refreshToken]);
 
   const value = useMemo(
     () => ({
