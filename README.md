@@ -1,42 +1,70 @@
-# ScholarAI Platform — Technical Blueprint
+# ScholarAI Platform
 
-**AI-Powered Scholarship Discovery and Preparation Platform**
+ScholarAI is an AI-powered scholarship platform focused on helping students discover scholarships, evaluate eligibility, plan application strategy, improve application documents, and practice scholarship interviews.
 
-An end-to-end platform that guides students through discovering scholarships, generating AI-based eligibility matches, preparing with an AI interview simulator, and connecting with mentors.
+## Current MVP Scope
+- Delivery model: 3 developers, 16 weeks, limited budget.
+- Architecture style: modular monolith.
+- Primary corpus: Canada-focused scholarship and program scope.
+- Program scope: MS Data Science, MS Artificial Intelligence, MS Analytics.
+- USA scope: limited to Fulbright-related information and narrowly scoped cross-border logic.
+- DAAD: deferred to Future Research Extensions.
+- Source of truth for policy-critical fields: structured validated data (not free-form generation).
 
----
+## High-Level Architecture Summary
+- Frontend: Next.js + React + TypeScript + TailwindCSS.
+- Backend: FastAPI.
+- Async processing: Celery + Redis.
+- Data layer: PostgreSQL + pgvector.
+- Knowledge Graph Layer: mandatory logical layer, implemented in MVP as either narrowly scoped Neo4j or a relationally derived graph abstraction.
+- Ingestion: Playwright + Pandas + Pydantic.
+- Deployment baseline: Docker Compose.
+- Database migrations: Alembic.
+- CI/CD baseline: GitHub Actions.
 
-## 🏗️ 6 Core Modules
+## Documentation Entry Points
+- Canonical docs index: `docs/scholarai/README.md`
+- Migration and authoring plan: `docs/scholarai/WORKPLAN.md`
+- Governing migration specification: `docs/scholarai/CODEX_MASTER_PROMPT_V1.md`
+- Current migration task: `docs/scholarai/CODEX_TASK_01_DOC_MIGRATION.md`
 
-1. **Targeted Discovery Engine**: Playwright scraping for MS DS/AI programs in Canada.
-2. **Hybrid Recommendation Engine**: 3-stage pipeline (Knowledge Graph → Vector Search → XGBoost).
-3. **Explainable AI (XAI)**: SHAP/LIME feature contributions for match transparency.
-4. **RAG Application Assistant**: LangChain-powered SOP/CV critique.
-5. **AI Mock Interview System**: Whisper speech-to-text with GPT-4 evaluation rubrics.
-6. **Role-Based Dashboards**: Portals for Students, Mentors, and Admins.
+Legacy files under `docs/` are being migrated into `docs/scholarai/` and should be treated as transitional inputs until archived.
 
----
-
-## 🛠️ Technology Stack (2025-2026)
-
-- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
-- **Backend:** FastAPI (Python 3.11+), Celery
-- **Databases:** PostgreSQL (pgvector), Neo4j (Graph), OpenSearch (Text Search)
-- **AI/ML:** scikit-learn, XGBoost, LangChain, Whisper, MLflow, HuggingFace
-- **DevOps:** Docker, GitHub Actions
-
----
-
-## 📁 Repository Structure
-
+## Repository Navigation
 ```text
 scholarai-platform/
-├── docs/                    # Architectural Specifications (PRD, API, DB Schema)
-├── backend/                 # FastAPI REST Services and Application Logic
-├── frontend/                # Next.js Application UI
-├── ai_services/             # LangChain agents, MLflow, XGBoost pipelines
-├── scrapers/                # Core Playwright scraping logic
-└── setup/                   # Docker-compose and seeding scripts
+├── backend/                 # Active FastAPI modular monolith root for Phase 1
+├── frontend/                # Active Next.js app root for Phase 1
+├── workers/                 # Thin worker scaffolding and future operational entrypoints
+├── shared/                  # Shared contracts and cross-app references
+├── tests/                   # Top-level browser and e2e planning assets
+├── infra/                   # Local-first infrastructure notes and docker guidance
+├── docs/
+│   ├── scholarai/           # Canonical active documentation pack
+│   └── *.md                 # Legacy docs pending migration
+├── ai_services/             # Legacy implementation area proposed for later archive/refactor
+└── setup/                   # Legacy setup area proposed for later archive/refactor
 ```
 
-Complete technical documentation resides in the [docs/](/docs) folder. Please read `docs/PRD.md` and `docs/architecture.md` for in-depth system designs.
+## Implementation Status
+- Repository status: documentation-first migration in progress.
+- Canonical docs `01` through `14` now define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
+- Phase 1 foundation implementation keeps `frontend/` and `backend/` as the active roots while the repo is normalized in place.
+- Advanced features remain deferred until the first vertical slice is implemented against the normalized foundation.
+
+## MVP decision
+ScholarAI implementation will follow a documentation-first path, with `docs/scholarai/` as the active source of truth.
+
+## Deferred items
+- Legacy docs archival/removal actions after migration content is finalized.
+- Feature work outside MVP constraints.
+
+## Assumptions
+- Team will use `docs/scholarai/WORKPLAN.md` as the sequencing reference for future documentation passes.
+- Legacy docs remain available for extraction until explicit archive/remove actions are approved.
+- Architecture defaults in `.codex/AGENTS.md` remain governing constraints.
+
+## Risks
+- Parallel editing in legacy and canonical docs may create inconsistencies.
+- Scope creep into deferred startup features can break MVP feasibility.
+- Early code work before canonical docs are complete can lock in conflicting assumptions.

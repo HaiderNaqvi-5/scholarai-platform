@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import decode_token, oauth2_scheme
-from app.models.models import User
+from app.models import User, UserRole
 
 
 # ── Current user ─────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ async def require_admin(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     """Assert that the authenticated user has the 'admin' role."""
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required",
@@ -87,7 +87,7 @@ async def require_student(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     """Assert that the authenticated user has the 'student' role."""
-    if current_user.role != "student":
+    if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Student role required",
