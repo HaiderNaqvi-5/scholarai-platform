@@ -70,6 +70,16 @@ class DocumentProcessingStatus(enum.StrEnum):
     FAILED = "failed"
 
 
+class InterviewSessionStatus(enum.StrEnum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class InterviewPracticeMode(enum.StrEnum):
+    GENERAL = "general"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -112,6 +122,11 @@ class User(Base):
     )
     documents: Mapped[list["DocumentRecord"]] = relationship(
         "DocumentRecord",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    interview_sessions: Mapped[list["InterviewSession"]] = relationship(
+        "InterviewSession",
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -225,10 +240,30 @@ class Scholarship(Base):
         nullable=False,
         default=RecordState.RAW,
     )
+    imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     provenance_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     source_last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    validated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unpublished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -466,4 +501,91 @@ class DocumentFeedback(Base):
 
     __table_args__ = (
         Index("ix_document_feedback_document_created_at", "document_id", "created_at"),
+    )
+
+
+class InterviewSession(Base):
+    __tablename__ = "interview_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    practice_mode: Mapped[InterviewPracticeMode] = mapped_column(
+        Enum(InterviewPracticeMode, name="interview_practice_mode"),
+        nullable=False,
+        default=InterviewPracticeMode.GENERAL,
+    )
+    status: Mapped[InterviewSessionStatus] = mapped_column(
+        Enum(InterviewSessionStatus, name="interview_session_status"),
+        nullable=False,
+        default=InterviewSessionStatus.NOT_STARTED,
+    )
+    current_question_index: Mapped[int] = mapped_column(nullable=False, default=0)
+    total_questions: Mapped[int] = mapped_column(nullable=False, default=0)
+    question_set: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="interview_sessions")
+    responses: Mapped[list["InterviewResponse"]] = relationship(
+        "InterviewResponse",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_interview_sessions_user_created_at", "user_id", "created_at"),
+        Index("ix_interview_sessions_status", "status"),
+    )
+
+
+class InterviewResponse(Base):
+    __tablename__ = "interview_responses"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    question_index: Mapped[int] = mapped_column(nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    answer_text: Mapped[str] = mapped_column(Text, nullable=False)
+    score_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    summary_feedback: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    session: Mapped["InterviewSession"] = relationship(
+        "InterviewSession",
+        back_populates="responses",
+    )
+
+    __table_args__ = (
+        Index("ix_interview_responses_session_index", "session_id", "question_index", unique=True),
     )

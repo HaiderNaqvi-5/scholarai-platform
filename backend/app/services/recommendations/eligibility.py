@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from app.models import Scholarship, StudentProfile
 
 MVP_FIELDS = {
@@ -8,6 +10,13 @@ MVP_FIELDS = {
     "business analytics",
     "machine learning",
 }
+
+
+@dataclass
+class MatchEvaluation:
+    score: float
+    matched_criteria: list[str]
+    constraint_notes: list[str]
 
 
 def normalize_gpa(gpa_value: float | None, gpa_scale: float) -> float | None:
@@ -51,7 +60,7 @@ def scholarship_in_scope(scholarship: Scholarship) -> bool:
 def evaluate_match(
     profile: StudentProfile,
     scholarship: Scholarship,
-) -> tuple[float, list[str], list[str]] | None:
+) -> MatchEvaluation | None:
     if scholarship.record_state.value != "published":
         return None
 
@@ -70,31 +79,52 @@ def evaluate_match(
         if profile.citizenship_country_code.upper() not in normalized_rules:
             return None
 
-    reasons: list[str] = []
-    warnings: list[str] = []
+    matched_criteria: list[str] = []
+    constraint_notes: list[str] = []
     score = 0.0
 
     score += 0.35
-    reasons.append(f"Target country aligns with {scholarship.country_code}.")
+    matched_criteria.append(
+        f"Study destination matches your target country choice: {scholarship.country_code}."
+    )
 
     score += 0.25
-    reasons.append("Degree level matches the MVP MS track.")
+    matched_criteria.append("The published record explicitly supports an MS-level applicant.")
 
     if field_matches(profile.target_field, scholarship.field_tags):
         score += 0.2
-        reasons.append("Target field aligns with scholarship field tags.")
+        matched_criteria.append(
+            f"Field fit is aligned with the published tags: {', '.join(scholarship.field_tags[:3])}."
+        )
     else:
-        warnings.append("Field alignment is broad rather than exact.")
+        constraint_notes.append(
+            "Field fit is broader than exact, so review the program emphasis before shortlisting."
+        )
 
     normalized_gpa = normalize_gpa(profile.gpa_value, profile.gpa_scale)
     if scholarship.min_gpa_value is None:
-        warnings.append("Minimum GPA is not specified in the published record.")
+        constraint_notes.append(
+            "The published record does not list a GPA minimum, which lowers ranking confidence."
+        )
     elif normalized_gpa is None:
-        warnings.append("Profile GPA is missing, so GPA fit is not fully evaluated.")
+        constraint_notes.append(
+            "Your GPA was not provided, so the GPA portion of fit could not be fully evaluated."
+        )
     elif normalized_gpa < float(scholarship.min_gpa_value):
         return None
     else:
         score += 0.2
-        reasons.append("Normalized GPA clears the published minimum.")
+        matched_criteria.append(
+            f"Your normalized GPA clears the published minimum of {float(scholarship.min_gpa_value):.1f}."
+        )
 
-    return round(min(score, 0.99), 2), reasons, warnings
+    if scholarship.country_code == "US":
+        matched_criteria.append(
+            "This US result remains in scope because the published source is Fulbright-related."
+        )
+
+    return MatchEvaluation(
+        score=round(min(score, 0.99), 2),
+        matched_criteria=matched_criteria,
+        constraint_notes=constraint_notes,
+    )

@@ -1,5 +1,4 @@
-class InterviewService:
-    """Reserved for text-first interview practice after the first vertical slice."""
+from app.services.interview.scoring import InterviewScoringService
+from app.services.interview.service import InterviewSessionService
 
-
-__all__ = ["InterviewService"]
+__all__ = ["InterviewScoringService", "InterviewSessionService"]

@@ -1,27 +1,58 @@
-from fastapi import APIRouter, HTTPException
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.dependencies import CurrentUser
+from app.schemas import (
+    InterviewAnswerRequest,
+    InterviewCurrentQuestionResponse,
+    InterviewSessionStartRequest,
+    InterviewSessionSummaryResponse,
+)
+from app.services.interview import InterviewSessionService
 
 router = APIRouter()
 
 
-@router.post("")
-async def create_interview_session() -> dict[str, str]:
-    raise HTTPException(
-        status_code=501,
-        detail="Interview practice is deferred until after the first vertical slice",
-    )
+@router.post("", response_model=InterviewSessionSummaryResponse, status_code=status.HTTP_201_CREATED)
+async def create_interview_session(
+    payload: InterviewSessionStartRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewSessionSummaryResponse:
+    service = InterviewSessionService(db)
+    return await service.start_session(current_user.id, payload.practice_mode)
 
 
-@router.post("/{session_id}/responses")
-async def submit_interview_response(session_id: str) -> dict[str, str]:
-    raise HTTPException(
-        status_code=501,
-        detail=f"Interview response handling for {session_id} is deferred",
-    )
+@router.get("/{session_id}", response_model=InterviewSessionSummaryResponse)
+async def get_interview_session(
+    session_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewSessionSummaryResponse:
+    service = InterviewSessionService(db)
+    return await service.get_session(current_user.id, session_id)
 
 
-@router.get("/{session_id}")
-async def get_interview_session(session_id: str) -> dict[str, str]:
-    raise HTTPException(
-        status_code=501,
-        detail=f"Interview feedback for {session_id} is deferred",
-    )
+@router.get("/{session_id}/question", response_model=InterviewCurrentQuestionResponse)
+async def get_interview_question(
+    session_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewCurrentQuestionResponse:
+    service = InterviewSessionService(db)
+    return await service.get_current_question(current_user.id, session_id)
+
+
+@router.post("/{session_id}/responses", response_model=InterviewSessionSummaryResponse)
+async def submit_interview_response(
+    session_id: uuid.UUID,
+    payload: InterviewAnswerRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewSessionSummaryResponse:
+    service = InterviewSessionService(db)
+    return await service.submit_answer(current_user.id, session_id, payload)

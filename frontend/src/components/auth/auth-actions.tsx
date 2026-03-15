@@ -35,6 +35,11 @@ export function AuthActions() {
       <Link className="nav-link" href="/dashboard">
         Dashboard
       </Link>
+      {currentUser?.role === "admin" ? (
+        <Link className="nav-link" href="/curation">
+          Curation
+        </Link>
+      ) : null}
       <button
         className="auth-link auth-link--secondary"
         onClick={() => {

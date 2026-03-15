@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
 from app.schemas.recommendations import RecommendationItem
-from app.services.recommendations.eligibility import evaluate_match
+from app.services.recommendations.eligibility import MatchEvaluation, evaluate_match
 
 
 class RecommendationService:
@@ -28,17 +28,22 @@ class RecommendationService:
             if evaluation is None:
                 continue
 
-            score, reasons, warnings = evaluation
+            fit_band = _fit_band(evaluation.score)
             recommendations.append(
                 RecommendationItem(
                     scholarship_id=str(scholarship.id),
                     title=scholarship.title,
                     provider_name=scholarship.provider_name,
+                    country_code=scholarship.country_code,
                     deadline_at=scholarship.deadline_at,
-                    estimated_fit_score=score,
-                    fit_band=_fit_band(score),
-                    top_reasons=reasons[:3],
-                    warnings=warnings,
+                    record_state=scholarship.record_state.value,
+                    estimated_fit_score=evaluation.score,
+                    fit_band=fit_band,
+                    match_summary=_build_match_summary(fit_band, evaluation),
+                    matched_criteria=evaluation.matched_criteria,
+                    constraint_notes=evaluation.constraint_notes,
+                    top_reasons=evaluation.matched_criteria[:3],
+                    warnings=evaluation.constraint_notes,
                 )
             )
 
@@ -60,3 +65,23 @@ def _fit_band(score: float) -> str:
     if score >= 0.55:
         return "possible"
     return "watch"
+
+
+def _build_match_summary(
+    fit_band: str,
+    evaluation: MatchEvaluation,
+) -> str:
+    if fit_band == "strong":
+        opening = "Strong match across the main published filters."
+    elif fit_band == "possible":
+        opening = "Possible match with clear baseline alignment."
+    else:
+        opening = "Limited-fit option worth a manual review only if it still supports your priorities."
+
+    lead_reason = evaluation.matched_criteria[0] if evaluation.matched_criteria else (
+        "This record cleared the current deterministic filter set."
+    )
+    if evaluation.constraint_notes:
+        return f"{opening} {lead_reason} Ranking stayed conservative because {evaluation.constraint_notes[0].lower()}"
+
+    return f"{opening} {lead_reason}"

@@ -32,6 +32,7 @@ export default function SignupPage() {
       <section className="auth-grid">
         <form
           className="surface-card auth-form"
+          data-testid="signup-form"
           onSubmit={async (event) => {
             event.preventDefault();
             setError(null);

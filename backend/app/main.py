@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,16 +8,23 @@ from sqlalchemy import text
 from app.api.v1 import router as api_v1_router
 from app.core.config import settings
 from app.core.database import async_session_factory
+from app.demo import seed_demo_data_if_enabled
 from app.schemas import HealthResponse
 
 
 def create_app() -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        await seed_demo_data_if_enabled()
+        yield
+
     app = FastAPI(
         title=settings.APP_NAME,
         description="ScholarAI modular monolith MVP foundation",
         version=settings.APP_VERSION,
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

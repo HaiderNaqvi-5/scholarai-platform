@@ -13,9 +13,14 @@ class RecommendationItem(BaseModel):
     scholarship_id: str
     title: str
     provider_name: str | None
+    country_code: str
     deadline_at: datetime | None
+    record_state: str
     estimated_fit_score: float
     fit_band: str
+    match_summary: str
+    matched_criteria: list[str]
+    constraint_notes: list[str]
     top_reasons: list[str]
     warnings: list[str]
 

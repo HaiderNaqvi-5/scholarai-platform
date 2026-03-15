@@ -38,7 +38,7 @@ export const appRoutes = [
   {
     href: "/interview",
     label: "Interview Practice",
-    description: "Text-first rubric workflow with audio still deferred.",
-    status: "deferred",
+    description: "Text-first practice sessions with rubric scoring and structured feedback.",
+    status: "active",
   },
 ] as const;

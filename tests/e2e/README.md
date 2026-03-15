@@ -10,9 +10,14 @@ Initial browser test plan:
 5. A future profile submission flow navigates from profile to recommendations.
 6. Login submits successfully and lands on the dashboard shell for an authenticated user.
 7. Document feedback accepts a draft submission and renders the structured feedback panel.
+8. Interview practice starts a session, accepts an answer, and renders rubric feedback.
+9. Curator dashboard loads, shows raw records, and supports a basic approval action.
+10. A new user can save a narrow profile and receive seeded published recommendations with explanation panels.
 
 Current note:
 - The `webapp-testing` skill expects helper scripts such as `scripts/with_server.py`, but that helper is not present in this repo yet.
 - Browser automation should therefore use direct Playwright scripts or add the helper later if the team standardizes on that workflow.
-- Current smoke artifacts are `tests/e2e/playwright/auth_dashboard_smoke.py` and `tests/e2e/playwright/document_feedback_smoke.py`.
-- Both scripts assume local backend and frontend servers are already running with a test user available.
+- Current smoke artifacts are `tests/e2e/playwright/auth_dashboard_smoke.py`, `tests/e2e/playwright/document_feedback_smoke.py`, `tests/e2e/playwright/interview_practice_smoke.py`, `tests/e2e/playwright/curation_smoke.py`, and `tests/e2e/playwright/seeded_recommendations_smoke.py`.
+- All scripts assume local backend and frontend servers are already running.
+- `curation_smoke.py` additionally assumes an admin user exists and at least one raw curation record is available.
+- `seeded_recommendations_smoke.py` assumes the app can seed or already contains the demo scholarship dataset.

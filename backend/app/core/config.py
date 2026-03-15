@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     MVP_PRIMARY_COUNTRY: str = "CA"
     MVP_SECONDARY_COUNTRY: str = "US"
     MVP_FULBRIGHT_KEYWORD: str = "fulbright"
+    AUTO_SEED_DEMO_DATA: bool = True
 
 
 settings = Settings()

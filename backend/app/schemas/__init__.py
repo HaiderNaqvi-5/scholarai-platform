@@ -1,4 +1,11 @@
 from app.schemas.auth import TokenResponse, UserCreate, UserLogin, UserResponse
+from app.schemas.curation import (
+    CurationActionRequest,
+    CurationRecordDetail,
+    CurationRecordListResponse,
+    CurationRecordSummary,
+    CurationRecordUpdateRequest,
+)
 from app.schemas.documents import (
     DocumentDetailResponse,
     DocumentFeedbackRefreshResponse,
@@ -8,6 +15,14 @@ from app.schemas.documents import (
     DocumentSubmissionResponse,
 )
 from app.schemas.health import ErrorEnvelope, HealthResponse
+from app.schemas.interviews import (
+    InterviewAnswerFeedback,
+    InterviewAnswerRequest,
+    InterviewCurrentQuestionResponse,
+    InterviewRubricDimension,
+    InterviewSessionStartRequest,
+    InterviewSessionSummaryResponse,
+)
 from app.schemas.recommendations import (
     RecommendationItem,
     RecommendationListResponse,
@@ -27,8 +42,19 @@ __all__ = [
     "DocumentListResponse",
     "DocumentRecordSummary",
     "DocumentSubmissionResponse",
+    "CurationActionRequest",
+    "CurationRecordDetail",
+    "CurationRecordListResponse",
+    "CurationRecordSummary",
+    "CurationRecordUpdateRequest",
     "ErrorEnvelope",
     "HealthResponse",
+    "InterviewAnswerFeedback",
+    "InterviewAnswerRequest",
+    "InterviewCurrentQuestionResponse",
+    "InterviewRubricDimension",
+    "InterviewSessionStartRequest",
+    "InterviewSessionSummaryResponse",
     "RecommendationItem",
     "RecommendationListResponse",
     "RecommendationRequest",
