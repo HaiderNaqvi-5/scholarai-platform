@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SavedOpportunityItem(BaseModel):
@@ -19,3 +19,4 @@ class SavedOpportunityListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[SavedOpportunityItem]
+    total: int = Field(ge=0)

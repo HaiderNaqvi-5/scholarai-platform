@@ -44,7 +44,10 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
           ? apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
               token: accessToken,
             })
-          : Promise.resolve({ items: [] } satisfies SavedOpportunityListResponse);
+          : Promise.resolve({
+              items: [],
+              total: 0,
+            } satisfies SavedOpportunityListResponse);
 
         const [detail, saved] = await Promise.all([detailPromise, savedPromise]);
 

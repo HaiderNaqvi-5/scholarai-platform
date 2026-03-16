@@ -60,3 +60,13 @@ def test_public_scholarships_use_list_envelope(app, client):
     assert body["applied_sort"] == "deadline"
     assert body["items"][0]["title"] == "Waterloo AI Graduate Scholarship"
     assert body["items"][0]["record_state"] == "published"
+
+
+def test_public_scholarships_invalid_sort_uses_error_envelope(client):
+    response = client.get("/api/v1/scholarships?sort=unknown")
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"]["code"] == "BAD_REQUEST"
+    assert body["error"]["status"] == 400
+    assert "request_id" in body["error"]

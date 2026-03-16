@@ -110,6 +110,8 @@ class CurationRecordDetail(CurationRecordSummary):
 
 class CurationRecordListResponse(BaseModel):
     items: list[CurationRecordSummary]
+    total: int = Field(ge=0)
+    applied_state: str | None = None
 
 
 class IngestionRunSummary(BaseModel):
@@ -137,3 +139,4 @@ class IngestionRunDetail(IngestionRunSummary):
 
 class IngestionRunListResponse(BaseModel):
     items: list[IngestionRunSummary]
+    total: int = Field(ge=0)

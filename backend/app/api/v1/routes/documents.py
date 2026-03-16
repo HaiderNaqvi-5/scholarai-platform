@@ -24,7 +24,7 @@ async def list_documents(
 ) -> DocumentListResponse:
     service = DocumentService(db)
     items = await service.list_documents(current_user.id)
-    return DocumentListResponse(items=items)
+    return DocumentListResponse(items=items, total=len(items))
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse)

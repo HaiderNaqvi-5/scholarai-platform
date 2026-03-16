@@ -63,6 +63,7 @@ export type SavedOpportunityItem = ScholarshipListItem & {
 
 export type SavedOpportunityListResponse = {
   items: SavedOpportunityItem[];
+  total: number;
 };
 
 export type RecommendationItem = ScholarshipListItem & {
@@ -77,6 +78,7 @@ export type RecommendationItem = ScholarshipListItem & {
 
 export type RecommendationListResponse = {
   items: RecommendationItem[];
+  total: number;
 };
 
 export type DocumentType = "sop" | "essay";
@@ -119,6 +121,7 @@ export type DocumentDetail = DocumentRecordSummary & {
 
 export type DocumentListResponse = {
   items: DocumentRecordSummary[];
+  total: number;
 };
 
 export type DocumentSubmissionResponse = {
@@ -216,6 +219,8 @@ export type CurationRecordDetail = CurationRecordSummary & {
 
 export type CurationRecordListResponse = {
   items: CurationRecordSummary[];
+  total: number;
+  applied_state: CurationRecordState | null;
 };
 
 export type IngestionRunStatus =
@@ -248,6 +253,7 @@ export type IngestionRunDetail = IngestionRunSummary & {
 
 export type IngestionRunListResponse = {
   items: IngestionRunSummary[];
+  total: number;
 };
 
 export type IngestionRunStartRequest = {

@@ -28,4 +28,4 @@ async def build_recommendations(
 
     service = RecommendationService(db)
     items = await service.build_for_profile(profile, limit=payload.limit)
-    return RecommendationListResponse(items=items)
+    return RecommendationListResponse(items=items, total=len(items))

@@ -38,7 +38,10 @@ class DocumentDetailResponse(DocumentRecordSummary):
 
 
 class DocumentListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     items: list[DocumentRecordSummary]
+    total: int = Field(ge=0)
 
 
 class DocumentSubmissionResponse(BaseModel):

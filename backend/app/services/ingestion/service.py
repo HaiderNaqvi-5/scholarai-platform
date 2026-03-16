@@ -186,7 +186,7 @@ class IngestionService:
             .limit(limit)
         )
         items = [self._build_summary(item) for item in result.scalars().all()]
-        return IngestionRunListResponse(items=items)
+        return IngestionRunListResponse(items=items, total=len(items))
 
     async def get_run(self, run_id: uuid.UUID) -> IngestionRunDetail:
         result = await self.db.execute(

@@ -114,7 +114,10 @@ export function ScholarshipBrowseShell() {
           ? apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
               token: accessToken,
             })
-          : Promise.resolve({ items: [] } satisfies SavedOpportunityListResponse);
+          : Promise.resolve({
+              items: [],
+              total: 0,
+            } satisfies SavedOpportunityListResponse);
 
         const [scholarships, saved] = await Promise.all([
           scholarshipPromise,

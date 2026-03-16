@@ -29,3 +29,4 @@ class RecommendationListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[RecommendationItem]
+    total: int = Field(ge=0)

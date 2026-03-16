@@ -71,7 +71,11 @@ async def list_curation_records(
 ) -> CurationRecordListResponse:
     service = CurationService(db)
     items = await service.list_records(state=state, limit=limit)
-    return CurationRecordListResponse(items=items)
+    return CurationRecordListResponse(
+        items=items,
+        total=len(items),
+        applied_state=state.lower() if state else None,
+    )
 
 
 @router.get("/records/{record_id}", response_model=CurationRecordDetail)

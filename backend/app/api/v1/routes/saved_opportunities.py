@@ -19,7 +19,7 @@ async def list_saved_opportunities(
 ) -> SavedOpportunityListResponse:
     service = SavedOpportunityService(db)
     items = await service.list_saved(current_user.id)
-    return SavedOpportunityListResponse(items=items)
+    return SavedOpportunityListResponse(items=items, total=len(items))
 
 
 @router.post("/{scholarship_id}", response_model=SavedOpportunityItem, status_code=status.HTTP_201_CREATED)
