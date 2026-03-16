@@ -72,11 +72,12 @@ docs/scholarai/
 - Public-live readiness gap analysis: `PUBLIC_LIVE_HARDENING_PLAN.md`
 - Current codebase reality:
   - auth, protected routes, and session persistence are implemented
-  - profile save/load and seeded recommendation flow are implemented
-  - public scholarship browse and scholarship detail pages are implemented
+  - profile save/load and a functional onboarding route are implemented
+  - public scholarship browse, search/filter, and scholarship detail pages are implemented
   - dashboard, saved opportunities, document assistance, interview practice, and curation are implemented as narrow MVP slices
-  - curation now includes a manual raw-record import bridge
-  - ingestion automation and some API contract cleanup are still incomplete
+  - curation now includes manual raw import plus source-registry ingestion runs
+  - migration-driven bootstrap and browser smoke checks in CI are implemented
+  - recommendation depth, scholarship-specific preparation grounding, and broader ingestion coverage are still incomplete
 
 ## Required Diagrams List
 1. Product context and actor map.

@@ -45,26 +45,26 @@ scholarai-platform/
 ├── docs/
 │   ├── scholarai/           # Canonical active documentation pack
 │   └── *.md                 # Legacy docs pending migration
+├── backend/legacy/          # Quarantined inactive backend routes and services
 ├── ai_services/             # Legacy implementation area proposed for later archive/refactor
 └── setup/                   # Legacy setup area proposed for later archive/refactor
 ```
 
 ## Implementation Status
-- Repository status: active MVP implementation with documentation-led scope control.
+- Repository status: active internal MVP implementation with documentation-led scope control.
 - Canonical docs `01` through `14` define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
 - The current implementation includes:
   - auth and session persistence
-  - public scholarship browse and detail pages backed by published-only routes
-  - public published-scholarship read endpoints
-  - profile save/load flow
+  - public scholarship browse, search/filter, and scholarship detail pages backed by published-only routes
+  - profile save/load flow and a functional onboarding route
   - seeded recommendation flow with explanation panels
   - saved opportunities and dashboard shell
   - document assistance shell
   - interview practice shell
   - curator workflow with `raw`, `validated`, and `published` states
-  - manual raw-record import into curation as the current narrow upstream bridge
-- Fresh local environments now use an Alembic-driven bootstrap path plus seeded demo data for MVP rehearsal.
-- Remaining MVP gaps include upstream ingestion automation, broader discovery filters, and tighter API-wide contract consistency.
+  - source-registry ingestion runs that create raw records for curation
+  - migration-driven bootstrap and browser smoke checks in CI
+- Remaining implementation depth is concentrated in recommendation stages beyond the rules-first baseline, scholarship-specific grounding for preparation tools, and richer ingestion coverage.
 
 ## Local MVP Run
 ### Env files
@@ -94,12 +94,13 @@ scholarai-platform/
 - Current repo-level audit: `docs/scholarai/DEMO_READINESS_AUDIT.md`
 - Full implementation status audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
 - Internal handoff and presenter notes: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
-- Recommended local demo path: scholarships -> scholarship detail -> signup/login -> dashboard -> profile -> recommendations -> document feedback -> interview -> curation
+- Recommended local demo path: scholarships -> scholarship detail -> signup/login -> dashboard -> onboarding/profile -> recommendations -> document feedback -> interview -> curation
 - Seeded local demo accounts:
   - student: `student@example.com` / `strongpass1`
   - admin: `admin@example.com` / `strongpass1`
 - API rehearsal script: `backend/scripts/rehearse_seeded_demo.py`
 - Rehearsal script: `tests/e2e/playwright/rehearse_seeded_demo.py`
+- Smoke suite runner: `tests/e2e/playwright/run_smoke_suite.py`
 
 ## MVP decision
 ScholarAI implementation will follow a documentation-first path, with `docs/scholarai/` as the active source of truth.
