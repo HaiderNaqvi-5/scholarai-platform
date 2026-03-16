@@ -57,3 +57,98 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: scholarai
+          POSTGRES_USER: scholarai
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql+asyncpg://scholarai:password@localhost:5432/scholarai
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/0
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api/v1
+      DEMO_STUDENT_EMAIL: student@example.com
+      DEMO_STUDENT_PASSWORD: strongpass1
+      DEMO_ADMIN_EMAIL: admin@example.com
+      DEMO_ADMIN_PASSWORD: strongpass1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend and smoke dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Install Playwright browser
+        run: python -m playwright install chromium
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend for smoke
+        run: npm run build
+        working-directory: frontend
+
+      - name: Bootstrap database
+        run: python scripts/bootstrap_local.py
+        working-directory: backend
+
+      - name: Start backend
+        run: nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/scholarai-backend.log 2>&1 &
+        working-directory: backend
+
+      - name: Start frontend
+        run: nohup npm run start -- --hostname 0.0.0.0 --port 3000 > /tmp/scholarai-frontend.log 2>&1 &
+        working-directory: frontend
+
+      - name: Wait for services
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl -sf http://localhost:8000/health >/dev/null && curl -sf http://localhost:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Services did not become ready in time"
+          exit 1
+
+      - name: Run critical browser smoke
+        run: |
+          python tests/e2e/playwright/public_scholarship_browse_smoke.py
+          python tests/e2e/playwright/auth_dashboard_smoke.py
+          python tests/e2e/playwright/seeded_recommendations_smoke.py
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: |
+          echo "=== backend ==="
+          cat /tmp/scholarai-backend.log || true
+          echo "=== frontend ==="
+          cat /tmp/scholarai-frontend.log || true
