@@ -29,7 +29,8 @@ docs/scholarai/
 ├── 14_future_roadmap.md
 ├── IMPLEMENTATION_STATUS_REPORT.md
 ├── DEMO_READINESS_AUDIT.md
-└── INTERNAL_HANDOFF_PACKAGE.md
+├── INTERNAL_HANDOFF_PACKAGE.md
+└── PUBLIC_LIVE_HARDENING_PLAN.md
 ```
 
 ## Section-To-File Mapping
@@ -68,6 +69,7 @@ docs/scholarai/
 - Current repo-evidence audit: `IMPLEMENTATION_STATUS_REPORT.md`
 - Demo-readiness audit: `DEMO_READINESS_AUDIT.md`
 - Internal handoff and presentation note: `INTERNAL_HANDOFF_PACKAGE.md`
+- Public-live readiness gap analysis: `PUBLIC_LIVE_HARDENING_PLAN.md`
 - Current codebase reality:
   - auth, protected routes, and session persistence are implemented
   - profile save/load and seeded recommendation flow are implemented

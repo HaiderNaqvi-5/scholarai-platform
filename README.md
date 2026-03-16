@@ -27,6 +27,7 @@ ScholarAI is an AI-powered scholarship platform focused on helping students disc
 - Migration and authoring plan: `docs/scholarai/WORKPLAN.md`
 - Current implementation audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
 - Internal MVP handoff: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
+- Public-live hardening plan: `docs/scholarai/PUBLIC_LIVE_HARDENING_PLAN.md`
 - Governing migration specification: `docs/scholarai/CODEX_MASTER_PROMPT_V1.md`
 - Current migration task: `docs/scholarai/CODEX_TASK_01_DOC_MIGRATION.md`
 
