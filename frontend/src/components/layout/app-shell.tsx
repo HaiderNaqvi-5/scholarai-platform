@@ -18,7 +18,7 @@ type AppShellProps = {
 export function AppShell({
   title,
   description,
-  eyebrow = "ScholarAI workspace",
+  eyebrow,
   children,
   intro,
 }: AppShellProps) {
@@ -36,7 +36,6 @@ export function AppShell({
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
               <span className="brand-title">ScholarAI</span>
-              <span className="brand-subtitle">Calm, structured scholarship planning</span>
             </span>
           </Link>
           <div className="shell-nav__links">
@@ -59,7 +58,7 @@ export function AppShell({
         </nav>
         <header className="hero-block hero-block--app">
           <div className="hero-block__copy">
-            <p className="section-eyebrow">{eyebrow}</p>
+            {eyebrow ? <p className="section-eyebrow">{eyebrow}</p> : null}
             <h1 className="page-title">{title}</h1>
             <p className="page-description">{description}</p>
           </div>

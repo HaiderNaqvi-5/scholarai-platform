@@ -31,7 +31,6 @@ export function MarketingShell({
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
               <span className="brand-title">ScholarAI</span>
-              <span className="brand-subtitle">Scholarship decisions with clear provenance</span>
             </span>
           </Link>
           <div className="shell-nav__links">

@@ -301,6 +301,9 @@ class Scholarship(Base):
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    funding_amount_max: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     source_url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     source_document_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     field_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
@@ -363,6 +366,7 @@ class Scholarship(Base):
         Index("ix_scholarships_record_state", "record_state"),
         Index("ix_scholarships_country_code", "country_code"),
         Index("ix_scholarships_deadline_at", "deadline_at"),
+        Index("ix_scholarships_funding_type", "funding_type"),
     )
 
 

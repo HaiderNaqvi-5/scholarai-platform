@@ -23,12 +23,15 @@ class FakeExecuteResult:
 
 class FakeSession:
     async def execute(self, _query):
-        scholarship = Scholarship(
+        waterloo = Scholarship(
             title="Waterloo AI Graduate Scholarship",
             provider_name="University of Waterloo",
             country_code="CA",
             summary="Published scholarship summary",
-            funding_summary="Tuition support",
+            funding_summary="Stipend support",
+            funding_type="stipend",
+            funding_amount_min=12000,
+            funding_amount_max=18000,
             source_url="https://uwaterloo.ca/funding/ai-scholarship",
             field_tags=["artificial intelligence", "data science"],
             degree_levels=["MS"],
@@ -36,30 +39,63 @@ class FakeSession:
             record_state=RecordState.PUBLISHED,
             deadline_at=datetime(2026, 8, 15, tzinfo=timezone.utc),
         )
-        scholarship.id = uuid4()
-        return FakeExecuteResult([scholarship])
+        waterloo.id = uuid4()
+
+        ubc = Scholarship(
+            title="UBC MDS Excellence Entrance Award",
+            provider_name="University of British Columbia",
+            country_code="CA",
+            summary="Entrance funding for MDS applicants",
+            funding_summary="Tuition support",
+            funding_type="tuition_award",
+            funding_amount_min=8000,
+            funding_amount_max=12000,
+            source_url="https://www.grad.ubc.ca/awards/mds-excellence-entrance-award",
+            field_tags=["data science", "analytics"],
+            degree_levels=["MS"],
+            citizenship_rules=[],
+            record_state=RecordState.PUBLISHED,
+            deadline_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        )
+        ubc.id = uuid4()
+        return FakeExecuteResult([waterloo, ubc])
 
 
 async def override_get_db():
     yield FakeSession()
 
 
-def test_public_scholarships_use_list_envelope(app, client):
+def test_public_scholarships_use_paginated_envelope(app, client):
     app.dependency_overrides[get_db] = override_get_db
 
-    response = client.get("/api/v1/scholarships")
+    response = client.get("/api/v1/scholarships?page=1&page_size=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["page"] == 1
+    assert body["page_size"] == 1
+    assert body["has_more"] is True
+    assert body["applied_filters"]["degree_level"] is None
+    assert body["applied_filters"]["sort"] == "deadline"
+    assert len(body["items"]) == 1
+    assert body["items"][0]["title"] == "Waterloo AI Graduate Scholarship"
+
+
+def test_public_scholarships_apply_provider_and_funding_filters(app, client):
+    app.dependency_overrides[get_db] = override_get_db
+
+    response = client.get(
+        "/api/v1/scholarships?provider=Waterloo&funding_type=stipend&field_tag=artificial%20intelligence&page=1&page_size=12"
+    )
 
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
-    assert body["applied_country_code"] is None
-    assert body["applied_query"] is None
-    assert body["applied_field_tag"] is None
-    assert body["applied_degree_level"] is None
-    assert body["applied_deadline_within_days"] is None
-    assert body["applied_sort"] == "deadline"
+    assert body["applied_filters"]["provider"] == "Waterloo"
+    assert body["applied_filters"]["funding_type"] == "stipend"
+    assert body["applied_filters"]["field_tag"] == "artificial intelligence"
     assert body["items"][0]["title"] == "Waterloo AI Graduate Scholarship"
-    assert body["items"][0]["record_state"] == "published"
 
 
 def test_public_scholarships_invalid_sort_uses_error_envelope(client):

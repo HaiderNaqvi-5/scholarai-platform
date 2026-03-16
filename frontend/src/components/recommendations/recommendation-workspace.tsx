@@ -36,9 +36,7 @@ export function RecommendationWorkspace() {
   });
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     let isActive = true;
 
@@ -60,9 +58,7 @@ export function RecommendationWorkspace() {
           }),
         ]);
 
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
 
         setState({
           isLoading: false,
@@ -72,10 +68,7 @@ export function RecommendationWorkspace() {
           savedItems: saved.items,
         });
       } catch (caught) {
-        if (!isActive) {
-          return;
-        }
-
+        if (!isActive) return;
         const error = caught as ApiError;
         setState({
           isLoading: false,
@@ -100,9 +93,7 @@ export function RecommendationWorkspace() {
   );
 
   const handleSave = async (scholarshipId: string) => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     const item = await apiRequest<SavedOpportunityItem>(
       `/saved-opportunities/${scholarshipId}`,
@@ -124,9 +115,7 @@ export function RecommendationWorkspace() {
   };
 
   const handleUnsave = async (scholarshipId: string) => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
       method: "DELETE",
@@ -144,18 +133,12 @@ export function RecommendationWorkspace() {
   return (
     <AppShell
       eyebrow="Recommendations"
-      title="Use a saved profile to review a shortlist that explains both fit and caution."
-      description="Recommendations stay rules-first and tied to published scholarship records so the shortlist reads as guidance, not prediction."
+      title="Scholarships ranked by your profile."
+      description="Each recommendation explains why a scholarship fits and what to verify."
       intro={
-        <div className="surface-band">
-          <div className="button-row">
-            <StatusBadge label="Published records only" variant="validated" />
-            <StatusBadge label="Deterministic fit bands" variant="generated" />
-          </div>
-          <p className="body-copy">
-            Match summaries reflect explicit profile fields and scholarship constraints.
-            They are advisory, not authoritative scholarship decisions.
-          </p>
+        <div className="meta-row">
+          <StatusBadge label="Published records" variant="validated" />
+          <StatusBadge label="Profile-based ranking" variant="generated" />
         </div>
       }
     >
@@ -164,8 +147,8 @@ export function RecommendationWorkspace() {
           {state.error ? (
             <section className="surface-card" data-testid="recommendations-error">
               <PageHeader
-                eyebrow="Recommendation status"
-                title="Recommendations are not ready yet."
+                eyebrow="Status"
+                title="Recommendations are not available."
                 description={state.error}
               />
               {!state.profile ? (
@@ -179,11 +162,11 @@ export function RecommendationWorkspace() {
           <section className="surface-card">
             <PageHeader
               eyebrow="Shortlist"
-              title="Each recommendation keeps the reason visible"
-              description="Strong matches surface first, but the interface also shows what may limit fit so the ranking stays honest."
+              title="Your matches"
+              description="Strong matches appear first. Each card shows what aligned and what needs verification."
             />
             {state.isLoading ? (
-              <p className="body-copy">Loading your profile and shortlist.</p>
+              <p className="body-copy">Loading recommendations…</p>
             ) : state.items.length > 0 ? (
               <div className="recommendation-list">
                 {state.items.map((item) => {
@@ -200,13 +183,12 @@ export function RecommendationWorkspace() {
                             label={`${Math.round(item.estimated_fit_score * 100)}% ${item.fit_band}`}
                             variant={fitVariant(item.fit_band)}
                           />
-                          <StatusBadge label="Published source" variant="validated" />
+                          <span className="route-card__label">{item.country_code}</span>
                         </div>
                         <p className="route-card__label">
-                          {item.country_code} ·{" "}
                           {item.deadline_at
                             ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
-                            : "Deadline not listed"}
+                            : "No deadline listed"}
                         </p>
                       </div>
 
@@ -240,7 +222,7 @@ export function RecommendationWorkspace() {
                             </ul>
                           ) : (
                             <p className="body-copy">
-                              No material cautions surfaced from the current published record.
+                              No cautions found in the current record.
                             </p>
                           )}
                         </section>
@@ -263,11 +245,8 @@ export function RecommendationWorkspace() {
                           }
                           type="button"
                         >
-                          {isSaved ? "Saved" : "Save opportunity"}
+                          {isSaved ? "Saved" : "Save"}
                         </button>
-                        <Link className="nav-link" href="/dashboard">
-                          Open dashboard
-                        </Link>
                       </div>
                     </article>
                   );
@@ -276,11 +255,10 @@ export function RecommendationWorkspace() {
             ) : (
               <div className="empty-panel">
                 <p className="body-copy">
-                  No published seeded records matched your current profile. Adjust your
-                  target field, GPA, or country to broaden the shortlist.
+                  No matches for your current profile. Adjust your target field, GPA, or country to broaden results.
                 </p>
                 <Link className="auth-link auth-link--primary" href="/profile">
-                  Refine profile
+                  Edit profile
                 </Link>
               </div>
             )}
@@ -290,23 +268,23 @@ export function RecommendationWorkspace() {
         <div className="collection-grid">
           <section className="surface-panel">
             <PageHeader
-              eyebrow="Profile anchor"
-              title="The input behind this shortlist"
-              description="The recommendation path stays understandable because it is tied to explicit profile data."
+              eyebrow="Profile"
+              title="Your ranking inputs"
+              description="Recommendations are based on these profile fields."
             />
             {state.isLoading ? (
-              <p className="body-copy">Loading profile context.</p>
+              <p className="body-copy">Loading profile…</p>
             ) : state.profile ? (
               <div className="surface-list">
                 <article>
-                  <p className="list-heading">Target route</p>
+                  <p className="list-heading">Target</p>
                   <p className="body-copy">
                     {state.profile.target_degree_level} in {state.profile.target_field} for{" "}
                     {state.profile.target_country_code}
                   </p>
                 </article>
                 <article>
-                  <p className="list-heading">Eligibility anchors</p>
+                  <p className="list-heading">Eligibility</p>
                   <p className="body-copy">
                     Citizenship {state.profile.citizenship_country_code}, GPA{" "}
                     {state.profile.gpa_value ?? "not set"} / {state.profile.gpa_scale}
@@ -321,7 +299,7 @@ export function RecommendationWorkspace() {
             ) : (
               <div className="empty-panel">
                 <p className="body-copy">
-                  A saved profile is required before ScholarAI can score published records.
+                  A profile is required to generate recommendations.
                 </p>
                 <Link className="auth-link auth-link--primary" href="/profile">
                   Add profile
@@ -332,22 +310,21 @@ export function RecommendationWorkspace() {
 
           <section className="surface-card">
             <PageHeader
-              eyebrow="Trust boundary"
-              title="What this ranking means"
-              description="The shortlist explains why a scholarship surfaced without pretending to be a scholarship outcome predictor."
+              eyebrow="How it works"
+              title="About these recommendations"
+              description="Rankings explain why a scholarship surfaced — they don't predict outcomes."
             />
-            <div className="surface-list">
+            <div className="split-panel">
               <article className="data-callout">
-                <p className="list-heading">Validated facts</p>
+                <p className="list-heading">Verified facts</p>
                 <p className="body-copy">
-                  Titles, providers, deadlines, and publication state come directly from curated records.
+                  Titles, providers, and deadlines come from published records.
                 </p>
               </article>
               <article className="guidance-callout">
-                <p className="list-heading">Generated explanation</p>
+                <p className="list-heading">Generated explanations</p>
                 <p className="body-copy">
-                  Fit bands and reasoning summarize explicit rules and profile inputs. They do
-                  not replace the scholarship record itself.
+                  Fit scores and reasoning summarize your profile against scholarship criteria. They are advisory.
                 </p>
               </article>
             </div>
@@ -361,11 +338,7 @@ export function RecommendationWorkspace() {
 function fitVariant(
   fitBand: RecommendationItem["fit_band"],
 ): "validated" | "generated" | "warning" {
-  if (fitBand === "strong") {
-    return "validated";
-  }
-  if (fitBand === "possible") {
-    return "generated";
-  }
+  if (fitBand === "strong") return "validated";
+  if (fitBand === "possible") return "generated";
   return "warning";
 }

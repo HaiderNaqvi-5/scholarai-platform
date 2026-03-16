@@ -35,9 +35,7 @@ export function InterviewPracticeShell() {
   });
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     const sessionId = localStorage.getItem(LATEST_SESSION_KEY);
     if (!sessionId) {
@@ -53,9 +51,7 @@ export function InterviewPracticeShell() {
           `/interviews/${sessionId}`,
           { token: accessToken },
         );
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
         setState({
           isLoading: false,
           isStarting: false,
@@ -64,9 +60,7 @@ export function InterviewPracticeShell() {
           session,
         });
       } catch (error) {
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
         localStorage.removeItem(LATEST_SESSION_KEY);
         setState((current) => ({
           ...current,
@@ -90,9 +84,7 @@ export function InterviewPracticeShell() {
   );
 
   const startSession = async () => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     setState((current) => ({ ...current, isStarting: true, error: null }));
     try {
@@ -120,14 +112,12 @@ export function InterviewPracticeShell() {
   };
 
   const submitAnswer = async () => {
-    if (!accessToken || !state.session) {
-      return;
-    }
+    if (!accessToken || !state.session) return;
 
     if (answerText.trim().length < 50) {
       setState((current) => ({
         ...current,
-        error: "Write at least 50 characters before submitting an interview answer.",
+        error: "Write at least 50 characters before submitting.",
       }));
       return;
     }
@@ -160,57 +150,32 @@ export function InterviewPracticeShell() {
 
   return (
     <AppShell
-      title="Practice scholarship interview answers in a text-first, rubric-based workspace."
-      description="Interview practice stays focused and explainable so the feedback reads like coaching, not performance theater."
-      eyebrow="Interview practice"
+      title="Practice scholarship interview answers."
+      description="Text-first practice with rubric-based scoring on clarity, relevance, confidence, and specificity."
+      eyebrow="Interview"
       intro={
-        <div className="surface-band">
-          <div className="button-row">
-            <StatusBadge label="Rules-based scoring" variant="validated" />
-            <StatusBadge label="Text-first practice" variant="generated" />
-          </div>
-          <p className="body-copy">
-            The MVP uses one bounded session flow so the feedback remains readable and comparable.
-          </p>
+        <div className="meta-row">
+          <StatusBadge label="Rubric-based scoring" variant="validated" />
+          <StatusBadge label="Text practice" variant="generated" />
         </div>
       }
     >
-      <section className="interview-hero" data-testid="interview-practice-shell">
-        <div>
-          <p className="section-eyebrow">Practice workspace</p>
-          <h2 className="section-title">
-            Practice one focused session at a time with direct, modest coaching.
-          </h2>
-          <p className="body-copy">
-            The system uses a fixed rubric for clarity, relevance, confidence,
-            and specificity. It does not simulate a live conversational
-            interviewer in this MVP slice.
-          </p>
-        </div>
-        <div className="interview-hero__badges">
-          <StatusBadge label="Rules-based scoring" variant="validated" />
-          <StatusBadge label="Text first" variant="generated" />
-        </div>
-      </section>
-
       {state.error ? (
         <section className="surface-card" data-testid="interview-error">
-          <p className="section-eyebrow">Interview practice error</p>
-          <h2 className="section-title">The session needs attention.</h2>
-          <p className="body-copy">{state.error}</p>
+          <p className="form-error">{state.error}</p>
         </section>
       ) : null}
 
-      <section className="interview-grid">
+      <section className="interview-grid" data-testid="interview-practice-shell">
         <article className="surface-card">
           <PageHeader
-            eyebrow="Session entry"
-            title="Start or resume a focused session"
-            description="The question set stays intentionally narrow so scoring remains consistent and easy to interpret."
+            eyebrow="Session"
+            title="Start or resume practice"
+            description="Each session has a fixed set of questions for consistent scoring."
           />
 
           {state.isLoading ? (
-            <p className="body-copy">Loading your latest interview session.</p>
+            <p className="body-copy">Loading session…</p>
           ) : state.session ? (
             <div className="surface-list">
               <article>
@@ -231,9 +196,6 @@ export function InterviewPracticeShell() {
                     {state.session.current_question_index} of {state.session.total_questions} answered
                   </span>
                 </div>
-                <p className="body-copy">
-                  Continue this session or review the latest rubric feedback below.
-                </p>
               </article>
               <div className="document-actions">
                 <button
@@ -243,15 +205,14 @@ export function InterviewPracticeShell() {
                   onClick={() => void startSession()}
                   type="button"
                 >
-                  {state.isStarting ? "Starting new session" : "Start new session"}
+                  {state.isStarting ? "Starting…" : "New session"}
                 </button>
               </div>
             </div>
           ) : (
             <div className="empty-panel">
               <p className="body-copy">
-                No active session is stored yet. Start one fixed-text practice
-                run to see question flow and rubric feedback.
+                No active session. Start a practice run to see questions and rubric feedback.
               </p>
               <button
                 className="auth-link auth-link--primary"
@@ -260,7 +221,7 @@ export function InterviewPracticeShell() {
                 onClick={() => void startSession()}
                 type="button"
               >
-                {state.isStarting ? "Starting session" : "Start practice session"}
+                {state.isStarting ? "Starting…" : "Start session"}
               </button>
             </div>
           )}
@@ -268,17 +229,17 @@ export function InterviewPracticeShell() {
 
         <article className="surface-panel" data-testid="interview-question-panel">
           <PageHeader
-            eyebrow="Current question"
+            eyebrow="Question"
             title="Current prompt"
-            description="Questions stay fixed and modest so the feedback emphasizes structure, clarity, and specificity."
+            description="Respond with a clear, specific answer."
           />
           {currentQuestion?.question_text ? (
             <div className="surface-list">
               <article className="question-card">
                 <div className="meta-row">
-                  <StatusBadge label={`Question ${currentQuestion.question_index}`} variant="planned" />
+                  <StatusBadge label={`Q${currentQuestion.question_index}`} variant="planned" />
                   <span className="route-card__label">
-                    {currentQuestion.total_questions} total questions
+                    {currentQuestion.total_questions} total
                   </span>
                 </div>
                 <p className="body-copy">{currentQuestion.question_text}</p>
@@ -291,13 +252,11 @@ export function InterviewPracticeShell() {
                     data-testid="interview-answer-input"
                     name="interview_answer"
                     onChange={(event) => setAnswerText(event.target.value)}
-                    placeholder="Write a direct answer with one concrete example and a clear takeaway."
+                    placeholder="Write a direct answer with one concrete example."
                     rows={10}
                     value={answerText}
                   />
-                  <span className="field-note">
-                    Minimum 50 characters. Focus on one direct answer rather than a long transcript.
-                  </span>
+                  <span className="field-note">Minimum 50 characters.</span>
                 </label>
               ) : null}
               {state.session?.status !== "completed" ? (
@@ -309,7 +268,7 @@ export function InterviewPracticeShell() {
                     onClick={() => void submitAnswer()}
                     type="button"
                   >
-                    {state.isSubmitting ? "Scoring answer" : "Submit answer"}
+                    {state.isSubmitting ? "Scoring…" : "Submit answer"}
                   </button>
                 </div>
               ) : null}
@@ -318,8 +277,8 @@ export function InterviewPracticeShell() {
             <div className="empty-panel">
               <p className="body-copy">
                 {state.session?.status === "completed"
-                  ? "This session is complete. Review the results below or start a new one."
-                  : "Start a session to reveal the first question."}
+                  ? "Session complete. Review results below or start a new one."
+                  : "Start a session to see the first question."}
               </p>
             </div>
           )}
@@ -329,9 +288,9 @@ export function InterviewPracticeShell() {
       <section className="interview-grid">
         <article className="surface-card" data-testid="interview-result-view">
           <PageHeader
-            eyebrow="Latest result"
-            title="Structured rubric feedback"
-            description="Scores stay coarse and explainable so the feedback reads as guidance rather than false precision."
+            eyebrow="Feedback"
+            title="Rubric scores"
+            description="Coarse scoring for clarity, relevance, confidence, and specificity."
           />
           {state.session?.latest_feedback ? (
             <div className="surface-list">
@@ -342,7 +301,7 @@ export function InterviewPracticeShell() {
                     variant="validated"
                   />
                   <span className="route-card__label">
-                    Average rubric score {state.session.latest_feedback.overall_score}
+                    Score {state.session.latest_feedback.overall_score}
                   </span>
                 </div>
                 <p className="body-copy">{state.session.latest_feedback.summary_feedback}</p>
@@ -352,7 +311,7 @@ export function InterviewPracticeShell() {
                   <article className="score-card" key={dimension.dimension}>
                     <p className="list-label">{dimension.dimension}</p>
                     <strong>{dimension.band}</strong>
-                    <p className="body-copy">Score {dimension.score} / 4</p>
+                    <p className="body-copy">{dimension.score} / 4</p>
                   </article>
                 ))}
               </div>
@@ -365,7 +324,7 @@ export function InterviewPracticeShell() {
                 </ul>
               </article>
               <article>
-                <p className="list-heading">Improvement prompts</p>
+                <p className="list-heading">Improvements</p>
                 <ul className="detail-list">
                   {state.session.latest_feedback.improvement_prompts.map((item) => (
                     <li key={item}>{item}</li>
@@ -373,7 +332,7 @@ export function InterviewPracticeShell() {
                 </ul>
               </article>
               <article className="guidance-callout">
-                <p className="list-heading">Limitation notice</p>
+                <p className="list-heading">Limitation</p>
                 <p className="body-copy">
                   {state.session.latest_feedback.limitation_notice}
                 </p>
@@ -382,7 +341,7 @@ export function InterviewPracticeShell() {
           ) : (
             <div className="empty-panel">
               <p className="body-copy">
-                Submit the first answer to populate the scoring and feedback panel.
+                Submit your first answer to see scoring and feedback.
               </p>
             </div>
           )}
@@ -390,9 +349,9 @@ export function InterviewPracticeShell() {
 
         <article className="surface-panel">
           <PageHeader
-            eyebrow="Session summary"
-            title="Question-by-question record"
-            description="The session log keeps only the minimum answer and rubric history needed for review."
+            eyebrow="History"
+            title="Session log"
+            description="Answers and scores from this session."
           />
           {state.session?.responses.length ? (
             <div className="surface-list">
@@ -400,7 +359,7 @@ export function InterviewPracticeShell() {
                 <article key={`${response.question_index}-${response.created_at ?? "pending"}`}>
                   <div className="meta-row">
                     <StatusBadge
-                      label={`Question ${response.question_index + 1}`}
+                      label={`Q${response.question_index + 1}`}
                       variant="planned"
                     />
                     <span className="route-card__label">
@@ -415,7 +374,7 @@ export function InterviewPracticeShell() {
           ) : (
             <div className="empty-panel">
               <p className="body-copy">
-                Session answers and scores will appear here as you progress.
+                Answers and scores will appear here as you progress.
               </p>
             </div>
           )}

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
 import type { ApiError, StudentProfile } from "@/lib/types";
@@ -74,8 +73,8 @@ export function ProfileFormShell({
           });
           setMessage(
             mode === "onboarding"
-              ? "Your profile is already on file. You can adjust it before opening recommendations."
-              : "Your current profile has been loaded for review.",
+              ? "Your profile is already on file. Adjust anything before continuing."
+              : "Profile loaded. Make changes and save when ready.",
           );
         }
       } catch (caught) {
@@ -99,39 +98,9 @@ export function ProfileFormShell({
 
   const helperNote = useMemo(() => {
     return form.target_country_code === "US"
-      ? "US scope remains limited to Fulbright-related published opportunities in this MVP."
-      : "Canada is the strongest part of the current MVP corpus, so recommendations are most complete here.";
+      ? "US coverage is limited to Fulbright-related opportunities."
+      : "Canada has the strongest coverage in the current catalog.";
   }, [form.target_country_code]);
-
-  const intro = useMemo(() => {
-    if (mode === "onboarding") {
-      return (
-        <div className="surface-band">
-          <div className="button-row">
-            <StatusBadge label="First-run setup" variant="validated" />
-            <StatusBadge label="5 essential inputs" variant="neutral" />
-          </div>
-          <p className="body-copy">
-            This first pass asks only for the details needed to generate a clear,
-            explainable shortlist.
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="surface-band">
-        <div className="button-row">
-          <StatusBadge label="Editable profile" variant="neutral" />
-          <StatusBadge label="Recommendation input" variant="generated" />
-        </div>
-        <p className="body-copy">
-          Keep this profile current when your target country, field, or academic
-          standing changes.
-        </p>
-      </div>
-    );
-  }, [mode]);
 
   const handleChange = (name: keyof StudentProfile, value: string) => {
     setForm((current) => ({
@@ -175,95 +144,42 @@ export function ProfileFormShell({
 
   return (
     <AppShell
-      eyebrow={mode === "onboarding" ? "Onboarding" : "Profile"}
+      eyebrow={mode === "onboarding" ? "Get started" : "Profile"}
       title={
         mode === "onboarding"
-          ? "Set the essentials once so ScholarAI can explain why an opportunity fits."
-          : "Keep the profile behind your recommendations clear, current, and easy to inspect."
+          ? "Tell us the essentials so we can find scholarships that fit."
+          : "Keep your profile current for better recommendations."
       }
       description={
         mode === "onboarding"
-          ? "The MVP starts with a short profile instead of a long intake. Each field is here because it affects discovery or eligibility."
-          : "This workspace keeps the recommendation contract visible and editable without turning profile setup into a complex account flow."
+          ? "Five fields are all we need to build your first personalized shortlist."
+          : "Changes here update how scholarships are ranked and explained."
       }
-      intro={intro}
+      intro={
+        <div className="meta-row">
+          <StatusBadge
+            label={mode === "onboarding" ? "First-run setup" : "Editable profile"}
+            variant={mode === "onboarding" ? "validated" : "neutral"}
+          />
+          <span className="body-copy">{helperNote}</span>
+        </div>
+      }
     >
-      <section className="page-grid">
-        <article className="surface-card">
-          <PageHeader
-            eyebrow={mode === "onboarding" ? "Why these fields matter" : "Profile posture"}
-            title={
-              mode === "onboarding"
-                ? "A small amount of information can still produce a trustworthy shortlist."
-                : "Recommendations stay readable when the input stays disciplined."
-            }
-            description={
-              mode === "onboarding"
-                ? "ScholarAI needs academic intent, destination, and a few eligibility anchors. Everything else is deferred until the product earns it."
-                : "The current MVP uses citizenship, academic intent, GPA, and optional language evidence to rank only published opportunities."
-            }
-          />
-          <div className="surface-list">
-            <article>
-              <p className="list-heading">Recommendation anchors</p>
-              <p className="body-copy">
-                Citizenship, target country, target field, and GPA keep the shortlist
-                grounded in explicit user inputs instead of hidden assumptions.
-              </p>
-            </article>
-            <article>
-              <p className="list-heading">Scope discipline</p>
-              <p className="body-copy">
-                The current dataset focuses on Canada-first MS opportunities with
-                only limited Fulbright-related US coverage.
-              </p>
-            </article>
-          </div>
-        </article>
+      {message ? (
+        <section className="info-band">
+          <p className="body-copy">{message}</p>
+        </section>
+      ) : null}
 
-        <article className="surface-panel">
-          <PageHeader
-            eyebrow="Readiness note"
-            title="What happens after this"
-            description="Saving the profile takes you directly into the recommendation workspace so the result stays connected to the inputs you just reviewed."
-            compact
-          />
-          <div className="surface-list">
-            <article>
-              <div className="meta-row">
-                <StatusBadge label="Published data only" variant="validated" />
-                <StatusBadge label="Rules-first ranking" variant="generated" />
-              </div>
-              <p className="body-copy">{helperNote}</p>
-            </article>
-            {message ? (
-              <article>
-                <p className="list-heading">Status</p>
-                <p className="body-copy">{message}</p>
-              </article>
-            ) : null}
-            {error ? (
-              <article>
-                <p className="list-heading">Attention needed</p>
-                <p className="form-error">{error}</p>
-              </article>
-            ) : null}
-          </div>
-        </article>
-      </section>
+      {error ? (
+        <section className="surface-card">
+          <p className="form-error">{error}</p>
+        </section>
+      ) : null}
 
       <section className="surface-card" data-testid="profile-form-shell">
-        <PageHeader
-          eyebrow={mode === "onboarding" ? "Step 1 of 1" : "Profile editor"}
-          title={
-            mode === "onboarding"
-              ? "Save the minimum profile needed for your first shortlist."
-              : "Review and update the information ScholarAI uses for ranking."
-          }
-          description="The form is grouped by user intent so it feels like planning, not raw data entry."
-        />
         {isLoading ? (
-          <p className="body-copy">Loading your saved profile.</p>
+          <p className="body-copy">Loading your profile…</p>
         ) : (
           <form
             className="profile-form"
@@ -320,7 +236,7 @@ export function ProfileFormShell({
             </section>
 
             <section className="form-section">
-              <p className="route-card__label">Eligibility anchors</p>
+              <p className="route-card__label">Eligibility</p>
               <div className="form-grid">
                 <label className="form-field">
                   <span className="form-field__label">Citizenship country</span>
@@ -340,7 +256,7 @@ export function ProfileFormShell({
                 </label>
 
                 <label className="form-field">
-                  <span className="form-field__label">GPA value</span>
+                  <span className="form-field__label">GPA</span>
                   <input
                     className="text-input"
                     min="0"
@@ -370,10 +286,10 @@ export function ProfileFormShell({
             </section>
 
             <section className="form-section">
-              <p className="route-card__label">Optional language evidence</p>
+              <p className="route-card__label">Language (optional)</p>
               <div className="form-grid">
                 <label className="form-field">
-                  <span className="form-field__label">Language test type</span>
+                  <span className="form-field__label">Test type</span>
                   <input
                     className="text-input"
                     name="language_test_type"
@@ -385,7 +301,7 @@ export function ProfileFormShell({
                 </label>
 
                 <label className="form-field">
-                  <span className="form-field__label">Language test score</span>
+                  <span className="form-field__label">Score</span>
                   <input
                     className="text-input"
                     min="0"
@@ -408,9 +324,9 @@ export function ProfileFormShell({
                 type="submit"
               >
                 {isSubmitting
-                  ? "Saving profile"
+                  ? "Saving…"
                   : mode === "onboarding"
-                    ? "Save and open recommendations"
+                    ? "Save and view recommendations"
                     : "Save profile"}
               </button>
             </div>

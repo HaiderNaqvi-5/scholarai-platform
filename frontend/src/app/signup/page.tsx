@@ -29,8 +29,8 @@ export default function SignupPage() {
   return (
     <MarketingShell
       eyebrow="Create account"
-      title="Create your ScholarAI account and keep the scholarship workflow connected."
-      description="The account flow stays deliberately short so you can move straight into profile setup and recommendations."
+      title="Get started with ScholarAI."
+      description="Set up takes less than a minute, then you can jump straight to profile and recommendations."
     >
       <section className="auth-grid">
         <form
@@ -93,14 +93,13 @@ export default function SignupPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">What this unlocks</p>
-          <h2 className="section-title">Save opportunities, complete your profile, and return later.</h2>
+          <p className="section-eyebrow">Already have an account?</p>
+          <h2 className="section-title">Pick up where you left off.</h2>
           <p className="body-copy">
-            The account gives your shortlist and preparation work a stable home.
-            It does not introduce extra complexity beyond what the MVP needs.
+            Your shortlist, profile, and preparation work are waiting for you.
           </p>
           <Link className="nav-link" href="/login">
-            Already have an account?
+            Sign in
           </Link>
         </article>
       </section>

@@ -27,9 +27,9 @@ export default function LoginPage() {
 
   return (
     <MarketingShell
-      eyebrow="Account access"
-      title="Sign in to continue your scholarship planning."
-      description="Use the same account to keep your shortlist, profile, and preparation workspaces connected."
+      eyebrow="Account"
+      title="Sign in."
+      description="Continue with your saved shortlist, profile, and preparation work."
     >
       <section className="auth-grid">
         <form
@@ -81,12 +81,10 @@ export default function LoginPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">Why sign in</p>
-          <h2 className="section-title">Keep your shortlist and profile in one place.</h2>
+          <p className="section-eyebrow">No account yet?</p>
+          <h2 className="section-title">Create one in under a minute.</h2>
           <p className="body-copy">
-            ScholarAI uses one lightweight account so saved opportunities,
-            recommendations, and preparation work stay connected without adding
-            unnecessary setup.
+            One account keeps your shortlist, recommendations, and preparation work connected.
           </p>
           <Link className="nav-link" href="/signup">
             Create an account

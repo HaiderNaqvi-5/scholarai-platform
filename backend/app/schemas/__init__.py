@@ -43,6 +43,7 @@ from app.schemas.saved_opportunities import (
     SavedOpportunityListResponse,
 )
 from app.schemas.scholarships import (
+    ScholarshipAppliedFilters,
     ScholarshipDetailResponse,
     ScholarshipListItem,
     ScholarshipListResponse,
@@ -78,6 +79,7 @@ __all__ = [
     "RecommendationRequest",
     "SavedOpportunityItem",
     "SavedOpportunityListResponse",
+    "ScholarshipAppliedFilters",
     "ScholarshipDetailResponse",
     "ScholarshipListItem",
     "ScholarshipListResponse",

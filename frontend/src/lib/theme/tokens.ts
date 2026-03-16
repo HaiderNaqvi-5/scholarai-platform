@@ -1,18 +1,40 @@
 export const themeTokens = {
   colors: {
     ink: "#0C1117",
-    mutedInk: "#334155",
+    inkStrong: "#1B2633",
+    inkMuted: "#334155",
+    inkSubtle: "#64748B",
     paper: "#F7F5F0",
-    paperRaised: "#EEE9DF",
+    paperWarm: "#F1EDE4",
+    paperDim: "#E7E1D5",
+    white: "#FFFDF9",
     validated: "#426B5A",
     caution: "#B7791F",
     danger: "#B94A48",
     generated: "#2E5B9A",
   },
-  spacing: [4, 8, 12, 16, 24, 32, 48, 64],
+  surfaces: {
+    base: "rgba(255, 253, 249, 0.84)",
+    raised: "rgba(255, 253, 249, 0.96)",
+    muted: "rgba(241, 237, 228, 0.82)",
+    tint: "rgba(247, 245, 240, 0.88)",
+  },
+  spacing: [4, 8, 12, 16, 20, 24, 32, 48, 64, 80] as const,
   radii: {
+    sm: "12px",
     card: "16px",
     panel: "20px",
+    hero: "24px",
     pill: "999px",
+  },
+  elevation: {
+    quiet: "0 12px 32px rgba(12, 17, 23, 0.04)",
+    soft: "0 20px 48px rgba(12, 17, 23, 0.07)",
+    focus: "0 0 0 3px rgba(46, 91, 154, 0.14)",
+  },
+  text: {
+    display: "var(--font-display), sans-serif",
+    ui: "var(--font-ui), sans-serif",
+    mono: "var(--font-mono), monospace",
   },
 } as const;
