@@ -9,6 +9,37 @@ class CurationActionRequest(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
+class CurationRawImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_key: str = Field(min_length=3, max_length=64)
+    source_display_name: str = Field(min_length=3, max_length=255)
+    source_base_url: str = Field(min_length=8, max_length=2000)
+    source_type: str = Field(default="manual_import", max_length=64)
+    title: str = Field(min_length=3, max_length=255)
+    provider_name: str | None = Field(default=None, max_length=255)
+    country_code: str = Field(min_length=2, max_length=2)
+    source_url: str = Field(min_length=8, max_length=2000)
+    external_source_id: str | None = Field(default=None, max_length=255)
+    source_document_ref: str | None = Field(default=None, max_length=255)
+    summary: str | None = Field(default=None, max_length=4000)
+    funding_summary: str | None = Field(default=None, max_length=2000)
+    field_tags: list[str] = Field(default_factory=list)
+    degree_levels: list[str] = Field(default_factory=lambda: ["MS"])
+    citizenship_rules: list[str] = Field(default_factory=list)
+    min_gpa_value: float | None = Field(default=None, ge=0, le=4.0)
+    deadline_at: datetime | None = None
+    imported_at: datetime | None = None
+    source_last_seen_at: datetime | None = None
+    review_notes: str | None = Field(default=None, max_length=2000)
+    provenance_payload: dict | None = None
+
+    @field_validator("country_code")
+    @classmethod
+    def normalize_import_country_code(cls, value: str) -> str:
+        return value.upper()
+
+
 class CurationRecordUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

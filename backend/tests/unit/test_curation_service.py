@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models import RecordState, Scholarship
-from app.schemas.curation import CurationActionRequest
+from app.schemas.curation import CurationActionRequest, CurationRawImportRequest
 from app.services.curation import CurationService
 
 pytestmark = pytest.mark.asyncio
@@ -16,7 +16,7 @@ class FakeSession:
         self.added = []
 
     async def execute(self, _query):
-        raise AssertionError("execute should not be called in this unit path")
+        return FakeResult(None)
 
     def add(self, value):
         if getattr(value, "id", None) is None:
@@ -29,6 +29,14 @@ class FakeSession:
 
     async def flush(self):
         return None
+
+
+class FakeResult:
+    def __init__(self, item):
+        self.item = item
+
+    def scalar_one_or_none(self):
+        return self.item
 
 
 def make_record(state: RecordState) -> Scholarship:
@@ -118,3 +126,38 @@ async def test_curation_service_rejects_invalid_publish_transition():
         )
 
     assert caught.value.status_code == 409
+
+
+async def test_curation_service_import_raw_record_creates_internal_raw_state():
+    session = FakeSession()
+    service = CurationService(session)
+    actor_user_id = uuid4()
+
+    async def fake_source_registry(_payload):
+        return None
+
+    service._get_or_create_source_registry = fake_source_registry  # type: ignore[method-assign]
+
+    result = await service.import_raw_record(
+        CurationRawImportRequest(
+            source_key="manual_demo_import",
+            source_display_name="Manual demo import",
+            source_base_url="https://example.edu",
+            source_type="manual_import",
+            title="UBC Data Science Award",
+            provider_name="University of British Columbia",
+            country_code="CA",
+            source_url="https://example.edu/ubc-data-science-award",
+            summary="Imported raw summary",
+            field_tags=["data science"],
+            degree_levels=["MS"],
+            citizenship_rules=["PK"],
+            review_notes="Imported for curator review",
+        ),
+        actor_user_id,
+    )
+
+    assert result.record_state == "raw"
+    assert result.review_notes == "Imported for curator review"
+    assert result.reviewed_by_user_id == str(actor_user_id)
+    assert any(getattr(item, "action", "") == "curation.import_raw" for item in session.added)

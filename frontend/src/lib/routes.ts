@@ -6,6 +6,12 @@ export const appRoutes = [
     status: "foundation",
   },
   {
+    href: "/scholarships",
+    label: "Scholarships",
+    description: "Public browse and detail views for published scholarship records.",
+    status: "active",
+  },
+  {
     href: "/onboarding",
     label: "Onboarding",
     description: "First-pass intake for the profile-to-recommendations slice.",

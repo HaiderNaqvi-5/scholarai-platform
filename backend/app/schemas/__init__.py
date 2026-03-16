@@ -7,6 +7,7 @@ from app.schemas.auth import (
 )
 from app.schemas.curation import (
     CurationActionRequest,
+    CurationRawImportRequest,
     CurationRecordDetail,
     CurationRecordListResponse,
     CurationRecordSummary,
@@ -38,7 +39,11 @@ from app.schemas.saved_opportunities import (
     SavedOpportunityItem,
     SavedOpportunityListResponse,
 )
-from app.schemas.scholarships import ScholarshipDetailResponse, ScholarshipListItem
+from app.schemas.scholarships import (
+    ScholarshipDetailResponse,
+    ScholarshipListItem,
+    ScholarshipListResponse,
+)
 from app.schemas.students import StudentProfileResponse, StudentProfileUpsertRequest
 
 __all__ = [
@@ -49,6 +54,7 @@ __all__ = [
     "DocumentRecordSummary",
     "DocumentSubmissionResponse",
     "CurationActionRequest",
+    "CurationRawImportRequest",
     "CurationRecordDetail",
     "CurationRecordListResponse",
     "CurationRecordSummary",
@@ -68,6 +74,7 @@ __all__ = [
     "SavedOpportunityListResponse",
     "ScholarshipDetailResponse",
     "ScholarshipListItem",
+    "ScholarshipListResponse",
     "StudentProfileResponse",
     "StudentProfileUpsertRequest",
     "RefreshTokenRequest",

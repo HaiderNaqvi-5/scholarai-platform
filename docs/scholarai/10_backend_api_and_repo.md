@@ -3,6 +3,17 @@
 ## Purpose
 This document defines the FastAPI modular monolith structure, API boundary, async task split, repository layout, and implementation guardrails for later code work. It keeps the backend design understandable, testable, and aligned with the documentation-first workflow.
 
+## Current Implementation Note
+- The mounted API surface currently lives in `backend/app/api/v1/__init__.py` and includes `auth`, `profile`, `scholarships`, `saved-opportunities`, `recommendations`, `documents`, `interviews`, and `curation`.
+- Public scholarship discovery reads are now open for published records:
+  - `GET /api/v1/scholarships`
+  - `GET /api/v1/scholarships/{id}`
+- The current code still diverges from this target doc in a few places:
+  - the active route prefix is `/profile`, not `/profiles`
+  - the standard error envelope is not implemented consistently yet
+  - list responses are not yet normalized across all endpoints
+  - `admin` is described here as a conceptual module, but the current mounted internal workflow is concentrated in `curation`
+
 ## Backend Architecture Stance
 ScholarAI MVP uses one FastAPI backend with clearly separated internal modules. Business domains stay in-process and share one primary PostgreSQL data layer rather than being split into separate deployable services.
 

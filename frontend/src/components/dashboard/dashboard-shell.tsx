@@ -13,6 +13,7 @@ import type {
   SavedOpportunityItem,
   SavedOpportunityListResponse,
   ScholarshipListItem,
+  ScholarshipListResponse,
   StudentProfile,
 } from "@/lib/types";
 
@@ -49,7 +50,7 @@ export function DashboardShell() {
         apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
           token: accessToken,
         }),
-        apiRequest<ScholarshipListItem[]>("/scholarships?limit=6", {
+        apiRequest<ScholarshipListResponse>("/scholarships?limit=6", {
           token: accessToken,
         }),
       ]);
@@ -79,7 +80,7 @@ export function DashboardShell() {
       }
 
       if (publishedResult.status === "fulfilled") {
-        nextState.published = publishedResult.value;
+        nextState.published = publishedResult.value.items;
       } else if (!nextState.error) {
         nextState.error = publishedResult.reason.message;
       }
@@ -313,6 +314,9 @@ export function DashboardShell() {
                     {item.provider_name ?? "Provider not listed"} · {item.country_code}
                   </p>
                   <div className="dashboard-actions">
+                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
+                      View details
+                    </Link>
                     <button
                       className={
                         isSaved

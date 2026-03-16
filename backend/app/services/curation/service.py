@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models import AuditLog, RecordState, Scholarship, SourceRegistry
 from app.schemas.curation import (
     CurationActionRequest,
+    CurationRawImportRequest,
     CurationRecordDetail,
     CurationRecordSummary,
     CurationRecordUpdateRequest,
@@ -18,6 +19,58 @@ from app.schemas.curation import (
 class CurationService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def import_raw_record(
+        self,
+        payload: CurationRawImportRequest,
+        actor_user_id: uuid.UUID,
+    ) -> CurationRecordDetail:
+        existing_result = await self.db.execute(
+            select(Scholarship).where(Scholarship.source_url == str(payload.source_url))
+        )
+        if existing_result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A scholarship record already exists for this source URL",
+            )
+
+        source_registry = await self._get_or_create_source_registry(payload)
+        timestamp = datetime.now(timezone.utc)
+
+        record = Scholarship(
+            source_registry=source_registry,
+            external_source_id=payload.external_source_id,
+            title=payload.title,
+            provider_name=payload.provider_name,
+            country_code=payload.country_code,
+            summary=payload.summary,
+            funding_summary=payload.funding_summary,
+            source_url=str(payload.source_url),
+            source_document_ref=payload.source_document_ref,
+            field_tags=list(payload.field_tags),
+            degree_levels=list(payload.degree_levels),
+            citizenship_rules=list(payload.citizenship_rules),
+            min_gpa_value=payload.min_gpa_value,
+            deadline_at=payload.deadline_at,
+            record_state=RecordState.RAW,
+            imported_at=payload.imported_at or timestamp,
+            provenance_payload=payload.provenance_payload or {},
+            source_last_seen_at=payload.source_last_seen_at or payload.imported_at or timestamp,
+            review_notes=payload.review_notes,
+            reviewed_by_user_id=actor_user_id,
+            last_reviewed_at=timestamp,
+        )
+        self.db.add(record)
+        await self.db.flush()
+        await self._append_audit_log(
+            actor_user_id=actor_user_id,
+            record=record,
+            action="curation.import_raw",
+            before={},
+            after=self._snapshot(record),
+        )
+        await self.db.flush()
+        return self._build_detail(record)
 
     async def list_records(
         self,
@@ -220,6 +273,32 @@ class CurationService:
                 detail="Curation record not found",
             )
         return record
+
+    async def _get_or_create_source_registry(
+        self,
+        payload: CurationRawImportRequest,
+    ) -> SourceRegistry:
+        result = await self.db.execute(
+            select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
+        )
+        source_registry = result.scalar_one_or_none()
+        if source_registry is None:
+            source_registry = SourceRegistry(
+                source_key=payload.source_key,
+                display_name=payload.source_display_name,
+                base_url=str(payload.source_base_url),
+                source_type=payload.source_type,
+                is_active=True,
+            )
+            self.db.add(source_registry)
+            await self.db.flush()
+            return source_registry
+
+        source_registry.display_name = payload.source_display_name
+        source_registry.base_url = str(payload.source_base_url)
+        source_registry.source_type = payload.source_type
+        source_registry.is_active = True
+        return source_registry
 
     async def _append_audit_log(
         self,

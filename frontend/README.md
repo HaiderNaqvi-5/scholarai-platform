@@ -5,8 +5,12 @@ This is the active Next.js frontend for the ScholarAI MVP.
 ## Local run
 1. Copy `.env.local.example` to `.env.local`.
 2. Run `npm ci`.
-3. Run `npm run dev`.
-4. Open `http://localhost:3000`.
+3. Make sure the backend is available at `NEXT_PUBLIC_API_BASE_URL`.
+4. Run `npm run dev`.
+5. Open `http://localhost:3000`.
+
+## Restart note
+- If route files or app-structure files changed while the frontend dev server was already running, restart `npm run dev`. A stale Next.js process can serve false `404` responses for newly added pages.
 
 ## Sanity commands
 - `npm run lint`

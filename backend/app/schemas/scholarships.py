@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScholarshipListItem(BaseModel):
@@ -23,3 +23,11 @@ class ScholarshipDetailResponse(ScholarshipListItem):
     citizenship_rules: list[str]
     min_gpa_value: float | None
     source_document_ref: str | None
+
+
+class ScholarshipListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ScholarshipListItem]
+    total: int = Field(ge=0)
+    applied_country_code: str | None = None

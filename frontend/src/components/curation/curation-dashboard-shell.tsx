@@ -11,6 +11,7 @@ import type {
   ApiError,
   CurationRecordDetail,
   CurationRecordListResponse,
+  CurationRawImportRequest,
   CurationRecordState,
 } from "@/lib/types";
 
@@ -44,6 +45,20 @@ type EditState = {
   review_notes: string;
 };
 
+type ImportState = {
+  source_key: string;
+  source_display_name: string;
+  source_base_url: string;
+  source_url: string;
+  title: string;
+  provider_name: string;
+  country_code: string;
+  summary: string;
+  field_tags: string;
+  degree_levels: string;
+  review_notes: string;
+};
+
 const EMPTY_EDIT_STATE: EditState = {
   title: "",
   provider_name: "",
@@ -54,6 +69,20 @@ const EMPTY_EDIT_STATE: EditState = {
   degree_levels: "",
   citizenship_rules: "",
   min_gpa_value: "",
+  review_notes: "",
+};
+
+const EMPTY_IMPORT_STATE: ImportState = {
+  source_key: "manual_demo_import",
+  source_display_name: "Manual demo import",
+  source_base_url: "https://example.edu",
+  source_url: "",
+  title: "",
+  provider_name: "",
+  country_code: "CA",
+  summary: "",
+  field_tags: "data science",
+  degree_levels: "MS",
   review_notes: "",
 };
 
@@ -69,6 +98,7 @@ export function CurationDashboardShell() {
     selectedRecord: null,
   });
   const [editState, setEditState] = useState<EditState>(EMPTY_EDIT_STATE);
+  const [importState, setImportState] = useState<ImportState>(EMPTY_IMPORT_STATE);
 
   useEffect(() => {
     if (!accessToken) {
@@ -297,6 +327,71 @@ export function CurationDashboardShell() {
     }
   };
 
+  const importRawRecord = async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    setState((current) => ({ ...current, isSaving: true, error: null }));
+    try {
+      const payload: CurationRawImportRequest = {
+        source_key: importState.source_key.trim(),
+        source_display_name: importState.source_display_name.trim(),
+        source_base_url: importState.source_base_url.trim(),
+        source_type: "manual_import",
+        title: importState.title.trim(),
+        provider_name: emptyToNull(importState.provider_name),
+        country_code: importState.country_code.trim().toUpperCase(),
+        source_url: importState.source_url.trim(),
+        external_source_id: null,
+        source_document_ref: null,
+        summary: emptyToNull(importState.summary),
+        funding_summary: null,
+        field_tags: parseCsv(importState.field_tags),
+        degree_levels: parseCsv(importState.degree_levels),
+        citizenship_rules: [],
+        min_gpa_value: null,
+        deadline_at: null,
+        imported_at: null,
+        source_last_seen_at: null,
+        review_notes: emptyToNull(importState.review_notes),
+        provenance_payload: { imported_via: "curator_dashboard" },
+      };
+
+      const detail = await apiRequest<CurationRecordDetail>("/curation/imports", {
+        method: "POST",
+        token: accessToken,
+        body: JSON.stringify(payload),
+      });
+
+      setImportState((current) => ({
+        ...current,
+        source_url: "",
+        title: "",
+        provider_name: "",
+        summary: "",
+        review_notes: "",
+      }));
+      setEditState(buildEditState(detail));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        filter: "raw",
+        selectedRecord: detail,
+        records:
+          current.filter === "raw"
+            ? [detail, ...current.records.filter((item) => item.record_id !== detail.record_id)]
+            : [detail],
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        error: resolveErrorMessage(error),
+      }));
+    }
+  };
+
   const runAction = async (
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
@@ -355,6 +450,174 @@ export function CurationDashboardShell() {
           <p className="body-copy">{state.error}</p>
         </section>
       ) : null}
+
+      <section className="surface-card" data-testid="curation-import-panel">
+        <PageHeader
+          eyebrow="Raw import"
+          title="Create one internal raw record when upstream ingestion is not wired yet"
+          description="This is the narrow manual bridge into curation. It creates an explicit raw record with provenance instead of letting curators author published records directly."
+        />
+        <div className="form-grid">
+          <label className="form-field">
+            <span className="form-field__label">Source key</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  source_key: event.target.value,
+                }))
+              }
+              value={importState.source_key}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Source display name</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  source_display_name: event.target.value,
+                }))
+              }
+              value={importState.source_display_name}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Source base URL</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  source_base_url: event.target.value,
+                }))
+              }
+              value={importState.source_base_url}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Source URL</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  source_url: event.target.value,
+                }))
+              }
+              placeholder="https://example.edu/scholarships/data-science-award"
+              value={importState.source_url}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Title</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              value={importState.title}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Provider</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  provider_name: event.target.value,
+                }))
+              }
+              value={importState.provider_name}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Country</span>
+            <input
+              className="text-input"
+              maxLength={2}
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  country_code: event.target.value,
+                }))
+              }
+              value={importState.country_code}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Field tags</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  field_tags: event.target.value,
+                }))
+              }
+              value={importState.field_tags}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Degree levels</span>
+            <input
+              className="text-input"
+              onChange={(event) =>
+                setImportState((current) => ({
+                  ...current,
+                  degree_levels: event.target.value,
+                }))
+              }
+              value={importState.degree_levels}
+            />
+          </label>
+        </div>
+        <label className="form-field">
+          <span className="form-field__label">Imported summary</span>
+          <textarea
+            className="text-area"
+            onChange={(event) =>
+              setImportState((current) => ({
+                ...current,
+                summary: event.target.value,
+              }))
+            }
+            rows={5}
+            value={importState.summary}
+          />
+        </label>
+        <label className="form-field">
+          <span className="form-field__label">Import notes</span>
+          <textarea
+            className="text-area"
+            onChange={(event) =>
+              setImportState((current) => ({
+                ...current,
+                review_notes: event.target.value,
+              }))
+            }
+            rows={3}
+            value={importState.review_notes}
+          />
+        </label>
+        <div className="document-actions">
+          <button
+            className="auth-link auth-link--primary"
+            data-testid="curation-import"
+            disabled={state.isSaving}
+            onClick={() => void importRawRecord()}
+            type="button"
+          >
+            {state.isSaving ? "Importing" : "Create raw record"}
+          </button>
+        </div>
+      </section>
 
       <section className="curation-grid">
         <article className="surface-card">

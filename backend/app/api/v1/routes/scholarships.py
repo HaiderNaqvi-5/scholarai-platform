@@ -8,18 +8,22 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models import RecordState, Scholarship
-from app.schemas import ScholarshipDetailResponse, ScholarshipListItem
+from app.schemas import (
+    ScholarshipDetailResponse,
+    ScholarshipListItem,
+    ScholarshipListResponse,
+)
 from app.services.recommendations.eligibility import scholarship_in_scope
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[ScholarshipListItem])
+@router.get("", response_model=ScholarshipListResponse)
 async def list_scholarships(
     db: Annotated[AsyncSession, Depends(get_db)],
     country_code: str | None = Query(default=None, min_length=2, max_length=2),
     limit: int = Query(default=25, ge=1, le=50),
-) -> list[ScholarshipListItem]:
+) -> ScholarshipListResponse:
     query = (
         select(Scholarship)
         .where(Scholarship.record_state == RecordState.PUBLISHED)
@@ -36,7 +40,12 @@ async def list_scholarships(
         for scholarship in result.scalars().all()
         if scholarship_in_scope(scholarship)
     ]
-    return [_serialize_list_item(scholarship) for scholarship in scholarships]
+    items = [_serialize_list_item(scholarship) for scholarship in scholarships]
+    return ScholarshipListResponse(
+        items=items,
+        total=len(items),
+        applied_country_code=country_code.upper() if country_code else None,
+    )
 
 
 @router.get("/{scholarship_id}", response_model=ScholarshipDetailResponse)

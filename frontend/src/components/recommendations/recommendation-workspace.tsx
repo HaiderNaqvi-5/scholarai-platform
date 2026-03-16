@@ -305,6 +305,12 @@ export function RecommendationWorkspace() {
                   </div>
 
                   <div className="dashboard-actions">
+                    <Link
+                      className="nav-link"
+                      href={`/scholarships/${item.scholarship_id}`}
+                    >
+                      View details
+                    </Link>
                     <button
                       className={
                         isSaved

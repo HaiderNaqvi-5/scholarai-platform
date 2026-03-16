@@ -41,10 +41,21 @@ async function parseError(response: Response): Promise<ApiError> {
   try {
     const payload = (await response.json()) as {
       detail?: string | Array<{ msg?: string }>;
-      error?: { message?: string };
+      error?: {
+        code?: string;
+        message?: string;
+        request_id?: string;
+        status?: number;
+      };
     };
     if (payload.error?.message) {
       message = payload.error.message;
+      return {
+        code: payload.error.code ?? `HTTP_${response.status}`,
+        message,
+        request_id: payload.error.request_id,
+        status: payload.error.status ?? response.status,
+      };
     } else if (typeof payload.detail === "string") {
       message = payload.detail;
     } else if (Array.isArray(payload.detail) && payload.detail.length > 0) {

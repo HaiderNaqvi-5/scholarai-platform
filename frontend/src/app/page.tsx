@@ -36,7 +36,7 @@ export default function LandingPage() {
               <div className="meta-row">
                 <StatusBadge
                   label={route.status === "next" ? "Next slice" : route.status}
-                  variant={route.status === "deferred" ? "warning" : "planned"}
+                  variant={route.status === "active" ? "validated" : "planned"}
                 />
               </div>
               <h3 className="route-card__title">{route.label}</h3>

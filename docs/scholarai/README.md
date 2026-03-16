@@ -27,7 +27,9 @@ docs/scholarai/
 ├── 12_execution_plan.md
 ├── 13_qa_devops_and_risks.md
 ├── 14_future_roadmap.md
-└── DEMO_READINESS_AUDIT.md
+├── IMPLEMENTATION_STATUS_REPORT.md
+├── DEMO_READINESS_AUDIT.md
+└── INTERNAL_HANDOFF_PACKAGE.md
 ```
 
 ## Section-To-File Mapping
@@ -61,6 +63,18 @@ docs/scholarai/
 10. USA usage is restricted to Fulbright-related scope and narrowly scoped cross-border logic.
 11. DAAD is not part of MVP and is deferred to Future Research Extensions.
 12. Structured validated data is authoritative for eligibility, deadlines, funding rules, and official scholarship requirements.
+
+## Current Implementation Status
+- Current repo-evidence audit: `IMPLEMENTATION_STATUS_REPORT.md`
+- Demo-readiness audit: `DEMO_READINESS_AUDIT.md`
+- Internal handoff and presentation note: `INTERNAL_HANDOFF_PACKAGE.md`
+- Current codebase reality:
+  - auth, protected routes, and session persistence are implemented
+  - profile save/load and seeded recommendation flow are implemented
+  - public scholarship browse and scholarship detail pages are implemented
+  - dashboard, saved opportunities, document assistance, interview practice, and curation are implemented as narrow MVP slices
+  - curation now includes a manual raw-record import bridge
+  - ingestion automation and some API contract cleanup are still incomplete
 
 ## Required Diagrams List
 1. Product context and actor map.

@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.dependencies import AdminUser
 from app.schemas import (
     CurationActionRequest,
+    CurationRawImportRequest,
     CurationRecordDetail,
     CurationRecordListResponse,
     CurationRecordUpdateRequest,
@@ -15,6 +16,16 @@ from app.schemas import (
 from app.services.curation import CurationService
 
 router = APIRouter()
+
+
+@router.post("/imports", response_model=CurationRecordDetail)
+async def import_raw_curation_record(
+    payload: CurationRawImportRequest,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CurationRecordDetail:
+    service = CurationService(db)
+    return await service.import_raw_record(payload, current_user.id)
 
 
 @router.get("/records", response_model=CurationRecordListResponse)

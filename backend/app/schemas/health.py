@@ -7,10 +7,16 @@ class HealthResponse(BaseModel):
     database: str
 
 
-class ErrorEnvelope(BaseModel):
+class ErrorDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     code: str
     message: str
     request_id: str | None = None
     status: int
+
+
+class ErrorEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error: ErrorDetail

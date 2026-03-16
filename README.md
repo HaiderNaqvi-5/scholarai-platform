@@ -25,6 +25,8 @@ ScholarAI is an AI-powered scholarship platform focused on helping students disc
 ## Documentation Entry Points
 - Canonical docs index: `docs/scholarai/README.md`
 - Migration and authoring plan: `docs/scholarai/WORKPLAN.md`
+- Current implementation audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
+- Internal MVP handoff: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
 - Governing migration specification: `docs/scholarai/CODEX_MASTER_PROMPT_V1.md`
 - Current migration task: `docs/scholarai/CODEX_TASK_01_DOC_MIGRATION.md`
 
@@ -49,28 +51,49 @@ scholarai-platform/
 ## Implementation Status
 - Repository status: active MVP implementation with documentation-led scope control.
 - Canonical docs `01` through `14` define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
-- The current implementation includes auth, dashboard, saved opportunities, seeded recommendation flow, document assistance, interview practice, and curator workflow foundations.
+- The current implementation includes:
+  - auth and session persistence
+  - public scholarship browse and detail pages backed by published-only routes
+  - public published-scholarship read endpoints
+  - profile save/load flow
+  - seeded recommendation flow with explanation panels
+  - saved opportunities and dashboard shell
+  - document assistance shell
+  - interview practice shell
+  - curator workflow with `raw`, `validated`, and `published` states
+  - manual raw-record import into curation as the current narrow upstream bridge
 - Fresh local environments now use an Alembic-driven bootstrap path plus seeded demo data for MVP rehearsal.
+- Remaining MVP gaps include upstream ingestion automation, broader discovery filters, and tighter API-wide contract consistency.
 
 ## Local MVP Run
-### Docker Compose
-1. Run `docker compose up --build`.
-2. If you need custom values, copy `.env.example` to `.env` and adjust it first.
-3. Open `http://localhost:3000`.
+### Env files
+- Docker Compose path: copy `.env.example` to `.env` only if you need to override defaults.
+- Direct backend path: copy `backend/.env.example` to `backend/.env`.
+- Direct frontend path: copy `frontend/.env.local.example` to `frontend/.env.local`.
+- No secrets belong in source control. Example values are for internal local/demo use only.
 
-### Direct Local Run
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Copy `frontend/.env.local.example` to `frontend/.env.local`.
-3. Start PostgreSQL and Redis locally.
-4. In `backend/`, run `pip install -r requirements.txt`.
-5. In `frontend/`, run `npm ci`.
-6. Run `python scripts/bootstrap_local.py` from `backend/` to apply migrations and seed the demo dataset.
-7. Start the backend with `uvicorn app.main:app --reload`.
-8. Start the frontend with `npm run dev`.
+### Quick internal Docker path
+1. Run `docker compose up --build`.
+2. Wait for backend bootstrap to apply Alembic migrations and seed demo data.
+3. Open `http://localhost:3000`.
+4. Check `http://localhost:8000/health` if the UI does not load expected data.
+
+### Direct local path
+1. Start PostgreSQL and Redis locally.
+2. In `backend/`, use Python `3.11` and run `pip install -r requirements.txt`.
+3. In `frontend/`, run `npm ci`.
+4. From `backend/`, run `python scripts/bootstrap_local.py`.
+5. Start the backend with `uvicorn app.main:app --reload`.
+6. Start the frontend with `npm run dev`.
+
+### Important local run note
+- If route files or app-structure files changed after the frontend server started, restart the Next.js process or rerun `docker compose up --build`. A stale dev process can serve false `404` responses for newly added routes.
 
 ## Demo Readiness
 - Current repo-level audit: `docs/scholarai/DEMO_READINESS_AUDIT.md`
-- Recommended local demo path: login -> dashboard -> profile -> recommendations -> document feedback -> interview -> curation
+- Full implementation status audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
+- Internal handoff and presenter notes: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
+- Recommended local demo path: scholarships -> scholarship detail -> signup/login -> dashboard -> profile -> recommendations -> document feedback -> interview -> curation
 - API rehearsal script: `backend/scripts/rehearse_seeded_demo.py`
 - Rehearsal script: `tests/e2e/playwright/rehearse_seeded_demo.py`
 

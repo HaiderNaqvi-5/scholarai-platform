@@ -35,6 +35,23 @@ export type ScholarshipListItem = {
   record_state: "published";
 };
 
+export type ScholarshipListResponse = {
+  items: ScholarshipListItem[];
+  total: number;
+  applied_country_code: string | null;
+};
+
+export type ScholarshipDetail = ScholarshipListItem & {
+  summary: string | null;
+  funding_summary: string | null;
+  source_url: string;
+  field_tags: string[];
+  degree_levels: string[];
+  citizenship_rules: string[];
+  min_gpa_value: number | null;
+  source_document_ref: string | null;
+};
+
 export type SavedOpportunityItem = ScholarshipListItem & {
   saved_at: string;
 };
@@ -194,6 +211,30 @@ export type CurationRecordDetail = CurationRecordSummary & {
 
 export type CurationRecordListResponse = {
   items: CurationRecordSummary[];
+};
+
+export type CurationRawImportRequest = {
+  source_key: string;
+  source_display_name: string;
+  source_base_url: string;
+  source_type: string;
+  title: string;
+  provider_name: string | null;
+  country_code: string;
+  source_url: string;
+  external_source_id: string | null;
+  source_document_ref: string | null;
+  summary: string | null;
+  funding_summary: string | null;
+  field_tags: string[];
+  degree_levels: string[];
+  citizenship_rules: string[];
+  min_gpa_value: number | null;
+  deadline_at: string | null;
+  imported_at: string | null;
+  source_last_seen_at: string | null;
+  review_notes: string | null;
+  provenance_payload: Record<string, unknown> | null;
 };
 
 export type ApiError = {
