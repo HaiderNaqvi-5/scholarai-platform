@@ -32,7 +32,13 @@ const DEFAULT_PROFILE: StudentProfile = {
   language_test_score: 7.5,
 };
 
-export function ProfileFormShell() {
+type ProfileFormShellProps = {
+  mode?: "onboarding" | "profile";
+};
+
+export function ProfileFormShell({
+  mode = "profile",
+}: ProfileFormShellProps) {
   const router = useRouter();
   const { accessToken } = useAuth();
   const [form, setForm] = useState<StudentProfile>(DEFAULT_PROFILE);
@@ -67,7 +73,9 @@ export function ProfileFormShell() {
               existing.language_test_score ?? DEFAULT_PROFILE.language_test_score,
           });
           setMessage(
-            "Loaded your saved profile. You can adjust it before rerunning recommendations.",
+            mode === "onboarding"
+              ? "Your profile is already on file. You can adjust it before opening recommendations."
+              : "Your current profile has been loaded for review.",
           );
         }
       } catch (caught) {
@@ -87,13 +95,43 @@ export function ProfileFormShell() {
     return () => {
       isActive = false;
     };
-  }, [accessToken]);
+  }, [accessToken, mode]);
 
   const helperNote = useMemo(() => {
     return form.target_country_code === "US"
-      ? "US recommendations stay limited to Fulbright-related published records in this MVP."
-      : "Canada remains the main MVP target, so the seeded demo set is strongest here.";
+      ? "US scope remains limited to Fulbright-related published opportunities in this MVP."
+      : "Canada is the strongest part of the current MVP corpus, so recommendations are most complete here.";
   }, [form.target_country_code]);
+
+  const intro = useMemo(() => {
+    if (mode === "onboarding") {
+      return (
+        <div className="surface-band">
+          <div className="button-row">
+            <StatusBadge label="First-run setup" variant="validated" />
+            <StatusBadge label="5 essential inputs" variant="neutral" />
+          </div>
+          <p className="body-copy">
+            This first pass asks only for the details needed to generate a clear,
+            explainable shortlist.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="surface-band">
+        <div className="button-row">
+          <StatusBadge label="Editable profile" variant="neutral" />
+          <StatusBadge label="Recommendation input" variant="generated" />
+        </div>
+        <p className="body-copy">
+          Keep this profile current when your target country, field, or academic
+          standing changes.
+        </p>
+      </div>
+    );
+  }, [mode]);
 
   const handleChange = (name: keyof StudentProfile, value: string) => {
     setForm((current) => ({
@@ -126,7 +164,7 @@ export function ProfileFormShell() {
           target_degree_level: "MS",
         }),
       });
-      setMessage("Profile saved. Redirecting to the recommendation workspace.");
+      setMessage("Profile saved. Opening recommendations.");
       router.push("/recommendations");
     } catch (caught) {
       setError((caught as ApiError).message);
@@ -137,175 +175,231 @@ export function ProfileFormShell() {
 
   return (
     <AppShell
-      eyebrow="Profile input"
-      title="Save the narrow profile contract that drives the seeded recommendation demo."
-      description="This form stays intentionally close to the backend schema so eligibility logic remains deterministic, inspectable, and easy to demo."
+      eyebrow={mode === "onboarding" ? "Onboarding" : "Profile"}
+      title={
+        mode === "onboarding"
+          ? "Set the essentials once so ScholarAI can explain why an opportunity fits."
+          : "Keep the profile behind your recommendations clear, current, and easy to inspect."
+      }
+      description={
+        mode === "onboarding"
+          ? "The MVP starts with a short profile instead of a long intake. Each field is here because it affects discovery or eligibility."
+          : "This workspace keeps the recommendation contract visible and editable without turning profile setup into a complex account flow."
+      }
+      intro={intro}
     >
       <section className="page-grid">
         <article className="surface-card">
           <PageHeader
-            eyebrow="Profile contract"
-            title="Profile inputs stay narrow and recommendation-focused."
-            description="The seeded demo dataset covers Canada-first MS Data Science, AI, and Analytics paths, plus Fulbright-related US scope only."
+            eyebrow={mode === "onboarding" ? "Why these fields matter" : "Profile posture"}
+            title={
+              mode === "onboarding"
+                ? "A small amount of information can still produce a trustworthy shortlist."
+                : "Recommendations stay readable when the input stays disciplined."
+            }
+            description={
+              mode === "onboarding"
+                ? "ScholarAI needs academic intent, destination, and a few eligibility anchors. Everything else is deferred until the product earns it."
+                : "The current MVP uses citizenship, academic intent, GPA, and optional language evidence to rank only published opportunities."
+            }
           />
           <div className="surface-list">
             <article>
-              <p className="list-heading">Recommendation inputs</p>
+              <p className="list-heading">Recommendation anchors</p>
               <p className="body-copy">
-                Citizenship, GPA, target country, target field, and optional language evidence are enough for the current deterministic filters.
+                Citizenship, target country, target field, and GPA keep the shortlist
+                grounded in explicit user inputs instead of hidden assumptions.
               </p>
             </article>
             <article>
-              <p className="list-heading">Source-of-truth rule</p>
+              <p className="list-heading">Scope discipline</p>
               <p className="body-copy">
-                Recommendations will only use published scholarship records. Raw and validated records stay inside the curator workflow.
+                The current dataset focuses on Canada-first MS opportunities with
+                only limited Fulbright-related US coverage.
               </p>
             </article>
           </div>
         </article>
 
         <article className="surface-panel">
-          <div className="meta-row">
-            <StatusBadge label="Seeded demo ready" variant="validated" />
-            <StatusBadge label="Rules-first" variant="generated" />
+          <PageHeader
+            eyebrow="Readiness note"
+            title="What happens after this"
+            description="Saving the profile takes you directly into the recommendation workspace so the result stays connected to the inputs you just reviewed."
+            compact
+          />
+          <div className="surface-list">
+            <article>
+              <div className="meta-row">
+                <StatusBadge label="Published data only" variant="validated" />
+                <StatusBadge label="Rules-first ranking" variant="generated" />
+              </div>
+              <p className="body-copy">{helperNote}</p>
+            </article>
+            {message ? (
+              <article>
+                <p className="list-heading">Status</p>
+                <p className="body-copy">{message}</p>
+              </article>
+            ) : null}
+            {error ? (
+              <article>
+                <p className="list-heading">Attention needed</p>
+                <p className="form-error">{error}</p>
+              </article>
+            ) : null}
           </div>
-          <p className="body-copy">{helperNote}</p>
-          {message ? <p className="field-note">{message}</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
         </article>
       </section>
 
-      <section className="surface-card">
+      <section className="surface-card" data-testid="profile-form-shell">
         <PageHeader
-          eyebrow="Profile form"
-          title="Save your profile, then move directly into recommendations."
-          description="The MVP keeps this form short on purpose so the browser demo reaches the recommendation page without a long intake wizard."
+          eyebrow={mode === "onboarding" ? "Step 1 of 1" : "Profile editor"}
+          title={
+            mode === "onboarding"
+              ? "Save the minimum profile needed for your first shortlist."
+              : "Review and update the information ScholarAI uses for ranking."
+          }
+          description="The form is grouped by user intent so it feels like planning, not raw data entry."
         />
         {isLoading ? (
           <p className="body-copy">Loading your saved profile.</p>
         ) : (
           <form
-            className="auth-form"
+            className="profile-form"
             data-testid="profile-form"
             onSubmit={handleSubmit}
           >
-            <div className="form-grid">
-              <label className="form-field">
-                <span className="form-field__label">Citizenship country</span>
-                <input
-                  className="text-input"
-                  maxLength={2}
-                  name="citizenship_country_code"
-                  onChange={(event) =>
-                    handleChange(
-                      "citizenship_country_code",
-                      event.target.value.toUpperCase(),
-                    )
-                  }
-                  required
-                  value={form.citizenship_country_code}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Academic direction</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Target country</span>
+                  <select
+                    className="text-input"
+                    name="target_country_code"
+                    onChange={(event) =>
+                      handleChange("target_country_code", event.target.value)
+                    }
+                    value={form.target_country_code}
+                  >
+                    {COUNTRY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Target country</span>
-                <select
-                  className="text-input"
-                  name="target_country_code"
-                  onChange={(event) =>
-                    handleChange("target_country_code", event.target.value)
-                  }
-                  value={form.target_country_code}
-                >
-                  {COUNTRY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">Target field</span>
+                  <select
+                    className="text-input"
+                    name="target_field"
+                    onChange={(event) => handleChange("target_field", event.target.value)}
+                    value={form.target_field}
+                  >
+                    {FIELD_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Target field</span>
-                <select
-                  className="text-input"
-                  name="target_field"
-                  onChange={(event) => handleChange("target_field", event.target.value)}
-                  value={form.target_field}
-                >
-                  {FIELD_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">Degree level</span>
+                  <input
+                    className="text-input"
+                    disabled
+                    name="target_degree_level"
+                    value={form.target_degree_level}
+                  />
+                </label>
+              </div>
+            </section>
 
-              <label className="form-field">
-                <span className="form-field__label">Degree level</span>
-                <input
-                  className="text-input"
-                  disabled
-                  name="target_degree_level"
-                  value={form.target_degree_level}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Eligibility anchors</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Citizenship country</span>
+                  <input
+                    className="text-input"
+                    maxLength={2}
+                    name="citizenship_country_code"
+                    onChange={(event) =>
+                      handleChange(
+                        "citizenship_country_code",
+                        event.target.value.toUpperCase(),
+                      )
+                    }
+                    required
+                    value={form.citizenship_country_code}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">GPA value</span>
-                <input
-                  className="text-input"
-                  min="0"
-                  name="gpa_value"
-                  onChange={(event) => handleChange("gpa_value", event.target.value)}
-                  required
-                  step="0.01"
-                  type="number"
-                  value={form.gpa_value ?? ""}
-                />
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">GPA value</span>
+                  <input
+                    className="text-input"
+                    min="0"
+                    name="gpa_value"
+                    onChange={(event) => handleChange("gpa_value", event.target.value)}
+                    required
+                    step="0.01"
+                    type="number"
+                    value={form.gpa_value ?? ""}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">GPA scale</span>
-                <input
-                  className="text-input"
-                  min="1"
-                  name="gpa_scale"
-                  onChange={(event) => handleChange("gpa_scale", event.target.value)}
-                  required
-                  step="0.1"
-                  type="number"
-                  value={form.gpa_scale}
-                />
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">GPA scale</span>
+                  <input
+                    className="text-input"
+                    min="1"
+                    name="gpa_scale"
+                    onChange={(event) => handleChange("gpa_scale", event.target.value)}
+                    required
+                    step="0.1"
+                    type="number"
+                    value={form.gpa_scale}
+                  />
+                </label>
+              </div>
+            </section>
 
-              <label className="form-field">
-                <span className="form-field__label">Language test type</span>
-                <input
-                  className="text-input"
-                  name="language_test_type"
-                  onChange={(event) =>
-                    handleChange("language_test_type", event.target.value)
-                  }
-                  value={form.language_test_type ?? ""}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Optional language evidence</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Language test type</span>
+                  <input
+                    className="text-input"
+                    name="language_test_type"
+                    onChange={(event) =>
+                      handleChange("language_test_type", event.target.value)
+                    }
+                    value={form.language_test_type ?? ""}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Language test score</span>
-                <input
-                  className="text-input"
-                  min="0"
-                  name="language_test_score"
-                  onChange={(event) =>
-                    handleChange("language_test_score", event.target.value)
-                  }
-                  step="0.1"
-                  type="number"
-                  value={form.language_test_score ?? ""}
-                />
-              </label>
-            </div>
+                <label className="form-field">
+                  <span className="form-field__label">Language test score</span>
+                  <input
+                    className="text-input"
+                    min="0"
+                    name="language_test_score"
+                    onChange={(event) =>
+                      handleChange("language_test_score", event.target.value)
+                    }
+                    step="0.1"
+                    type="number"
+                    value={form.language_test_score ?? ""}
+                  />
+                </label>
+              </div>
+            </section>
 
             <div className="dashboard-actions">
               <button
@@ -313,7 +407,11 @@ export function ProfileFormShell() {
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Saving profile" : "Save profile and continue"}
+                {isSubmitting
+                  ? "Saving profile"
+                  : mode === "onboarding"
+                    ? "Save and open recommendations"
+                    : "Save profile"}
               </button>
             </div>
           </form>

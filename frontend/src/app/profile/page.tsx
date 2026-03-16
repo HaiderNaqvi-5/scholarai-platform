@@ -4,7 +4,7 @@ import { ProfileFormShell } from "@/components/profile/profile-form-shell";
 export default function ProfilePage() {
   return (
     <ProtectedRoute>
-      <ProfileFormShell />
+      <ProfileFormShell mode="profile" />
     </ProtectedRoute>
   );
 }

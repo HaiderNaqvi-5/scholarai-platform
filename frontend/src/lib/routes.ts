@@ -1,50 +1,107 @@
-export const appRoutes = [
-  {
-    href: "/",
-    label: "Overview",
-    description: "Product framing and the bounded MVP posture.",
-    status: "foundation",
-  },
+export type NavLink = {
+  href: string;
+  label: string;
+  description?: string;
+};
+
+export type ProductRoute = NavLink & {
+  section: "discovery" | "workspace" | "preparation" | "account" | "admin";
+  requiresAuth?: boolean;
+};
+
+export const marketingNavLinks: NavLink[] = [
   {
     href: "/scholarships",
     label: "Scholarships",
-    description: "Public browse and detail views for published scholarship records.",
-    status: "active",
+    description: "Browse the published scholarship catalog.",
   },
   {
-    href: "/onboarding",
-    label: "Onboarding",
-    description: "First-pass intake for the profile-to-recommendations slice.",
-    status: "next",
+    href: "/#how-it-works",
+    label: "How it works",
+    description: "Understand the ScholarAI workflow.",
   },
+];
+
+export const appNavRoutes: ProductRoute[] = [
   {
-    href: "/profile",
-    label: "Profile",
-    description: "Canonical student profile contract for eligibility checks.",
-    status: "next",
+    href: "/scholarships",
+    label: "Scholarships",
+    description: "Explore the published scholarship catalog.",
+    section: "discovery",
   },
   {
     href: "/recommendations",
     label: "Recommendations",
-    description: "Published scholarships ranked with rules-derived reasons.",
-    status: "next",
+    description: "Review profile-aware scholarship matches.",
+    section: "workspace",
+    requiresAuth: true,
   },
   {
     href: "/dashboard",
     label: "Dashboard",
-    description: "Authenticated workspace for saved opportunities and next actions.",
-    status: "active",
+    description: "Keep saved opportunities and next actions in one place.",
+    section: "workspace",
+    requiresAuth: true,
   },
   {
     href: "/document-feedback",
-    label: "Document Feedback",
-    description: "Text-first SOP and essay feedback with bounded grounded guidance.",
-    status: "active",
+    label: "Documents",
+    description: "Improve application writing with bounded guidance.",
+    section: "preparation",
+    requiresAuth: true,
   },
   {
     href: "/interview",
-    label: "Interview Practice",
-    description: "Text-first practice sessions with rubric scoring and structured feedback.",
-    status: "active",
+    label: "Interview",
+    description: "Practice structured scholarship interview responses.",
+    section: "preparation",
+    requiresAuth: true,
   },
-] as const;
+];
+
+export const accountRoutes: ProductRoute[] = [
+  {
+    href: "/onboarding",
+    label: "Onboarding",
+    description: "Set up the minimum profile needed for recommendations.",
+    section: "account",
+    requiresAuth: true,
+  },
+  {
+    href: "/profile",
+    label: "Profile",
+    description: "Review and update your recommendation inputs.",
+    section: "account",
+    requiresAuth: true,
+  },
+  {
+    href: "/curation",
+    label: "Curation",
+    description: "Review records and publish validated scholarship data.",
+    section: "admin",
+    requiresAuth: true,
+  },
+];
+
+export const landingFeatureRoutes: ProductRoute[] = [
+  {
+    href: "/scholarships",
+    label: "Discovery",
+    description: "Search a Canada-first scholarship corpus with structured filters.",
+    section: "discovery",
+  },
+  {
+    href: "/recommendations",
+    label: "Prioritization",
+    description: "Review explainable matches once a profile is on file.",
+    section: "workspace",
+    requiresAuth: true,
+  },
+  {
+    href: "/document-feedback",
+    label: "Preparation",
+    description: "Improve writing and interview readiness with bounded coaching.",
+    section: "preparation",
+    requiresAuth: true,
+  },
+];

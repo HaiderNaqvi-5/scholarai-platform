@@ -144,206 +144,215 @@ export function RecommendationWorkspace() {
   return (
     <AppShell
       eyebrow="Recommendations"
-      title="Published scholarship recommendations now use a realistic demo dataset and clearer rationale."
-      description="The recommendation list stays rules-first and deterministic. The UI highlights what matched, what limited fit, and why each record appeared in the shortlist."
+      title="Use a saved profile to review a shortlist that explains both fit and caution."
+      description="Recommendations stay rules-first and tied to published scholarship records so the shortlist reads as guidance, not prediction."
+      intro={
+        <div className="surface-band">
+          <div className="button-row">
+            <StatusBadge label="Published records only" variant="validated" />
+            <StatusBadge label="Deterministic fit bands" variant="generated" />
+          </div>
+          <p className="body-copy">
+            Match summaries reflect explicit profile fields and scholarship constraints.
+            They are advisory, not authoritative scholarship decisions.
+          </p>
+        </div>
+      }
     >
-      <section className="recommendation-hero" data-testid="recommendations-workspace">
-        <div className="dashboard-hero__intro">
-          <p className="section-eyebrow">Demo quality pass</p>
-          <h2 className="section-title">
-            Recommendations remain grounded in published scholarship records only.
-          </h2>
-          <p className="body-copy">
-            The seeded demo dataset includes published Canada-first opportunities,
-            one Fulbright-related US example, and internal-only raw or validated
-            records that stay out of the student flow.
-          </p>
-        </div>
-        <div className="dashboard-hero__status">
-          <StatusBadge label="Published only" variant="validated" />
-          <StatusBadge label="Deterministic fit" variant="generated" />
-        </div>
-      </section>
-
-      <section className="page-grid">
-        <article className="data-callout">
-          <p className="list-label">Validated facts</p>
-          <p className="body-copy">
-            Titles, providers, deadlines, target countries, and publication state
-            come from curated records already marked published.
-          </p>
-        </article>
-        <article className="guidance-callout">
-          <p className="list-label">Generated explanation</p>
-          <p className="body-copy">
-            Match summaries and constraints are derived from explicit eligibility
-            rules. They do not claim hidden model insight or scholarship-rule authority.
-          </p>
-        </article>
-      </section>
-
-      {state.error ? (
-        <section className="surface-card" data-testid="recommendations-error">
-          <PageHeader
-            eyebrow="Recommendation state"
-            title="Recommendations are not ready yet."
-            description={state.error}
-          />
-          {!state.profile ? (
-            <Link className="auth-link auth-link--primary" href="/profile">
-              Complete profile first
-            </Link>
+      <section className="workspace-layout" data-testid="recommendations-workspace">
+        <div className="collection-grid">
+          {state.error ? (
+            <section className="surface-card" data-testid="recommendations-error">
+              <PageHeader
+                eyebrow="Recommendation status"
+                title="Recommendations are not ready yet."
+                description={state.error}
+              />
+              {!state.profile ? (
+                <Link className="auth-link auth-link--primary" href="/profile">
+                  Complete profile first
+                </Link>
+              ) : null}
+            </section>
           ) : null}
-        </section>
-      ) : null}
 
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Profile anchor"
-          title="Current recommendation input"
-          description="This snapshot keeps the explanation traceable back to the exact profile values used by the deterministic filter."
-        />
-        {state.isLoading ? (
-          <p className="body-copy">Loading your saved profile and seeded recommendation set.</p>
-        ) : state.profile ? (
-          <div className="surface-list">
-            <article>
-              <p className="list-heading">Target route</p>
-              <p className="body-copy">
-                {state.profile.target_degree_level} in {state.profile.target_field} for{" "}
-                {state.profile.target_country_code}
-              </p>
-            </article>
-            <article>
-              <p className="list-heading">Eligibility anchors</p>
-              <p className="body-copy">
-                Citizenship {state.profile.citizenship_country_code}, GPA{" "}
-                {state.profile.gpa_value ?? "not set"} / {state.profile.gpa_scale}
-              </p>
-            </article>
-          </div>
-        ) : (
-          <div className="empty-panel">
-            <p className="body-copy">
-              You need a saved profile before the recommendation engine can score published records.
-            </p>
-            <Link className="auth-link auth-link--primary" href="/profile">
-              Add profile
-            </Link>
-          </div>
-        )}
-      </section>
-
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Recommendation shortlist"
-          title="The seeded shortlist explains both fit and caution."
-          description="Strong matches surface first, but each card also tells you where the published record is broad, incomplete, or tighter than your profile."
-        />
-        {state.isLoading ? (
-          <p className="body-copy">Ranking seeded published records.</p>
-        ) : state.items.length > 0 ? (
-          <div className="recommendation-list">
-            {state.items.map((item) => {
-              const isSaved = savedIds.has(item.scholarship_id);
-              return (
-                <article
-                  className="recommendation-card"
-                  data-testid="recommendation-card"
-                  key={item.scholarship_id}
-                >
-                  <div className="recommendation-card__header">
-                    <div className="meta-row">
-                      <StatusBadge
-                        label={`${Math.round(item.estimated_fit_score * 100)}% ${item.fit_band}`}
-                        variant={fitVariant(item.fit_band)}
-                      />
-                      <StatusBadge label="Published source" variant="validated" />
-                    </div>
-                    <p className="route-card__label">
-                      {item.country_code} ·{" "}
-                      {item.deadline_at
-                        ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
-                        : "Deadline not listed"}
-                    </p>
-                  </div>
-
-                  <div className="recommendation-card__body">
-                    <div>
-                      <h3 className="route-card__title">{item.title}</h3>
-                      <p className="route-card__description">
-                        {item.provider_name ?? "Provider not listed"}
-                      </p>
-                    </div>
-                    <p className="recommendation-summary">{item.match_summary}</p>
-                  </div>
-
-                  <div className="recommendation-grid">
-                    <section className="explanation-panel">
-                      <p className="list-label">Criteria satisfied</p>
-                      <ul className="detail-list">
-                        {item.matched_criteria.map((criterion) => (
-                          <li key={criterion}>{criterion}</li>
-                        ))}
-                      </ul>
-                    </section>
-
-                    <section className="explanation-panel explanation-panel--caution">
-                      <p className="list-label">Ranking constraints</p>
-                      {item.constraint_notes.length > 0 ? (
-                        <ul className="detail-list">
-                          {item.constraint_notes.map((note) => (
-                            <li key={note}>{note}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="body-copy">
-                          No material constraints surfaced from the published record.
+          <section className="surface-card">
+            <PageHeader
+              eyebrow="Shortlist"
+              title="Each recommendation keeps the reason visible"
+              description="Strong matches surface first, but the interface also shows what may limit fit so the ranking stays honest."
+            />
+            {state.isLoading ? (
+              <p className="body-copy">Loading your profile and shortlist.</p>
+            ) : state.items.length > 0 ? (
+              <div className="recommendation-list">
+                {state.items.map((item) => {
+                  const isSaved = savedIds.has(item.scholarship_id);
+                  return (
+                    <article
+                      className="recommendation-card"
+                      data-testid="recommendation-card"
+                      key={item.scholarship_id}
+                    >
+                      <div className="recommendation-card__header">
+                        <div className="meta-row">
+                          <StatusBadge
+                            label={`${Math.round(item.estimated_fit_score * 100)}% ${item.fit_band}`}
+                            variant={fitVariant(item.fit_band)}
+                          />
+                          <StatusBadge label="Published source" variant="validated" />
+                        </div>
+                        <p className="route-card__label">
+                          {item.country_code} ·{" "}
+                          {item.deadline_at
+                            ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
+                            : "Deadline not listed"}
                         </p>
-                      )}
-                    </section>
-                  </div>
+                      </div>
 
-                  <div className="dashboard-actions">
-                    <Link
-                      className="nav-link"
-                      href={`/scholarships/${item.scholarship_id}`}
-                    >
-                      View details
-                    </Link>
-                    <button
-                      className={
-                        isSaved
-                          ? "auth-link auth-link--secondary"
-                          : "auth-link auth-link--primary"
-                      }
-                      onClick={() =>
-                        void (isSaved
-                          ? handleUnsave(item.scholarship_id)
-                          : handleSave(item.scholarship_id))
-                      }
-                      type="button"
-                    >
-                      {isSaved ? "Saved" : "Save opportunity"}
-                    </button>
-                    <Link className="nav-link" href="/dashboard">
-                      Open dashboard
-                    </Link>
-                  </div>
+                      <div className="recommendation-card__body">
+                        <div>
+                          <h3 className="route-card__title">{item.title}</h3>
+                          <p className="route-card__description">
+                            {item.provider_name ?? "Provider not listed"}
+                          </p>
+                        </div>
+                        <p className="recommendation-summary">{item.match_summary}</p>
+                      </div>
+
+                      <div className="recommendation-grid">
+                        <section className="explanation-panel">
+                          <p className="list-label">What aligned</p>
+                          <ul className="detail-list">
+                            {item.matched_criteria.map((criterion) => (
+                              <li key={criterion}>{criterion}</li>
+                            ))}
+                          </ul>
+                        </section>
+
+                        <section className="explanation-panel explanation-panel--caution">
+                          <p className="list-label">What to verify</p>
+                          {item.constraint_notes.length > 0 ? (
+                            <ul className="detail-list">
+                              {item.constraint_notes.map((note) => (
+                                <li key={note}>{note}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="body-copy">
+                              No material cautions surfaced from the current published record.
+                            </p>
+                          )}
+                        </section>
+                      </div>
+
+                      <div className="dashboard-actions">
+                        <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
+                          View details
+                        </Link>
+                        <button
+                          className={
+                            isSaved
+                              ? "auth-link auth-link--secondary"
+                              : "auth-link auth-link--primary"
+                          }
+                          onClick={() =>
+                            void (isSaved
+                              ? handleUnsave(item.scholarship_id)
+                              : handleSave(item.scholarship_id))
+                          }
+                          type="button"
+                        >
+                          {isSaved ? "Saved" : "Save opportunity"}
+                        </button>
+                        <Link className="nav-link" href="/dashboard">
+                          Open dashboard
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-panel">
+                <p className="body-copy">
+                  No published seeded records matched your current profile. Adjust your
+                  target field, GPA, or country to broaden the shortlist.
+                </p>
+                <Link className="auth-link auth-link--primary" href="/profile">
+                  Refine profile
+                </Link>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="collection-grid">
+          <section className="surface-panel">
+            <PageHeader
+              eyebrow="Profile anchor"
+              title="The input behind this shortlist"
+              description="The recommendation path stays understandable because it is tied to explicit profile data."
+            />
+            {state.isLoading ? (
+              <p className="body-copy">Loading profile context.</p>
+            ) : state.profile ? (
+              <div className="surface-list">
+                <article>
+                  <p className="list-heading">Target route</p>
+                  <p className="body-copy">
+                    {state.profile.target_degree_level} in {state.profile.target_field} for{" "}
+                    {state.profile.target_country_code}
+                  </p>
                 </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-panel">
-            <p className="body-copy">
-              No published seeded records matched your current profile. Adjust your target field, GPA, or country to see the available demo paths.
-            </p>
-            <Link className="auth-link auth-link--primary" href="/profile">
-              Refine profile
-            </Link>
-          </div>
-        )}
+                <article>
+                  <p className="list-heading">Eligibility anchors</p>
+                  <p className="body-copy">
+                    Citizenship {state.profile.citizenship_country_code}, GPA{" "}
+                    {state.profile.gpa_value ?? "not set"} / {state.profile.gpa_scale}
+                  </p>
+                </article>
+                <div className="dashboard-actions">
+                  <Link className="nav-link" href="/profile">
+                    Edit profile
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="empty-panel">
+                <p className="body-copy">
+                  A saved profile is required before ScholarAI can score published records.
+                </p>
+                <Link className="auth-link auth-link--primary" href="/profile">
+                  Add profile
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="surface-card">
+            <PageHeader
+              eyebrow="Trust boundary"
+              title="What this ranking means"
+              description="The shortlist explains why a scholarship surfaced without pretending to be a scholarship outcome predictor."
+            />
+            <div className="surface-list">
+              <article className="data-callout">
+                <p className="list-heading">Validated facts</p>
+                <p className="body-copy">
+                  Titles, providers, deadlines, and publication state come directly from curated records.
+                </p>
+              </article>
+              <article className="guidance-callout">
+                <p className="list-heading">Generated explanation</p>
+                <p className="body-copy">
+                  Fit bands and reasoning summarize explicit rules and profile inputs. They do
+                  not replace the scholarship record itself.
+                </p>
+              </article>
+            </div>
+          </section>
+        </div>
       </section>
     </AppShell>
   );

@@ -4,7 +4,7 @@ import { ProfileFormShell } from "@/components/profile/profile-form-shell";
 export default function OnboardingPage() {
   return (
     <ProtectedRoute>
-      <ProfileFormShell />
+      <ProfileFormShell mode="onboarding" />
     </ProtectedRoute>
   );
 }

@@ -1,51 +1,70 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { useAuth } from "@/components/auth/auth-provider";
 import { AuthActions } from "@/components/auth/auth-actions";
-import { appRoutes } from "@/lib/routes";
+import { appNavRoutes } from "@/lib/routes";
 
 type AppShellProps = {
   title: string;
   description: string;
   eyebrow?: string;
   children: React.ReactNode;
+  intro?: React.ReactNode;
 };
 
 export function AppShell({
   title,
   description,
-  eyebrow = "Implementation foundation",
+  eyebrow = "ScholarAI workspace",
   children,
+  intro,
 }: AppShellProps) {
+  const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
+  const visibleRoutes = appNavRoutes.filter(
+    (route) => !route.requiresAuth || isAuthenticated,
+  );
+
   return (
     <main className="app-shell">
       <div className="page-shell">
-        <nav className="top-nav">
-          <div className="brand-lockup">
+        <nav className="shell-nav shell-nav--app">
+          <Link className="brand-lockup brand-lockup--link" href="/">
             <span className="brand-mark" aria-hidden="true" />
-            <p className="brand-title">ScholarAI</p>
-          </div>
-          <div className="nav-links">
-            {appRoutes.map((route) => (
-              <Link key={route.href} className="nav-link" href={route.href}>
-                {route.label}
-              </Link>
-            ))}
+            <span className="brand-lockup__text">
+              <span className="brand-title">ScholarAI</span>
+              <span className="brand-subtitle">Calm, structured scholarship planning</span>
+            </span>
+          </Link>
+          <div className="shell-nav__links">
+            {visibleRoutes.map((route) => {
+              const isActive =
+                pathname === route.href || pathname.startsWith(`${route.href}/`);
+
+              return (
+                <Link
+                  key={route.href}
+                  className={isActive ? "shell-nav__link shell-nav__link--active" : "shell-nav__link"}
+                  href={route.href}
+                >
+                  {route.label}
+                </Link>
+              );
+            })}
           </div>
           <AuthActions />
         </nav>
-        <header className="page-header">
-          <p className="section-eyebrow">{eyebrow}</p>
-          <h1 className="page-title">{title}</h1>
-          <p className="page-description">{description}</p>
+        <header className="hero-block hero-block--app">
+          <div className="hero-block__copy">
+            <p className="section-eyebrow">{eyebrow}</p>
+            <h1 className="page-title">{title}</h1>
+            <p className="page-description">{description}</p>
+          </div>
+          {intro ? <div className="shell-intro">{intro}</div> : null}
         </header>
-        <div className="mode-banner">
-          <span className="mode-banner__label">Foundation phase</span>
-          <p className="mode-banner__copy">
-            Structured validated data remains the authority. Active MVP slices
-            stay narrow and grounded without implying broader functionality than
-            the product actually supports.
-          </p>
-        </div>
         {children}
       </div>
     </main>

@@ -43,8 +43,8 @@ def main() -> None:
 
         page.wait_for_selector('[data-testid="recommendations-workspace"]')
         page.wait_for_selector('[data-testid="recommendation-card"]')
-        page.wait_for_selector("text=Criteria satisfied")
-        page.wait_for_selector("text=Ranking constraints")
+        page.wait_for_selector("text=What aligned")
+        page.wait_for_selector("text=What to verify")
 
         browser.close()
 

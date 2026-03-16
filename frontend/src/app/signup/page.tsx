@@ -18,7 +18,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = searchParams.get("next") ?? "/onboarding";
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -28,9 +28,9 @@ export default function SignupPage() {
 
   return (
     <MarketingShell
-      eyebrow="Account setup"
-      title="Create the smallest account needed to save opportunities and use the dashboard."
-      description="ScholarAI keeps this slice intentionally lean: name, email, password, then direct entry into the authenticated workspace."
+      eyebrow="Create account"
+      title="Create your ScholarAI account and keep the scholarship workflow connected."
+      description="The account flow stays deliberately short so you can move straight into profile setup and recommendations."
     >
       <section className="auth-grid">
         <form
@@ -93,11 +93,11 @@ export default function SignupPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">Why this exists</p>
-          <h2 className="section-title">Saved opportunities need an account owner.</h2>
+          <p className="section-eyebrow">What this unlocks</p>
+          <h2 className="section-title">Save opportunities, complete your profile, and return later.</h2>
           <p className="body-copy">
-            Authentication is added here only because saved opportunities and
-            the dashboard shell require a stable user identity.
+            The account gives your shortlist and preparation work a stable home.
+            It does not introduce extra complexity beyond what the MVP needs.
           </p>
           <Link className="nav-link" href="/login">
             Already have an account?

@@ -160,13 +160,24 @@ export function InterviewPracticeShell() {
 
   return (
     <AppShell
-      title="Interview practice stays text-first, rubric-based, and clearly explainable."
-      description="This slice adds a deterministic session flow with bounded questions, structured rubric feedback, and no conversational-agent behavior."
+      title="Practice scholarship interview answers in a text-first, rubric-based workspace."
+      description="Interview practice stays focused and explainable so the feedback reads like coaching, not performance theater."
       eyebrow="Interview practice"
+      intro={
+        <div className="surface-band">
+          <div className="button-row">
+            <StatusBadge label="Rules-based scoring" variant="validated" />
+            <StatusBadge label="Text-first practice" variant="generated" />
+          </div>
+          <p className="body-copy">
+            The MVP uses one bounded session flow so the feedback remains readable and comparable.
+          </p>
+        </div>
+      }
     >
       <section className="interview-hero" data-testid="interview-practice-shell">
         <div>
-          <p className="section-eyebrow">Practice posture</p>
+          <p className="section-eyebrow">Practice workspace</p>
           <h2 className="section-title">
             Practice one focused session at a time with direct, modest coaching.
           </h2>
@@ -194,8 +205,8 @@ export function InterviewPracticeShell() {
         <article className="surface-card">
           <PageHeader
             eyebrow="Session entry"
-            title="Start a bounded practice session"
-            description="The MVP session uses one fixed question set so scoring stays consistent and explainable."
+            title="Start or resume a focused session"
+            description="The question set stays intentionally narrow so scoring remains consistent and easy to interpret."
           />
 
           {state.isLoading ? (
@@ -258,8 +269,8 @@ export function InterviewPracticeShell() {
         <article className="surface-panel" data-testid="interview-question-panel">
           <PageHeader
             eyebrow="Current question"
-            title="Question prompt"
-            description="Questions remain fixed and narrow so the score is easier to explain and compare."
+            title="Current prompt"
+            description="Questions stay fixed and modest so the feedback emphasizes structure, clarity, and specificity."
           />
           {currentQuestion?.question_text ? (
             <div className="surface-list">
@@ -320,7 +331,7 @@ export function InterviewPracticeShell() {
           <PageHeader
             eyebrow="Latest result"
             title="Structured rubric feedback"
-            description="Scores stay coarse and explainable so the feedback reads as coaching guidance rather than false precision."
+            description="Scores stay coarse and explainable so the feedback reads as guidance rather than false precision."
           />
           {state.session?.latest_feedback ? (
             <div className="surface-list">
@@ -381,7 +392,7 @@ export function InterviewPracticeShell() {
           <PageHeader
             eyebrow="Session summary"
             title="Question-by-question record"
-            description="The MVP stores only the minimum session metadata, answers, and rubric outputs."
+            description="The session log keeps only the minimum answer and rubric history needed for review."
           />
           {state.session?.responses.length ? (
             <div className="surface-list">

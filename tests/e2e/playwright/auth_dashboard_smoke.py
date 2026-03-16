@@ -16,6 +16,7 @@ def main() -> None:
             "strongpass1"
         )
         page.locator('[data-testid="login-form"] button[type="submit"]').click()
+        page.wait_for_url("**/dashboard")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="dashboard-shell"]')
 

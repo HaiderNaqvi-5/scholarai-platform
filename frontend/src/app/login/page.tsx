@@ -27,9 +27,9 @@ export default function LoginPage() {
 
   return (
     <MarketingShell
-      eyebrow="Authentication"
-      title="Sign in to access your saved opportunities and workspace shell."
-      description="This MVP authentication flow stays minimal: email, password, token-backed session, and protected workspace pages."
+      eyebrow="Account access"
+      title="Sign in to continue your scholarship planning."
+      description="Use the same account to keep your shortlist, profile, and preparation workspaces connected."
     >
       <section className="auth-grid">
         <form
@@ -81,14 +81,15 @@ export default function LoginPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">MVP auth posture</p>
-          <h2 className="section-title">Simple account access, no role sprawl.</h2>
+          <p className="section-eyebrow">Why sign in</p>
+          <h2 className="section-title">Keep your shortlist and profile in one place.</h2>
           <p className="body-copy">
-            This slice adds the minimum useful session flow so students can save
-            published opportunities and enter the dashboard workspace.
+            ScholarAI uses one lightweight account so saved opportunities,
+            recommendations, and preparation work stay connected without adding
+            unnecessary setup.
           </p>
           <Link className="nav-link" href="/signup">
-            Create a new account
+            Create an account
           </Link>
         </article>
       </section>

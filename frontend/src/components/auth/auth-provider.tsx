@@ -39,10 +39,31 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  });
+  const [refreshToken, setRefreshToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  });
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    return Boolean(
+      localStorage.getItem(ACCESS_TOKEN_KEY) ||
+        localStorage.getItem(REFRESH_TOKEN_KEY),
+    );
+  });
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -98,12 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!storedToken && !storedRefreshToken) {
-      setIsLoading(false);
       return;
     }
 
-    setAccessToken(storedToken);
-    setRefreshToken(storedRefreshToken);
     const bootstrapSession = async () => {
       if (!storedToken && storedRefreshToken) {
         await refreshSession(storedRefreshToken);

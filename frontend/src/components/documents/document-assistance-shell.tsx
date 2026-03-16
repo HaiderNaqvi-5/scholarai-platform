@@ -209,15 +209,26 @@ export function DocumentAssistanceShell() {
 
   return (
     <AppShell
-      title="Document assistance stays text-first, grounded, and visibly separate from validated scholarship facts."
-      description="This slice adds SOP and essay submission, a minimal processing pipeline, and structured feedback panels without introducing full RAG, full editor workflows, or document-management sprawl."
+      title="Work on one application draft at a time with grounded, clearly bounded feedback."
+      description="Document assistance is designed as a disciplined writing workspace, not a general-purpose AI editor."
       eyebrow="Document assistance"
+      intro={
+        <div className="surface-band">
+          <div className="button-row">
+            <StatusBadge label="Generated guidance" variant="generated" />
+            <StatusBadge label="Facts stay separate" variant="validated" />
+          </div>
+          <p className="body-copy">
+            Writing feedback is advisory. Official scholarship requirements still belong to published scholarship records.
+          </p>
+        </div>
+      }
     >
       <section className="document-hero" data-testid="document-assistance-shell">
         <div>
-          <p className="section-eyebrow">Submission flow</p>
+          <p className="section-eyebrow">Writing workspace</p>
           <h2 className="section-title">
-            Submit one draft, get one bounded guidance pass, and keep the feedback traceable.
+            Submit a focused draft, review one structured response, and keep the reasoning visible.
           </h2>
           <p className="body-copy">
             Generated feedback remains advisory. Official scholarship rules,
@@ -243,8 +254,8 @@ export function DocumentAssistanceShell() {
         <article className="surface-card">
           <PageHeader
             eyebrow="Submit draft"
-            title="Paste text or upload a plain-text file"
-            description="Keep the MVP input narrow and explicit. `.txt` and `.md` uploads are supported because they keep extraction risk and runtime cost low."
+            title="Paste text or upload a plain-text draft"
+            description="The MVP keeps input narrow on purpose so the feedback remains easy to understand and review."
           />
 
           <div className="toggle-row">
@@ -363,8 +374,8 @@ export function DocumentAssistanceShell() {
         <article className="surface-panel">
           <PageHeader
             eyebrow="Recent drafts"
-            title="Submitted document records"
-            description="This is a narrow working set, not a full document-management system."
+            title="Recent draft history"
+            description="This is a focused working set for active drafts, not a full document archive."
           />
           {state.isLoading ? (
             <p className="body-copy">Loading recent document records.</p>
@@ -420,8 +431,8 @@ export function DocumentAssistanceShell() {
         <article className="surface-card" data-testid="document-feedback-result">
           <PageHeader
             eyebrow="Feedback result"
-            title="Structured guidance"
-            description="The result is intentionally structured so users can separate suggested edits from factual scholarship constraints."
+            title="Structured writing guidance"
+            description="Feedback is grouped so you can separate revision advice from scholarship facts that live elsewhere."
           />
           {!selectedDocument ? (
             <div className="empty-panel">
@@ -488,8 +499,8 @@ export function DocumentAssistanceShell() {
         <article className="surface-panel">
           <PageHeader
             eyebrow="Grounding and limits"
-            title="Why this feedback is bounded"
-            description="The MVP should be explicit about what this slice does not do."
+            title="Why the feedback stays bounded"
+            description="ScholarAI is explicit about where writing guidance ends and official scholarship information begins."
           />
           {selectedDocument?.latest_feedback ? (
             <div className="surface-list">

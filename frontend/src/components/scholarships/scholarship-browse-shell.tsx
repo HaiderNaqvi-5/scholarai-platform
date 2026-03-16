@@ -12,6 +12,7 @@ import type {
   ApiError,
   SavedOpportunityItem,
   SavedOpportunityListResponse,
+  ScholarshipAppliedFilters,
   ScholarshipListItem,
   ScholarshipListResponse,
 } from "@/lib/types";
@@ -29,11 +30,26 @@ const FIELD_FILTERS = [
   { label: "Analytics", value: "analytics" },
 ] as const;
 
-const DEADLINE_FILTERS = [
+const DEADLINE_WINDOWS = [
   { label: "Any deadline", value: "all" },
   { label: "30 days", value: "30" },
   { label: "60 days", value: "60" },
   { label: "90 days", value: "90" },
+] as const;
+
+const DEADLINE_AVAILABILITY = [
+  { label: "Any availability", value: "all" },
+  { label: "Has deadline", value: "true" },
+  { label: "No deadline", value: "false" },
+] as const;
+
+const FUNDING_TYPES = [
+  { label: "Any funding type", value: "all" },
+  { label: "Tuition award", value: "tuition_award" },
+  { label: "Stipend", value: "stipend" },
+  { label: "Fellowship", value: "fellowship" },
+  { label: "Comprehensive award", value: "comprehensive_award" },
+  { label: "Bursary", value: "bursary" },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -44,43 +60,116 @@ const SORT_OPTIONS = [
 
 type CountryFilter = (typeof COUNTRY_FILTERS)[number]["value"];
 type FieldFilter = (typeof FIELD_FILTERS)[number]["value"];
-type DeadlineFilter = (typeof DEADLINE_FILTERS)[number]["value"];
+type DeadlineWindow = (typeof DEADLINE_WINDOWS)[number]["value"];
+type DeadlineAvailability = (typeof DEADLINE_AVAILABILITY)[number]["value"];
+type FundingTypeFilter = (typeof FUNDING_TYPES)[number]["value"];
 type SortFilter = (typeof SORT_OPTIONS)[number]["value"];
 
 type BrowseState = {
   isLoading: boolean;
   error: string | null;
   items: ScholarshipListItem[];
-  appliedCountryCode: string | null;
-  appliedQuery: string | null;
-  appliedFieldTag: string | null;
-  appliedDegreeLevel: string | null;
-  appliedDeadlineWithinDays: number | null;
-  appliedSort: SortFilter;
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  appliedFilters: ScholarshipAppliedFilters;
   savedIds: Set<string>;
   isSaving: string | null;
 };
+
+const DEFAULT_PAGE_SIZE = 12;
 
 export function ScholarshipBrowseShell() {
   const { accessToken, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [countryFilter, setCountryFilter] = useState<CountryFilter>("all");
   const [fieldFilter, setFieldFilter] = useState<FieldFilter>("all");
-  const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
+  const [providerFilter, setProviderFilter] = useState("");
+  const [fundingFilter, setFundingFilter] = useState<FundingTypeFilter>("all");
+  const [deadlineWindow, setDeadlineWindow] = useState<DeadlineWindow>("all");
+  const [deadlineAvailability, setDeadlineAvailability] =
+    useState<DeadlineAvailability>("all");
   const [sortFilter, setSortFilter] = useState<SortFilter>("deadline");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [page, setPage] = useState(1);
   const [state, setState] = useState<BrowseState>({
     isLoading: true,
     error: null,
     items: [],
-    appliedCountryCode: null,
-    appliedQuery: null,
-    appliedFieldTag: null,
-    appliedDegreeLevel: null,
-    appliedDeadlineWithinDays: null,
-    appliedSort: "deadline",
+    total: 0,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    hasMore: false,
+    appliedFilters: {
+      country_code: null,
+      query: null,
+      field_tag: null,
+      degree_level: null,
+      provider: null,
+      funding_type: null,
+      min_amount: null,
+      max_amount: null,
+      has_deadline: null,
+      deadline_within_days: null,
+      deadline_after: null,
+      deadline_before: null,
+      sort: "deadline",
+    },
     savedIds: new Set<string>(),
     isSaving: null,
   });
+
+  const updateSearchQuery = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  };
+
+  const updateCountryFilter = (value: CountryFilter) => {
+    setCountryFilter(value);
+    setPage(1);
+  };
+
+  const updateFieldFilter = (value: FieldFilter) => {
+    setFieldFilter(value);
+    setPage(1);
+  };
+
+  const updateProviderFilter = (value: string) => {
+    setProviderFilter(value);
+    setPage(1);
+  };
+
+  const updateFundingFilter = (value: FundingTypeFilter) => {
+    setFundingFilter(value);
+    setPage(1);
+  };
+
+  const updateDeadlineWindow = (value: DeadlineWindow) => {
+    setDeadlineWindow(value);
+    setPage(1);
+  };
+
+  const updateDeadlineAvailability = (value: DeadlineAvailability) => {
+    setDeadlineAvailability(value);
+    setPage(1);
+  };
+
+  const updateSortFilter = (value: SortFilter) => {
+    setSortFilter(value);
+    setPage(1);
+  };
+
+  const updateMinAmount = (value: string) => {
+    setMinAmount(value);
+    setPage(1);
+  };
+
+  const updateMaxAmount = (value: string) => {
+    setMaxAmount(value);
+    setPage(1);
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -90,21 +179,38 @@ export function ScholarshipBrowseShell() {
 
       try {
         const query = new URLSearchParams({
-          limit: "24",
           degree_level: "MS",
           sort: sortFilter,
+          page: page.toString(),
+          page_size: DEFAULT_PAGE_SIZE.toString(),
         });
+
         if (countryFilter !== "all") {
           query.set("country_code", countryFilter);
         }
         if (fieldFilter !== "all") {
           query.set("field_tag", fieldFilter);
         }
-        if (deadlineFilter !== "all") {
-          query.set("deadline_within_days", deadlineFilter);
+        if (providerFilter.trim()) {
+          query.set("provider", providerFilter.trim());
+        }
+        if (fundingFilter !== "all") {
+          query.set("funding_type", fundingFilter);
+        }
+        if (deadlineWindow !== "all") {
+          query.set("deadline_within_days", deadlineWindow);
+        }
+        if (deadlineAvailability !== "all") {
+          query.set("has_deadline", deadlineAvailability);
         }
         if (searchQuery.trim()) {
           query.set("query", searchQuery.trim());
+        }
+        if (minAmount.trim()) {
+          query.set("min_amount", minAmount.trim());
+        }
+        if (maxAmount.trim()) {
+          query.set("max_amount", maxAmount.trim());
         }
 
         const scholarshipPromise = apiRequest<ScholarshipListResponse>(
@@ -132,12 +238,11 @@ export function ScholarshipBrowseShell() {
           isLoading: false,
           error: null,
           items: scholarships.items,
-          appliedCountryCode: scholarships.applied_country_code,
-          appliedQuery: scholarships.applied_query,
-          appliedFieldTag: scholarships.applied_field_tag,
-          appliedDegreeLevel: scholarships.applied_degree_level,
-          appliedDeadlineWithinDays: scholarships.applied_deadline_within_days,
-          appliedSort: scholarships.applied_sort,
+          total: scholarships.total,
+          page: scholarships.page,
+          pageSize: scholarships.page_size,
+          hasMore: scholarships.has_more,
+          appliedFilters: scholarships.applied_filters,
           savedIds: new Set(saved.items.map((item) => item.scholarship_id)),
           isSaving: null,
         });
@@ -152,6 +257,8 @@ export function ScholarshipBrowseShell() {
           isLoading: false,
           error: error.message,
           items: [],
+          total: 0,
+          hasMore: false,
           isSaving: null,
         }));
       }
@@ -162,35 +269,41 @@ export function ScholarshipBrowseShell() {
     return () => {
       isActive = false;
     };
-  }, [accessToken, countryFilter, deadlineFilter, fieldFilter, searchQuery, sortFilter]);
-
-  const heading = useMemo(() => {
-    if (state.appliedCountryCode === "CA") {
-      return "Published Canada-first opportunities";
-    }
-    if (state.appliedCountryCode === "US") {
-      return "Published Fulbright-related US opportunities";
-    }
-    return "Published scholarship discovery";
-  }, [state.appliedCountryCode]);
+  }, [
+    accessToken,
+    countryFilter,
+    deadlineAvailability,
+    deadlineWindow,
+    fieldFilter,
+    fundingFilter,
+    maxAmount,
+    minAmount,
+    page,
+    providerFilter,
+    searchQuery,
+    sortFilter,
+  ]);
 
   const appliedFilterPills = useMemo(() => {
+    const filters = state.appliedFilters;
     return [
-      state.appliedDegreeLevel ? `Degree ${state.appliedDegreeLevel}` : null,
-      state.appliedFieldTag ? `Field ${state.appliedFieldTag}` : null,
-      state.appliedDeadlineWithinDays
-        ? `Deadline within ${state.appliedDeadlineWithinDays} days`
+      filters.country_code ? `Country ${filters.country_code}` : null,
+      filters.degree_level ? `Degree ${filters.degree_level}` : null,
+      filters.field_tag ? `Field ${filters.field_tag}` : null,
+      filters.provider ? `Provider ${filters.provider}` : null,
+      filters.funding_type ? `Funding ${filters.funding_type.replaceAll("_", " ")}` : null,
+      filters.min_amount !== null ? `Min ${filters.min_amount}` : null,
+      filters.max_amount !== null ? `Max ${filters.max_amount}` : null,
+      filters.has_deadline === true
+        ? "Has deadline"
+        : filters.has_deadline === false
+          ? "No deadline"
+          : null,
+      filters.deadline_within_days
+        ? `Deadline within ${filters.deadline_within_days} days`
         : null,
-      state.appliedQuery ? `Search ${state.appliedQuery}` : null,
-      `Sort ${state.appliedSort}`,
     ].filter(Boolean) as string[];
-  }, [
-    state.appliedDeadlineWithinDays,
-    state.appliedDegreeLevel,
-    state.appliedFieldTag,
-    state.appliedQuery,
-    state.appliedSort,
-  ]);
+  }, [state.appliedFilters]);
 
   const handleSaveToggle = async (scholarshipId: string, isSaved: boolean) => {
     if (!accessToken) {
@@ -231,209 +344,357 @@ export function ScholarshipBrowseShell() {
     }
   };
 
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setCountryFilter("all");
+    setFieldFilter("all");
+    setProviderFilter("");
+    setFundingFilter("all");
+    setDeadlineWindow("all");
+    setDeadlineAvailability("all");
+    setSortFilter("deadline");
+    setMinAmount("");
+    setMaxAmount("");
+    setPage(1);
+  };
+
   return (
     <AppShell
-      eyebrow="Public discovery"
-      title="Browse the published scholarship corpus with the same scope discipline the MVP uses everywhere else."
-      description="This view stays published-only, Canada-first, and explicit about filters, deadlines, and field alignment instead of pretending discovery is broader than the validated corpus."
-    >
-      <section className="recommendation-hero" data-testid="scholarship-browse-shell">
-        <div className="dashboard-hero__intro">
-          <p className="section-eyebrow">Published scholarship corpus</p>
-          <h2 className="section-title">{heading}</h2>
+      eyebrow="Scholarship discovery"
+      title="Browse a published scholarship catalog with clear scope and visible filters."
+      description="The discovery view stays disciplined: Canada-first, published-only, and explicit about the narrow MVP corpus."
+      intro={
+        <div className="surface-band">
+          <div className="button-row">
+            <StatusBadge label="Public catalog" variant="validated" />
+            <StatusBadge label={`${state.total} visible records`} variant="neutral" />
+          </div>
           <p className="body-copy">
-            Raw and validated records remain internal. This discovery surface only
-            exposes published scholarship records that stay inside documented MVP scope.
+            Students only see published records here. Internal raw and validated
+            records remain inside the curation workflow.
           </p>
         </div>
-        <div className="dashboard-hero__status">
-          <StatusBadge label="Published only" variant="validated" />
-          <StatusBadge label="Public read access" variant="generated" />
-        </div>
-      </section>
-
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Browse controls"
-          title="Search and filter the narrow published corpus"
-          description="Filters stay intentionally practical: country, field family, deadline urgency, and a simple sort order."
-        />
-        <div className="form-grid">
-          <label className="form-field">
-            <span className="form-field__label">Search title or provider</span>
-            <input
-              className="text-input"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Waterloo, Fulbright, analytics"
-              value={searchQuery}
-            />
-          </label>
-          <label className="form-field">
-            <span className="form-field__label">Deadline window</span>
-            <select
-              className="text-input"
-              onChange={(event) => setDeadlineFilter(event.target.value as DeadlineFilter)}
-              value={deadlineFilter}
-            >
-              {DEADLINE_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span className="form-field__label">Sort order</span>
-            <select
-              className="text-input"
-              onChange={(event) => setSortFilter(event.target.value as SortFilter)}
-              value={sortFilter}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="toggle-row">
-          {COUNTRY_FILTERS.map((filter) => (
-            <button
-              className={
-                countryFilter === filter.value
-                  ? "toggle-chip toggle-chip--active"
-                  : "toggle-chip"
-              }
-              key={filter.value}
-              onClick={() => setCountryFilter(filter.value)}
-              type="button"
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-        <div className="toggle-row">
-          {FIELD_FILTERS.map((filter) => (
-            <button
-              className={
-                fieldFilter === filter.value
-                  ? "toggle-chip toggle-chip--active"
-                  : "toggle-chip"
-              }
-              key={filter.value}
-              onClick={() => setFieldFilter(filter.value)}
-              type="button"
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {state.error ? (
-        <section className="surface-card" data-testid="scholarship-browse-error">
-          <p className="section-eyebrow">Scholarship browse error</p>
-          <h2 className="section-title">The published scholarship view could not load.</h2>
-          <p className="body-copy">{state.error}</p>
-        </section>
-      ) : null}
-
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Applied filters"
-          title="Keep the current discovery state explicit"
-          description="The browse layer should make it obvious why a result set is narrow instead of making the corpus look larger than it is."
-        />
-        <div className="meta-row">
-          {appliedFilterPills.map((pill) => (
-            <StatusBadge key={pill} label={pill} variant="generated" />
-          ))}
-        </div>
-      </section>
-
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Published results"
-          title="Use browse for public discovery, then move into saved and recommendation workflows."
-          description="Cards stay concise but now surface field alignment and deadline urgency more clearly for demo-quality browsing."
-        />
-        {state.isLoading ? (
-          <p className="body-copy">Loading published scholarships.</p>
-        ) : state.items.length > 0 ? (
-          <div className="recommendation-list">
-            {state.items.map((item) => {
-              const isSaved = state.savedIds.has(item.scholarship_id);
-              return (
-                <article className="recommendation-card" key={item.scholarship_id}>
-                  <div className="recommendation-card__header">
-                    <div className="meta-row">
-                      <StatusBadge label="Published" variant="validated" />
-                      <span className="route-card__label">{item.country_code}</span>
-                    </div>
-                    <p className="route-card__label">
-                      {item.deadline_at
-                        ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
-                        : "Deadline not listed"}
-                    </p>
-                  </div>
-                  <div className="recommendation-card__body">
-                    <div>
-                      <h3 className="route-card__title">{item.title}</h3>
-                      <p className="route-card__description">
-                        {item.provider_name ?? "Provider not listed"}
-                      </p>
-                    </div>
-                    <p className="body-copy">
-                      Open the full record to inspect eligibility anchors, provenance,
-                      and the published source link before saving or planning around it.
-                    </p>
-                  </div>
-                  <div className="dashboard-actions">
-                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
-                      View details
-                    </Link>
-                    {isAuthenticated ? (
-                      <button
-                        className={
-                          isSaved
-                            ? "auth-link auth-link--secondary"
-                            : "auth-link auth-link--primary"
-                        }
-                        disabled={state.isSaving === item.scholarship_id}
-                        onClick={() =>
-                          void handleSaveToggle(item.scholarship_id, isSaved)
-                        }
-                        type="button"
-                      >
-                        {state.isSaving === item.scholarship_id
-                          ? "Updating"
-                          : isSaved
-                            ? "Saved"
-                            : "Save opportunity"}
-                      </button>
-                    ) : (
-                      <Link
-                        className="auth-link auth-link--secondary"
-                        href="/login?next=/scholarships"
-                      >
-                        Sign in to save
-                      </Link>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+      }
+    >
+      <section className="workspace-layout" data-testid="scholarship-browse-shell">
+        <article className="surface-panel scholarship-filter-rail">
+          <PageHeader
+            eyebrow="Filter rail"
+            title="Keep the search state visible"
+            description="Filtering stays on the page so the catalog feels trustworthy and easy to adjust."
+          />
+          <div className="form-grid">
+            <label className="form-field">
+              <span className="form-field__label">Search title or provider</span>
+              <input
+                className="text-input"
+                data-testid="scholarship-search-input"
+                onChange={(event) => updateSearchQuery(event.target.value)}
+                placeholder="Waterloo, Fulbright, analytics"
+                value={searchQuery}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Provider</span>
+              <input
+                className="text-input"
+                data-testid="scholarship-provider-input"
+                onChange={(event) => updateProviderFilter(event.target.value)}
+                placeholder="University of Waterloo"
+                value={providerFilter}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Funding type</span>
+              <select
+                className="text-input"
+                data-testid="scholarship-funding-select"
+                onChange={(event) =>
+                  updateFundingFilter(event.target.value as FundingTypeFilter)
+                }
+                value={fundingFilter}
+              >
+                {FUNDING_TYPES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Deadline window</span>
+              <select
+                className="text-input"
+                onChange={(event) =>
+                  updateDeadlineWindow(event.target.value as DeadlineWindow)
+                }
+                value={deadlineWindow}
+              >
+                {DEADLINE_WINDOWS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Deadline availability</span>
+              <select
+                className="text-input"
+                onChange={(event) =>
+                  updateDeadlineAvailability(
+                    event.target.value as DeadlineAvailability,
+                  )
+                }
+                value={deadlineAvailability}
+              >
+                {DEADLINE_AVAILABILITY.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Sort order</span>
+              <select
+                className="text-input"
+                onChange={(event) => updateSortFilter(event.target.value as SortFilter)}
+                value={sortFilter}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Minimum amount</span>
+              <input
+                className="text-input"
+                inputMode="numeric"
+                onChange={(event) => updateMinAmount(event.target.value)}
+                placeholder="10000"
+                value={minAmount}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Maximum amount</span>
+              <input
+                className="text-input"
+                inputMode="numeric"
+                onChange={(event) => updateMaxAmount(event.target.value)}
+                placeholder="30000"
+                value={maxAmount}
+              />
+            </label>
           </div>
-        ) : (
-          <div className="empty-panel">
-            <p className="body-copy">
-              No published scholarships match the current discovery settings. Try
-              broadening the field filter, clearing the search text, or widening the
-              deadline window.
+
+          <div className="toggle-row">
+            {COUNTRY_FILTERS.map((filter) => (
+              <button
+                className={
+                  countryFilter === filter.value
+                    ? "toggle-chip toggle-chip--active"
+                    : "toggle-chip"
+                }
+                key={filter.value}
+                onClick={() => updateCountryFilter(filter.value)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="toggle-row">
+            {FIELD_FILTERS.map((filter) => (
+              <button
+                className={
+                  fieldFilter === filter.value
+                    ? "toggle-chip toggle-chip--active"
+                    : "toggle-chip"
+                }
+                data-testid={
+                  filter.value === "artificial intelligence" ? "field-filter-ai" : undefined
+                }
+                key={filter.value}
+                onClick={() => updateFieldFilter(filter.value)}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="dashboard-actions">
+            <button className="auth-link auth-link--secondary" onClick={clearAllFilters} type="button">
+              Clear filters
+            </button>
+            <p className="field-note">
+              {state.items.length > 0
+                ? `${(state.page - 1) * state.pageSize + 1}-${(state.page - 1) * state.pageSize + state.items.length} of ${state.total}`
+                : `0 of ${state.total}`} visible
             </p>
           </div>
-        )}
+        </article>
+
+        <div className="collection-grid">
+          <section className="surface-card">
+            <PageHeader
+              eyebrow="Trust boundary"
+              title="Published records only"
+              description="This catalog is intentionally narrower than a generic scholarship directory so the facts stay dependable."
+            />
+            <div className="split-panel">
+              <article className="data-callout">
+                <p className="list-label">Validated record facts</p>
+                <p className="body-copy">
+                  Title, provider, country, deadline, and structured filters come from
+                  published scholarship records.
+                </p>
+              </article>
+              <article className="guidance-callout">
+                <p className="list-label">What this page does not do</p>
+                <p className="body-copy">
+                  It does not guess fit on your behalf. That happens later in the
+                  recommendation workspace once a profile is saved.
+                </p>
+              </article>
+            </div>
+          </section>
+
+          {state.error ? (
+            <section className="surface-card" data-testid="scholarship-browse-error">
+              <PageHeader
+                eyebrow="Catalog status"
+                title="The scholarship catalog could not load."
+                description={state.error}
+              />
+            </section>
+          ) : null}
+
+          {appliedFilterPills.length > 0 ? (
+            <section className="surface-card">
+              <PageHeader
+                eyebrow="Current filters"
+                title="The active search state is visible at a glance"
+                description="ScholarAI shows why the current result set is narrow instead of hiding those constraints."
+                compact
+              />
+              <div className="meta-row">
+                {appliedFilterPills.map((pill) => (
+                  <StatusBadge key={pill} label={pill} variant="generated" />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="surface-card">
+            <PageHeader
+              eyebrow="Published results"
+              title="Review each opportunity before you save it"
+              description="Every result keeps the factual essentials close and the next action obvious."
+            />
+            {state.isLoading ? (
+              <p className="body-copy">Loading published scholarships.</p>
+            ) : state.items.length > 0 ? (
+              <>
+                <div className="recommendation-list">
+                  {state.items.map((item) => {
+                    const isSaved = state.savedIds.has(item.scholarship_id);
+                    return (
+                      <article className="recommendation-card" key={item.scholarship_id}>
+                        <div className="recommendation-card__header">
+                          <div className="meta-row">
+                            <StatusBadge label="Published" variant="validated" />
+                            <span className="route-card__label">{item.country_code}</span>
+                          </div>
+                          <p className="route-card__label">
+                            {item.deadline_at
+                              ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
+                              : "Deadline not listed"}
+                          </p>
+                        </div>
+                        <div className="recommendation-card__body">
+                          <div>
+                            <h3 className="route-card__title">{item.title}</h3>
+                            <p className="route-card__description">
+                              {item.provider_name ?? "Provider not listed"}
+                            </p>
+                          </div>
+                          <p className="body-copy">
+                            Open the full record to inspect requirements, funding shape,
+                            validation timing, and the published source before you save it.
+                          </p>
+                        </div>
+                        <div className="dashboard-actions">
+                          <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
+                            View details
+                          </Link>
+                          {isAuthenticated ? (
+                            <button
+                              className={
+                                isSaved
+                                  ? "auth-link auth-link--secondary"
+                                  : "auth-link auth-link--primary"
+                              }
+                              disabled={state.isSaving === item.scholarship_id}
+                              onClick={() =>
+                                void handleSaveToggle(item.scholarship_id, isSaved)
+                              }
+                              type="button"
+                            >
+                              {state.isSaving === item.scholarship_id
+                                ? "Updating"
+                                : isSaved
+                                  ? "Saved"
+                                  : "Save opportunity"}
+                            </button>
+                          ) : (
+                            <Link
+                              className="auth-link auth-link--secondary"
+                              href="/login?next=/scholarships"
+                            >
+                              Sign in to save
+                            </Link>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="dashboard-actions scholarship-pagination">
+                  <button
+                    className="auth-link auth-link--secondary"
+                    disabled={state.page <= 1 || state.isLoading}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    type="button"
+                  >
+                    Previous page
+                  </button>
+                  <StatusBadge label={`Page ${state.page}`} variant="neutral" />
+                  <button
+                    className="auth-link auth-link--secondary"
+                    disabled={!state.hasMore || state.isLoading}
+                    onClick={() => setPage((current) => current + 1)}
+                    type="button"
+                  >
+                    Next page
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="empty-panel">
+                <p className="body-copy">
+                  No published scholarships match the current filters. Try widening the
+                  deadline window, clearing the provider search, or switching to all fields.
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
       </section>
     </AppShell>
   );
