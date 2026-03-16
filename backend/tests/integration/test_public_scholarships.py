@@ -53,5 +53,10 @@ def test_public_scholarships_use_list_envelope(app, client):
     body = response.json()
     assert body["total"] == 1
     assert body["applied_country_code"] is None
+    assert body["applied_query"] is None
+    assert body["applied_field_tag"] is None
+    assert body["applied_degree_level"] is None
+    assert body["applied_deadline_within_days"] is None
+    assert body["applied_sort"] == "deadline"
     assert body["items"][0]["title"] == "Waterloo AI Graduate Scholarship"
     assert body["items"][0]["record_state"] == "published"

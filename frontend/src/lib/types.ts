@@ -39,6 +39,11 @@ export type ScholarshipListResponse = {
   items: ScholarshipListItem[];
   total: number;
   applied_country_code: string | null;
+  applied_query: string | null;
+  applied_field_tag: string | null;
+  applied_degree_level: string | null;
+  applied_deadline_within_days: number | null;
+  applied_sort: "deadline" | "title" | "recent";
 };
 
 export type ScholarshipDetail = ScholarshipListItem & {

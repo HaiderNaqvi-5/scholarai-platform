@@ -22,25 +22,62 @@ const COUNTRY_FILTERS = [
   { label: "Fulbright scope", value: "US" },
 ] as const;
 
+const FIELD_FILTERS = [
+  { label: "All fields", value: "all" },
+  { label: "Data Science", value: "data science" },
+  { label: "Artificial Intelligence", value: "artificial intelligence" },
+  { label: "Analytics", value: "analytics" },
+] as const;
+
+const DEADLINE_FILTERS = [
+  { label: "Any deadline", value: "all" },
+  { label: "30 days", value: "30" },
+  { label: "60 days", value: "60" },
+  { label: "90 days", value: "90" },
+] as const;
+
+const SORT_OPTIONS = [
+  { label: "Nearest deadline", value: "deadline" },
+  { label: "Alphabetical", value: "title" },
+  { label: "Recently added", value: "recent" },
+] as const;
+
 type CountryFilter = (typeof COUNTRY_FILTERS)[number]["value"];
+type FieldFilter = (typeof FIELD_FILTERS)[number]["value"];
+type DeadlineFilter = (typeof DEADLINE_FILTERS)[number]["value"];
+type SortFilter = (typeof SORT_OPTIONS)[number]["value"];
 
 type BrowseState = {
   isLoading: boolean;
   error: string | null;
   items: ScholarshipListItem[];
   appliedCountryCode: string | null;
+  appliedQuery: string | null;
+  appliedFieldTag: string | null;
+  appliedDegreeLevel: string | null;
+  appliedDeadlineWithinDays: number | null;
+  appliedSort: SortFilter;
   savedIds: Set<string>;
   isSaving: string | null;
 };
 
 export function ScholarshipBrowseShell() {
   const { accessToken, isAuthenticated } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
   const [countryFilter, setCountryFilter] = useState<CountryFilter>("all");
+  const [fieldFilter, setFieldFilter] = useState<FieldFilter>("all");
+  const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
+  const [sortFilter, setSortFilter] = useState<SortFilter>("deadline");
   const [state, setState] = useState<BrowseState>({
     isLoading: true,
     error: null,
     items: [],
     appliedCountryCode: null,
+    appliedQuery: null,
+    appliedFieldTag: null,
+    appliedDegreeLevel: null,
+    appliedDeadlineWithinDays: null,
+    appliedSort: "deadline",
     savedIds: new Set<string>(),
     isSaving: null,
   });
@@ -52,9 +89,22 @@ export function ScholarshipBrowseShell() {
       setState((current) => ({ ...current, isLoading: true, error: null }));
 
       try {
-        const query = new URLSearchParams({ limit: "24" });
+        const query = new URLSearchParams({
+          limit: "24",
+          degree_level: "MS",
+          sort: sortFilter,
+        });
         if (countryFilter !== "all") {
           query.set("country_code", countryFilter);
+        }
+        if (fieldFilter !== "all") {
+          query.set("field_tag", fieldFilter);
+        }
+        if (deadlineFilter !== "all") {
+          query.set("deadline_within_days", deadlineFilter);
+        }
+        if (searchQuery.trim()) {
+          query.set("query", searchQuery.trim());
         }
 
         const scholarshipPromise = apiRequest<ScholarshipListResponse>(
@@ -80,6 +130,11 @@ export function ScholarshipBrowseShell() {
           error: null,
           items: scholarships.items,
           appliedCountryCode: scholarships.applied_country_code,
+          appliedQuery: scholarships.applied_query,
+          appliedFieldTag: scholarships.applied_field_tag,
+          appliedDegreeLevel: scholarships.applied_degree_level,
+          appliedDeadlineWithinDays: scholarships.applied_deadline_within_days,
+          appliedSort: scholarships.applied_sort,
           savedIds: new Set(saved.items.map((item) => item.scholarship_id)),
           isSaving: null,
         });
@@ -94,7 +149,6 @@ export function ScholarshipBrowseShell() {
           isLoading: false,
           error: error.message,
           items: [],
-          appliedCountryCode: null,
           isSaving: null,
         }));
       }
@@ -105,7 +159,7 @@ export function ScholarshipBrowseShell() {
     return () => {
       isActive = false;
     };
-  }, [accessToken, countryFilter]);
+  }, [accessToken, countryFilter, deadlineFilter, fieldFilter, searchQuery, sortFilter]);
 
   const heading = useMemo(() => {
     if (state.appliedCountryCode === "CA") {
@@ -116,6 +170,24 @@ export function ScholarshipBrowseShell() {
     }
     return "Published scholarship discovery";
   }, [state.appliedCountryCode]);
+
+  const appliedFilterPills = useMemo(() => {
+    return [
+      state.appliedDegreeLevel ? `Degree ${state.appliedDegreeLevel}` : null,
+      state.appliedFieldTag ? `Field ${state.appliedFieldTag}` : null,
+      state.appliedDeadlineWithinDays
+        ? `Deadline within ${state.appliedDeadlineWithinDays} days`
+        : null,
+      state.appliedQuery ? `Search ${state.appliedQuery}` : null,
+      `Sort ${state.appliedSort}`,
+    ].filter(Boolean) as string[];
+  }, [
+    state.appliedDeadlineWithinDays,
+    state.appliedDegreeLevel,
+    state.appliedFieldTag,
+    state.appliedQuery,
+    state.appliedSort,
+  ]);
 
   const handleSaveToggle = async (scholarshipId: string, isSaved: boolean) => {
     if (!accessToken) {
@@ -159,16 +231,16 @@ export function ScholarshipBrowseShell() {
   return (
     <AppShell
       eyebrow="Public discovery"
-      title="Browse published scholarship records without stepping outside the curated MVP corpus."
-      description="This view exposes only published opportunities, keeps Canada-first scope explicit, and ties deeper actions back into authenticated recommendation and save flows."
+      title="Browse the published scholarship corpus with the same scope discipline the MVP uses everywhere else."
+      description="This view stays published-only, Canada-first, and explicit about filters, deadlines, and field alignment instead of pretending discovery is broader than the validated corpus."
     >
       <section className="recommendation-hero" data-testid="scholarship-browse-shell">
         <div className="dashboard-hero__intro">
           <p className="section-eyebrow">Published scholarship corpus</p>
           <h2 className="section-title">{heading}</h2>
           <p className="body-copy">
-            Raw and validated records stay inside curator tooling. This browse surface
-            only exposes published records that remain in documented MVP scope.
+            Raw and validated records remain internal. This discovery surface only
+            exposes published scholarship records that stay inside documented MVP scope.
           </p>
         </div>
         <div className="dashboard-hero__status">
@@ -180,9 +252,48 @@ export function ScholarshipBrowseShell() {
       <section className="surface-card">
         <PageHeader
           eyebrow="Browse controls"
-          title="Keep discovery narrow and explicit"
-          description="The filter is intentionally small: published records only, with Canada-first scope and Fulbright-limited US access."
+          title="Search and filter the narrow published corpus"
+          description="Filters stay intentionally practical: country, field family, deadline urgency, and a simple sort order."
         />
+        <div className="form-grid">
+          <label className="form-field">
+            <span className="form-field__label">Search title or provider</span>
+            <input
+              className="text-input"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Waterloo, Fulbright, analytics"
+              value={searchQuery}
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Deadline window</span>
+            <select
+              className="text-input"
+              onChange={(event) => setDeadlineFilter(event.target.value as DeadlineFilter)}
+              value={deadlineFilter}
+            >
+              {DEADLINE_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span className="form-field__label">Sort order</span>
+            <select
+              className="text-input"
+              onChange={(event) => setSortFilter(event.target.value as SortFilter)}
+              value={sortFilter}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="toggle-row">
           {COUNTRY_FILTERS.map((filter) => (
             <button
@@ -193,6 +304,22 @@ export function ScholarshipBrowseShell() {
               }
               key={filter.value}
               onClick={() => setCountryFilter(filter.value)}
+              type="button"
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <div className="toggle-row">
+          {FIELD_FILTERS.map((filter) => (
+            <button
+              className={
+                fieldFilter === filter.value
+                  ? "toggle-chip toggle-chip--active"
+                  : "toggle-chip"
+              }
+              key={filter.value}
+              onClick={() => setFieldFilter(filter.value)}
               type="button"
             >
               {filter.label}
@@ -211,9 +338,22 @@ export function ScholarshipBrowseShell() {
 
       <section className="surface-card">
         <PageHeader
+          eyebrow="Applied filters"
+          title="Keep the current discovery state explicit"
+          description="The browse layer should make it obvious why a result set is narrow instead of making the corpus look larger than it is."
+        />
+        <div className="meta-row">
+          {appliedFilterPills.map((pill) => (
+            <StatusBadge key={pill} label={pill} variant="generated" />
+          ))}
+        </div>
+      </section>
+
+      <section className="surface-card">
+        <PageHeader
           eyebrow="Published results"
           title="Use browse for public discovery, then move into saved and recommendation workflows."
-          description="Cards stay concise: title, provider, deadline, scope, and a direct route into the scholarship detail view."
+          description="Cards stay concise but now surface field alignment and deadline urgency more clearly for demo-quality browsing."
         />
         {state.isLoading ? (
           <p className="body-copy">Loading published scholarships.</p>
@@ -242,8 +382,8 @@ export function ScholarshipBrowseShell() {
                       </p>
                     </div>
                     <p className="body-copy">
-                      Open the full record to inspect scope, eligibility anchors, provenance,
-                      and the published source link before saving or applying.
+                      Open the full record to inspect eligibility anchors, provenance,
+                      and the published source link before saving or planning around it.
                     </p>
                   </div>
                   <div className="dashboard-actions">
@@ -285,8 +425,9 @@ export function ScholarshipBrowseShell() {
         ) : (
           <div className="empty-panel">
             <p className="body-copy">
-              No published scholarships match the current scope filter. Try switching
-              between Canada-first and Fulbright-limited US records.
+              No published scholarships match the current discovery settings. Try
+              broadening the field filter, clearing the search text, or widening the
+              deadline window.
             </p>
           </div>
         )}

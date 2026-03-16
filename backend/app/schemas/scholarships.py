@@ -31,3 +31,8 @@ class ScholarshipListResponse(BaseModel):
     items: list[ScholarshipListItem]
     total: int = Field(ge=0)
     applied_country_code: str | None = None
+    applied_query: str | None = None
+    applied_field_tag: str | None = None
+    applied_degree_level: str | None = None
+    applied_deadline_within_days: int | None = None
+    applied_sort: str = "deadline"
