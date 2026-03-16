@@ -36,6 +36,12 @@ Recommended internal demo order:
 3. Open `http://localhost:3000`.
 4. Verify `http://localhost:8000/health` returns a healthy response.
 
+### Seeded demo accounts
+- student login: `student@example.com` / `strongpass1`
+- admin login: `admin@example.com` / `strongpass1`
+
+These accounts are seeded only for local/internal demo workflows when demo seeding is enabled.
+
 ### Direct local path
 1. Copy `backend/.env.example` to `backend/.env`.
 2. Copy `frontend/.env.local.example` to `frontend/.env.local`.

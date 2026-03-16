@@ -95,6 +95,9 @@ scholarai-platform/
 - Full implementation status audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
 - Internal handoff and presenter notes: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
 - Recommended local demo path: scholarships -> scholarship detail -> signup/login -> dashboard -> profile -> recommendations -> document feedback -> interview -> curation
+- Seeded local demo accounts:
+  - student: `student@example.com` / `strongpass1`
+  - admin: `admin@example.com` / `strongpass1`
 - API rehearsal script: `backend/scripts/rehearse_seeded_demo.py`
 - Rehearsal script: `tests/e2e/playwright/rehearse_seeded_demo.py`
 

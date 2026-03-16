@@ -49,7 +49,7 @@ class InterviewSessionService:
         )
         self.db.add(session)
         await self.db.flush()
-        await self.db.refresh(session)
+        session = await self._load_session(user_id, session.id)
         return self._build_session_response(session)
 
     async def get_session(

@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     MVP_SECONDARY_COUNTRY: str = "US"
     MVP_FULBRIGHT_KEYWORD: str = "fulbright"
     AUTO_SEED_DEMO_DATA: bool = True
+    DEMO_STUDENT_EMAIL: str = "student@example.com"
+    DEMO_STUDENT_PASSWORD: str = "strongpass1"
+    DEMO_STUDENT_FULL_NAME: str = "ScholarAI Demo Student"
+    DEMO_ADMIN_EMAIL: str = "admin@example.com"
+    DEMO_ADMIN_PASSWORD: str = "strongpass1"
+    DEMO_ADMIN_FULL_NAME: str = "ScholarAI Demo Admin"
 
 
 settings = Settings()

@@ -7,12 +7,13 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import async_session_factory
+from app.core.security import hash_password
 from app.demo.demo_dataset import SCHOLARSHIP_SEED, SOURCE_REGISTRY_SEED
-from app.models import Scholarship, ScholarshipRequirement, SourceRegistry
+from app.models import Scholarship, ScholarshipRequirement, SourceRegistry, User, UserRole
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_TABLES = {"source_registry", "scholarships", "scholarship_requirements"}
+REQUIRED_TABLES = {"users", "source_registry", "scholarships", "scholarship_requirements"}
 
 
 class DemoSeedService:
@@ -20,6 +21,7 @@ class DemoSeedService:
         self.db = db
 
     async def ensure_seeded(self) -> tuple[int, int]:
+        await self._upsert_demo_users()
         source_map = await self._upsert_sources()
         scholarship_count = 0
         for scholarship_payload in SCHOLARSHIP_SEED:
@@ -27,6 +29,41 @@ class DemoSeedService:
             scholarship_count += 1
         await self.db.flush()
         return len(source_map), scholarship_count
+
+    async def _upsert_demo_users(self) -> None:
+        await self._upsert_demo_user(
+            email=settings.DEMO_STUDENT_EMAIL,
+            password=settings.DEMO_STUDENT_PASSWORD,
+            full_name=settings.DEMO_STUDENT_FULL_NAME,
+            role=UserRole.STUDENT,
+        )
+        await self._upsert_demo_user(
+            email=settings.DEMO_ADMIN_EMAIL,
+            password=settings.DEMO_ADMIN_PASSWORD,
+            full_name=settings.DEMO_ADMIN_FULL_NAME,
+            role=UserRole.ADMIN,
+        )
+
+    async def _upsert_demo_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        full_name: str,
+        role: UserRole,
+    ) -> None:
+        normalized_email = email.strip().lower()
+        result = await self.db.execute(select(User).where(User.email == normalized_email))
+        user = result.scalar_one_or_none()
+        if user is None:
+            user = User(email=normalized_email, password_hash=hash_password(password), full_name=full_name)
+            self.db.add(user)
+
+        user.email = normalized_email
+        user.password_hash = hash_password(password)
+        user.full_name = full_name
+        user.role = role
+        user.is_active = True
 
     async def _upsert_sources(self) -> dict[str, SourceRegistry]:
         sources: dict[str, SourceRegistry] = {}
