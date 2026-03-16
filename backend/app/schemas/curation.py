@@ -40,6 +40,16 @@ class CurationRawImportRequest(BaseModel):
         return value.upper()
 
 
+class IngestionRunStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_key: str = Field(min_length=3, max_length=64)
+    source_display_name: str | None = Field(default=None, min_length=3, max_length=255)
+    source_base_url: str | None = Field(default=None, min_length=8, max_length=2000)
+    source_type: str = Field(default="official", max_length=64)
+    max_records: int = Field(default=5, ge=1, le=20)
+
+
 class CurationRecordUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -100,3 +110,30 @@ class CurationRecordDetail(CurationRecordSummary):
 
 class CurationRecordListResponse(BaseModel):
     items: list[CurationRecordSummary]
+
+
+class IngestionRunSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    run_id: str
+    source_key: str
+    source_display_name: str
+    fetch_url: str
+    status: str
+    capture_mode: str | None
+    parser_name: str | None
+    records_found: int
+    records_created: int
+    records_skipped: int
+    failure_reason: str | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+
+
+class IngestionRunDetail(IngestionRunSummary):
+    run_metadata: dict | None
+
+
+class IngestionRunListResponse(BaseModel):
+    items: list[IngestionRunSummary]

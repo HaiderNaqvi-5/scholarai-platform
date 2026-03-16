@@ -6,7 +6,7 @@ celery_app = Celery(
     "scholarai",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.recommendation_tasks"],
+    include=["app.tasks.recommendation_tasks", "app.tasks.scraper_tasks"],
 )
 
 celery_app.conf.update(

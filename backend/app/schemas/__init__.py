@@ -7,6 +7,9 @@ from app.schemas.auth import (
 )
 from app.schemas.curation import (
     CurationActionRequest,
+    IngestionRunDetail,
+    IngestionRunListResponse,
+    IngestionRunStartRequest,
     CurationRawImportRequest,
     CurationRecordDetail,
     CurationRecordListResponse,
@@ -54,6 +57,9 @@ __all__ = [
     "DocumentRecordSummary",
     "DocumentSubmissionResponse",
     "CurationActionRequest",
+    "IngestionRunDetail",
+    "IngestionRunListResponse",
+    "IngestionRunStartRequest",
     "CurationRawImportRequest",
     "CurationRecordDetail",
     "CurationRecordListResponse",

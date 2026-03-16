@@ -8,14 +8,48 @@ from app.core.database import get_db
 from app.core.dependencies import AdminUser
 from app.schemas import (
     CurationActionRequest,
+    IngestionRunDetail,
+    IngestionRunListResponse,
+    IngestionRunStartRequest,
     CurationRawImportRequest,
     CurationRecordDetail,
     CurationRecordListResponse,
     CurationRecordUpdateRequest,
 )
 from app.services.curation import CurationService
+from app.services.ingestion import IngestionService
 
 router = APIRouter()
+
+
+@router.post("/ingestion-runs", response_model=IngestionRunDetail, status_code=201)
+async def start_ingestion_run(
+    payload: IngestionRunStartRequest,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunDetail:
+    service = IngestionService(db)
+    return await service.start_run(payload, current_user.id)
+
+
+@router.get("/ingestion-runs", response_model=IngestionRunListResponse)
+async def list_ingestion_runs(
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=20, ge=1, le=100),
+) -> IngestionRunListResponse:
+    service = IngestionService(db)
+    return await service.list_runs(limit=limit)
+
+
+@router.get("/ingestion-runs/{run_id}", response_model=IngestionRunDetail)
+async def get_ingestion_run(
+    run_id: uuid.UUID,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunDetail:
+    service = IngestionService(db)
+    return await service.get_run(run_id)
 
 
 @router.post("/imports", response_model=CurationRecordDetail)

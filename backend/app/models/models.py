@@ -40,6 +40,14 @@ class RecordState(enum.StrEnum):
     ARCHIVED = "archived"
 
 
+class IngestionRunStatus(enum.StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+
 class RequirementType(enum.StrEnum):
     CITIZENSHIP = "citizenship"
     GPA = "gpa"
@@ -210,6 +218,67 @@ class SourceRegistry(Base):
     scholarships: Mapped[list["Scholarship"]] = relationship(
         "Scholarship",
         back_populates="source_registry",
+    )
+    ingestion_runs: Mapped[list["IngestionRun"]] = relationship(
+        "IngestionRun",
+        back_populates="source_registry",
+        cascade="all, delete-orphan",
+    )
+
+
+class IngestionRun(Base):
+    __tablename__ = "ingestion_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    source_registry_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("source_registry.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    triggered_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[IngestionRunStatus] = mapped_column(
+        Enum(IngestionRunStatus, name="ingestion_run_status", values_callable=enum_values),
+        nullable=False,
+        default=IngestionRunStatus.QUEUED,
+    )
+    fetch_url: Mapped[str] = mapped_column(Text, nullable=False)
+    capture_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    parser_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    records_found: Mapped[int] = mapped_column(default=0, nullable=False)
+    records_created: Mapped[int] = mapped_column(default=0, nullable=False)
+    records_skipped: Mapped[int] = mapped_column(default=0, nullable=False)
+    run_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    source_registry: Mapped["SourceRegistry"] = relationship(
+        "SourceRegistry",
+        back_populates="ingestion_runs",
+    )
+
+    __table_args__ = (
+        Index("ix_ingestion_runs_source_created_at", "source_registry_id", "created_at"),
+        Index("ix_ingestion_runs_status", "status"),
     )
 
 

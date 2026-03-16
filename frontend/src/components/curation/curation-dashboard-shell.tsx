@@ -13,6 +13,10 @@ import type {
   CurationRecordListResponse,
   CurationRawImportRequest,
   CurationRecordState,
+  IngestionRunDetail,
+  IngestionRunListResponse,
+  IngestionRunStartRequest,
+  IngestionRunSummary,
 } from "@/lib/types";
 
 const FILTERS: CurationRecordState[] = [
@@ -22,14 +26,42 @@ const FILTERS: CurationRecordState[] = [
   "archived",
 ];
 
+const CURATION_SOURCE_OPTIONS = [
+  {
+    label: "UBC Graduate Funding",
+    source_key: "ubc-grad-funding",
+    source_display_name: "UBC Graduate Funding",
+    source_base_url: "https://www.grad.ubc.ca/awards",
+    source_type: "official",
+  },
+  {
+    label: "Waterloo Graduate Funding",
+    source_key: "waterloo-awards",
+    source_display_name: "University of Waterloo Graduate Funding",
+    source_base_url:
+      "https://uwaterloo.ca/graduate-studies-postdoctoral-affairs/funding",
+    source_type: "official",
+  },
+  {
+    label: "Fulbright Foreign Student",
+    source_key: "fulbright-foreign-student",
+    source_display_name: "Fulbright Foreign Student Program",
+    source_base_url: "https://foreign.fulbrightonline.org",
+    source_type: "official",
+  },
+] as const;
+
 type CurationState = {
   isLoading: boolean;
   isDetailLoading: boolean;
+  isRunsLoading: boolean;
   isSaving: boolean;
   error: string | null;
   filter: CurationRecordState;
   records: CurationRecordListResponse["items"];
   selectedRecord: CurationRecordDetail | null;
+  runs: IngestionRunSummary[];
+  selectedRun: IngestionRunDetail | null;
 };
 
 type EditState = {
@@ -59,6 +91,14 @@ type ImportState = {
   review_notes: string;
 };
 
+type IngestionState = {
+  source_key: string;
+  source_display_name: string;
+  source_base_url: string;
+  source_type: string;
+  max_records: string;
+};
+
 const EMPTY_EDIT_STATE: EditState = {
   title: "",
   provider_name: "",
@@ -86,19 +126,32 @@ const EMPTY_IMPORT_STATE: ImportState = {
   review_notes: "",
 };
 
+const EMPTY_INGESTION_STATE: IngestionState = {
+  source_key: CURATION_SOURCE_OPTIONS[0].source_key,
+  source_display_name: CURATION_SOURCE_OPTIONS[0].source_display_name,
+  source_base_url: CURATION_SOURCE_OPTIONS[0].source_base_url,
+  source_type: CURATION_SOURCE_OPTIONS[0].source_type,
+  max_records: "5",
+};
+
 export function CurationDashboardShell() {
   const { accessToken } = useAuth();
   const [state, setState] = useState<CurationState>({
     isLoading: true,
     isDetailLoading: false,
+    isRunsLoading: true,
     isSaving: false,
     error: null,
     filter: "raw",
     records: [],
     selectedRecord: null,
+    runs: [],
+    selectedRun: null,
   });
   const [editState, setEditState] = useState<EditState>(EMPTY_EDIT_STATE);
   const [importState, setImportState] = useState<ImportState>(EMPTY_IMPORT_STATE);
+  const [ingestionState, setIngestionState] =
+    useState<IngestionState>(EMPTY_INGESTION_STATE);
 
   useEffect(() => {
     if (!accessToken) {
@@ -146,6 +199,47 @@ export function CurationDashboardShell() {
       }
     };
 
+    const loadRuns = async () => {
+      setState((current) => ({ ...current, isRunsLoading: true, error: null }));
+      try {
+        const response = await apiRequest<IngestionRunListResponse>(
+          "/curation/ingestion-runs?limit=8",
+          { token: accessToken },
+        );
+        if (!isActive) {
+          return;
+        }
+
+        setState((current) => ({
+          ...current,
+          isRunsLoading: false,
+          runs: response.items,
+        }));
+
+        if (response.items[0]) {
+          const detail = await apiRequest<IngestionRunDetail>(
+            `/curation/ingestion-runs/${response.items[0].run_id}`,
+            { token: accessToken },
+          );
+          if (!isActive) {
+            return;
+          }
+          setState((current) => ({ ...current, selectedRun: detail }));
+        } else {
+          setState((current) => ({ ...current, selectedRun: null }));
+        }
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          isRunsLoading: false,
+          error: resolveErrorMessage(error),
+        }));
+      }
+    };
+
     const loadRecordDetail = async (recordId: string, initial = false) => {
       setState((current) => ({
         ...current,
@@ -179,6 +273,7 @@ export function CurationDashboardShell() {
     };
 
     void loadRecords();
+    void loadRuns();
 
     return () => {
       isActive = false;
@@ -215,20 +310,25 @@ export function CurationDashboardShell() {
     return [];
   }, [state.selectedRecord]);
 
-  const refreshCurrentFilter = async (targetRecordId?: string) => {
+  const refreshCurrentFilter = async (
+    targetRecordId?: string,
+    filterOverride?: CurationRecordState,
+  ) => {
     if (!accessToken) {
       return;
     }
 
+    const activeFilter = filterOverride ?? state.filter;
     setState((current) => ({ ...current, isLoading: true, error: null }));
     try {
       const response = await apiRequest<CurationRecordListResponse>(
-        `/curation/records?state=${state.filter}`,
+        `/curation/records?state=${activeFilter}`,
         { token: accessToken },
       );
       setState((current) => ({
         ...current,
         isLoading: false,
+        filter: activeFilter,
         records: response.items,
       }));
 
@@ -277,6 +377,31 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isDetailLoading: false,
+        error: resolveErrorMessage(error),
+      }));
+    }
+  };
+
+  const loadIngestionRun = async (runId: string) => {
+    if (!accessToken) {
+      return;
+    }
+
+    setState((current) => ({ ...current, isRunsLoading: true, error: null }));
+    try {
+      const detail = await apiRequest<IngestionRunDetail>(
+        `/curation/ingestion-runs/${runId}`,
+        { token: accessToken },
+      );
+      setState((current) => ({
+        ...current,
+        isRunsLoading: false,
+        selectedRun: detail,
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isRunsLoading: false,
         error: resolveErrorMessage(error),
       }));
     }
@@ -392,6 +517,44 @@ export function CurationDashboardShell() {
     }
   };
 
+  const startIngestionRun = async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    setState((current) => ({ ...current, isSaving: true, error: null }));
+    try {
+      const payload: IngestionRunStartRequest = {
+        source_key: ingestionState.source_key.trim(),
+        source_display_name: emptyToNull(ingestionState.source_display_name),
+        source_base_url: emptyToNull(ingestionState.source_base_url),
+        source_type: ingestionState.source_type.trim() || "official",
+        max_records: Number(ingestionState.max_records) || 5,
+      };
+
+      const detail = await apiRequest<IngestionRunDetail>("/curation/ingestion-runs", {
+        method: "POST",
+        token: accessToken,
+        body: JSON.stringify(payload),
+      });
+
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        filter: "raw",
+        selectedRun: detail,
+        runs: [detail, ...current.runs.filter((item) => item.run_id !== detail.run_id)],
+      }));
+      await refreshCurrentFilter(undefined, "raw");
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        error: resolveErrorMessage(error),
+      }));
+    }
+  };
+
   const runAction = async (
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
@@ -451,11 +614,188 @@ export function CurationDashboardShell() {
         </section>
       ) : null}
 
+      <section className="page-grid">
+        <article className="surface-card" data-testid="curation-ingestion-panel">
+          <PageHeader
+            eyebrow="Source ingestion"
+            title="Run a narrow source-registry import into raw review state"
+            description="This is the new upstream bridge: capture an approved source page, parse candidate records, and create raw items for curator review."
+          />
+          <div className="form-grid">
+            <label className="form-field">
+              <span className="form-field__label">Source preset</span>
+              <select
+                className="text-input"
+                onChange={(event) => {
+                  const selected =
+                    CURATION_SOURCE_OPTIONS.find(
+                      (option) => option.source_key === event.target.value,
+                    ) ?? CURATION_SOURCE_OPTIONS[0];
+                  setIngestionState({
+                    source_key: selected.source_key,
+                    source_display_name: selected.source_display_name,
+                    source_base_url: selected.source_base_url,
+                    source_type: selected.source_type,
+                    max_records: ingestionState.max_records,
+                  });
+                }}
+                value={ingestionState.source_key}
+              >
+                {CURATION_SOURCE_OPTIONS.map((option) => (
+                  <option key={option.source_key} value={option.source_key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Source key</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    source_key: event.target.value,
+                  }))
+                }
+                value={ingestionState.source_key}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Display name</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    source_display_name: event.target.value,
+                  }))
+                }
+                value={ingestionState.source_display_name}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Source base URL</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    source_base_url: event.target.value,
+                  }))
+                }
+                value={ingestionState.source_base_url}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Source type</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    source_type: event.target.value,
+                  }))
+                }
+                value={ingestionState.source_type}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Max raw records</span>
+              <input
+                className="text-input"
+                inputMode="numeric"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    max_records: event.target.value,
+                  }))
+                }
+                value={ingestionState.max_records}
+              />
+            </label>
+          </div>
+          <div className="document-actions">
+            <button
+              className="auth-link auth-link--primary"
+              data-testid="curation-start-ingestion"
+              disabled={state.isSaving}
+              onClick={() => void startIngestionRun()}
+              type="button"
+            >
+              {state.isSaving ? "Running import" : "Run ingestion"}
+            </button>
+          </div>
+        </article>
+
+        <article className="surface-panel">
+          <PageHeader
+            eyebrow="Recent ingestion runs"
+            title="Keep upstream source imports explicit and reviewable"
+            description="Each run records capture mode, parser, and how many raw records were created or skipped."
+          />
+          {state.isRunsLoading ? (
+            <p className="body-copy">Loading ingestion history.</p>
+          ) : state.runs.length > 0 ? (
+            <div className="curation-list">
+              {state.runs.map((run) => (
+                <button
+                  className={
+                    state.selectedRun?.run_id === run.run_id
+                      ? "curation-list__item curation-list__item--active"
+                      : "curation-list__item"
+                  }
+                  key={run.run_id}
+                  onClick={() => void loadIngestionRun(run.run_id)}
+                  type="button"
+                >
+                  <div className="meta-row">
+                    <StatusBadge label={run.status} variant={runBadgeVariant(run.status)} />
+                    <span className="route-card__label">{run.source_key}</span>
+                  </div>
+                  <h3 className="route-card__title">{run.source_display_name}</h3>
+                  <p className="route-card__description">
+                    Created {run.records_created} · Skipped {run.records_skipped}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-panel">
+              <p className="body-copy">
+                No ingestion runs have been recorded yet.
+              </p>
+            </div>
+          )}
+          {state.selectedRun ? (
+            <article className="data-callout">
+              <p className="list-label">Latest run detail</p>
+              <p className="body-copy">
+                {state.selectedRun.source_display_name} used{" "}
+                {state.selectedRun.capture_mode ?? "unknown"} capture and{" "}
+                {state.selectedRun.parser_name ?? "unknown"} parsing.
+              </p>
+              <ul className="detail-list">
+                <li>Found: {state.selectedRun.records_found}</li>
+                <li>Created: {state.selectedRun.records_created}</li>
+                <li>Skipped: {state.selectedRun.records_skipped}</li>
+                <li>
+                  Completed:{" "}
+                  {state.selectedRun.completed_at
+                    ? new Date(state.selectedRun.completed_at).toLocaleString()
+                    : "Still running"}
+                </li>
+              </ul>
+            </article>
+          ) : null}
+        </article>
+      </section>
+
       <section className="surface-card" data-testid="curation-import-panel">
         <PageHeader
           eyebrow="Raw import"
-          title="Create one internal raw record when upstream ingestion is not wired yet"
-          description="This is the narrow manual bridge into curation. It creates an explicit raw record with provenance instead of letting curators author published records directly."
+          title="Create one fallback raw record when a source needs manual correction"
+          description="Manual import remains available as a controlled fallback, but the preferred path is now source-registry ingestion into raw review state."
         />
         <div className="form-grid">
           <label className="form-field">
@@ -928,6 +1268,19 @@ function badgeVariant(state: CurationRecordState) {
     return "generated";
   }
   if (state === "archived") {
+    return "warning";
+  }
+  return "planned";
+}
+
+function runBadgeVariant(status: IngestionRunSummary["status"]) {
+  if (status === "completed") {
+    return "validated";
+  }
+  if (status === "partial") {
+    return "generated";
+  }
+  if (status === "failed") {
     return "warning";
   }
   return "planned";

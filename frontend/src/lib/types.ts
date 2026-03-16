@@ -213,6 +213,46 @@ export type CurationRecordListResponse = {
   items: CurationRecordSummary[];
 };
 
+export type IngestionRunStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "partial"
+  | "failed";
+
+export type IngestionRunSummary = {
+  run_id: string;
+  source_key: string;
+  source_display_name: string;
+  fetch_url: string;
+  status: IngestionRunStatus;
+  capture_mode: string | null;
+  parser_name: string | null;
+  records_found: number;
+  records_created: number;
+  records_skipped: number;
+  failure_reason: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type IngestionRunDetail = IngestionRunSummary & {
+  run_metadata: Record<string, unknown> | null;
+};
+
+export type IngestionRunListResponse = {
+  items: IngestionRunSummary[];
+};
+
+export type IngestionRunStartRequest = {
+  source_key: string;
+  source_display_name?: string | null;
+  source_base_url?: string | null;
+  source_type: string;
+  max_records: number;
+};
+
 export type CurationRawImportRequest = {
   source_key: string;
   source_display_name: string;
