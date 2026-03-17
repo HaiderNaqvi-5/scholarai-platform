@@ -7,6 +7,7 @@ class InterviewSessionStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     practice_mode: str = "general"
+    scholarship_id: str | None = None
 
 
 class InterviewCurrentQuestionResponse(BaseModel):

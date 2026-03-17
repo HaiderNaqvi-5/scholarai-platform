@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
 from dataclasses import dataclass
@@ -40,6 +41,24 @@ FIELD_KEYWORD_MAP = {
     "analytics": ["analytics", "business analytics", "data analytics"],
 }
 DEGREE_KEYWORDS = ("master", "masters", "m.sc", "msc", "ms ")
+
+from functools import wraps
+
+def retry_async(max_retries: int = 3, delay: float = 1.0):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(delay * (2 ** attempt)) # Exponential backoff
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -232,6 +251,7 @@ class IngestionService:
         source.is_active = True
         return source
 
+    @retry_async(max_retries=2, delay=2.0)
     async def _capture_source(self, url: str) -> CaptureResult:
         capture_errors: list[str] = []
         try:

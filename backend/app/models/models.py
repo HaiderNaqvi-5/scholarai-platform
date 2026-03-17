@@ -305,6 +305,7 @@ class Scholarship(Base):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     funding_amount_max: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     source_url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
@@ -314,6 +315,7 @@ class Scholarship(Base):
     citizenship_rules: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     min_gpa_value: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     record_state: Mapped[RecordState] = mapped_column(
         Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
@@ -556,6 +558,11 @@ class DocumentRecord(Base):
         nullable=False,
         default=DocumentProcessingStatus.SUBMITTED,
     )
+    scholarship_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     latest_feedback_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -659,6 +666,11 @@ class InterviewSession(Base):
         ),
         nullable=False,
         default=InterviewSessionStatus.NOT_STARTED,
+    )
+    scholarship_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="SET NULL"),
+        nullable=True,
     )
     current_question_index: Mapped[int] = mapped_column(nullable=False, default=0)
     total_questions: Mapped[int] = mapped_column(nullable=False, default=0)

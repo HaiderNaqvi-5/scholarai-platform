@@ -56,11 +56,13 @@ class DocumentService:
         title: str | None,
         content_text: str | None = None,
         upload: UploadFile | None = None,
+        scholarship_id: uuid.UUID | None = None,
     ) -> DocumentDetailResponse:
         validation = DocumentSubmissionValidation(
             title=title,
             document_type=document_type,
             content_text=content_text,
+            scholarship_id=str(scholarship_id) if scholarship_id else None,
             has_file=upload is not None,
         )
 
@@ -92,6 +94,7 @@ class DocumentService:
             storage_path=storage_path,
             content_text=document_text,
             processing_status=DocumentProcessingStatus.SUBMITTED,
+            scholarship_id=scholarship_id,
         )
         self.db.add(document)
         await self.db.flush()
@@ -243,7 +246,10 @@ class DocumentService:
             if os.environ.get("GOOGLE_API_KEY"):
                 from app.services.documents.retriever import DocumentEvaluator
                 evaluator = DocumentEvaluator(self.db)
-                return await evaluator.evaluate_document(text)
+                return await evaluator.evaluate_document(
+                    document_text=text, 
+                    scholarship_id=document.scholarship_id
+                )
         except Exception as e:
             print(f"RAG Evaluation failed, falling back to rules: {e}")
 

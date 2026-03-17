@@ -3,13 +3,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
 from app.schemas.recommendations import RecommendationItem
-from app.services.recommendations.eligibility import MatchEvaluation, evaluate_match, normalize_gpa
+from app.services.recommendations.eligibility import MatchEvaluation, evaluate_match, normalize_gpa, get_bulk_kg_eligibility
+import logging
+from app.services.recommendations.hybrid_retriever import OpenSearchHybridRetriever
 import os
+import uuid
 
 
 class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.retriever = OpenSearchHybridRetriever()
+        self.logger = logging.getLogger(__name__)
         
         # Load XGBoost Explainer
         model_path = os.path.join(os.path.dirname(__file__), "../../../models/xgboost_model.json")
@@ -25,12 +30,54 @@ class RecommendationService:
         profile: StudentProfile,
         limit: int = 10,
     ) -> list[RecommendationItem]:
-        result = await self.db.execute(
-            select(Scholarship)
-            .where(Scholarship.record_state == RecordState.PUBLISHED)
-            .order_by(Scholarship.deadline_at.asc().nulls_last(), Scholarship.title.asc())
+        # Stage 1: Hybrid Search (Vector + BM25)
+        # Generate real query embedding
+        try:
+            from sentence_transformers import SentenceTransformer
+            embedder = SentenceTransformer('all-mpnet-base-v2')
+            query_vector = embedder.encode(search_query).tolist()
+        except Exception as e:
+            self.logger.warning(f"Failed to generate query embedding: {e}")
+            query_vector = [0.0] * 768 
+        
+        best_effort_results = await self.retriever.hybrid_search(
+            query=search_query,
+            query_vector=query_vector,
+            limit=50
         )
-        scholarships = result.scalars().all()
+        
+        # Map OpenSearch results back to SQLAlchemy models
+        scholarship_ids = [uuid.UUID(res["scholarship_id"]) for res in best_effort_results if "scholarship_id" in res]
+        
+        if scholarship_ids:
+            result = await self.db.execute(
+                select(Scholarship)
+                .where(Scholarship.id.in_(scholarship_ids))
+                .where(Scholarship.record_state == RecordState.PUBLISHED)
+            )
+            scholarships = result.scalars().all()
+        else:
+            # Fallback to DB query if OS is cold/empty
+            result = await self.db.execute(
+                select(Scholarship)
+                .where(Scholarship.record_state == RecordState.PUBLISHED)
+                .order_by(Scholarship.deadline_at.asc().nulls_last(), Scholarship.title.asc())
+                .limit(50)
+            )
+            scholarships = result.scalars().all()
+            
+        # Stage 2: Knowledge Graph Filtering (Hard Constraints)
+        if scholarships:
+            candidate_ids = [str(s.id) for s in scholarships]
+            eligible_ids = await get_bulk_kg_eligibility(str(profile.id), candidate_ids)
+            # Filter scholarships list to only include those in eligible_ids
+            scholarships = [s for s in scholarships if str(s.id) in eligible_ids]
+            
+        # Retrieval Source Telemetry
+        retrieval_metadata = {str(s.id): "hybrid_opensearch" for s in scholarships}
+        if not scholarship_ids:
+             for s in scholarships:
+                  retrieval_metadata[str(s.id)] = "db_fallback"
 
         recommendations: list[RecommendationItem] = []
         for scholarship in scholarships:
@@ -80,6 +127,12 @@ class RecommendationService:
                     warnings=evaluation.constraint_notes,
                     shap_explanation=shap_output,
                 )
+            )
+            
+            # 10D: Log prediction for evaluation
+            self.logger.info(
+                f"Recommendation Generated: student={profile.id} scholarship={scholarship.id} "
+                f"score={fit_score:.3f} source={retrieval_metadata.get(str(scholarship.id), 'unknown')}"
             )
 
         recommendations.sort(

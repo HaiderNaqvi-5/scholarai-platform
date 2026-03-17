@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import RateLimiter
 from app.models import User
 from app.schemas import (
     RefreshTokenRequest,
@@ -33,25 +34,13 @@ async def register(
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(RateLimiter(requests_limit=5, window_seconds=60))])
 async def login(
     payload: UserLogin,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenResponse:
     service = AuthService(db)
-    token_response, error_code = await service.login(payload)
-    if error_code == "invalid_credentials":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if error_code == "inactive_account":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled",
-        )
-    return token_response
+    return await service.login(payload)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -59,7 +48,7 @@ async def get_current_user_info(current_user: CurrentUser) -> User:
     return current_user
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(RateLimiter(requests_limit=10, window_seconds=60))])
 async def refresh_session(
     payload: RefreshTokenRequest,
     db: Annotated[AsyncSession, Depends(get_db)],

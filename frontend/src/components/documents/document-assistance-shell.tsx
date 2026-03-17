@@ -403,6 +403,9 @@ export function DocumentAssistanceShell() {
                     label={formatStatus(selectedDocument.processing_status)}
                     variant="validated"
                   />
+                  {selectedDocument.scholarship_id && (
+                    <StatusBadge label="Grounded in Scholarship" variant="validated" />
+                  )}
                 </div>
                 <p className="body-copy">{selectedDocument.latest_feedback.summary}</p>
               </article>

@@ -18,7 +18,7 @@ router = APIRouter()
 
 router.include_router(health.router, prefix="/health", tags=["System Health"])
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-router.include_router(students.router, prefix="/profile", tags=["Student Profile"])
+router.include_router(students.router, prefix="/profiles", tags=["Student Profile"])
 router.include_router(scholarships.router, prefix="/scholarships", tags=["Scholarships"])
 router.include_router(
     saved_opportunities.router,
@@ -29,5 +29,5 @@ router.include_router(recommendations.router, prefix="/recommendations", tags=["
 router.include_router(documents.router, prefix="/documents", tags=["Documents"])
 router.include_router(interview.router, prefix="/interviews", tags=["Interview Practice"])
 router.include_router(curation.router, prefix="/curation", tags=["Curation"])
-router.include_router(mentor.router, prefix="/mentor", tags=["Mentor Dashboard"])
+router.include_router(mentor.router, prefix="/mentors", tags=["Mentor Dashboard"])
 router.include_router(analytics.router, prefix="/analytics", tags=["Admin Analytics"])

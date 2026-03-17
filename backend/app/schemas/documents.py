@@ -30,6 +30,7 @@ class DocumentRecordSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     latest_feedback_at: datetime | None
+    scholarship_id: str | None = None
 
 
 class DocumentDetailResponse(DocumentRecordSummary):
@@ -56,6 +57,7 @@ class DocumentSubmissionValidation(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     document_type: str
     content_text: str | None = Field(default=None, min_length=50, max_length=12000)
+    scholarship_id: str | None = Field(default=None)
     has_file: bool = False
 
     @model_validator(mode="after")
