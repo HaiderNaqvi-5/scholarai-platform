@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -18,54 +18,11 @@ import type {
   ScholarshipListItem,
   ScholarshipListResponse,
 } from "@/lib/types";
+import { DiscoveryFilterBar } from "@/components/scholarships/discovery-filter-bar";
+import { motion, AnimatePresence } from "framer-motion";
+import { Calendar, Building2, ExternalLink } from "lucide-react";
 
-const COUNTRY_FILTERS = [
-  { label: "All", value: "all" },
-  { label: "Canada", value: "CA" },
-  { label: "Fulbright", value: "US" },
-] as const;
-
-const FIELD_FILTERS = [
-  { label: "All fields", value: "all" },
-  { label: "Data Science", value: "data science" },
-  { label: "AI", value: "artificial intelligence" },
-  { label: "Analytics", value: "analytics" },
-] as const;
-
-const DEADLINE_WINDOWS = [
-  { label: "Any", value: "all" },
-  { label: "30 days", value: "30" },
-  { label: "60 days", value: "60" },
-  { label: "90 days", value: "90" },
-] as const;
-
-const DEADLINE_AVAILABILITY = [
-  { label: "Any", value: "all" },
-  { label: "Has deadline", value: "true" },
-  { label: "No deadline", value: "false" },
-] as const;
-
-const FUNDING_TYPES = [
-  { label: "Any type", value: "all" },
-  { label: "Tuition award", value: "tuition_award" },
-  { label: "Stipend", value: "stipend" },
-  { label: "Fellowship", value: "fellowship" },
-  { label: "Comprehensive", value: "comprehensive_award" },
-  { label: "Bursary", value: "bursary" },
-] as const;
-
-const SORT_OPTIONS = [
-  { label: "Nearest deadline", value: "deadline" },
-  { label: "Alphabetical", value: "title" },
-  { label: "Recently added", value: "recent" },
-] as const;
-
-type CountryFilter = (typeof COUNTRY_FILTERS)[number]["value"];
-type FieldFilter = (typeof FIELD_FILTERS)[number]["value"];
-type DeadlineWindow = (typeof DEADLINE_WINDOWS)[number]["value"];
-type DeadlineAvailability = (typeof DEADLINE_AVAILABILITY)[number]["value"];
-type FundingTypeFilter = (typeof FUNDING_TYPES)[number]["value"];
-type SortFilter = (typeof SORT_OPTIONS)[number]["value"];
+// Filter types removed for brevity as they are now handled by discovery-filter-bar
 
 type BrowseState = {
   isLoading: boolean;
@@ -85,14 +42,14 @@ const DEFAULT_PAGE_SIZE = 12;
 export function ScholarshipBrowseShell() {
   const { accessToken, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [countryFilter, setCountryFilter] = useState<CountryFilter>("all");
-  const [fieldFilter, setFieldFilter] = useState<FieldFilter>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [fieldFilter, setFieldFilter] = useState<string>("all");
   const [providerFilter, setProviderFilter] = useState("");
-  const [fundingFilter, setFundingFilter] = useState<FundingTypeFilter>("all");
-  const [deadlineWindow, setDeadlineWindow] = useState<DeadlineWindow>("all");
+  const [fundingFilter, setFundingFilter] = useState<string>("all");
+  const [deadlineWindow, setDeadlineWindow] = useState<string>("all");
   const [deadlineAvailability, setDeadlineAvailability] =
-    useState<DeadlineAvailability>("all");
-  const [sortFilter, setSortFilter] = useState<SortFilter>("deadline");
+    useState<string>("all");
+  const [sortFilter, setSortFilter] = useState<string>("deadline");
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [page, setPage] = useState(1);
@@ -218,27 +175,6 @@ export function ScholarshipBrowseShell() {
     sortFilter,
   ]);
 
-  const appliedFilterPills = useMemo(() => {
-    const filters = state.appliedFilters;
-    return [
-      filters.country_code ? `Country: ${filters.country_code}` : null,
-      filters.degree_level ? `Degree: ${filters.degree_level}` : null,
-      filters.field_tag ? `Field: ${filters.field_tag}` : null,
-      filters.provider ? `Provider: ${filters.provider}` : null,
-      filters.funding_type ? `Funding: ${filters.funding_type.replaceAll("_", " ")}` : null,
-      filters.min_amount !== null ? `Min $${filters.min_amount}` : null,
-      filters.max_amount !== null ? `Max $${filters.max_amount}` : null,
-      filters.has_deadline === true
-        ? "Has deadline"
-        : filters.has_deadline === false
-          ? "No deadline"
-          : null,
-      filters.deadline_within_days
-        ? `Within ${filters.deadline_within_days} days`
-        : null,
-    ].filter(Boolean) as string[];
-  }, [state.appliedFilters]);
-
   const handleSaveToggle = async (scholarshipId: string, isSaved: boolean) => {
     if (!accessToken) return;
 
@@ -290,305 +226,182 @@ export function ScholarshipBrowseShell() {
     setPage(1);
   };
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, scale: 0.98, y: 10 },
+    show: { opacity: 1, scale: 1, y: 0 }
+  };
+
   return (
     <AppShell
-      eyebrow="Scholarships"
-      title="Browse published scholarships."
-      description="A curated catalog with structured filters, verified deadlines, and clear data provenance."
-      intro={
-        <div className="meta-row">
-          <StatusBadge label="Published records" variant="validated" />
-          <StatusBadge label={`${state.total} results`} variant="neutral" />
-        </div>
-      }
+      title="Discovery Hub"
+      description="Global Scholarship Repository"
+      hideHeader
     >
-      <section className="workspace-layout" data-testid="scholarship-browse-shell">
-        <article className="surface-panel scholarship-filter-rail">
-          <PageHeader
-            eyebrow="Filters"
-            title="Narrow your search"
-            description="Adjust filters to find scholarships that match your criteria."
-          />
-          <div className="form-grid">
-            <label className="form-field">
-              <span className="form-field__label">Search</span>
-              <input
-                className="text-input"
-                data-testid="scholarship-search-input"
-                onChange={(event) => updateAndReset(setSearchQuery)(event.target.value)}
-                placeholder="Title or provider"
-                value={searchQuery}
-              />
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Provider</span>
-              <input
-                className="text-input"
-                data-testid="scholarship-provider-input"
-                onChange={(event) => updateAndReset(setProviderFilter)(event.target.value)}
-                placeholder="University name"
-                value={providerFilter}
-              />
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Funding type</span>
-              <select
-                className="text-input"
-                data-testid="scholarship-funding-select"
-                onChange={(event) =>
-                  updateAndReset(setFundingFilter)(event.target.value as FundingTypeFilter)
-                }
-                value={fundingFilter}
-              >
-                {FUNDING_TYPES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Deadline window</span>
-              <select
-                className="text-input"
-                onChange={(event) =>
-                  updateAndReset(setDeadlineWindow)(event.target.value as DeadlineWindow)
-                }
-                value={deadlineWindow}
-              >
-                {DEADLINE_WINDOWS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Deadline status</span>
-              <select
-                className="text-input"
-                onChange={(event) =>
-                  updateAndReset(setDeadlineAvailability)(
-                    event.target.value as DeadlineAvailability,
-                  )
-                }
-                value={deadlineAvailability}
-              >
-                {DEADLINE_AVAILABILITY.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Sort</span>
-              <select
-                className="text-input"
-                onChange={(event) => updateAndReset(setSortFilter)(event.target.value as SortFilter)}
-                value={sortFilter}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Min amount</span>
-              <input
-                className="text-input"
-                inputMode="numeric"
-                onChange={(event) => updateAndReset(setMinAmount)(event.target.value)}
-                placeholder="10000"
-                value={minAmount}
-              />
-            </label>
-            <label className="form-field">
-              <span className="form-field__label">Max amount</span>
-              <input
-                className="text-input"
-                inputMode="numeric"
-                onChange={(event) => updateAndReset(setMaxAmount)(event.target.value)}
-                placeholder="30000"
-                value={maxAmount}
-              />
-            </label>
-          </div>
+      <header className="mb-12">
+        <motion.div 
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex items-center gap-3 mb-4"
+        >
+          <Building2 size={16} className="text-cobalt-600" />
+          <span className="text-xs font-bold uppercase tracking-widest text-neutral-400">
+            Global Knowledge Base
+          </span>
+        </motion.div>
+        <h1 className="text-5xl font-semibold tracking-tight text-neutral-900">
+          Search Scholarships.
+        </h1>
+      </header>
 
-          <div className="toggle-row">
-            {COUNTRY_FILTERS.map((filter) => (
-              <button
-                className={
-                  countryFilter === filter.value
-                    ? "toggle-chip toggle-chip--active"
-                    : "toggle-chip"
-                }
-                key={filter.value}
-                onClick={() => updateAndReset(setCountryFilter)(filter.value)}
-                type="button"
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+      <DiscoveryFilterBar 
+        searchQuery={searchQuery}
+        onSearchChange={(v) => updateAndReset(setSearchQuery)(v)}
+        filters={{
+          country: countryFilter,
+          field: fieldFilter,
+          funding: fundingFilter,
+          sort: sortFilter
+        }}
+        onFilterChange={(key, val) => {
+          if (key === "country") updateAndReset(setCountryFilter)(val);
+          if (key === "field") updateAndReset(setFieldFilter)(val);
+          if (key === "funding") updateAndReset(setFundingFilter)(val);
+        }}
+        onClear={clearAllFilters}
+        resultsCount={state.total}
+      />
 
-          <div className="toggle-row">
-            {FIELD_FILTERS.map((filter) => (
-              <button
-                className={
-                  fieldFilter === filter.value
-                    ? "toggle-chip toggle-chip--active"
-                    : "toggle-chip"
-                }
-                data-testid={
-                  filter.value === "artificial intelligence" ? "field-filter-ai" : undefined
-                }
-                key={filter.value}
-                onClick={() => updateAndReset(setFieldFilter)(filter.value)}
-                type="button"
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
+      {state.error && (
+        <motion.section 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="glass-surface p-6 mb-8 border-coral-600/20 bg-coral-600/5"
+        >
+          <PageHeader eyebrow="Repo Error" title="Connection Interrupted" description={state.error} />
+        </motion.section>
+      )}
 
-          <div className="dashboard-actions">
-            <button className="auth-link auth-link--secondary" onClick={clearAllFilters} type="button">
-              Clear filters
-            </button>
-            <p className="field-note">
-              {state.items.length > 0
-                ? `${(state.page - 1) * state.pageSize + 1}–${(state.page - 1) * state.pageSize + state.items.length} of ${state.total}`
-                : `0 of ${state.total}`}
-            </p>
-          </div>
-        </article>
-
-        <div className="collection-grid">
-          {state.error ? (
-            <section className="surface-card" data-testid="scholarship-browse-error">
-              <PageHeader
-                eyebrow="Error"
-                title="Could not load scholarships."
-                description={state.error}
-              />
-            </section>
-          ) : null}
-
-          {appliedFilterPills.length > 0 ? (
-            <section className="meta-row">
-              {appliedFilterPills.map((pill) => (
-                <StatusBadge key={pill} label={pill} variant="generated" />
-              ))}
-            </section>
-          ) : null}
-
-          <section className="surface-card">
-            <PageHeader
-              eyebrow="Results"
-              title="Published scholarships"
-              description="Each record has been verified and published with source provenance."
-            />
-            {state.isLoading ? (
-              <div className="recommendation-list">
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </div>
-            ) : state.items.length > 0 ? (
-              <>
-                <div className="recommendation-list">
-                  {state.items.map((item) => {
-                    const isSaved = state.savedIds.has(item.scholarship_id);
-                    return (
-                      <article className="recommendation-card" key={item.scholarship_id}>
-                        <div className="recommendation-card__header">
-                          <div className="meta-row">
-                            <StatusBadge label="Published" variant="validated" />
-                            <span className="route-card__label">{item.country_code}</span>
-                          </div>
-                          <p className="route-card__label">
-                            {item.deadline_at
-                              ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
-                              : "No deadline listed"}
-                          </p>
+      <div className="collection-workspace">
+        <AnimatePresence mode="wait">
+          {state.isLoading ? (
+            <motion.div 
+               key="loading"
+               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="results"
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              {state.items.length > 0 ? (
+                state.items.map((itemData) => {
+                  const isSaved = state.savedIds.has(itemData.scholarship_id);
+                  return (
+                    <motion.article 
+                      variants={item}
+                      key={itemData.scholarship_id}
+                      className="glass-surface flex flex-col h-full rounded-2xl group overflow-hidden hover:border-cobalt-600/30 transition-all"
+                    >
+                      <div className="flex-1 p-8">
+                        <div className="flex justify-between items-start mb-6">
+                           <div className="px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-md uppercase tracking-widest">
+                             {itemData.country_code}
+                           </div>
+                           {itemData.deadline_at && (
+                             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-500">
+                               <Calendar size={14} />
+                               {new Date(itemData.deadline_at).toLocaleDateString()}
+                             </div>
+                           )}
                         </div>
-                        <div className="recommendation-card__body">
-                          <div>
-                            <h3 className="route-card__title">{item.title}</h3>
-                            <p className="route-card__description">
-                              {item.provider_name ?? "Provider not listed"}
-                            </p>
-                          </div>
+
+                        <h3 className="text-xl font-semibold text-neutral-900 line-clamp-2 leading-snug mb-4 group-hover:text-cobalt-600 transition-colors">
+                          {itemData.title}
+                        </h3>
+                        
+                        <div className="flex items-center gap-3 text-sm text-neutral-500 mb-8">
+                          <Building2 size={16} className="text-neutral-300" />
+                          <span className="truncate">{itemData.provider_name || 'Global Provider'}</span>
                         </div>
-                        <div className="dashboard-actions">
-                          <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
-                            View details
-                          </Link>
-                          {isAuthenticated ? (
-                            <button
-                              className={
-                                isSaved
-                                  ? "auth-link auth-link--secondary"
-                                  : "auth-link auth-link--primary"
-                              }
-                              disabled={state.isSaving === item.scholarship_id}
-                              onClick={() =>
-                                void handleSaveToggle(item.scholarship_id, isSaved)
-                              }
-                              type="button"
-                            >
-                              {state.isSaving === item.scholarship_id
-                                ? "Updating…"
-                                : isSaved
-                                  ? "Saved"
-                                  : "Save"}
-                            </button>
-                          ) : (
-                            <Link
-                              className="auth-link auth-link--secondary"
-                              href="/login?next=/scholarships"
-                            >
-                              Sign in to save
-                            </Link>
-                          )}
+
+                        <div className="flex flex-wrap gap-2">
+                           <StatusBadge label="Verified Data" variant="validated" />
+                           <StatusBadge label="Academic Grant" variant="neutral" />
                         </div>
-                      </article>
-                    );
-                  })}
+                      </div>
+
+                      <div className="p-4 bg-neutral-50 border-t border-white/5 flex gap-3">
+                        <Link 
+                          href={`/scholarships/${itemData.scholarship_id}`}
+                          className="flex-1 flex items-center justify-center gap-2 text-sm font-bold text-neutral-700 bg-white border border-neutral-200 py-3 rounded-xl hover:bg-neutral-50 transition-all"
+                        >
+                          Details
+                          <ExternalLink size={14} />
+                        </Link>
+                        {isAuthenticated && (
+                          <button
+                            disabled={state.isSaving === itemData.scholarship_id}
+                            onClick={() => void handleSaveToggle(itemData.scholarship_id, isSaved)}
+                            className={`flex-1 text-sm font-bold py-3 rounded-xl transition-all ${isSaved ? 'bg-neutral-200 text-neutral-500' : 'bg-neutral-900 text-white hover:bg-black shadow-lg shadow-neutral-900/10'}`}
+                          >
+                            {state.isSaving === itemData.scholarship_id ? 'Syncing...' : isSaved ? 'Saved' : 'Save'}
+                          </button>
+                        )}
+                      </div>
+                    </motion.article>
+                  );
+                })
+              ) : (
+                <div className="col-span-full py-24 text-center">
+                  <EmptyState title="Repository Clear" description="No scholarships match the current knowledge filters." />
                 </div>
-                <div className="dashboard-actions scholarship-pagination">
-                  <button
-                    className="auth-link auth-link--secondary"
-                    disabled={state.page <= 1 || state.isLoading}
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    type="button"
-                  >
-                    Previous
-                  </button>
-                  <StatusBadge label={`Page ${state.page}`} variant="neutral" />
-                  <button
-                    className="auth-link auth-link--secondary"
-                    disabled={!state.hasMore || state.isLoading}
-                    onClick={() => setPage((current) => current + 1)}
-                    type="button"
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            ) : (
-              <EmptyState
-                title="No scholarships found"
-                description="No scholarships match the current filters. Try widening your search or clearing filters."
-              />
-            )}
-          </section>
-        </div>
-      </section>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {state.total > state.pageSize && (
+          <footer className="mt-16 flex items-center justify-center gap-4">
+             <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={state.page === 1}
+                className="px-6 py-3 rounded-xl border border-neutral-200 font-bold text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 transition-all"
+             >
+               Prev
+             </button>
+             <span className="px-4 py-2 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-500">
+               Batch {state.page}
+             </span>
+             <button 
+                onClick={() => setPage(p => p + 1)}
+                disabled={!state.hasMore}
+                className="px-6 py-3 rounded-xl border border-neutral-200 font-bold text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 transition-all"
+             >
+               Next
+             </button>
+          </footer>
+        )}
+      </div>
     </AppShell>
   );
 }

@@ -23,8 +23,8 @@ export function AnalyticsDashboardShell() {
         setIsLoading(true);
         const data = await getAdminAnalytics(accessToken);
         setAnalytics(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load platform analytics.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load platform analytics.");
       } finally {
         setIsLoading(false);
       }

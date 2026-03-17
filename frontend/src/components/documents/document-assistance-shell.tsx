@@ -1,12 +1,8 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { AppShell } from "@/components/layout/app-shell";
-import { SkeletonCard } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
 import type {
@@ -17,6 +13,8 @@ import type {
   DocumentSubmissionResponse,
   DocumentType,
 } from "@/lib/types";
+import { PrepLabShell } from "@/components/layout/prep-lab-shell";
+import { Plus, RefreshCw, Terminal, Sparkles, AlertTriangle } from "lucide-react";
 
 type DocumentState = {
   isLoading: boolean;
@@ -35,6 +33,7 @@ export function DocumentAssistanceShell() {
   const [contentText, setContentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [state, setState] = useState<DocumentState>({
     isLoading: true,
     isSubmitting: false,
@@ -68,7 +67,7 @@ export function DocumentAssistanceShell() {
         }
 
         const detailResponses = await Promise.all(
-          response.items.slice(0, 6).map((item) =>
+          response.items.slice(0, 10).map((item) =>
             apiRequest<DocumentDetail>(`/documents/${item.id}`, {
               token: accessToken,
             }),
@@ -100,16 +99,11 @@ export function DocumentAssistanceShell() {
     };
   }, [accessToken]);
 
+
   const selectedDocument = useMemo(
     () => state.items.find((item) => item.id === state.selectedId) ?? null,
     [state.items, state.selectedId],
   );
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0] ?? null;
-    setFile(nextFile);
-    setFormError(null);
-  };
 
   const handleSubmit = async () => {
     if (!accessToken) return;
@@ -192,307 +186,243 @@ export function DocumentAssistanceShell() {
   };
 
   return (
-    <AppShell
-      title="Get structured feedback on your application writing."
-      description="Submit a draft and receive bounded, advisory writing guidance."
-      eyebrow="Documents"
-      intro={
-        <div className="meta-row">
-          <StatusBadge label="Advisory feedback" variant="generated" />
-          <StatusBadge label="Facts stay separate" variant="validated" />
-        </div>
-      }
+    <PrepLabShell 
+      eyebrow="Redaction Phase"
+      title="Writing Room."
     >
-      {state.error ? (
-        <section className="surface-card" data-testid="document-error">
-          <p className="form-error">{state.error}</p>
-        </section>
-      ) : null}
-
-      <section className="document-grid" data-testid="document-assistance-shell">
-        <article className="surface-card">
-          <PageHeader
-            eyebrow="Submit"
-            title="Upload or paste your draft"
-            description="One draft at a time for focused feedback."
-          />
-
-          <div className="toggle-row">
-            <button
-              className={
-                inputMethod === "text"
-                  ? "toggle-chip toggle-chip--active"
-                  : "toggle-chip"
-              }
-              onClick={() => setInputMethod("text")}
-              type="button"
-            >
-              Paste text
-            </button>
-            <button
-              className={
-                inputMethod === "file"
-                  ? "toggle-chip toggle-chip--active"
-                  : "toggle-chip"
-              }
-              onClick={() => setInputMethod("file")}
-              type="button"
-            >
-              Upload file
-            </button>
-          </div>
-
-          <form
-            className="document-form"
-            data-testid="document-submission-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleSubmit();
-            }}
-          >
-            <div className="form-grid">
-              <label className="form-field">
-                <span className="form-field__label">Document type</span>
-                <select
-                  className="text-input"
-                  name="document_type"
-                  onChange={(event) =>
-                    setDocumentType(event.target.value as DocumentType)
-                  }
-                  value={documentType}
-                >
-                  <option value="sop">Statement of purpose</option>
-                  <option value="essay">Essay</option>
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span className="form-field__label">Title</span>
-                <input
-                  className="text-input"
-                  maxLength={255}
-                  name="title"
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Fall applications draft"
-                  value={title}
-                />
-              </label>
-            </div>
-
-            {inputMethod === "text" ? (
-              <label className="form-field">
-                <span className="form-field__label">Draft text</span>
-                <textarea
-                  className="text-area"
-                  name="content_text"
-                  onChange={(event) => setContentText(event.target.value)}
-                  placeholder="Paste your SOP or essay draft here."
-                  rows={14}
-                  value={contentText}
-                />
-                <span className="field-note">
-                  50–12,000 characters.
-                </span>
-              </label>
-            ) : (
-              <label className="form-field">
-                <span className="form-field__label">Upload draft</span>
-                <input
-                  accept=".txt,.md,text/plain,text/markdown"
-                  className="file-input"
-                  name="file"
-                  onChange={handleFileChange}
-                  type="file"
-                />
-                <span className="field-note">UTF-8 .txt or .md under 512KB.</span>
-                {file ? (
-                  <span className="field-note">Selected: {file.name}</span>
-                ) : null}
-              </label>
-            )}
-
-            {formError ? <p className="form-error">{formError}</p> : null}
-
-            <div className="document-actions">
-              <button
-                className="auth-link auth-link--primary"
-                disabled={state.isSubmitting}
-                type="submit"
-              >
-                {state.isSubmitting ? "Processing…" : "Submit for feedback"}
-              </button>
-            </div>
-          </form>
-        </article>
-
-        <article className="surface-panel">
-          <PageHeader
-            eyebrow="History"
-            title="Recent drafts"
-            description="Select a draft to view its feedback."
-          />
-          {state.isLoading ? (
-            <div className="surface-list">
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          ) : state.items.length > 0 ? (
-            <div className="document-list">
-              {state.items.map((item) => (
-                <button
-                  className={
-                    item.id === state.selectedId
-                      ? "document-list__item document-list__item--active"
-                      : "document-list__item"
-                  }
-                  key={item.id}
-                  onClick={() =>
-                    setState((current) => ({ ...current, selectedId: item.id }))
-                  }
-                  type="button"
-                >
-                  <div className="meta-row">
-                    <StatusBadge
-                      label={formatStatus(item.processing_status)}
-                      variant={
-                        item.processing_status === "completed"
-                          ? "validated"
-                          : item.processing_status === "failed"
-                            ? "warning"
-                            : "planned"
-                      }
-                    />
-                    <span className="route-card__label">
-                      {new Date(item.updated_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="route-card__title">{item.title}</h3>
-                  <p className="route-card__description">
-                    {item.document_type.toUpperCase()} · {item.input_method}
-                  </p>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No drafts submitted"
-              description="Upload your first statement of purpose or scholarship essay for structured feedback."
-            />
-          )}
-        </article>
-      </section>
-
-      <section className="document-grid">
-        <article className="surface-card" data-testid="document-feedback-result">
-          <PageHeader
-            eyebrow="Feedback"
-            title="Writing guidance"
-            description="Structured feedback on strengths, revisions, and cautions."
-          />
-          {!selectedDocument ? (
-            <EmptyState
-              title="No draft selected"
-              description="Submit or select a draft to see feedback here."
-            />
-          ) : selectedDocument.latest_feedback ? (
-            <div className="surface-list">
-              <article>
-                <div className="meta-row">
-                  <StatusBadge label="Generated" variant="generated" />
-                  <StatusBadge
-                    label={formatStatus(selectedDocument.processing_status)}
-                    variant="validated"
-                  />
-                  {selectedDocument.scholarship_id && (
-                    <StatusBadge label="Grounded in Scholarship" variant="validated" />
-                  )}
-                </div>
-                <p className="body-copy">{selectedDocument.latest_feedback.summary}</p>
-              </article>
-              <article>
-                <p className="list-heading">Strengths</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.strengths.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article>
-                <p className="list-heading">Revision priorities</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.revision_priorities.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article>
-                <p className="list-heading">Cautions</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.caution_notes.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <div className="document-actions">
-                <button
-                  className="auth-link auth-link--secondary"
-                  disabled={state.isRefreshing}
-                  onClick={() => void handleRefreshFeedback()}
-                  type="button"
-                >
-                  {state.isRefreshing ? "Refreshing…" : "Refresh feedback"}
-                </button>
+      <div className="flex h-[calc(100vh-320px)] gap-8">
+        
+        {/* Left: Document Ledger & New Form */}
+        <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} flex-shrink-0 transition-all duration-500 overflow-hidden`}>
+           <div className="glass-surface h-full flex flex-col border-white/5 bg-white/[0.02]">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                 <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Ledger</h2>
+                 <button 
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-1 hover:bg-white/5 rounded-md transition-colors"
+                 >
+                    <Plus size={16} className="rotate-45" />
+                 </button>
               </div>
-            </div>
-          ) : (
-            <EmptyState
-              title="Analyzing draft"
-              description="Feedback is currently being generated. Check back shortly."
-            />
-          )}
-        </article>
 
-        <article className="surface-panel">
-          <PageHeader
-            eyebrow="Context"
-            title="About this feedback"
-            description="Writing guidance is advisory. Official scholarship requirements live in published records."
-          />
-          {selectedDocument?.latest_feedback ? (
-            <div className="surface-list">
-              <article>
-                <p className="list-heading">Grounded context</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.grounded_context.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article>
-                <p className="list-heading">Citations</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.citations.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article className="guidance-callout">
-                <p className="list-heading">Limitation</p>
-                <p className="body-copy">
-                  {selectedDocument.latest_feedback.limitation_notice}
-                </p>
-              </article>
-            </div>
-          ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Context will appear after the first feedback response.
-              </p>
-            </div>
-          )}
-        </article>
-      </section>
-    </AppShell>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                 {state.isLoading ? (
+                    <div className="space-y-4">
+                      {[1,2,3].map(i => <div key={i} className="h-20 bg-white/5 animate-pulse rounded-2xl" />)}
+                    </div>
+                 ) : state.items.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => setState(c => ({ ...c, selectedId: item.id }))}
+                      className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                        item.id === state.selectedId 
+                        ? 'bg-cobalt-600/10 border-cobalt-600/30' 
+                        : 'border-transparent hover:bg-white/5 hover:border-white/10'
+                      }`}
+                    >
+                       <div className="flex items-center justify-between mb-2">
+                          <span className={`${item.processing_status === 'completed' ? 'text-emerald-500' : 'text-cobalt-500'} text-[10px] font-black uppercase tracking-tighter`}>
+                             {formatStatus(item.processing_status)}
+                          </span>
+                          <span className="text-[10px] text-neutral-600">
+                             {new Date(item.updated_at).toLocaleDateString()}
+                          </span>
+                       </div>
+                       <h3 className="text-sm font-medium truncate">{item.title}</h3>
+                       <p className="text-[10px] text-neutral-600 mt-1 uppercase tracking-widest">{item.document_type}</p>
+                    </button>
+                 ))}
+              </div>
+
+              <div className="p-4 border-t border-white/5">
+                 <button 
+                  onClick={() => {
+                    setState(c => ({ ...c, selectedId: null }));
+                    setTitle("");
+                    setContentText("");
+                  }}
+                  className="w-full py-4 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
+                 >
+                    <Plus size={14} /> New Draft
+                 </button>
+              </div>
+           </div>
+        </aside>
+
+        {/* Center: Immersive Editor */}
+        <main className="flex-1 flex flex-col gap-6">
+           {!isSidebarOpen && (
+             <button 
+               onClick={() => setIsSidebarOpen(true)}
+               className="self-start glass-surface px-4 py-2 rounded-full border-white/5 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-all mb-2"
+             >
+               Open Ledger
+             </button>
+           )}
+
+           <div className="flex-1 glass-surface rounded-[2.5rem] border-white/10 bg-white/[0.03] shadow-inner relative overflow-hidden group">
+              {state.selectedId ? (
+                 <div className="absolute inset-0 p-12 overflow-y-auto selection:bg-cobalt-500/30">
+                    <header className="mb-12 flex items-center justify-between">
+                       <div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-cobalt-500 mb-2 block">
+                            Document Scope · {selectedDocument?.document_type.toUpperCase()}
+                          </span>
+                          <h2 className="text-3xl font-medium">{selectedDocument?.title}</h2>
+                       </div>
+                       <div className="flex items-center gap-4">
+                          <StatusBadge 
+                             label={formatStatus(selectedDocument?.processing_status || '')} 
+                             variant={selectedDocument?.processing_status === 'completed' ? 'validated' : 'planned'} 
+                          />
+                       </div>
+                    </header>
+                    <div className="prose prose-invert max-w-none">
+                       <p className="text-xl leading-[1.8] text-white/70 font-light whitespace-pre-wrap">
+                          {selectedDocument?.content_text}
+                       </p>
+                    </div>
+                 </div>
+              ) : (
+                 <div className="absolute inset-0 p-12 overflow-y-auto">
+                    <header className="mb-12">
+                       <h2 className="text-3xl font-medium">Draft Neutralization.</h2>
+                       <p className="text-neutral-500 mt-2">Submit a new baseline draft for neural analysis.</p>
+                    </header>
+
+                    <form 
+                      onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+                      className="space-y-8 max-w-2xl"
+                    >
+                       <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Document Blueprint</label>
+                             <select 
+                                value={documentType}
+                                onChange={(e) => setDocumentType(e.target.value as DocumentType)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-cobalt-600/20"
+                             >
+                                <option value="sop">Statement of Purpose</option>
+                                <option value="essay">Thematic Essay</option>
+                             </select>
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Working Title</label>
+                             <input 
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Refined Draft v1"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-cobalt-600/20"
+                             />
+                          </div>
+                       </div>
+
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Content Manifest</label>
+                          <textarea 
+                             value={contentText}
+                             onChange={(e) => setContentText(e.target.value)}
+                             placeholder="Inject draft content here..."
+                             rows={12}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 text-lg font-light outline-none focus:ring-2 focus:ring-cobalt-600/20 resize-none"
+                          />
+                       </div>
+
+                       {formError && (
+                          <div className="p-4 bg-coral-600/10 border border-coral-600/20 rounded-xl text-coral-500 text-sm flex items-center gap-3">
+                             <AlertTriangle size={16} /> {formError}
+                          </div>
+                       )}
+
+                       <button 
+                          disabled={state.isSubmitting}
+                          className="px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-[10px] rounded-full hover:scale-105 transition-all shadow-xl"
+                       >
+                          {state.isSubmitting ? 'Neutralizing...' : 'Submit to Core'}
+                       </button>
+                    </form>
+                 </div>
+              )}
+           </div>
+        </main>
+
+        {/* Right: Neutral Feedback Panel */}
+        <aside className="w-96 flex-shrink-0">
+           <div className="glass-surface h-full flex flex-col border-white/5 bg-white/[0.02]">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                 <h2 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Neural Observations</h2>
+                 <RefreshCw 
+                    size={16} 
+                    className={`text-neutral-600 cursor-pointer hover:text-white transition-all ${state.isRefreshing ? 'animate-spin' : ''}`}
+                    onClick={() => void handleRefreshFeedback()}
+                 />
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8">
+                 {selectedDocument?.latest_feedback ? (
+                    <div className="space-y-12">
+                       <section>
+                          <div className="flex items-center gap-2 mb-4 text-emerald-500">
+                             <Sparkles size={14} />
+                             <h4 className="text-[10px] font-black uppercase tracking-widest">Synthesis</h4>
+                          </div>
+                          <p className="text-sm leading-relaxed text-neutral-300">
+                             {selectedDocument.latest_feedback.summary}
+                          </p>
+                       </section>
+
+                       <section>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-6 flex items-center gap-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                             Structural Strengths
+                          </h4>
+                          <ul className="space-y-4">
+                             {selectedDocument.latest_feedback.strengths.slice(0, 3).map((s, i) => (
+                                <li key={i} className="text-xs text-neutral-400 bg-white/5 p-4 rounded-xl border border-white/5">
+                                   {s}
+                                </li>
+                             ))}
+                          </ul>
+                       </section>
+
+                       <section>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-cobalt-500 mb-6 flex items-center gap-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-cobalt-500" />
+                             Revision Vectors
+                          </h4>
+                          <ul className="space-y-4">
+                             {selectedDocument.latest_feedback.revision_priorities.slice(0, 3).map((s, i) => (
+                                <li key={i} className="text-xs text-neutral-400 bg-white/5 p-4 rounded-xl border border-white/5">
+                                   {s}
+                                </li>
+                             ))}
+                          </ul>
+                       </section>
+
+                       <section className="pt-8 border-t border-white/5">
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-600 mb-4">Neural Context</h4>
+                          <div className="flex flex-wrap gap-2">
+                             {selectedDocument.latest_feedback.grounded_context.slice(0, 2).map((c, i) => (
+                                <span key={i} className="px-2 py-1 bg-white/5 rounded-md text-[9px] text-neutral-500 uppercase font-bold border border-white/5">
+                                   {c}
+                                </span>
+                             ))}
+                          </div>
+                       </section>
+                    </div>
+                 ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                       <Terminal size={40} className="mb-6" />
+                       <h3 className="text-sm font-medium">Awaiting Data.</h3>
+                       <p className="text-xs text-neutral-600 mt-2">Select a document to retrieve neural logs.</p>
+                    </div>
+                 )}
+              </div>
+           </div>
+        </aside>
+
+      </div>
+    </PrepLabShell>
   );
 }
 
@@ -503,28 +433,28 @@ function validateClientSubmission(
 ) {
   if (inputMethod === "text") {
     if (contentText.trim().length < 50) {
-      return "Paste at least 50 characters before requesting feedback.";
+      return "Injection requires at least 50 characters of baseline text.";
     }
     return null;
   }
 
   if (!file) {
-    return "Select a .txt or .md file before requesting feedback.";
+    return "Neutralize requires a valid .txt or .md archive.";
   }
 
   return null;
 }
 
 function formatStatus(status: string) {
-  if (status === "completed") return "Feedback ready";
-  if (status === "processing") return "Processing";
-  if (status === "failed") return "Needs retry";
-  return "Submitted";
+  if (status === "completed") return "Ready";
+  if (status === "processing") return "Analyzing";
+  if (status === "failed") return "Halt";
+  return "Queued";
 }
 
 function resolveErrorMessage(error: unknown) {
   if (typeof error === "object" && error !== null && "message" in error) {
     return (error as ApiError).message;
   }
-  return "Unexpected document assistance failure";
+  return "Unexpected Neural Environment failure";
 }

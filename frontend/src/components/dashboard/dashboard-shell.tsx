@@ -18,6 +18,9 @@ import type {
   ScholarshipListResponse,
   StudentProfile,
 } from "@/lib/types";
+import { PulseHeader } from "@/components/dashboard/pulse-header";
+import { motion } from "framer-motion";
+import { Activity } from "lucide-react";
 
 type DashboardDataState = {
   isLoading: boolean;
@@ -142,244 +145,230 @@ export function DashboardShell() {
     }));
   };
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 15 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
     <AppShell
-      eyebrow="Dashboard"
-      title={
-        currentUser?.full_name
-          ? `Welcome back, ${currentUser.full_name}.`
-          : "Your scholarship workspace."
-      }
-      description="Profile status, saved opportunities, and next steps — all in one place."
-      intro={
-        <div className="meta-row">
-          <StatusBadge label="Account active" variant="validated" />
-          <StatusBadge
-            label={profileReady ? "Profile ready" : "Profile needed"}
-            variant={profileReady ? "generated" : "warning"}
-          />
-        </div>
-      }
+      title="Dashboard"
+      description="ScholarAI Pulse"
+      hideHeader
     >
+      <PulseHeader 
+        name={currentUser?.full_name} 
+        savedCount={state.saved.length} 
+        profileReady={profileReady} 
+      />
+
       {state.error ? (
-        <section className="surface-card" data-testid="dashboard-error">
+        <section className="glass-surface p-6 mb-8 border-coral-600/20 bg-coral-600/5" data-testid="dashboard-error">
           <PageHeader
-            eyebrow="Status"
-            title="Something went wrong."
+            eyebrow="Alert"
+            title="System Connection Issue"
             description={state.error}
           />
         </section>
       ) : null}
 
-      <section className="metrics-grid" data-testid="dashboard-shell">
-        <article className="data-point">
-          <p className="data-point__label">Saved</p>
-          <strong>{state.saved.length}</strong>
-          <p className="body-copy">Opportunities on your shortlist.</p>
-        </article>
-        <article className="data-point">
-          <p className="data-point__label">Profile</p>
-          <strong>{profileReady ? "Ready" : "Incomplete"}</strong>
-          <p className="body-copy">
-            {profileReady
-              ? "Recommendations are personalized to your profile."
-              : "Complete your profile to unlock recommendations."}
-          </p>
-        </article>
-        <article className="data-point">
-          <p className="data-point__label">Preparation</p>
-          <strong>Documents & Interview</strong>
-          <p className="body-copy">Writing feedback and practice scoring available.</p>
-        </article>
-      </section>
-
-      <section className="dashboard-grid">
-        <article className="surface-card" data-testid="profile-summary">
-          <PageHeader
-            eyebrow="Profile"
-            title="Your recommendation inputs"
-            description="The profile data used to rank and explain scholarship matches."
-          />
-          {state.isLoading ? (
-            <div className="surface-list">
-              <SkeletonLine count={3} />
-              <SkeletonLine count={2} />
-            </div>
-          ) : state.profile ? (
-            <div className="surface-list">
-              <article>
-                <p className="list-heading">Academic target</p>
-                <p className="body-copy">
-                  {state.profile.target_degree_level} in {state.profile.target_field} for{" "}
-                  {state.profile.target_country_code}
-                </p>
-              </article>
-              <article>
-                <p className="list-heading">Eligibility</p>
-                <p className="body-copy">
-                  Citizenship {state.profile.citizenship_country_code}, GPA{" "}
-                  {state.profile.gpa_value ?? "not set"} / {state.profile.gpa_scale}
-                </p>
-              </article>
-              <div className="dashboard-actions">
-                <Link className="nav-link" href="/profile">
-                  Edit profile
-                </Link>
-                <Link className="auth-link auth-link--primary" href="/recommendations">
-                  View recommendations
-                </Link>
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="space-y-12"
+      >
+        <section className="dashboard-grid">
+          <motion.article variants={item} className="glass-surface p-8" data-testid="profile-summary">
+            <PageHeader
+              eyebrow="Intelligence Profile"
+              title="Identity & Targets"
+              description="Refined data for personalized matching."
+            />
+            {state.isLoading ? (
+              <div className="space-y-4 pt-6">
+                <SkeletonLine count={3} />
               </div>
-            </div>
-          ) : (
-            <EmptyState
-              title="Profile incomplete"
-              description="Set up your profile so ScholarAI can explain why scholarships match your background."
-              action={
-                <Link className="auth-link auth-link--primary" href="/onboarding">
-                  Complete profile
-                </Link>
-              }
-            />
-          )}
-        </article>
+            ) : state.profile ? (
+              <div className="space-y-6 pt-6">
+                <div className="grid gap-4">
+                  <div className="flex justify-between items-center py-3 border-b border-white/5">
+                    <span className="text-sm text-neutral-500">Academic Target</span>
+                    <span className="text-sm font-semibold text-neutral-900">{state.profile.target_degree_level} · {state.profile.target_field}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-white/5">
+                    <span className="text-sm text-neutral-500">Destination</span>
+                    <span className="text-sm font-semibold text-neutral-900">{state.profile.target_country_code}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-white/5">
+                    <span className="text-sm text-neutral-500">Academic Standing</span>
+                    <span className="text-sm font-semibold text-neutral-900">{state.profile.gpa_value ?? "—"} / {state.profile.gpa_scale} GPA</span>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Link className="nav-link !rounded-xl" href="/profile">
+                    Edit Profile
+                  </Link>
+                  <Link className="auth-link auth-link--primary !rounded-xl" href="/recommendations">
+                    View Matches
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                title="Profile Lockdown"
+                description="Your intelligence profile is incomplete. This restricts personalized matching."
+                action={
+                  <Link className="auth-link auth-link--primary" href="/onboarding">
+                    Complete Identity
+                  </Link>
+                }
+              />
+            )}
+          </motion.article>
 
-        <article className="surface-panel" data-testid="saved-opportunities">
+          <motion.article variants={item} className="glass-surface p-8" data-testid="saved-opportunities">
+            <PageHeader
+              eyebrow="Shortlist"
+              title="Active Opportunities"
+              description="Track deadlines and preparation readiness."
+            />
+            {state.isLoading ? (
+              <div className="pt-6 space-y-4">
+                <SkeletonCard />
+              </div>
+            ) : state.saved.length > 0 ? (
+              <div className="opportunity-list pt-6">
+                {state.saved.map((item) => (
+                  <article className="p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all group" key={item.scholarship_id}>
+                    <div className="flex justify-between items-start mb-2">
+                       <h3 className="font-semibold text-neutral-900 group-hover:text-cobalt-600 transition-colors">{item.title}</h3>
+                       <StatusBadge label="Saved" variant="validated" />
+                    </div>
+                    <p className="text-xs text-neutral-500 mb-4 uppercase tracking-wider">
+                      {item.provider_name} · {item.country_code}
+                    </p>
+                    <div className="flex gap-2">
+                      <Link className="text-xs font-bold text-neutral-400 hover:text-neutral-900 transition-all" href={`/scholarships/${item.scholarship_id}`}>
+                        View Details
+                      </Link>
+                      <button
+                        className="text-xs font-bold text-coral-600 opacity-60 hover:opacity-100 transition-all"
+                        onClick={() => void handleUnsave(item.scholarship_id)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Empty Vault"
+                description="Save opportunities from the discovery engine to track them here."
+                action={
+                  <Link className="auth-link auth-link--primary" href="/scholarships">
+                    Launch Discovery
+                  </Link>
+                }
+              />
+            )}
+          </motion.article>
+        </section>
+
+        <motion.section variants={item} className="glass-surface p-10">
           <PageHeader
-            eyebrow="Shortlist"
-            title="Saved opportunities"
-            description="Scholarships you&apos;re tracking for deadlines and follow-up."
+            eyebrow="Preparation Hub"
+            title="Accelerate Your Applications"
+            description="Use AI-driven feedback and practice to increase your fit scores."
           />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <EntryCard
+              href="/recommendations"
+              label="Intelligent Matches"
+              description="XGBoost ranked opportunities tailored to your targets."
+            />
+            <EntryCard
+              href="/document-feedback"
+              label="Document Lab"
+              description="Grounded writing assistance for statements and prompts."
+            />
+            <EntryCard
+              href="/interview"
+              label="Interview Forge"
+              description="Practice sessions with live probing and rubric scoring."
+            />
+          </div>
+        </motion.section>
+
+        <motion.section variants={item} className="glass-surface p-10" data-testid="published-opportunities">
+          <div className="flex items-end justify-between mb-8">
+              <PageHeader
+                eyebrow="Global Discovery"
+                title="Recent Additions"
+                description="New opportunities synced from the ingestion pipeline."
+              />
+              <Link href="/scholarships" className="text-sm font-bold text-cobalt-600 hover:underline">
+                Browse Repository →
+              </Link>
+          </div>
           {state.isLoading ? (
-            <div className="opportunity-list">
-              <SkeletonCard />
-              <SkeletonCard />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
             </div>
-          ) : state.saved.length > 0 ? (
-            <div className="opportunity-list">
-              {state.saved.map((item) => (
-                <article className="opportunity-card" key={item.scholarship_id}>
-                  <div className="meta-row">
-                    <StatusBadge label="Published" variant="validated" />
-                    <span className="route-card__label">
-                      Saved {new Date(item.saved_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="route-card__title">{item.title}</h3>
-                  <p className="route-card__description">
-                    {item.provider_name ?? "Provider not listed"} · {item.country_code}
-                  </p>
-                  <div className="dashboard-actions">
-                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
-                      View details
-                    </Link>
-                    <button
-                      className="auth-link auth-link--secondary"
-                      onClick={() => void handleUnsave(item.scholarship_id)}
-                      type="button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </article>
-              ))}
+          ) : state.published.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {state.published.map((item) => {
+                const isSaved = savedIds.has(item.scholarship_id);
+                return (
+                  <article className="p-6 rounded-2xl border border-white/5 bg-white/5 hover:border-cobalt-600/30 transition-all flex flex-col justify-between" key={item.scholarship_id}>
+                    <div>
+                        <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-3">
+                            {item.country_code} · {item.deadline_at ? new Date(item.deadline_at).toLocaleDateString() : 'No Deadline'}
+                        </div>
+                        <h3 className="text-lg font-semibold text-neutral-900 leading-snug mb-2">{item.title}</h3>
+                        <p className="text-xs text-neutral-500 line-clamp-2">{item.provider_name}</p>
+                    </div>
+                    <div className="mt-8 flex gap-3">
+                      <button
+                        className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-all ${isSaved ? 'bg-neutral-100 text-neutral-500' : 'bg-neutral-900 text-white hover:bg-black'}`}
+                        onClick={() =>
+                          void (isSaved
+                            ? handleUnsave(item.scholarship_id)
+                            : handleSave(item.scholarship_id))
+                        }
+                        type="button"
+                      >
+                        {isSaved ? "Saved" : "Save Opportunity"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
-            <EmptyState
-              title="No saved items"
-              description="Explore the catalog and save scholarships to track them here."
-              action={
-                <Link className="auth-link auth-link--primary" href="/scholarships">
-                  Browse catalog
-                </Link>
-              }
-            />
+            <div className="p-12 text-center border-2 border-dashed border-white/10 rounded-3xl">
+              <p className="text-neutral-400 font-medium">
+                Syncing global repository... No new records found in current batch.
+              </p>
+            </div>
           )}
-        </article>
-      </section>
-
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Next steps"
-          title="Continue your workflow"
-          description="Pick up where you left off across recommendations, writing, and interview practice."
-        />
-        <div className="dashboard-grid dashboard-grid--tight">
-          <EntryCard
-            href="/recommendations"
-            label="Recommendations"
-            description="Review scholarship matches ranked by your profile."
-          />
-          <EntryCard
-            href="/document-feedback"
-            label="Documents"
-            description="Get structured feedback on application writing."
-          />
-          <EntryCard
-            href="/interview"
-            label="Interview"
-            description="Practice responses with rubric-based scoring."
-          />
-        </div>
-      </section>
-
-      <section className="surface-card" data-testid="published-opportunities">
-        <PageHeader
-          eyebrow="Explore"
-          title="Recently published scholarships"
-          description="Quick access to new opportunities without leaving the dashboard."
-        />
-        {state.isLoading ? (
-          <p className="body-copy">Loading scholarships…</p>
-        ) : state.published.length > 0 ? (
-          <div className="opportunity-list">
-            {state.published.map((item) => {
-              const isSaved = savedIds.has(item.scholarship_id);
-              return (
-                <article className="opportunity-card" key={item.scholarship_id}>
-                  <div className="meta-row">
-                    <StatusBadge label="Published" variant="validated" />
-                    <span className="route-card__label">
-                      {item.deadline_at
-                        ? `Deadline ${new Date(item.deadline_at).toLocaleDateString()}`
-                        : "Deadline not listed"}
-                    </span>
-                  </div>
-                  <h3 className="route-card__title">{item.title}</h3>
-                  <p className="route-card__description">
-                    {item.provider_name ?? "Provider not listed"} · {item.country_code}
-                  </p>
-                  <div className="dashboard-actions">
-                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
-                      View details
-                    </Link>
-                    <button
-                      className={
-                        isSaved
-                          ? "auth-link auth-link--secondary"
-                          : "auth-link auth-link--primary"
-                      }
-                      onClick={() =>
-                        void (isSaved
-                          ? handleUnsave(item.scholarship_id)
-                          : handleSave(item.scholarship_id))
-                      }
-                      type="button"
-                    >
-                      {isSaved ? "Saved" : "Save"}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-panel">
-            <p className="body-copy">
-              No published scholarships in the current dataset. Check back as new records are added.
-            </p>
-          </div>
-        )}
-      </section>
+        </motion.section>
+      </motion.div>
     </AppShell>
   );
 }
@@ -394,16 +383,17 @@ function EntryCard({
   description: string;
 }) {
   return (
-    <article className="route-card">
-      <h3 className="route-card__title">{label}</h3>
-      <p className="route-card__description">{description}</p>
-      <Link className="nav-link" href={href}>
-        Open
-      </Link>
-    </article>
+    <Link href={href} className="group p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-cobalt-600/50 hover:bg-white/10 transition-all flex flex-col gap-4">
+      <div className="w-10 h-10 rounded-xl bg-cobalt-600/10 flex items-center justify-center text-cobalt-600 group-hover:scale-110 transition-transform">
+          <Activity size={20} />
+      </div>
+      <div>
+        <h3 className="font-bold text-lg text-neutral-900">{label}</h3>
+        <p className="text-sm text-neutral-500 leading-relaxed mt-1">{description}</p>
+      </div>
+    </Link>
   );
 }
-
 function is404(error: unknown): error is ApiError {
   return (
     typeof error === "object" &&

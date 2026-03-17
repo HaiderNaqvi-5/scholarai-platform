@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from sqlalchemy.exceptions import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1 import router as api_v1_router
 from app.core.config import settings

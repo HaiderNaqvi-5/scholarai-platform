@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
-import { SkeletonLine, SkeletonCard } from "@/components/ui/skeleton";
+import { SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -30,8 +30,8 @@ export function MentorDashboardShell() {
         setIsLoading(true);
         const data = await getMentorPendingReviews(accessToken);
         setPendingReviews(data.items);
-      } catch (err: any) {
-        setError(err.message || "Failed to load pending reviews.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load pending reviews.");
       } finally {
         setIsLoading(false);
       }
@@ -46,8 +46,8 @@ export function MentorDashboardShell() {
       setSelectedDocument(null);
       const doc = await getMentorDocument(docId, accessToken);
       setSelectedDocument(doc);
-    } catch (err: any) {
-      setError(err.message || "Failed to load document content.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load document content.");
     }
   };
 
@@ -60,8 +60,8 @@ export function MentorDashboardShell() {
       const data = await getMentorPendingReviews(accessToken);
       setPendingReviews(data.items);
       setSelectedDocument(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to submit feedback.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to submit feedback.");
     } finally {
       setIsSubmitting(false);
     }

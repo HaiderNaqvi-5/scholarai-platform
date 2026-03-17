@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -11,7 +12,9 @@ class InterviewSessionStartRequest(BaseModel):
 
 
 class InterviewCurrentQuestionResponse(BaseModel):
-    session_id: str
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    session_id: UUID
     status: str
     practice_mode: str
     question_index: int
@@ -36,7 +39,12 @@ class InterviewAnswerRequest(BaseModel):
         return self
 
 
+    rationale: str
+
+
 class InterviewRubricDimension(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
     dimension: str
     score: int
     band: str
@@ -44,6 +52,8 @@ class InterviewRubricDimension(BaseModel):
 
 
 class InterviewAnswerFeedback(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
     question_index: int
     question_text: str
     answer_text: str
@@ -59,7 +69,9 @@ class InterviewAnswerFeedback(BaseModel):
 
 
 class InterviewSessionSummaryResponse(BaseModel):
-    session_id: str
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    session_id: UUID
     status: str
     practice_mode: str
     current_question_index: int

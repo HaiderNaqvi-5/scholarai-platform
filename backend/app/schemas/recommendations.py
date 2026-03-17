@@ -10,6 +10,8 @@ class RecommendationRequest(BaseModel):
 
 
 class RecommendationItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
     scholarship_id: str
     title: str
     provider_name: str | None

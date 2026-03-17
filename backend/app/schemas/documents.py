@@ -1,12 +1,13 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DocumentFeedbackResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    id: str
+    id: UUID
     status: str
     summary: str
     strengths: list[str]
@@ -19,9 +20,9 @@ class DocumentFeedbackResponse(BaseModel):
 
 
 class DocumentRecordSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    id: str
+    id: UUID
     title: str
     document_type: str
     input_method: str
@@ -30,10 +31,11 @@ class DocumentRecordSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     latest_feedback_at: datetime | None
-    scholarship_id: str | None = None
+    scholarship_id: str | None = None # Linked to external scholarship_id string
 
 
 class DocumentDetailResponse(DocumentRecordSummary):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
     content_text: str
     latest_feedback: DocumentFeedbackResponse | None = None
 
@@ -46,14 +48,20 @@ class DocumentListResponse(BaseModel):
 
 
 class DocumentSubmissionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     document: DocumentDetailResponse
 
 
 class DocumentFeedbackRefreshResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     document: DocumentDetailResponse
 
 
 class DocumentSubmissionValidation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str | None = Field(default=None, max_length=255)
     document_type: str
     content_text: str | None = Field(default=None, min_length=50, max_length=12000)

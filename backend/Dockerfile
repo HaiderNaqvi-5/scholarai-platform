@@ -30,9 +30,11 @@ RUN pip install --no-cache-dir /wheels/*
 
 COPY . .
 
-# Security: Run as non-root user
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
-USER appuser
+# Security: Run as non-root user with explicit UID
+RUN groupadd -g 1001 appgroup && \
+    useradd -r -u 1001 -g appgroup appuser && \
+    chown -R appuser:appgroup /app
+USER 1001
 
 EXPOSE 8000
 

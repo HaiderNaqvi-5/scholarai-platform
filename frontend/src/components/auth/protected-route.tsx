@@ -8,10 +8,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 
 export function ProtectedRoute({
   children,
-  message = "Checking your workspace session.",
 }: {
   children: React.ReactNode;
-  message?: string;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();

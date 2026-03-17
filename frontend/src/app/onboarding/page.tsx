@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
+"use client";
 
+import { AuthEntrance } from "@/components/auth/auth-entrance";
+import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { ProfileFormShell } from "@/components/profile/profile-form-shell";
-
-export const metadata: Metadata = {
-  title: "Onboarding",
-  description:
-    "Set up your profile in under a minute to get personalized scholarship recommendations.",
-};
 
 export default function OnboardingPage() {
   return (
     <ProtectedRoute>
-      <ProfileFormShell mode="onboarding" />
+      <AuthEntrance 
+        title="Personalize."
+        subtitle="Let's build your matching engine profile."
+      >
+        <OnboardingFlow />
+      </AuthEntrance>
     </ProtectedRoute>
   );
 }

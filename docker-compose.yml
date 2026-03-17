@@ -18,6 +18,13 @@ services:
     networks:
       - internal
       - public
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/logs:uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    user: "1001:1001"
 
   frontend:
     build:
@@ -141,6 +148,13 @@ services:
     restart: unless-stopped
     networks:
       - internal
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/logs:uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    user: "1001:1001"
 
   celery-beat:
     build:
@@ -157,6 +171,13 @@ services:
     restart: unless-stopped
     networks:
       - internal
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/logs:uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    user: "1001:1001"
 
 networks:
   internal:

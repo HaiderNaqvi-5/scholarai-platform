@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { AppShell } from "@/components/layout/app-shell";
 import { SkeletonLine } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { AudioRecorder } from "@/components/interview/audio-recorder";
 import { apiRequest } from "@/lib/api";
 import type {
@@ -15,6 +11,9 @@ import type {
   InterviewCurrentQuestion,
   InterviewSessionSummary,
 } from "@/lib/types";
+import { PrepLabShell } from "@/components/layout/prep-lab-shell";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, History, Award, CheckCircle2, AlertCircle } from "lucide-react";
 
 const LATEST_SESSION_KEY = "scholarai.latest_interview_session";
 
@@ -125,7 +124,7 @@ export function InterviewPracticeShell() {
     if (!hasText && !hasAudio) {
       setState((current) => ({
         ...current,
-        error: "Either write at least 50 characters or provide a voice response.",
+        error: "Voice response or 50+ chars of text required.",
       }));
       return;
     }
@@ -161,247 +160,238 @@ export function InterviewPracticeShell() {
   };
 
   return (
-    <AppShell
-      title="Practice scholarship interview answers."
-      description="Voice or text practice with rubric-based scoring on clarity, relevance, confidence, and specificity."
-      eyebrow="Interview"
-      intro={
-        <div className="meta-row">
-          <StatusBadge label="Rubric-based scoring" variant="validated" />
-          <StatusBadge label="Multimodal practice" variant="generated" />
-        </div>
-      }
+    <PrepLabShell 
+      eyebrow="Simulation Phase"
+      title="Interview Hub."
     >
-      {state.error ? (
-        <section className="surface-card" data-testid="interview-error">
-          <p className="form-error">{state.error}</p>
-        </section>
-      ) : null}
-
-      <section className="interview-grid" data-testid="interview-practice-shell">
-        <article className="surface-card">
-          <PageHeader
-            eyebrow="Session"
-            title="Start or resume practice"
-            description="Each session has a fixed set of questions for consistent scoring."
-          />
-
-          {state.isLoading ? (
-            <div className="surface-list">
-              <SkeletonLine count={2} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        
+        {/* Left: Controls & Status */}
+        <div className="lg:col-span-4 space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="glass-surface p-8 rounded-[2rem] border-white/5 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+               <h2 className="text-xl font-medium">Session Status</h2>
+               {state.session && (
+                 <div className="px-3 py-1 bg-cobalt-600/20 text-cobalt-500 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                   Active
+                 </div>
+               )}
             </div>
-          ) : state.session ? (
-            <div className="surface-list">
-              <article>
-                <div className="meta-row">
-                  <StatusBadge
-                    label={
-                      state.session.status === "completed"
-                        ? "Completed"
-                        : "In progress"
-                    }
-                    variant={
-                      state.session.status === "completed"
-                        ? "validated"
-                        : "generated"
-                    }
-                  />
-                  <span className="route-card__label">
-                    {state.session.current_question_index} of {state.session.total_questions} answered
-                  </span>
-                  {state.session.scholarship_id && (
-                    <StatusBadge label="Grounded in Scholarship" variant="validated" />
-                  )}
-                </div>
-              </article>
-              <div className="document-actions">
-                <button
-                  className="auth-link auth-link--secondary"
-                  data-testid="interview-start-new-session"
-                  disabled={state.isStarting}
-                  onClick={() => void startSession()}
-                  type="button"
-                >
-                  {state.isStarting ? "Starting…" : "New session"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <EmptyState
-              title="No active session"
-              description="Start a practice run to receive questions and structured rubric feedback."
-              action={
-                <button
-                  className="auth-link auth-link--primary"
-                  data-testid="interview-start-session"
-                  disabled={state.isStarting}
-                  onClick={() => void startSession()}
-                  type="button"
-                >
-                  {state.isStarting ? "Starting…" : "Start session"}
-                </button>
-              }
-            />
-          )}
-        </article>
 
-        <article className="surface-panel" data-testid="interview-question-panel">
-          <PageHeader
-            eyebrow="Question"
-            title="Current prompt"
-            description="Respond verbally or via text. Concrete examples score highest."
-          />
-          {currentQuestion?.question_text ? (
-            <div className="surface-list">
-              <article className="question-card">
-                <div className="meta-row">
-                  <StatusBadge label={`Q${currentQuestion.question_index}`} variant="planned" />
-                  <span className="route-card__label">
-                    {currentQuestion.total_questions} total
-                  </span>
-                </div>
-                <p className="body-copy leading-relaxed">{currentQuestion.question_text}</p>
-              </article>
-              {state.session?.status !== "completed" ? (
-                <div className="flex flex-col gap-6">
-                  <AudioRecorder onRecordingComplete={(b64) => setAudioB64(b64)} />
-                  
-                  <label className="form-field">
-                    <span className="form-field__label">Text answer (Optional if voice provided)</span>
-                    <textarea
-                      className="text-area"
-                      data-testid="interview-answer-input"
-                      name="interview_answer"
-                      onChange={(event) => setAnswerText(event.target.value)}
-                      placeholder="Or write a direct answer with one concrete example..."
-                      rows={6}
-                      value={answerText}
-                    />
-                    <span className="field-note">Min 50 chars for text scoring.</span>
-                  </label>
-                </div>
-              ) : null}
-              {state.session?.status !== "completed" ? (
-                <div className="document-actions pt-4 border-t border-ink-950/5">
-                  <button
-                    className="auth-link auth-link--primary"
-                    data-testid="interview-submit-answer"
-                    disabled={state.isSubmitting}
-                    onClick={() => void submitAnswer()}
-                    type="button"
-                  >
-                    {state.isSubmitting ? "Processing & Scoring…" : "Submit answer"}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <EmptyState
-              title={state.session?.status === "completed" ? "Session complete" : "Awaiting session"}
-              description={state.session?.status === "completed" 
-                ? "Review results below or start a new practice run."
-                : "Start a session to see the first question."}
-            />
-          )}
-        </article>
-      </section>
-
-      <section className="interview-grid">
-        <article className="surface-card" data-testid="interview-result-view">
-          <PageHeader
-            eyebrow="Feedback"
-            title="Rubric scores"
-            description="Coarse scoring for clarity, relevance, confidence, and specificity."
-          />
-          {state.session?.latest_feedback ? (
-            <div className="surface-list">
-              <article>
-                <div className="meta-row">
-                  <StatusBadge
-                    label={state.session.latest_feedback.overall_band}
-                    variant="validated"
-                  />
-                  <span className="route-card__label">
-                    Score {state.session.latest_feedback.overall_score}
-                  </span>
-                </div>
-                <p className="body-copy">{state.session.latest_feedback.summary_feedback}</p>
-              </article>
-              <div className="score-grid">
-                {state.session.latest_feedback.dimensions.map((dimension) => (
-                  <article className="score-card" key={dimension.dimension}>
-                    <p className="list-label">{dimension.dimension}</p>
-                    <strong>{dimension.band}</strong>
-                    <p className="body-copy">{dimension.score} / 4</p>
-                  </article>
-                ))}
-              </div>
-              <article>
-                <p className="list-heading">Strengths</p>
-                <ul className="detail-list">
-                  {state.session.latest_feedback.strengths.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article>
-                <p className="list-heading">Improvements</p>
-                <ul className="detail-list">
-                  {state.session.latest_feedback.improvement_prompts.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-              <article className="guidance-callout">
-                <p className="list-heading">Limitation</p>
-                <p className="body-copy">
-                  {state.session.latest_feedback.limitation_notice}
-                </p>
-              </article>
-            </div>
-          ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Submit your first answer to see scoring and feedback.
-              </p>
-            </div>
-          )}
-        </article>
-
-        <article className="surface-panel">
-          <PageHeader
-            eyebrow="History"
-            title="Session log"
-            description="Answers and scores from this session."
-          />
-          {state.session?.responses.length ? (
-            <div className="surface-list">
-              {state.session.responses.map((response) => (
-                <article key={`${response.question_index}-${response.created_at ?? "pending"}`}>
-                  <div className="meta-row">
-                    <StatusBadge
-                      label={`Q${response.question_index + 1}`}
-                      variant="planned"
-                    />
-                    <span className="route-card__label">
-                      {response.overall_band} · {response.overall_score}
+            {state.isLoading ? (
+               <SkeletonLine count={3} />
+            ) : state.session ? (
+               <div className="space-y-6">
+                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <span className="text-neutral-400 text-sm">Progress</span>
+                    <span className="text-lg font-mono font-bold">
+                       {state.session.current_question_index} <span className="text-neutral-600">/</span> {state.session.total_questions}
                     </span>
-                  </div>
-                  <p className="body-copy">{response.question_text}</p>
-                  <p className="code-note">{response.answer_text}</p>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Answers and scores will appear here as you progress.
-              </p>
-            </div>
+                 </div>
+                 <button
+                    onClick={() => void startSession()}
+                    disabled={state.isStarting}
+                    className="w-full py-4 text-sm font-bold text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all"
+                 >
+                   {state.isStarting ? "Re-initializing..." : "Reset Simulation"}
+                 </button>
+               </div>
+            ) : (
+               <button
+                  onClick={() => void startSession()}
+                  className="w-full py-6 bg-cobalt-600 text-white font-bold rounded-2xl shadow-lg shadow-cobalt-600/20 hover:scale-[1.02] transition-all"
+               >
+                 Start Simulation
+               </button>
+            )}
+
+            {state.error && (
+              <div className="mt-8 flex items-center gap-3 p-4 bg-coral-600/10 border border-coral-600/20 rounded-2xl text-coral-500 text-sm">
+                 <AlertCircle size={18} />
+                 {state.error}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Feedback Metrics Summary */}
+          {state.session?.latest_feedback && (
+            <motion.div 
+               initial={{ opacity: 0, x: -20 }}
+               animate={{ opacity: 1, x: 0 }}
+               transition={{ delay: 0.1 }}
+               className="glass-surface p-8 rounded-[2rem] border-white/5"
+            >
+               <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-6">Latest Performance</h3>
+               <div className="space-y-4">
+                  {state.session.latest_feedback.dimensions.map(d => (
+                    <div key={d.dimension} className="flex items-center justify-between">
+                       <span className="text-sm text-neutral-400 capitalize">{d.dimension}</span>
+                       <div className="flex items-center gap-2">
+                          <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                             <div 
+                                className="h-full bg-cobalt-500 rounded-full" 
+                                style={{ width: `${(d.score / 4) * 100}%` }} 
+                             />
+                          </div>
+                          <span className="text-xs font-mono font-bold">{d.score}</span>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </motion.div>
           )}
-        </article>
-      </section>
-    </AppShell>
+        </div>
+
+        {/* Right: Immersive Interaction Panel */}
+        <div className="lg:col-span-8">
+           <AnimatePresence mode="wait">
+             {currentQuestion?.question_text ? (
+               <motion.div 
+                  key="question"
+                  initial={{ opacity: 0, scale: 0.98, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -20 }}
+                  className="glass-surface p-12 rounded-[2.5rem] border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] bg-white/5"
+               >
+                  <div className="mb-12">
+                     <span className="inline-block px-4 py-1.5 bg-cobalt-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full mb-6 italic">
+                       Phase 0{currentQuestion.question_index}
+                     </span>
+                     <h2 className="text-4xl font-medium leading-tight text-white/90">
+                       {currentQuestion.question_text}
+                     </h2>
+                  </div>
+
+                  {state.session?.status !== "completed" && (
+                    <div className="space-y-8">
+                       <AudioRecorder onRecordingComplete={(b64) => setAudioB64(b64)} />
+                       
+                       <div className="relative group">
+                          <textarea
+                            value={answerText}
+                            onChange={(e) => setAnswerText(e.target.value)}
+                            placeholder="Draft your response here (Voice preferred)..."
+                            className="w-full bg-white/[0.03] border border-white/5 rounded-[1.5rem] p-6 text-lg text-white/80 placeholder:text-neutral-600 focus:ring-2 focus:ring-cobalt-600/20 focus:bg-white/[0.05] transition-all outline-none resize-none min-h-[200px]"
+                          />
+                          <div className="absolute bottom-6 right-6 flex items-center gap-4">
+                             <span className="text-[10px] font-bold text-neutral-600 uppercase">
+                               {answerText.length} Characters
+                             </span>
+                          </div>
+                       </div>
+
+                       <div className="pt-8 border-t border-white/5 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-neutral-500 text-xs">
+                             <CheckCircle2 size={14} />
+                             Responses are analyzed by GPT neural models
+                          </div>
+                          <button 
+                            disabled={state.isSubmitting}
+                            onClick={() => void submitAnswer()}
+                            className="group flex items-center gap-3 px-8 py-4 bg-white text-black font-black uppercase tracking-widest text-xs rounded-full hover:scale-105 transition-all disabled:opacity-50"
+                          >
+                            {state.isSubmitting ? "Processing..." : "Submit Answer"}
+                            <Send size={16} className="group-hover:translate-x-1 transition-transform" />
+                          </button>
+                       </div>
+                    </div>
+                  )}
+               </motion.div>
+             ) : (
+               <motion.div 
+                 key="empty"
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                 className="h-[600px] flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-white/5 rounded-[3rem]"
+               >
+                 <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-8 text-neutral-300">
+                    <Award size={40} />
+                 </div>
+                 <h2 className="text-3xl font-medium mb-4">Simulation Readiness</h2>
+                 <p className="text-neutral-500 max-w-sm mb-12">
+                   {state.session?.status === "completed" 
+                    ? "Simulation complete. Comprehensive feedback generated below."
+                    : "Initializing neural environment. Prepare for behavioral assessment."}
+                 </p>
+                 {state.session?.status === "completed" && (
+                   <button 
+                      onClick={() => void startSession()}
+                      className="px-10 py-4 bg-white text-black font-bold rounded-full hover:bg-neutral-200 transition-all uppercase tracking-widest text-xs"
+                   >
+                     New Practice Run
+                   </button>
+                 )}
+               </motion.div>
+             )}
+           </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Results Workspace */}
+      <AnimatePresence>
+         {state.session?.responses.length ? (
+           <motion.section 
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-24 pt-24 border-t border-white/5"
+           >
+              <div className="flex items-center gap-4 mb-12">
+                 <History size={24} className="text-cobalt-600" />
+                 <h2 className="text-3xl font-medium">Session Transcript</h2>
+              </div>
+
+              <div className="space-y-8">
+                 {state.session.responses.map((res, i) => (
+                    <motion.div 
+                       key={i}
+                       className="glass-surface p-8 rounded-[2rem] border-white/5 hover:border-white/10 transition-all"
+                    >
+                       <div className="flex justify-between items-start mb-6">
+                          <div>
+                             <span className="text-[10px] font-black uppercase tracking-widest text-cobalt-500">Response Analysis {i + 1}</span>
+                             <h4 className="text-lg font-medium text-white/90 mt-2">{res.question_text}</h4>
+                          </div>
+                          <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-xs font-bold uppercase tracking-widest">
+                             {res.overall_band} · {res.overall_score}/4
+                          </div>
+                       </div>
+                       <p className="text-neutral-500 leading-relaxed italic border-l-2 border-white/10 pl-6 mb-8">
+                         &quot;{res.answer_text}&quot;
+                       </p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-white/5">
+                          <div>
+                             <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-4">Neural Strengths</h5>
+                             <ul className="space-y-2">
+                                {res.strengths.slice(0, 3).map(s => (
+                                  <li key={s} className="text-sm text-neutral-400 flex items-start gap-2">
+                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5" />
+                                     {s}
+                                  </li>
+                                ))}
+                             </ul>
+                          </div>
+                          <div>
+                             <h5 className="text-[10px] font-black uppercase tracking-widest text-coral-500 mb-4">Growth Vectors</h5>
+                             <ul className="space-y-2">
+                                {res.improvement_prompts.slice(0, 3).map(s => (
+                                  <li key={s} className="text-sm text-neutral-400 flex items-start gap-2">
+                                     <div className="w-1.5 h-1.5 rounded-full bg-coral-500 mt-1.5" />
+                                     {s}
+                                  </li>
+                                ))}
+                             </ul>
+                          </div>
+                       </div>
+                    </motion.div>
+                 ))}
+              </div>
+           </motion.section>
+         ) : null}
+      </AnimatePresence>
+    </PrepLabShell>
   );
 }
 

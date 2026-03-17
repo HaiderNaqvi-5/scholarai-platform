@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AuthActions } from "@/components/auth/auth-actions";
+import { GlobalSearch } from "@/components/ui/global-search";
 import { Footer } from "@/components/layout/footer";
 import { appNavRoutes } from "@/lib/routes";
 
@@ -14,6 +15,7 @@ type AppShellProps = {
   eyebrow?: string;
   children: React.ReactNode;
   intro?: React.ReactNode;
+  hideHeader?: boolean;
 };
 
 export function AppShell({
@@ -22,6 +24,7 @@ export function AppShell({
   eyebrow,
   children,
   intro,
+  hideHeader,
 }: AppShellProps) {
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
@@ -55,16 +58,22 @@ export function AppShell({
               );
             })}
           </div>
+          <div className="flex-1 flex justify-center max-w-sm px-4">
+            <GlobalSearch />
+          </div>
           <AuthActions />
         </nav>
-        <header className="hero-block hero-block--app fade-in">
-          <div className="hero-block__copy">
-            {eyebrow ? <p className="section-eyebrow">{eyebrow}</p> : null}
-            <h1 className="page-title">{title}</h1>
-            <p className="page-description">{description}</p>
-          </div>
-          {intro ? <div className="shell-intro">{intro}</div> : null}
-        </header>
+        
+        {!hideHeader && (
+          <header className="hero-block hero-block--app fade-in">
+            <div className="hero-block__copy">
+              {eyebrow ? <p className="section-eyebrow">{eyebrow}</p> : null}
+              <h1 className="page-title">{title}</h1>
+              <p className="page-description">{description}</p>
+            </div>
+            {intro ? <div className="shell-intro">{intro}</div> : null}
+          </header>
+        )}
         {children}
       </div>
       <Footer />

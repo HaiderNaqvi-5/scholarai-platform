@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedToken && !accessToken) setAccessToken(storedToken);
     if (storedRefreshToken && !refreshToken) setRefreshToken(storedRefreshToken);
 

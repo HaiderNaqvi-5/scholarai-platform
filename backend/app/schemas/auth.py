@@ -29,7 +29,7 @@ class UserLogin(BaseModel):
 
 
 class UserResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: UUID = Field(..., description="Unique user identifier (UUID)")
     email: str = Field(..., description="User's primary email address")
@@ -39,6 +39,8 @@ class UserResponse(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     access_token: str = Field(..., description="JWT access token")
     refresh_token: str = Field(..., description="JWT refresh token")
     token_type: str = Field("bearer", description="Type of the token")

@@ -22,6 +22,7 @@ from app.core.security import decode_token, oauth2_scheme
 from app.models import User, UserRole
 from scholarai_common.errors import ScholarAIException, ErrorCode
 from app.core.rate_limit import redis_client
+from app.core.auth_utils import is_token_blacklisted
 import json
 from pydantic import TypeAdapter
 
@@ -36,10 +37,20 @@ async def get_current_user(
     payload = decode_token(token, expected_type="access")
 
     user_id_raw = payload.get("sub")
+    jti = payload.get("jti")
+
     if user_id_raw is None:
         raise ScholarAIException(
             code=ErrorCode.AUTH_TOKEN_EXPIRED,
             message="Token payload missing subject",
+            status_code=status.HTTP_401_UNAUTHORIZED
+        )
+
+    # Check if token is blacklisted
+    if await is_token_blacklisted(jti):
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_REVOKED,
+            message="Token has been revoked",
             status_code=status.HTTP_401_UNAUTHORIZED
         )
 

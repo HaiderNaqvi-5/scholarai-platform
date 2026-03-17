@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -73,9 +74,9 @@ class CurationRecordUpdateRequest(BaseModel):
 
 
 class CurationRecordSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    record_id: str
+    record_id: UUID
     title: str
     provider_name: str | None
     country_code: str
@@ -91,6 +92,7 @@ class CurationRecordSummary(BaseModel):
 
 
 class CurationRecordDetail(CurationRecordSummary):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
     summary: str | None
     funding_summary: str | None
     field_tags: list[str]
@@ -99,9 +101,9 @@ class CurationRecordDetail(CurationRecordSummary):
     min_gpa_value: float | None
     source_document_ref: str | None
     provenance_payload: dict | None
-    reviewed_by_user_id: str | None
-    validated_by_user_id: str | None
-    published_by_user_id: str | None
+    reviewed_by_user_id: UUID | None
+    validated_by_user_id: UUID | None
+    published_by_user_id: UUID | None
     rejected_at: datetime | None
     unpublished_at: datetime | None
     created_at: datetime
@@ -109,15 +111,17 @@ class CurationRecordDetail(CurationRecordSummary):
 
 
 class CurationRecordListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     items: list[CurationRecordSummary]
     total: int = Field(ge=0)
     applied_state: str | None = None
 
 
 class IngestionRunSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    run_id: str
+    run_id: UUID
     source_key: str
     source_display_name: str
     fetch_url: str
@@ -134,9 +138,12 @@ class IngestionRunSummary(BaseModel):
 
 
 class IngestionRunDetail(IngestionRunSummary):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
     run_metadata: dict | None
 
 
 class IngestionRunListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     items: list[IngestionRunSummary]
     total: int = Field(ge=0)

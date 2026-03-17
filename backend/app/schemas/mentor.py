@@ -1,5 +1,5 @@
-"""Pydantic schemas for mentor-specific operations."""
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,11 +16,11 @@ class MentorFeedbackRequest(BaseModel):
 
 class MentorFeedbackResponse(BaseModel):
     """Response after mentor feedback is persisted."""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    id: str
-    document_id: str
-    mentor_id: str
+    id: UUID
+    document_id: UUID
+    mentor_id: UUID
     summary: str
     strengths: list[str]
     revision_priorities: list[str]

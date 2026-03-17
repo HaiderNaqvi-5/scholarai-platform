@@ -35,7 +35,7 @@ class StudentProfileUpsertRequest(BaseModel):
 
 
 class StudentProfileResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: UUID
     user_id: UUID

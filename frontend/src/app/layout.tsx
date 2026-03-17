@@ -1,24 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
+import { Geist_Mono, Outfit } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
-const displayFont = Sora({
-  variable: "--font-display",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const uiFont = IBM_Plex_Sans({
-  variable: "--font-ui",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const monoFont = IBM_Plex_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -38,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${displayFont.variable} ${uiFont.variable} ${monoFont.variable} app-body`}
+        className={`${outfit.variable} ${geistMono.variable} app-body`}
       >
         <a className="skip-link" href="#main-content">
           Skip to content

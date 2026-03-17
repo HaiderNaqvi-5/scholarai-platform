@@ -8,10 +8,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 
 export function AdminRoute({
   children,
-  message = "Checking curator access.",
 }: {
   children: React.ReactNode;
-  message?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();

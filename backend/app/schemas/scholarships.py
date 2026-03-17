@@ -1,12 +1,13 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScholarshipListItem(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-    scholarship_id: str
+    scholarship_id: str # External ID remains str
     title: str
     provider_name: str | None
     country_code: str
@@ -33,6 +34,7 @@ class ScholarshipAppliedFilters(BaseModel):
 
 
 class ScholarshipDetailResponse(ScholarshipListItem):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
     summary: str | None
     funding_summary: str | None
     funding_type: str | None

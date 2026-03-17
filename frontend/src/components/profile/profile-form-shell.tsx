@@ -179,7 +179,7 @@ export function ProfileFormShell({
 
       <section className="surface-card" data-testid="profile-form-shell">
         {isLoading ? (
-          <p className="body-copy">Loading your profile…</p>
+          <p className="body-copy">Loading your profile&hellip;</p>
         ) : (
           <form
             className="profile-form"

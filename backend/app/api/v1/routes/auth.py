@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import CurrentUser, oauth2_scheme
 from app.core.rate_limit import RateLimiter
+from app.core.auth_utils import blacklist_token
+from app.core.security import decode_token
 from app.models import User
 from app.schemas import (
     RefreshTokenRequest,
@@ -55,3 +57,16 @@ async def refresh_session(
 ) -> TokenResponse:
     service = AuthService(db)
     return await service.refresh_session(payload.refresh_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    current_user: CurrentUser,
+) -> None:
+    """Invalidate current access token."""
+    payload = decode_token(token, expected_type="access")
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    if jti and exp:
+        await blacklist_token(jti, exp)
