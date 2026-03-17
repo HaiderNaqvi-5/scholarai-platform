@@ -1,4 +1,9 @@
-type StatusBadgeVariant = "validated" | "generated" | "planned" | "warning";
+type StatusBadgeVariant =
+  | "validated"
+  | "generated"
+  | "planned"
+  | "warning"
+  | "neutral";
 
 type StatusBadgeProps = {
   label: string;
@@ -7,11 +12,12 @@ type StatusBadgeProps = {
 
 export function StatusBadge({
   label,
-  variant = "planned",
+  variant = "neutral",
 }: StatusBadgeProps) {
   return (
     <span className={`status-badge status-badge--${variant}`}>
-      {label}
+      <span className="status-badge__dot" aria-hidden="true" />
+      <span>{label}</span>
     </span>
   );
 }

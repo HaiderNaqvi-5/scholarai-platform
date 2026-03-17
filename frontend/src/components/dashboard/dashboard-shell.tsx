@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -50,7 +52,7 @@ export function DashboardShell() {
         apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
           token: accessToken,
         }),
-        apiRequest<ScholarshipListResponse>("/scholarships?limit=6", {
+        apiRequest<ScholarshipListResponse>("/scholarships?page=1&page_size=4", {
           token: accessToken,
         }),
       ]);
@@ -100,6 +102,8 @@ export function DashboardShell() {
     [state.saved],
   );
 
+  const profileReady = Boolean(state.profile);
+
   const handleSave = async (scholarshipId: string) => {
     if (!accessToken) {
       return;
@@ -140,88 +144,116 @@ export function DashboardShell() {
 
   return (
     <AppShell
-      title="Dashboard keeps the authenticated workspace calm, focused, and tied to published scholarship records."
-      description="This slice adds the minimum useful account flow, saved opportunities, and workspace navigation without pulling in advanced recommendation or document systems."
-      eyebrow="Authenticated workspace"
-    >
-      <section className="dashboard-hero" data-testid="dashboard-shell">
-        <div className="dashboard-hero__intro">
-          <p className="section-eyebrow">Workspace</p>
-          <h2 className="section-title">
-            {currentUser?.full_name
-              ? `${currentUser.full_name}, your next scholarship actions are organized here.`
-              : "Your scholarship workspace is ready."}
-          </h2>
-          <p className="body-copy">
-            Saved opportunities remain linked to published scholarship records
-            only. Recommendations, documents, and interview tools stay as entry
-            points until their deeper slices are implemented.
-          </p>
-        </div>
-        <div className="dashboard-hero__status">
-          <StatusBadge label="Authenticated" variant="validated" />
+      eyebrow="Dashboard"
+      title={
+        currentUser?.full_name
+          ? `Welcome back, ${currentUser.full_name}.`
+          : "Your scholarship workspace."
+      }
+      description="Profile status, saved opportunities, and next steps — all in one place."
+      intro={
+        <div className="meta-row">
+          <StatusBadge label="Account active" variant="validated" />
           <StatusBadge
-            label={state.profile ? "Profile on file" : "Profile pending"}
-            variant={state.profile ? "validated" : "warning"}
+            label={profileReady ? "Profile ready" : "Profile needed"}
+            variant={profileReady ? "generated" : "warning"}
           />
         </div>
-      </section>
-
+      }
+    >
       {state.error ? (
         <section className="surface-card" data-testid="dashboard-error">
-          <p className="section-eyebrow">Dashboard error</p>
-          <h2 className="section-title">The workspace could not load cleanly.</h2>
-          <p className="body-copy">{state.error}</p>
+          <PageHeader
+            eyebrow="Status"
+            title="Something went wrong."
+            description={state.error}
+          />
         </section>
       ) : null}
+
+      <section className="metrics-grid" data-testid="dashboard-shell">
+        <article className="data-point">
+          <p className="data-point__label">Saved</p>
+          <strong>{state.saved.length}</strong>
+          <p className="body-copy">Opportunities on your shortlist.</p>
+        </article>
+        <article className="data-point">
+          <p className="data-point__label">Profile</p>
+          <strong>{profileReady ? "Ready" : "Incomplete"}</strong>
+          <p className="body-copy">
+            {profileReady
+              ? "Recommendations are personalized to your profile."
+              : "Complete your profile to unlock recommendations."}
+          </p>
+        </article>
+        <article className="data-point">
+          <p className="data-point__label">Preparation</p>
+          <strong>Documents & Interview</strong>
+          <p className="body-copy">Writing feedback and practice scoring available.</p>
+        </article>
+      </section>
 
       <section className="dashboard-grid">
         <article className="surface-card" data-testid="profile-summary">
           <PageHeader
-            eyebrow="Profile summary"
-            title="Current student profile"
-            description="A lightweight profile summary keeps the dashboard grounded in explicit inputs rather than generated assumptions."
+            eyebrow="Profile"
+            title="Your recommendation inputs"
+            description="The profile data used to rank and explain scholarship matches."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading saved workspace context.</p>
+            <div className="surface-list">
+              <SkeletonLine count={3} />
+              <SkeletonLine count={2} />
+            </div>
           ) : state.profile ? (
             <div className="surface-list">
               <article>
-                <p className="list-heading">Target</p>
+                <p className="list-heading">Academic target</p>
                 <p className="body-copy">
                   {state.profile.target_degree_level} in {state.profile.target_field} for{" "}
                   {state.profile.target_country_code}
                 </p>
               </article>
               <article>
-                <p className="list-heading">Eligibility anchors</p>
+                <p className="list-heading">Eligibility</p>
                 <p className="body-copy">
                   Citizenship {state.profile.citizenship_country_code}, GPA{" "}
-                  {state.profile.gpa_value ?? "Not set"} / {state.profile.gpa_scale}
+                  {state.profile.gpa_value ?? "not set"} / {state.profile.gpa_scale}
                 </p>
               </article>
+              <div className="dashboard-actions">
+                <Link className="nav-link" href="/profile">
+                  Edit profile
+                </Link>
+                <Link className="auth-link auth-link--primary" href="/recommendations">
+                  View recommendations
+                </Link>
+              </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No profile has been saved yet. Add your first profile to unlock
-                profile-aware recommendation flows.
-              </p>
-              <Link className="auth-link auth-link--primary" href="/profile">
-                Complete profile
-              </Link>
-            </div>
+            <EmptyState
+              title="Profile incomplete"
+              description="Set up your profile so ScholarAI can explain why scholarships match your background."
+              action={
+                <Link className="auth-link auth-link--primary" href="/onboarding">
+                  Complete profile
+                </Link>
+              }
+            />
           )}
         </article>
 
         <article className="surface-panel" data-testid="saved-opportunities">
           <PageHeader
-            eyebrow="Saved opportunities"
-            title="Published scholarships you have saved"
-            description="Saved opportunities are always tied to published scholarship records, never raw or review-state items."
+            eyebrow="Shortlist"
+            title="Saved opportunities"
+            description="Scholarships you&apos;re tracking for deadlines and follow-up."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading saved opportunities.</p>
+            <div className="opportunity-list">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.saved.length > 0 ? (
             <div className="opportunity-list">
               {state.saved.map((item) => (
@@ -237,8 +269,8 @@ export function DashboardShell() {
                     {item.provider_name ?? "Provider not listed"} · {item.country_code}
                   </p>
                   <div className="dashboard-actions">
-                    <Link className="nav-link" href="/recommendations">
-                      Recommendation entry
+                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
+                      View details
                     </Link>
                     <button
                       className="auth-link auth-link--secondary"
@@ -252,49 +284,52 @@ export function DashboardShell() {
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No opportunities are saved yet. Use the published opportunities
-                section below to add a short list.
-              </p>
-            </div>
+            <EmptyState
+              title="No saved items"
+              description="Explore the catalog and save scholarships to track them here."
+              action={
+                <Link className="auth-link auth-link--primary" href="/scholarships">
+                  Browse catalog
+                </Link>
+              }
+            />
           )}
         </article>
       </section>
 
       <section className="surface-card">
         <PageHeader
-          eyebrow="Core entry points"
-          title="The dashboard links into the next MVP workflows."
-          description="Each section below reserves a concrete next action without turning the workspace into an analytics-heavy control center."
+          eyebrow="Next steps"
+          title="Continue your workflow"
+          description="Pick up where you left off across recommendations, writing, and interview practice."
         />
         <div className="dashboard-grid dashboard-grid--tight">
           <EntryCard
             href="/recommendations"
             label="Recommendations"
-            description="Open the recommendation workspace once profile-aware ranking is ready."
+            description="Review scholarship matches ranked by your profile."
           />
           <EntryCard
             href="/document-feedback"
-            label="Document tools"
-            description="Enter the bounded document-assistance flow with fact and guidance separation."
+            label="Documents"
+            description="Get structured feedback on application writing."
           />
           <EntryCard
             href="/interview"
-            label="Interview practice"
-            description="Open the text-first interview practice workflow."
+            label="Interview"
+            description="Practice responses with rubric-based scoring."
           />
         </div>
       </section>
 
       <section className="surface-card" data-testid="published-opportunities">
         <PageHeader
-          eyebrow="Published opportunities"
-          title="Use published scholarships as the save source."
-          description="This snapshot gives the dashboard a narrow, trustworthy save flow without adding a broader browse product prematurely."
+          eyebrow="Explore"
+          title="Recently published scholarships"
+          description="Quick access to new opportunities without leaving the dashboard."
         />
         {state.isLoading ? (
-          <p className="body-copy">Loading published opportunities.</p>
+          <p className="body-copy">Loading scholarships…</p>
         ) : state.published.length > 0 ? (
           <div className="opportunity-list">
             {state.published.map((item) => {
@@ -330,7 +365,7 @@ export function DashboardShell() {
                       }
                       type="button"
                     >
-                      {isSaved ? "Saved" : "Save opportunity"}
+                      {isSaved ? "Saved" : "Save"}
                     </button>
                   </div>
                 </article>
@@ -340,8 +375,7 @@ export function DashboardShell() {
         ) : (
           <div className="empty-panel">
             <p className="body-copy">
-              No published scholarships are currently available in the local
-              data set. The save flow is ready once curation publishes records.
+              No published scholarships in the current dataset. Check back as new records are added.
             </p>
           </div>
         )}
@@ -361,7 +395,6 @@ function EntryCard({
 }) {
   return (
     <article className="route-card">
-      <StatusBadge label="Workspace link" variant="planned" />
       <h3 className="route-card__title">{label}</h3>
       <p className="route-card__description">{description}</p>
       <Link className="nav-link" href={href}>

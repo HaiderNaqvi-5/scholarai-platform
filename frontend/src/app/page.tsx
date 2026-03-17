@@ -1,63 +1,78 @@
+import Link from "next/link";
+
 import { MarketingShell } from "@/components/layout/marketing-shell";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { appRoutes } from "@/lib/routes";
 
 export default function LandingPage() {
   return (
     <MarketingShell
-      eyebrow="Canada-first scholarship guidance"
-      title="ScholarAI helps students move from scattered research to confident application planning."
-      description="A restrained, data-first MVP for scholarship discovery, eligibility-aware recommendations, document feedback, and interview practice."
+      eyebrow="Scholarship planning"
+      title="Find the right scholarships. Know why they fit."
+      description="ScholarAI combines a curated Canada-first catalog with profile-aware recommendations and structured preparation tools."
+      actions={
+        <>
+          <Link className="auth-link auth-link--primary" href="/signup">
+            Get started
+          </Link>
+          <Link className="nav-link" href="/scholarships">
+            Browse scholarships
+          </Link>
+        </>
+      }
     >
-      <section className="hero-grid">
+      <section className="landing-hero fade-in fade-in-d1">
+        <div className="hero-trust-rail">
+          <article className="data-point">
+            <p className="data-point__label">Catalog</p>
+            <strong>Canada-first, MS-focused</strong>
+            <p className="body-copy">
+              Published scholarship records with verified deadlines, requirements, and funding details.
+            </p>
+          </article>
+          <article className="data-point">
+            <p className="data-point__label">Trust model</p>
+            <strong>Facts lead, guidance follows</strong>
+            <p className="body-copy">
+              Official scholarship data stays primary. Recommendations and writing help are clearly labeled as advisory.
+            </p>
+          </article>
+          <article className="data-point">
+            <p className="data-point__label">Scope</p>
+            <strong>Data Science, AI, Analytics</strong>
+            <p className="body-copy">
+              A focused corpus designed for depth over breadth, with Fulbright-related US coverage included.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="feature-grid fade-in fade-in-d2" id="how-it-works">
         <article className="surface-card">
-          <p className="section-eyebrow">Why this MVP exists</p>
-          <h2 className="section-title">Structured facts first, guidance second.</h2>
+          <p className="section-eyebrow">How it works</p>
+          <h2 className="section-title">A clear path from discovery to preparation.</h2>
           <p className="body-copy">
-            ScholarAI treats validated scholarship records as the source of truth,
-            then layers recommendations and preparation support on top.
+            ScholarAI is structured so each step narrows your attention instead of adding more tools to manage.
           </p>
         </article>
         <article className="surface-panel">
-          <p className="section-eyebrow">Core paths</p>
-          <ul className="stack-list">
-            <li>Discover scholarships in a Canada-first corpus</li>
-            <li>Review eligibility-aware recommendation lists</li>
-            <li>Improve documents with grounded feedback</li>
-            <li>Practice interviews with rubric-based guidance</li>
-          </ul>
+          <ol className="flow-list">
+            <li>Browse published scholarships with structured filters and visible data boundaries.</li>
+            <li>Save a profile so recommendations can explain why each opportunity fits.</li>
+            <li>Use writing and interview workspaces that keep coaching separate from official requirements.</li>
+          </ol>
         </article>
       </section>
-      <section className="surface-card">
-        <p className="section-eyebrow">Foundation routes</p>
-        <div className="route-grid">
-          {appRoutes.slice(1).map((route) => (
-            <article className="route-card" key={route.href}>
-              <div className="meta-row">
-                <StatusBadge
-                  label={route.status === "next" ? "Next slice" : route.status}
-                  variant={route.status === "active" ? "validated" : "planned"}
-                />
-              </div>
-              <h3 className="route-card__title">{route.label}</h3>
-              <p className="route-card__description">{route.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="split-panel">
+
+      <section className="split-panel fade-in fade-in-d3">
         <article className="data-callout">
-          <p className="list-label">Validated data</p>
+          <p className="list-label">Verified scholarship data</p>
           <p className="body-copy">
-            Published scholarship records, eligibility constraints, and
-            provenance-aware fields remain the authority for user-facing facts.
+            Requirements, deadlines, and funding come from published records. These are the facts you plan around.
           </p>
         </article>
         <article className="guidance-callout">
-          <p className="list-label">Generated guidance</p>
+          <p className="list-label">Advisory guidance</p>
           <p className="body-copy">
-            Recommendations, document feedback, and interview support remain
-            bounded overlays on top of validated data, not replacements for it.
+            Recommendations, writing feedback, and interview practice are layered on top and always labeled as generated.
           </p>
         </article>
       </section>

@@ -1,0 +1,107 @@
+"""
+Admin analytics and system health endpoints.
+
+Provides aggregate platform metrics for the admin dashboard:
+user counts, scholarship stats, application statuses, and recent ingestion health.
+"""
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.dependencies import AdminUser
+from app.models import (
+    Application,
+    ApplicationStatus,
+    DocumentRecord,
+    IngestionRun,
+    IngestionRunStatus,
+    InterviewSession,
+    Scholarship,
+    User,
+    UserRole,
+)
+from app.schemas.analytics import PlatformAnalyticsResponse
+
+router = APIRouter()
+
+
+@router.get("", response_model=PlatformAnalyticsResponse)
+async def get_platform_analytics(
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PlatformAnalyticsResponse:
+    """Return aggregate platform metrics for the admin dashboard."""
+
+    # ── User counts ───────────────────────────────────────────────────────
+    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    student_count = (
+        await db.execute(
+            select(func.count(User.id)).where(User.role == UserRole.STUDENT)
+        )
+    ).scalar() or 0
+    mentor_count = (
+        await db.execute(
+            select(func.count(User.id)).where(User.role == UserRole.MENTOR)
+        )
+    ).scalar() or 0
+    admin_count = (
+        await db.execute(
+            select(func.count(User.id)).where(User.role == UserRole.ADMIN)
+        )
+    ).scalar() or 0
+
+    # ── Scholarship counts ────────────────────────────────────────────────
+    total_scholarships = (
+        await db.execute(select(func.count(Scholarship.id)))
+    ).scalar() or 0
+
+    # ── Application counts ────────────────────────────────────────────────
+    total_applications = (
+        await db.execute(select(func.count(Application.id)))
+    ).scalar() or 0
+    submitted_applications = (
+        await db.execute(
+            select(func.count(Application.id)).where(
+                Application.status == ApplicationStatus.SUBMITTED
+            )
+        )
+    ).scalar() or 0
+
+    # ── Document counts ───────────────────────────────────────────────────
+    total_documents = (
+        await db.execute(select(func.count(DocumentRecord.id)))
+    ).scalar() or 0
+
+    # ── Interview session counts ──────────────────────────────────────────
+    total_interview_sessions = (
+        await db.execute(select(func.count(InterviewSession.id)))
+    ).scalar() or 0
+
+    # ── Ingestion health ──────────────────────────────────────────────────
+    total_runs = (
+        await db.execute(select(func.count(IngestionRun.id)))
+    ).scalar() or 0
+    failed_runs = (
+        await db.execute(
+            select(func.count(IngestionRun.id)).where(
+                IngestionRun.status == IngestionRunStatus.FAILED
+            )
+        )
+    ).scalar() or 0
+
+    return PlatformAnalyticsResponse(
+        total_users=total_users,
+        student_count=student_count,
+        mentor_count=mentor_count,
+        admin_count=admin_count,
+        total_scholarships=total_scholarships,
+        total_applications=total_applications,
+        submitted_applications=submitted_applications,
+        total_documents=total_documents,
+        total_interview_sessions=total_interview_sessions,
+        ingestion_runs_total=total_runs,
+        ingestion_runs_failed=failed_runs,
+    )

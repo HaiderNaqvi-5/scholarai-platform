@@ -45,8 +45,9 @@ Global scraping is explicitly disabled for the MVP timeline.
 - **Framework:** LangChain.
 
 ### 5. AI Mock Interview System
-- **Pipeline:** Speech Input → Whisper STT → LangChain LLM evaluation → Feedback Generation.
+- **Pipeline:** Speech/Text Input → Gemini 2.0 Flash (Multimodal) → Feedback Generation.
 - **Metrics Evaluated:** Answer clarity, content relevance, and confidence.
+- **Infrastructure Note:** Uses Google Gemini Free Tier for MVP to avoid local Whisper GPU requirements. Must upgrade to a paid API tier for production scaling.
 
 ### 6. Role-Based Dashboards
 - **Roles:** Student (discovery, interviews, tracking), Mentor (SOP reviews, feedback), and Admin (scraper health monitors, analytics).
@@ -62,7 +63,7 @@ Global scraping is explicitly disabled for the MVP timeline.
 | Databases | PostgreSQL (primary config), Neo4j (graph), pgvector |
 | Search Engine | OpenSearch |
 | Task Queue | Celery, Redis |
-| AI Processing | HuggingFace, LangChain, SHAP, LIME |
+| AI Processing | HuggingFace, LangChain, SHAP, LIME, Gemini 2.0 |
 | Scraping | Playwright, Browserless |
 | Containerization | Docker |
 
@@ -70,6 +71,7 @@ Global scraping is explicitly disabled for the MVP timeline.
 
 ## LLM Integration Strategy (via LangChain Router)
 
-- **Claude 3.5:** Long-form SOP review, deep analysis.
-- **GPT-4o:** Primary LangChain agent routing, complex logical reasoning, API integration.
-- **Gemini 1.5 Pro:** Unstructured data extraction, summarization, context-building.
+- **Gemini 2.0 Flash:** Primary multimodal engine for mock interviews (audio-to-text evaluation) and RAG document assistance.
+- **Claude 3.5 / GPT-4o (Deferred):** Optional future integrations for deep, long-form SOP review or complex logical routing.
+
+**Scaling Requirement:** The MVP relies on the Gemini API Free Tier (15 RPM limits). To deploy for a wider student body, the project must migrate to a paid Google AI Studio or Vertex AI billing account.

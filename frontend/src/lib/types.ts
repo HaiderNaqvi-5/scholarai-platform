@@ -35,26 +35,47 @@ export type ScholarshipListItem = {
   record_state: "published";
 };
 
+export type ScholarshipAppliedFilters = {
+  country_code: string | null;
+  query: string | null;
+  field_tag: string | null;
+  degree_level: string | null;
+  provider: string | null;
+  funding_type: string | null;
+  min_amount: number | null;
+  max_amount: number | null;
+  has_deadline: boolean | null;
+  deadline_within_days: number | null;
+  deadline_after: string | null;
+  deadline_before: string | null;
+  sort: "deadline" | "title" | "recent";
+};
+
 export type ScholarshipListResponse = {
   items: ScholarshipListItem[];
   total: number;
-  applied_country_code: string | null;
-  applied_query: string | null;
-  applied_field_tag: string | null;
-  applied_degree_level: string | null;
-  applied_deadline_within_days: number | null;
-  applied_sort: "deadline" | "title" | "recent";
+  page: number;
+  page_size: number;
+  has_more: boolean;
+  applied_filters: ScholarshipAppliedFilters;
 };
 
 export type ScholarshipDetail = ScholarshipListItem & {
   summary: string | null;
   funding_summary: string | null;
+  funding_type: string | null;
+  funding_amount_min: number | null;
+  funding_amount_max: number | null;
   source_url: string;
   field_tags: string[];
   degree_levels: string[];
   citizenship_rules: string[];
   min_gpa_value: number | null;
   source_document_ref: string | null;
+  requirement_summary: string[];
+  last_validated_at: string | null;
+  published_at: string | null;
+  publication_hint: string;
 };
 
 export type SavedOpportunityItem = ScholarshipListItem & {
@@ -74,6 +95,7 @@ export type RecommendationItem = ScholarshipListItem & {
   constraint_notes: string[];
   top_reasons: string[];
   warnings: string[];
+  shap_explanation?: Record<string, number> | null;
 };
 
 export type RecommendationListResponse = {
@@ -293,4 +315,36 @@ export type ApiError = {
   message: string;
   request_id?: string;
   status: number;
+};
+
+export type MentorFeedbackRequest = {
+  summary: string;
+  strengths: string[];
+  revision_priorities: string[];
+  caution_notes: string[];
+};
+
+export type MentorFeedbackResponse = {
+  id: string;
+  document_id: string;
+  mentor_id: string;
+  summary: string;
+  strengths: string[];
+  revision_priorities: string[];
+  caution_notes: string[];
+  submitted_at: string | null;
+};
+
+export type PlatformAnalyticsResponse = {
+  total_users: number;
+  student_count: number;
+  mentor_count: number;
+  admin_count: number;
+  total_scholarships: number;
+  total_applications: number;
+  submitted_applications: number;
+  total_documents: number;
+  total_interview_sessions: number;
+  ingestion_runs_total: number;
+  ingestion_runs_failed: number;
 };

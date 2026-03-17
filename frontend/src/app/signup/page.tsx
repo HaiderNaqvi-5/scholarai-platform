@@ -18,7 +18,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = searchParams.get("next") ?? "/onboarding";
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -28,9 +28,9 @@ export default function SignupPage() {
 
   return (
     <MarketingShell
-      eyebrow="Account setup"
-      title="Create the smallest account needed to save opportunities and use the dashboard."
-      description="ScholarAI keeps this slice intentionally lean: name, email, password, then direct entry into the authenticated workspace."
+      eyebrow="Create account"
+      title="Get started with ScholarAI."
+      description="Set up takes less than a minute, then you can jump straight to profile and recommendations."
     >
       <section className="auth-grid">
         <form
@@ -93,14 +93,13 @@ export default function SignupPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">Why this exists</p>
-          <h2 className="section-title">Saved opportunities need an account owner.</h2>
+          <p className="section-eyebrow">Already have an account?</p>
+          <h2 className="section-title">Pick up where you left off.</h2>
           <p className="body-copy">
-            Authentication is added here only because saved opportunities and
-            the dashboard shell require a stable user identity.
+            Your shortlist, profile, and preparation work are waiting for you.
           </p>
           <Link className="nav-link" href="/login">
-            Already have an account?
+            Sign in
           </Link>
         </article>
       </section>

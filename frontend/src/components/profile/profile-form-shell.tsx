@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
 import type { ApiError, StudentProfile } from "@/lib/types";
@@ -32,7 +31,13 @@ const DEFAULT_PROFILE: StudentProfile = {
   language_test_score: 7.5,
 };
 
-export function ProfileFormShell() {
+type ProfileFormShellProps = {
+  mode?: "onboarding" | "profile";
+};
+
+export function ProfileFormShell({
+  mode = "profile",
+}: ProfileFormShellProps) {
   const router = useRouter();
   const { accessToken } = useAuth();
   const [form, setForm] = useState<StudentProfile>(DEFAULT_PROFILE);
@@ -67,7 +72,9 @@ export function ProfileFormShell() {
               existing.language_test_score ?? DEFAULT_PROFILE.language_test_score,
           });
           setMessage(
-            "Loaded your saved profile. You can adjust it before rerunning recommendations.",
+            mode === "onboarding"
+              ? "Your profile is already on file. Adjust anything before continuing."
+              : "Profile loaded. Make changes and save when ready.",
           );
         }
       } catch (caught) {
@@ -87,12 +94,12 @@ export function ProfileFormShell() {
     return () => {
       isActive = false;
     };
-  }, [accessToken]);
+  }, [accessToken, mode]);
 
   const helperNote = useMemo(() => {
     return form.target_country_code === "US"
-      ? "US recommendations stay limited to Fulbright-related published records in this MVP."
-      : "Canada remains the main MVP target, so the seeded demo set is strongest here.";
+      ? "US coverage is limited to Fulbright-related opportunities."
+      : "Canada has the strongest coverage in the current catalog.";
   }, [form.target_country_code]);
 
   const handleChange = (name: keyof StudentProfile, value: string) => {
@@ -126,7 +133,7 @@ export function ProfileFormShell() {
           target_degree_level: "MS",
         }),
       });
-      setMessage("Profile saved. Redirecting to the recommendation workspace.");
+      setMessage("Profile saved. Opening recommendations.");
       router.push("/recommendations");
     } catch (caught) {
       setError((caught as ApiError).message);
@@ -137,175 +144,178 @@ export function ProfileFormShell() {
 
   return (
     <AppShell
-      eyebrow="Profile input"
-      title="Save the narrow profile contract that drives the seeded recommendation demo."
-      description="This form stays intentionally close to the backend schema so eligibility logic remains deterministic, inspectable, and easy to demo."
-    >
-      <section className="page-grid">
-        <article className="surface-card">
-          <PageHeader
-            eyebrow="Profile contract"
-            title="Profile inputs stay narrow and recommendation-focused."
-            description="The seeded demo dataset covers Canada-first MS Data Science, AI, and Analytics paths, plus Fulbright-related US scope only."
+      eyebrow={mode === "onboarding" ? "Get started" : "Profile"}
+      title={
+        mode === "onboarding"
+          ? "Tell us the essentials so we can find scholarships that fit."
+          : "Keep your profile current for better recommendations."
+      }
+      description={
+        mode === "onboarding"
+          ? "Five fields are all we need to build your first personalized shortlist."
+          : "Changes here update how scholarships are ranked and explained."
+      }
+      intro={
+        <div className="meta-row">
+          <StatusBadge
+            label={mode === "onboarding" ? "First-run setup" : "Editable profile"}
+            variant={mode === "onboarding" ? "validated" : "neutral"}
           />
-          <div className="surface-list">
-            <article>
-              <p className="list-heading">Recommendation inputs</p>
-              <p className="body-copy">
-                Citizenship, GPA, target country, target field, and optional language evidence are enough for the current deterministic filters.
-              </p>
-            </article>
-            <article>
-              <p className="list-heading">Source-of-truth rule</p>
-              <p className="body-copy">
-                Recommendations will only use published scholarship records. Raw and validated records stay inside the curator workflow.
-              </p>
-            </article>
-          </div>
-        </article>
+          <span className="body-copy">{helperNote}</span>
+        </div>
+      }
+    >
+      {message ? (
+        <section className="info-band">
+          <p className="body-copy">{message}</p>
+        </section>
+      ) : null}
 
-        <article className="surface-panel">
-          <div className="meta-row">
-            <StatusBadge label="Seeded demo ready" variant="validated" />
-            <StatusBadge label="Rules-first" variant="generated" />
-          </div>
-          <p className="body-copy">{helperNote}</p>
-          {message ? <p className="field-note">{message}</p> : null}
-          {error ? <p className="form-error">{error}</p> : null}
-        </article>
-      </section>
+      {error ? (
+        <section className="surface-card">
+          <p className="form-error">{error}</p>
+        </section>
+      ) : null}
 
-      <section className="surface-card">
-        <PageHeader
-          eyebrow="Profile form"
-          title="Save your profile, then move directly into recommendations."
-          description="The MVP keeps this form short on purpose so the browser demo reaches the recommendation page without a long intake wizard."
-        />
+      <section className="surface-card" data-testid="profile-form-shell">
         {isLoading ? (
-          <p className="body-copy">Loading your saved profile.</p>
+          <p className="body-copy">Loading your profile…</p>
         ) : (
           <form
-            className="auth-form"
+            className="profile-form"
             data-testid="profile-form"
             onSubmit={handleSubmit}
           >
-            <div className="form-grid">
-              <label className="form-field">
-                <span className="form-field__label">Citizenship country</span>
-                <input
-                  className="text-input"
-                  maxLength={2}
-                  name="citizenship_country_code"
-                  onChange={(event) =>
-                    handleChange(
-                      "citizenship_country_code",
-                      event.target.value.toUpperCase(),
-                    )
-                  }
-                  required
-                  value={form.citizenship_country_code}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Academic direction</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Target country</span>
+                  <select
+                    className="text-input"
+                    name="target_country_code"
+                    onChange={(event) =>
+                      handleChange("target_country_code", event.target.value)
+                    }
+                    value={form.target_country_code}
+                  >
+                    {COUNTRY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Target country</span>
-                <select
-                  className="text-input"
-                  name="target_country_code"
-                  onChange={(event) =>
-                    handleChange("target_country_code", event.target.value)
-                  }
-                  value={form.target_country_code}
-                >
-                  {COUNTRY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">Target field</span>
+                  <select
+                    className="text-input"
+                    name="target_field"
+                    onChange={(event) => handleChange("target_field", event.target.value)}
+                    value={form.target_field}
+                  >
+                    {FIELD_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Target field</span>
-                <select
-                  className="text-input"
-                  name="target_field"
-                  onChange={(event) => handleChange("target_field", event.target.value)}
-                  value={form.target_field}
-                >
-                  {FIELD_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">Degree level</span>
+                  <input
+                    className="text-input"
+                    disabled
+                    name="target_degree_level"
+                    value={form.target_degree_level}
+                  />
+                </label>
+              </div>
+            </section>
 
-              <label className="form-field">
-                <span className="form-field__label">Degree level</span>
-                <input
-                  className="text-input"
-                  disabled
-                  name="target_degree_level"
-                  value={form.target_degree_level}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Eligibility</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Citizenship country</span>
+                  <input
+                    className="text-input"
+                    maxLength={2}
+                    name="citizenship_country_code"
+                    onChange={(event) =>
+                      handleChange(
+                        "citizenship_country_code",
+                        event.target.value.toUpperCase(),
+                      )
+                    }
+                    required
+                    value={form.citizenship_country_code}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">GPA value</span>
-                <input
-                  className="text-input"
-                  min="0"
-                  name="gpa_value"
-                  onChange={(event) => handleChange("gpa_value", event.target.value)}
-                  required
-                  step="0.01"
-                  type="number"
-                  value={form.gpa_value ?? ""}
-                />
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">GPA</span>
+                  <input
+                    className="text-input"
+                    min="0"
+                    name="gpa_value"
+                    onChange={(event) => handleChange("gpa_value", event.target.value)}
+                    required
+                    step="0.01"
+                    type="number"
+                    value={form.gpa_value ?? ""}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">GPA scale</span>
-                <input
-                  className="text-input"
-                  min="1"
-                  name="gpa_scale"
-                  onChange={(event) => handleChange("gpa_scale", event.target.value)}
-                  required
-                  step="0.1"
-                  type="number"
-                  value={form.gpa_scale}
-                />
-              </label>
+                <label className="form-field">
+                  <span className="form-field__label">GPA scale</span>
+                  <input
+                    className="text-input"
+                    min="1"
+                    name="gpa_scale"
+                    onChange={(event) => handleChange("gpa_scale", event.target.value)}
+                    required
+                    step="0.1"
+                    type="number"
+                    value={form.gpa_scale}
+                  />
+                </label>
+              </div>
+            </section>
 
-              <label className="form-field">
-                <span className="form-field__label">Language test type</span>
-                <input
-                  className="text-input"
-                  name="language_test_type"
-                  onChange={(event) =>
-                    handleChange("language_test_type", event.target.value)
-                  }
-                  value={form.language_test_type ?? ""}
-                />
-              </label>
+            <section className="form-section">
+              <p className="route-card__label">Language (optional)</p>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span className="form-field__label">Test type</span>
+                  <input
+                    className="text-input"
+                    name="language_test_type"
+                    onChange={(event) =>
+                      handleChange("language_test_type", event.target.value)
+                    }
+                    value={form.language_test_type ?? ""}
+                  />
+                </label>
 
-              <label className="form-field">
-                <span className="form-field__label">Language test score</span>
-                <input
-                  className="text-input"
-                  min="0"
-                  name="language_test_score"
-                  onChange={(event) =>
-                    handleChange("language_test_score", event.target.value)
-                  }
-                  step="0.1"
-                  type="number"
-                  value={form.language_test_score ?? ""}
-                />
-              </label>
-            </div>
+                <label className="form-field">
+                  <span className="form-field__label">Score</span>
+                  <input
+                    className="text-input"
+                    min="0"
+                    name="language_test_score"
+                    onChange={(event) =>
+                      handleChange("language_test_score", event.target.value)
+                    }
+                    step="0.1"
+                    type="number"
+                    value={form.language_test_score ?? ""}
+                  />
+                </label>
+              </div>
+            </section>
 
             <div className="dashboard-actions">
               <button
@@ -313,7 +323,11 @@ export function ProfileFormShell() {
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Saving profile" : "Save profile and continue"}
+                {isSubmitting
+                  ? "Saving…"
+                  : mode === "onboarding"
+                    ? "Save and view recommendations"
+                    : "Save profile"}
               </button>
             </div>
           </form>

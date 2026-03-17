@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from app.core.database import Base
 
@@ -27,6 +28,7 @@ def enum_values(enum_cls: type[enum.StrEnum]) -> list[str]:
 class UserRole(enum.StrEnum):
     STUDENT = "student"
     ADMIN = "admin"
+    MENTOR = "mentor"
 
 
 class DegreeLevel(enum.StrEnum):
@@ -68,6 +70,7 @@ class ApplicationStatus(enum.StrEnum):
 class DocumentType(enum.StrEnum):
     SOP = "sop"
     ESSAY = "essay"
+    CV = "cv"
 
 
 class DocumentInputMethod(enum.StrEnum):
@@ -301,6 +304,9 @@ class Scholarship(Base):
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    funding_amount_max: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     source_url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     source_document_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     field_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
@@ -358,11 +364,17 @@ class Scholarship(Base):
         back_populates="scholarship",
         cascade="all, delete-orphan",
     )
+    chunks: Mapped[list["ScholarshipChunk"]] = relationship(
+        "ScholarshipChunk",
+        back_populates="scholarship",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_scholarships_record_state", "record_state"),
         Index("ix_scholarships_country_code", "country_code"),
         Index("ix_scholarships_deadline_at", "deadline_at"),
+        Index("ix_scholarships_funding_type", "funding_type"),
     )
 
 
@@ -398,6 +410,38 @@ class ScholarshipRequirement(Base):
     )
 
     __table_args__ = (Index("ix_scholarship_requirements_type", "requirement_type"),)
+
+
+class ScholarshipChunk(Base):
+    __tablename__ = "scholarship_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    scholarship_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(768), nullable=True) # 768 for sentence-transformers
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    scholarship: Mapped["Scholarship"] = relationship(
+        "Scholarship",
+        back_populates="chunks",
+    )
+
+    __table_args__ = (
+        Index("ix_scholarship_chunks_embedding", "embedding", postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
+    )
 
 
 class Application(Base):

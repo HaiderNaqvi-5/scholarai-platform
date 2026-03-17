@@ -10,13 +10,13 @@ export function AuthActions() {
   const { currentUser, isAuthenticated, isLoading, logout } = useAuth();
 
   if (isLoading) {
-    return <div className="auth-actions" />;
+    return <div className="auth-actions auth-actions--loading" />;
   }
 
   if (!isAuthenticated) {
     return (
       <div className="auth-actions">
-        <Link className="nav-link" href="/login">
+        <Link className="nav-link nav-link--quiet" href="/login">
           Sign in
         </Link>
         <Link className="auth-link auth-link--primary" href="/signup">
@@ -30,13 +30,13 @@ export function AuthActions() {
     <div className="auth-actions">
       <div className="auth-chip">
         <span className="auth-chip__label">Signed in</span>
-        <strong>{currentUser?.full_name}</strong>
+        <strong>{currentUser?.full_name ?? "ScholarAI user"}</strong>
       </div>
-      <Link className="nav-link" href="/dashboard">
+      <Link className="nav-link nav-link--quiet" href="/dashboard">
         Dashboard
       </Link>
       {currentUser?.role === "admin" ? (
-        <Link className="nav-link" href="/curation">
+        <Link className="nav-link nav-link--quiet" href="/curation">
           Curation
         </Link>
       ) : null}

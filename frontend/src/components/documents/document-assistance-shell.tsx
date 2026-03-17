@@ -4,6 +4,8 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -43,9 +45,7 @@ export function DocumentAssistanceShell() {
   });
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     let isActive = true;
 
@@ -55,9 +55,7 @@ export function DocumentAssistanceShell() {
         const response = await apiRequest<DocumentListResponse>("/documents", {
           token: accessToken,
         });
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
 
         if (response.items.length === 0) {
           setState((current) => ({
@@ -77,9 +75,7 @@ export function DocumentAssistanceShell() {
           ),
         );
 
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
 
         setState((current) => ({
           ...current,
@@ -88,9 +84,7 @@ export function DocumentAssistanceShell() {
           selectedId: current.selectedId ?? detailResponses[0]?.id ?? null,
         }));
       } catch (error) {
-        if (!isActive) {
-          return;
-        }
+        if (!isActive) return;
         setState((current) => ({
           ...current,
           isLoading: false,
@@ -118,9 +112,7 @@ export function DocumentAssistanceShell() {
   };
 
   const handleSubmit = async () => {
-    if (!accessToken) {
-      return;
-    }
+    if (!accessToken) return;
 
     const clientError = validateClientSubmission(inputMethod, contentText, file);
     if (clientError) {
@@ -133,15 +125,9 @@ export function DocumentAssistanceShell() {
 
     const formData = new FormData();
     formData.append("document_type", documentType);
-    if (title.trim()) {
-      formData.append("title", title.trim());
-    }
-    if (inputMethod === "text") {
-      formData.append("content_text", contentText.trim());
-    }
-    if (inputMethod === "file" && file) {
-      formData.append("file", file);
-    }
+    if (title.trim()) formData.append("title", title.trim());
+    if (inputMethod === "text") formData.append("content_text", contentText.trim());
+    if (inputMethod === "file" && file) formData.append("file", file);
 
     try {
       const response = await apiRequest<DocumentSubmissionResponse>("/documents", {
@@ -177,9 +163,7 @@ export function DocumentAssistanceShell() {
   };
 
   const handleRefreshFeedback = async () => {
-    if (!accessToken || !selectedDocument) {
-      return;
-    }
+    if (!accessToken || !selectedDocument) return;
 
     setState((current) => ({ ...current, isRefreshing: true, error: null }));
     try {
@@ -209,42 +193,28 @@ export function DocumentAssistanceShell() {
 
   return (
     <AppShell
-      title="Document assistance stays text-first, grounded, and visibly separate from validated scholarship facts."
-      description="This slice adds SOP and essay submission, a minimal processing pipeline, and structured feedback panels without introducing full RAG, full editor workflows, or document-management sprawl."
-      eyebrow="Document assistance"
+      title="Get structured feedback on your application writing."
+      description="Submit a draft and receive bounded, advisory writing guidance."
+      eyebrow="Documents"
+      intro={
+        <div className="meta-row">
+          <StatusBadge label="Advisory feedback" variant="generated" />
+          <StatusBadge label="Facts stay separate" variant="validated" />
+        </div>
+      }
     >
-      <section className="document-hero" data-testid="document-assistance-shell">
-        <div>
-          <p className="section-eyebrow">Submission flow</p>
-          <h2 className="section-title">
-            Submit one draft, get one bounded guidance pass, and keep the feedback traceable.
-          </h2>
-          <p className="body-copy">
-            Generated feedback remains advisory. Official scholarship rules,
-            deadlines, and eligibility constraints still come from validated
-            scholarship records elsewhere in the product.
-          </p>
-        </div>
-        <div className="document-hero__badges">
-          <StatusBadge label="Generated guidance" variant="generated" />
-          <StatusBadge label="Validated facts stay separate" variant="validated" />
-        </div>
-      </section>
-
       {state.error ? (
         <section className="surface-card" data-testid="document-error">
-          <p className="section-eyebrow">Document assistance error</p>
-          <h2 className="section-title">The document flow needs attention.</h2>
-          <p className="body-copy">{state.error}</p>
+          <p className="form-error">{state.error}</p>
         </section>
       ) : null}
 
-      <section className="document-grid">
+      <section className="document-grid" data-testid="document-assistance-shell">
         <article className="surface-card">
           <PageHeader
-            eyebrow="Submit draft"
-            title="Paste text or upload a plain-text file"
-            description="Keep the MVP input narrow and explicit. `.txt` and `.md` uploads are supported because they keep extraction risk and runtime cost low."
+            eyebrow="Submit"
+            title="Upload or paste your draft"
+            description="One draft at a time for focused feedback."
           />
 
           <div className="toggle-row">
@@ -297,7 +267,7 @@ export function DocumentAssistanceShell() {
               </label>
 
               <label className="form-field">
-                <span className="form-field__label">Draft title</span>
+                <span className="form-field__label">Title</span>
                 <input
                   className="text-input"
                   maxLength={255}
@@ -311,22 +281,22 @@ export function DocumentAssistanceShell() {
 
             {inputMethod === "text" ? (
               <label className="form-field">
-                <span className="form-field__label">Document text</span>
+                <span className="form-field__label">Draft text</span>
                 <textarea
                   className="text-area"
                   name="content_text"
                   onChange={(event) => setContentText(event.target.value)}
-                  placeholder="Paste your SOP or essay draft here. Keep it to one focused draft for the MVP flow."
+                  placeholder="Paste your SOP or essay draft here."
                   rows={14}
                   value={contentText}
                 />
                 <span className="field-note">
-                  Minimum 50 characters. Maximum 12,000 characters.
+                  50–12,000 characters.
                 </span>
               </label>
             ) : (
               <label className="form-field">
-                <span className="form-field__label">Upload plain-text draft</span>
+                <span className="form-field__label">Upload draft</span>
                 <input
                   accept=".txt,.md,text/plain,text/markdown"
                   className="file-input"
@@ -334,11 +304,9 @@ export function DocumentAssistanceShell() {
                   onChange={handleFileChange}
                   type="file"
                 />
-                <span className="field-note">
-                  Use UTF-8 `.txt` or `.md` files under 512KB.
-                </span>
+                <span className="field-note">UTF-8 .txt or .md under 512KB.</span>
                 {file ? (
-                  <span className="field-note">Selected file: {file.name}</span>
+                  <span className="field-note">Selected: {file.name}</span>
                 ) : null}
               </label>
             )}
@@ -351,23 +319,23 @@ export function DocumentAssistanceShell() {
                 disabled={state.isSubmitting}
                 type="submit"
               >
-                {state.isSubmitting ? "Processing draft" : "Submit for feedback"}
+                {state.isSubmitting ? "Processing…" : "Submit for feedback"}
               </button>
-              <p className="field-note">
-                Feedback is generated from your draft and a bounded writing checklist.
-              </p>
             </div>
           </form>
         </article>
 
         <article className="surface-panel">
           <PageHeader
-            eyebrow="Recent drafts"
-            title="Submitted document records"
-            description="This is a narrow working set, not a full document-management system."
+            eyebrow="History"
+            title="Recent drafts"
+            description="Select a draft to view its feedback."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading recent document records.</p>
+            <div className="surface-list">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.items.length > 0 ? (
             <div className="document-list">
               {state.items.map((item) => (
@@ -400,18 +368,16 @@ export function DocumentAssistanceShell() {
                   </div>
                   <h3 className="route-card__title">{item.title}</h3>
                   <p className="route-card__description">
-                    {item.document_type.toUpperCase()} · {item.input_method} input
+                    {item.document_type.toUpperCase()} · {item.input_method}
                   </p>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No drafts have been submitted yet. Start with one SOP or essay
-                draft to open the feedback panel.
-              </p>
-            </div>
+            <EmptyState
+              title="No drafts submitted"
+              description="Upload your first statement of purpose or scholarship essay for structured feedback."
+            />
           )}
         </article>
       </section>
@@ -419,21 +385,20 @@ export function DocumentAssistanceShell() {
       <section className="document-grid">
         <article className="surface-card" data-testid="document-feedback-result">
           <PageHeader
-            eyebrow="Feedback result"
-            title="Structured guidance"
-            description="The result is intentionally structured so users can separate suggested edits from factual scholarship constraints."
+            eyebrow="Feedback"
+            title="Writing guidance"
+            description="Structured feedback on strengths, revisions, and cautions."
           />
           {!selectedDocument ? (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Submit a draft to populate the feedback view.
-              </p>
-            </div>
+            <EmptyState
+              title="No draft selected"
+              description="Submit or select a draft to see feedback here."
+            />
           ) : selectedDocument.latest_feedback ? (
             <div className="surface-list">
               <article>
                 <div className="meta-row">
-                  <StatusBadge label="Generated guidance" variant="generated" />
+                  <StatusBadge label="Generated" variant="generated" />
                   <StatusBadge
                     label={formatStatus(selectedDocument.processing_status)}
                     variant="validated"
@@ -458,7 +423,7 @@ export function DocumentAssistanceShell() {
                 </ul>
               </article>
               <article>
-                <p className="list-heading">Caution notes</p>
+                <p className="list-heading">Cautions</p>
                 <ul className="detail-list">
                   {selectedDocument.latest_feedback.caution_notes.map((item) => (
                     <li key={item}>{item}</li>
@@ -472,24 +437,23 @@ export function DocumentAssistanceShell() {
                   onClick={() => void handleRefreshFeedback()}
                   type="button"
                 >
-                  {state.isRefreshing ? "Refreshing feedback" : "Refresh feedback"}
+                  {state.isRefreshing ? "Refreshing…" : "Refresh feedback"}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Feedback is not ready yet for this draft.
-              </p>
-            </div>
+            <EmptyState
+              title="Analyzing draft"
+              description="Feedback is currently being generated. Check back shortly."
+            />
           )}
         </article>
 
         <article className="surface-panel">
           <PageHeader
-            eyebrow="Grounding and limits"
-            title="Why this feedback is bounded"
-            description="The MVP should be explicit about what this slice does not do."
+            eyebrow="Context"
+            title="About this feedback"
+            description="Writing guidance is advisory. Official scholarship requirements live in published records."
           />
           {selectedDocument?.latest_feedback ? (
             <div className="surface-list">
@@ -510,25 +474,16 @@ export function DocumentAssistanceShell() {
                 </ul>
               </article>
               <article className="guidance-callout">
-                <p className="list-heading">Limitation notice</p>
+                <p className="list-heading">Limitation</p>
                 <p className="body-copy">
                   {selectedDocument.latest_feedback.limitation_notice}
-                </p>
-              </article>
-              <article className="data-callout">
-                <p className="list-heading">Validated facts remain elsewhere</p>
-                <p className="body-copy">
-                  Use published scholarship records for official requirements,
-                  deadlines, and eligibility logic. This panel does not replace
-                  those sources.
                 </p>
               </article>
             </div>
           ) : (
             <div className="empty-panel">
               <p className="body-copy">
-                The limits panel will populate after the first successful
-                feedback response.
+                Context will appear after the first feedback response.
               </p>
             </div>
           )}
@@ -551,22 +506,16 @@ function validateClientSubmission(
   }
 
   if (!file) {
-    return "Select a `.txt` or `.md` file before requesting feedback.";
+    return "Select a .txt or .md file before requesting feedback.";
   }
 
   return null;
 }
 
 function formatStatus(status: string) {
-  if (status === "completed") {
-    return "Feedback ready";
-  }
-  if (status === "processing") {
-    return "Processing";
-  }
-  if (status === "failed") {
-    return "Needs retry";
-  }
+  if (status === "completed") return "Feedback ready";
+  if (status === "processing") return "Processing";
+  if (status === "failed") return "Needs retry";
   return "Submitted";
 }
 

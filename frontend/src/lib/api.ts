@@ -1,4 +1,11 @@
-import type { ApiError } from "@/lib/types";
+import type {
+  ApiError,
+  DocumentListResponse,
+  DocumentDetail,
+  MentorFeedbackRequest,
+  MentorFeedbackResponse,
+  PlatformAnalyticsResponse,
+} from "@/lib/types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
@@ -70,4 +77,31 @@ async function parseError(response: Response): Promise<ApiError> {
     message,
     status: response.status,
   };
+}
+
+export async function getMentorPendingReviews(token?: string | null) {
+  return apiRequest<DocumentListResponse>("/mentor/pending-reviews", { token });
+}
+
+export async function getMentorDocument(documentId: string, token?: string | null) {
+  return apiRequest<DocumentDetail>(`/mentor/documents/${documentId}`, { token });
+}
+
+export async function submitMentorFeedback(
+  documentId: string,
+  feedback: MentorFeedbackRequest,
+  token?: string | null,
+) {
+  return apiRequest<MentorFeedbackResponse>(
+    `/mentor/documents/${documentId}/feedback`,
+    {
+      method: "POST",
+      body: JSON.stringify(feedback),
+      token,
+    },
+  );
+}
+
+export async function getAdminAnalytics(token?: string | null) {
+  return apiRequest<PlatformAnalyticsResponse>("/analytics", { token });
 }

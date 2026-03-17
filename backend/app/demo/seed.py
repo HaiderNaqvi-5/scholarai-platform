@@ -118,6 +118,9 @@ class DemoSeedService:
         scholarship.country_code = payload["country_code"]
         scholarship.summary = payload["summary"]
         scholarship.funding_summary = payload["funding_summary"]
+        scholarship.funding_type = payload.get("funding_type")
+        scholarship.funding_amount_min = payload.get("funding_amount_min")
+        scholarship.funding_amount_max = payload.get("funding_amount_max")
         scholarship.source_url = payload["source_url"]
         scholarship.source_document_ref = payload["source_document_ref"]
         scholarship.field_tags = list(payload["field_tags"])

@@ -98,7 +98,7 @@ class DocumentService:
 
         try:
             document.processing_status = DocumentProcessingStatus.PROCESSING
-            payload = self._generate_feedback_payload(document)
+            payload = await self._generate_feedback_payload(document)
             completed_at = datetime.now(timezone.utc)
             feedback = DocumentFeedback(
                 document_id=document.id,
@@ -137,7 +137,7 @@ class DocumentService:
     ) -> DocumentDetailResponse:
         document = await self._load_document(user_id, document_id)
         document.processing_status = DocumentProcessingStatus.PROCESSING
-        payload = self._generate_feedback_payload(document)
+        payload = await self._generate_feedback_payload(document)
         completed_at = datetime.now(timezone.utc)
         feedback = DocumentFeedback(
             document_id=document.id,
@@ -235,8 +235,19 @@ class DocumentService:
             len(raw_bytes),
         )
 
-    def _generate_feedback_payload(self, document: DocumentRecord) -> dict:
+    async def _generate_feedback_payload(self, document: DocumentRecord) -> dict:
         text = document.content_text.strip()
+        
+        try:
+            import os
+            if os.environ.get("GOOGLE_API_KEY"):
+                from app.services.documents.retriever import DocumentEvaluator
+                evaluator = DocumentEvaluator(self.db)
+                return await evaluator.evaluate_document(text)
+        except Exception as e:
+            print(f"RAG Evaluation failed, falling back to rules: {e}")
+
+        # Fallback to rules-based processing
         word_count = len(text.split())
         paragraphs = [chunk.strip() for chunk in text.split("\n\n") if chunk.strip()]
         lower_text = text.lower()

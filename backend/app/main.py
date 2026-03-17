@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.exceptions import SQLAlchemyError
 
 from app.api.v1 import router as api_v1_router
 from app.core.config import settings
@@ -70,6 +71,18 @@ def create_app() -> FastAPI:
             status_code=422,
             code="REQUEST_VALIDATION_ERROR",
             message=message,
+        )
+
+    @app.exception_handler(SQLAlchemyError)
+    async def handle_database_exception(
+        request: Request,
+        exc: SQLAlchemyError,
+    ) -> JSONResponse:
+        return build_error_response(
+            request=request,
+            status_code=503,
+            code="DATABASE_ERROR",
+            message="Database availability issue. Please retry shortly.",
         )
 
     @app.exception_handler(Exception)

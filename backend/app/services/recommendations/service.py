@@ -3,12 +3,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
 from app.schemas.recommendations import RecommendationItem
-from app.services.recommendations.eligibility import MatchEvaluation, evaluate_match
+from app.services.recommendations.eligibility import MatchEvaluation, evaluate_match, normalize_gpa
+import os
 
 
 class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        
+        # Load XGBoost Explainer
+        model_path = os.path.join(os.path.dirname(__file__), "../../../models/xgboost_model.json")
+        try:
+            from ai_services.evaluation.explainer import ShapExplainer
+            self.explainer = ShapExplainer(model_path)
+        except Exception as e:
+            print(f"Warning: Failed to load SHAP Explainer: {e}")
+            self.explainer = None
 
     async def build_for_profile(
         self,
@@ -28,7 +38,31 @@ class RecommendationService:
             if evaluation is None:
                 continue
 
-            fit_band = _fit_band(evaluation.score)
+            fit_score = evaluation.score
+            shap_output = None
+            
+            # Stage 3: XGBoost Reranking if explainer is loaded and GPA exists
+            if self.explainer and profile.gpa_value:
+                gpa = normalize_gpa(profile.gpa_value, profile.gpa_scale) or 3.2
+                ielts = profile.ielts_score or 7.0
+                research = profile.research_score or 5.0
+                volunteer = profile.volunteer_score or 2.0
+                match_val = 8.0 if evaluation.score > 0.6 else 4.0
+                
+                try:
+                    explanation = self.explainer.explain_prediction({
+                        "gpa": gpa,
+                        "ielts_score": ielts,
+                        "research_score": research,
+                        "volunteer_score": volunteer,
+                        "program_match_score": match_val,
+                    })
+                    fit_score = explanation["prediction_probability"]
+                    shap_output = explanation["contributions"]
+                except Exception:
+                    pass
+
+            fit_band = _fit_band(fit_score)
             recommendations.append(
                 RecommendationItem(
                     scholarship_id=str(scholarship.id),
@@ -37,13 +71,14 @@ class RecommendationService:
                     country_code=scholarship.country_code,
                     deadline_at=scholarship.deadline_at,
                     record_state=scholarship.record_state.value,
-                    estimated_fit_score=evaluation.score,
+                    estimated_fit_score=fit_score,
                     fit_band=fit_band,
                     match_summary=_build_match_summary(fit_band, evaluation),
                     matched_criteria=evaluation.matched_criteria,
                     constraint_notes=evaluation.constraint_notes,
                     top_reasons=evaluation.matched_criteria[:3],
                     warnings=evaluation.constraint_notes,
+                    shap_explanation=shap_output,
                 )
             )
 

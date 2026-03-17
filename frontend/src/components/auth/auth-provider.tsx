@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
@@ -38,7 +39,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
@@ -97,13 +98,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    
+    if (storedToken && !accessToken) setAccessToken(storedToken);
+    if (storedRefreshToken && !refreshToken) setRefreshToken(storedRefreshToken);
+
     if (!storedToken && !storedRefreshToken) {
       setIsLoading(false);
       return;
     }
 
-    setAccessToken(storedToken);
-    setRefreshToken(storedRefreshToken);
     const bootstrapSession = async () => {
       if (!storedToken && storedRefreshToken) {
         await refreshSession(storedRefreshToken);
@@ -130,7 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [clearSession, loadCurrentUser, refreshSession]);
+  }, [
+    accessToken,
+    refreshToken,
+    clearSession,
+    loadCurrentUser,
+    refreshSession,
+  ]);
 
   const login = useCallback(
     async (payload: LoginPayload) => {

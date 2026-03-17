@@ -57,11 +57,46 @@ def scholarship_in_scope(scholarship: Scholarship) -> bool:
     return "fulbright" in haystack
 
 
+def check_neo4j_eligibility(profile: StudentProfile, scholarship: Scholarship) -> bool:
+    try:
+        from app.core.config import settings
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
+        
+        query = """
+        MATCH (s:Student {id: $student_id})
+        MATCH (sch:Scholarship {id: $scholarship_id})
+        
+        WHERE (sch.min_gpa_value IS NULL OR s.gpa_value >= sch.min_gpa_value)
+          AND (s.target_country_code = sch.country_code)
+        
+        MATCH (sch)-[:ACCEPTS_DEGREE]->(d:DegreeLevel {name: s.target_degree_level})
+        MATCH (sch)-[:ACCEPTS_CITIZEN]->(c:Country {code: s.citizenship_country_code})
+        
+        RETURN count(sch) > 0 as is_eligible
+        """
+        
+        with driver.session() as session:
+            result = session.run(query, student_id=str(profile.id), scholarship_id=str(scholarship.id))
+            record = result.single()
+            if record and record["is_eligible"]:
+                return True
+            return False
+            
+    except Exception as e:
+        print(f"Neo4j eligibility check failed or skipped: {e}")
+        return True # Fallback to Python rules if graph is down
+
+
 def evaluate_match(
     profile: StudentProfile,
     scholarship: Scholarship,
 ) -> MatchEvaluation | None:
     if scholarship.record_state.value != "published":
+        return None
+
+    # Stage 1: Graph-based constraint filtering
+    if not check_neo4j_eligibility(profile, scholarship):
         return None
 
     if not scholarship_in_scope(scholarship):

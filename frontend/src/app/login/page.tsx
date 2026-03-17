@@ -27,9 +27,9 @@ export default function LoginPage() {
 
   return (
     <MarketingShell
-      eyebrow="Authentication"
-      title="Sign in to access your saved opportunities and workspace shell."
-      description="This MVP authentication flow stays minimal: email, password, token-backed session, and protected workspace pages."
+      eyebrow="Account"
+      title="Sign in."
+      description="Continue with your saved shortlist, profile, and preparation work."
     >
       <section className="auth-grid">
         <form
@@ -81,14 +81,13 @@ export default function LoginPage() {
           </button>
         </form>
         <article className="surface-panel">
-          <p className="section-eyebrow">MVP auth posture</p>
-          <h2 className="section-title">Simple account access, no role sprawl.</h2>
+          <p className="section-eyebrow">No account yet?</p>
+          <h2 className="section-title">Create one in under a minute.</h2>
           <p className="body-copy">
-            This slice adds the minimum useful session flow so students can save
-            published opportunities and enter the dashboard workspace.
+            One account keeps your shortlist, recommendations, and preparation work connected.
           </p>
           <Link className="nav-link" href="/signup">
-            Create a new account
+            Create an account
           </Link>
         </article>
       </section>

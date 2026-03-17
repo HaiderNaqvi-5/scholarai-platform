@@ -23,6 +23,7 @@ class RecommendationItem(BaseModel):
     constraint_notes: list[str]
     top_reasons: list[str]
     warnings: list[str]
+    shap_explanation: dict[str, str] | None = None
 
 
 class RecommendationListResponse(BaseModel):

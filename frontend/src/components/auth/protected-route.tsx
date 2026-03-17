@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { SkeletonLine } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export function ProtectedRoute({
@@ -29,9 +30,7 @@ export function ProtectedRoute({
       <main className="app-shell">
         <div className="page-shell">
           <section className="surface-card">
-            <p className="section-eyebrow">Workspace access</p>
-            <h1 className="page-title">Session check in progress.</h1>
-            <p className="page-description">{message}</p>
+            <SkeletonLine count={2} />
           </section>
         </div>
       </main>
