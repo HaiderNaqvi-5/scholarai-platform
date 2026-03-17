@@ -7,8 +7,13 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
+from scholarai_common.errors import ScholarAIException, ErrorCode
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto",
+    pbkdf2_sha256__rounds=600000,
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
 
 
@@ -39,15 +44,15 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         token_type = payload.get("type")
         if token_type != expected_type:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid token type: expected {expected_type}",
-                headers={"WWW-Authenticate": "Bearer"},
+            raise ScholarAIException(
+                code=ErrorCode.AUTH_TOKEN_EXPIRED,
+                message=f"Invalid token type: expected {expected_type}",
+                status_code=status.HTTP_401_UNAUTHORIZED
             )
         return payload
     except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_EXPIRED,
+            message="Invalid or expired token",
+            status_code=status.HTTP_401_UNAUTHORIZED
         )

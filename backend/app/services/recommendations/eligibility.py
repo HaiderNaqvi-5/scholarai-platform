@@ -87,6 +87,46 @@ def check_neo4j_eligibility(profile: StudentProfile, scholarship: Scholarship) -
         print(f"Neo4j eligibility check failed or skipped: {e}")
         return True # Fallback to Python rules if graph is down
 
+def get_bulk_kg_eligibility(profile: StudentProfile, scholarship_ids: list[str]) -> set[str]:
+    """
+    Returns a set of scholarship IDs that pass the hard KG constraints for this student.
+    """
+    try:
+        from app.core.config import settings
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
+        
+        # This query checks which of the provided scholarship IDs match the student's 
+        # GPA, target country, degree level, and citizenship.
+        query = """
+        MATCH (s:Student {id: $student_id})
+        MATCH (sch:Scholarship)
+        WHERE sch.id IN $scholarship_ids
+          AND (sch.min_gpa_value IS NULL OR s.gpa_value >= sch.min_gpa_value)
+          AND (s.target_country_code = sch.country_code)
+        
+        MATCH (sch)-[:ACCEPTS_DEGREE]->(d:DegreeLevel {name: s.target_degree_level})
+        MATCH (sch)-[:ACCEPTS_CITIZEN]->(c:Country {code: s.citizenship_country_code})
+        
+        RETURN sch.id as eligible_id
+        """
+        
+        eligible_ids = set()
+        with driver.session() as session:
+            result = session.run(
+                query, 
+                student_id=str(profile.id), 
+                scholarship_ids=scholarship_ids
+            )
+            for record in result:
+                eligible_ids.add(record["eligible_id"])
+        
+        driver.close()
+        return eligible_ids
+            
+    except Exception as e:
+        print(f"Neo4j bulk check failed: {e}")
+        return set(scholarship_ids) # Fallback: assume all are eligible if graph fails
 
 def evaluate_match(
     profile: StudentProfile,

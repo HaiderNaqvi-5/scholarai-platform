@@ -128,6 +128,7 @@ export type DocumentRecordSummary = {
   id: string;
   title: string;
   document_type: DocumentType;
+  scholarship_id?: string | null;
   input_method: DocumentInputMethod;
   processing_status: DocumentProcessingStatus;
   original_filename: string | null;
@@ -190,6 +191,7 @@ export type InterviewCurrentQuestion = {
 
 export type InterviewSessionSummary = {
   session_id: string;
+  scholarship_id?: string | null;
   status: InterviewSessionStatus;
   practice_mode: InterviewPracticeMode;
   current_question_index: number;

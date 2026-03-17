@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.database import async_session_factory
 from app.demo import seed_demo_data_if_enabled
 from app.schemas import ErrorEnvelope, HealthResponse
+from scholarai_common.errors import ScholarAIException
 
 
 def create_app() -> FastAPI:
@@ -46,6 +47,18 @@ def create_app() -> FastAPI:
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
+
+    @app.exception_handler(ScholarAIException)
+    async def handle_scholarai_exception(
+        request: Request,
+        exc: ScholarAIException,
+    ) -> JSONResponse:
+        return build_error_response(
+            request=request,
+            status_code=exc.status_code,
+            code=exc.code.value,
+            message=exc.message,
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(

@@ -44,7 +44,13 @@ Your task is to transcribe the audio (if provided) and evaluate the answer based
 3. Confidence (1-4): Does the speaker use decisive, ownership language rather than hedging?
 4. Specificity (1-4): Are there concrete examples, actions, and outcomes?
 
-Provide constructive, encouraging feedback tailored to a student applying for a prestigious scholarship."""
+Special Instruction for Audio:
+If audio is provided, also evaluate the student's delivery:
+- Tone: Is it formal yet passionate?
+- Pace: Is it steady or does it show signs of anxiety (rushing/stuttering)?
+- Clarity of Speech: Are the words enunciated clearly?
+
+Provide constructive, encouraging feedback tailored to a student applying for a prestigious scholarship. Include a 'Transcription' section at the start of your feedback summary if audio was the primary input."""
 
         content = [
             {"type": "text", "text": f"Question: {question_text}\n\n"}
@@ -94,3 +100,68 @@ Provide constructive, encouraging feedback tailored to a student applying for a 
             dimensions=dimensions,
             limitation_notice="Evaluated using Gemini AI. This is practice guidance only."
         )
+
+    async def generate_questions(self, scholarship_context: str, count: int = 3) -> list[str]:
+        """
+        Generates interview questions tailored to the scholarship guidelines.
+        """
+        prompt = f"""You are an elite scholarship interviewer.
+Based on the following scholarship details, generate {count} challenging but fair interview questions.
+Focus on areas where the scholarship has specific values or requirements.
+
+<scholarship_details>
+{scholarship_context}
+</scholarship_details>
+
+Return ONLY a JSON list of strings."""
+        
+        # We can use a simpler call here or structured output
+        try:
+            raw_response = await self.llm.ainvoke([
+                SystemMessage(content="Return a JSON list of interview question strings."),
+                HumanMessage(content=prompt)
+            ])
+            # If our LLM is configured with structured output, it might already return a dict/model.
+            # But generate_questions is a new use case. Let's assume we can get a list.
+            if hasattr(raw_response, "content"):
+                 # Parsing if it returns a standard message
+                 import re
+                 content = raw_response.content
+                 match = re.search(r"\[.*\]", content, re.DOTALL)
+                 if match:
+                      return json.loads(match.group(0))
+            return ["Tell us why you are a fit for this specific scholarship.", "How will this scholarship help you achieve your goals?", "Describe a challenge you've overcome that aligns with our values."]
+        except Exception as e:
+            print(f"Question generation failed: {e}")
+            return ["Tell us why you are a fit for this specific scholarship.", "How will this scholarship help you achieve your goals?", "Describe a challenge you've overcome that aligns with our values."]
+    async def generate_follow_up(self, question: str, answer: str, context: str = "") -> str:
+        """
+        Generates a follow-up probing question based on the previous answer.
+        """
+        prompt = f"""You are a scholarship interviewer. The student just answered a question. 
+Generate a short, incisive follow-up question that probes deeper into their specific answer, asking for more detail or challenging a specific claim.
+
+<context>
+{context}
+</context>
+
+<previous_question>
+{question}
+</previous_question>
+
+<student_answer>
+{answer}
+</student_answer>
+
+Return ONLY the follow-up question text."""
+
+        try:
+            response = await self.llm.ainvoke([
+                SystemMessage(content="You are a follow-up question generator. Be concise."),
+                HumanMessage(content=prompt)
+            ])
+            if hasattr(response, "content"):
+                return response.content.strip()
+            return "Could you elaborate more on how that experience shaped your future goals?"
+        except Exception:
+            return "Could you elaborate more on the specific outcome of that project?"

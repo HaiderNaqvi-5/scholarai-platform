@@ -1,4 +1,6 @@
 import os
+import uuid
+from typing import Any, Dict, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -33,17 +35,31 @@ class DocumentEvaluator:
             temperature=0.2,
         ).with_structured_output(RAGFeedbackResponse)
 
-    async def evaluate_document(self, document_text: str) -> dict:
+    async def evaluate_document(self, document_text: str, scholarship_id: Any = None) -> dict:
         context_chunks = []
-        if self.embedder:
+        if scholarship_id:
+            # Fetch priority chunks for the linked scholarship
+            result = await self.db.execute(
+                select(ScholarshipChunk)
+                .where(ScholarshipChunk.scholarship_id == scholarship_id)
+                .limit(5)
+            )
+            chunks = result.scalars().all()
+            for chunk in chunks:
+                context_chunks.append(chunk.content_text)
+        
+        # If we need more context or no scholarship_id was provided
+        if len(context_chunks) < 3 and self.embedder:
             # Encode a sample of the document to find matching context
             query_embedding = self.embedder.encode(document_text[:1000]).tolist()
             
-            # Fetch top 5 most semantically similar scholarship chunks
+            query = select(ScholarshipChunk)
+            if scholarship_id:
+                 query = query.where(ScholarshipChunk.scholarship_id != scholarship_id)
+            
             result = await self.db.execute(
-                select(ScholarshipChunk)
-                .order_by(ScholarshipChunk.embedding.cosine_distance(query_embedding))
-                .limit(5)
+                query.order_by(ScholarshipChunk.embedding.cosine_distance(query_embedding))
+                .limit(5 - len(context_chunks))
             )
             chunks = result.scalars().all()
             for chunk in chunks:

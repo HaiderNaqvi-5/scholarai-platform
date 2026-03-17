@@ -41,5 +41,15 @@ class Settings(BaseSettings):
     DEMO_ADMIN_PASSWORD: str = "strongpass1"
     DEMO_ADMIN_FULL_NAME: str = "ScholarAI Demo Admin"
 
+    def validate_production_settings(self):
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY == "change-me-in-production-min-32-chars!!":
+                raise RuntimeError("PROD_ERROR: SECRET_KEY must be overridden in production!")
+            if self.NEO4J_PASSWORD == "password":
+                raise RuntimeError("PROD_ERROR: NEO4J_PASSWORD must be overridden in production!")
+            if "password" in self.DATABASE_URL and "@localhost" not in self.DATABASE_URL:
+                raise RuntimeError("PROD_ERROR: DATABASE_URL appears to use default password in production!")
+
 
 settings = Settings()
+settings.validate_production_settings()

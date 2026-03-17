@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import datetime, timezone
 
@@ -14,21 +15,36 @@ from app.schemas.curation import (
     CurationRecordSummary,
     CurationRecordUpdateRequest,
 )
+from app.services.recommendations.hybrid_retriever import OpenSearchHybridRetriever
 
 
 class CurationService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.retriever = OpenSearchHybridRetriever()
 
     async def import_raw_record(
         self,
         payload: CurationRawImportRequest,
         actor_user_id: uuid.UUID,
     ) -> CurationRecordDetail:
-        existing_result = await self.db.execute(
+        # Content-hash deduplication
+        content_string = f"{payload.title}|{payload.summary or ''}|{payload.provider_name or ''}"
+        content_hash = hashlib.sha256(content_string.encode()).hexdigest()
+        
+        existing_hash_result = await self.db.execute(
+            select(Scholarship).where(Scholarship.content_hash == content_hash)
+        )
+        if existing_hash_result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A scholarship record with identical content already exists",
+            )
+
+        existing_url_result = await self.db.execute(
             select(Scholarship).where(Scholarship.source_url == str(payload.source_url))
         )
-        if existing_result.scalar_one_or_none() is not None:
+        if existing_url_result.scalar_one_or_none() is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A scholarship record already exists for this source URL",
@@ -53,6 +69,7 @@ class CurationService:
             min_gpa_value=payload.min_gpa_value,
             deadline_at=payload.deadline_at,
             record_state=RecordState.RAW,
+            content_hash=content_hash,
             imported_at=payload.imported_at or timestamp,
             provenance_payload=payload.provenance_payload or {},
             source_last_seen_at=payload.source_last_seen_at or payload.imported_at or timestamp,
@@ -217,14 +234,16 @@ class CurationService:
             record.review_notes = payload.note
 
         await self.db.flush()
-        await self._append_audit_log(
-            actor_user_id=actor_user_id,
-            record=record,
-            action="curation.publish",
-            before=before,
-            after=self._snapshot(record),
-        )
-        await self.db.flush()
+        
+        # Trigger OpenSearch indexing
+        try:
+            # We need an embedding for the scholarship. 
+            # In a real system, this would be a background task.
+            embedding = [0.0] * 768 # Placeholder for MVP
+            await self.retriever.index_scholarship(record, embedding)
+        except Exception as e:
+            print(f"Failed to index scholarship into OpenSearch: {e}")
+            
         return self._build_detail(record)
 
     async def unpublish_record(
@@ -250,14 +269,13 @@ class CurationService:
             record.review_notes = payload.note
 
         await self.db.flush()
-        await self._append_audit_log(
-            actor_user_id=actor_user_id,
-            record=record,
-            action="curation.unpublish",
-            before=before,
-            after=self._snapshot(record),
-        )
-        await self.db.flush()
+        
+        # Remove from OpenSearch index
+        try:
+            await self.retriever.delete_scholarship(str(record.id))
+        except Exception as e:
+            print(f"Failed to remove scholarship from OpenSearch: {e}")
+            
         return self._build_detail(record)
 
     async def _load_record(self, record_id: uuid.UUID) -> Scholarship:

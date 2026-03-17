@@ -209,6 +209,9 @@ export function InterviewPracticeShell() {
                   <span className="route-card__label">
                     {state.session.current_question_index} of {state.session.total_questions} answered
                   </span>
+                  {state.session.scholarship_id && (
+                    <StatusBadge label="Grounded in Scholarship" variant="validated" />
+                  )}
                 </div>
               </article>
               <div className="document-actions">

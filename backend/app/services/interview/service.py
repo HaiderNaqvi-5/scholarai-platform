@@ -11,6 +11,7 @@ from app.models import (
     InterviewResponse,
     InterviewSession,
     InterviewSessionStatus,
+    Scholarship,
 )
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
@@ -44,15 +45,34 @@ class InterviewSessionService:
         self,
         user_id: uuid.UUID,
         practice_mode: str = InterviewPracticeMode.GENERAL.value,
+        scholarship_id: uuid.UUID | None = None,
     ) -> InterviewSessionSummaryResponse:
         parsed_mode = self._parse_mode(practice_mode)
+        
+        question_set = list(GENERAL_QUESTION_SET)
+        
+        if scholarship_id and self.evaluator:
+            # Fetch scholarship context
+            result = await self.db.execute(
+                select(Scholarship).where(Scholarship.id == scholarship_id)
+            )
+            scholarship = result.scalar_one_or_none()
+            if scholarship:
+                from app.services.interview.prompts import get_prompts_for_category
+                prompts = get_prompts_for_category(scholarship.category or "general")
+                context = f"Category Context: {prompts['system_instruction']}\nTitle: {scholarship.title}\nSummary: {scholarship.summary}\nFunding: {scholarship.funding_summary}"
+                custom_questions = await self.evaluator.generate_questions(context)
+                if custom_questions:
+                    question_set = custom_questions
+
         session = InterviewSession(
             user_id=user_id,
             practice_mode=parsed_mode,
+            scholarship_id=scholarship_id,
             status=InterviewSessionStatus.IN_PROGRESS,
             current_question_index=0,
-            total_questions=len(GENERAL_QUESTION_SET),
-            question_set=list(GENERAL_QUESTION_SET),
+            total_questions=len(question_set),
+            question_set=question_set,
             started_at=datetime.now(timezone.utc),
         )
         self.db.add(session)
@@ -136,6 +156,22 @@ class InterviewSessionService:
         self.db.add(response)
 
         session.current_question_index += 1
+        
+        # Live Probing: Generate a follow-up for the NEXT question if applicable
+        if session.current_question_index < session.total_questions and self.evaluator:
+            try:
+                # We use the previous answer to 're-tune' the next question in the set
+                follow_up = await self.evaluator.generate_follow_up(
+                    question=question_text,
+                    answer=feedback.answer_text,
+                    context=f"Scholarship ID: {session.scholarship_id}"
+                )
+                if follow_up:
+                    # Replace the next placeholder question with this specific follow-up
+                    session.question_set[session.current_question_index] = follow_up
+            except Exception as e:
+                print(f"Follow-up generation failed: {e}")
+
         if session.current_question_index >= session.total_questions:
             session.status = InterviewSessionStatus.COMPLETED
             session.completed_at = datetime.now(timezone.utc)
@@ -178,6 +214,7 @@ class InterviewSessionService:
 
         return InterviewSessionSummaryResponse(
             session_id=str(session.id),
+            scholarship_id=str(session.scholarship_id) if session.scholarship_id else None,
             status=session.status.value,
             practice_mode=session.practice_mode.value,
             current_question_index=session.current_question_index,
