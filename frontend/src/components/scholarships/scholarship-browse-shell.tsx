@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -490,7 +492,12 @@ export function ScholarshipBrowseShell() {
               description="Each record has been verified and published with source provenance."
             />
             {state.isLoading ? (
-              <p className="body-copy">Loading…</p>
+              <div className="recommendation-list">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
             ) : state.items.length > 0 ? (
               <>
                 <div className="recommendation-list">
@@ -574,11 +581,10 @@ export function ScholarshipBrowseShell() {
                 </div>
               </>
             ) : (
-              <div className="empty-panel">
-                <p className="body-copy">
-                  No scholarships match the current filters. Try widening your search or clearing filters.
-                </p>
-              </div>
+              <EmptyState
+                title="No scholarships found"
+                description="No scholarships match the current filters. Try widening your search or clearing filters."
+              />
             )}
           </section>
         </div>

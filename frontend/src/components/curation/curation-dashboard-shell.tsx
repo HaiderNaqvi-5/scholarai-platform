@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -585,19 +587,18 @@ export function CurationDashboardShell() {
 
   return (
     <AppShell
-      title="Curator review keeps raw records internal, validated records traceable, and published records intentional."
-      description="This slice adds the minimum protected curation workflow for review, correction, approval, rejection, publication, and unpublication."
-      eyebrow="Curator workspace"
+      title="Review, correct, and promote scholarship records."
+      description="Only published records reach users. Raw and validated states stay internal."
+      eyebrow="Curation"
     >
       <section className="curation-hero" data-testid="curation-dashboard-shell">
         <div>
           <p className="section-eyebrow">Curation posture</p>
           <h2 className="section-title">
-            Raw data stays internal until a curator reviews and promotes it.
+            Raw data stays internal until reviewed.
           </h2>
           <p className="body-copy">
-            Published scholarship records remain the only user-facing state.
-            This dashboard is intentionally operational, narrow, and traceable.
+            Published records are the only user-facing state.
           </p>
         </div>
         <div className="curation-hero__badges">
@@ -618,8 +619,8 @@ export function CurationDashboardShell() {
         <article className="surface-card" data-testid="curation-ingestion-panel">
           <PageHeader
             eyebrow="Source ingestion"
-            title="Run a narrow source-registry import into raw review state"
-            description="This is the new upstream bridge: capture an approved source page, parse candidate records, and create raw items for curator review."
+            title="Import records from a configured source"
+            description="Select a source, run the importer, and review the new raw records."
           />
           <div className="form-grid">
             <label className="form-field">
@@ -730,12 +731,15 @@ export function CurationDashboardShell() {
 
         <article className="surface-panel">
           <PageHeader
-            eyebrow="Recent ingestion runs"
-            title="Keep upstream source imports explicit and reviewable"
-            description="Each run records capture mode, parser, and how many raw records were created or skipped."
+            eyebrow="Recent runs"
+            title="Ingestion history"
+            description="Each run tracks source, records found, created, and skipped."
           />
           {state.isRunsLoading ? (
-            <p className="body-copy">Loading ingestion history.</p>
+            <div className="surface-list">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.runs.length > 0 ? (
             <div className="curation-list">
               {state.runs.map((run) => (
@@ -761,11 +765,10 @@ export function CurationDashboardShell() {
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No ingestion runs have been recorded yet.
-              </p>
-            </div>
+            <EmptyState
+              title="No recent ingestion runs"
+              description="Importer logs and record capture counts will appear here once a source has been parsed."
+            />
           )}
           {state.selectedRun ? (
             <article className="data-callout">
@@ -793,9 +796,9 @@ export function CurationDashboardShell() {
 
       <section className="surface-card" data-testid="curation-import-panel">
         <PageHeader
-          eyebrow="Raw import"
-          title="Create one fallback raw record when a source needs manual correction"
-          description="Manual import remains available as a controlled fallback, but the preferred path is now source-registry ingestion into raw review state."
+          eyebrow="Manual import"
+          title="Add one raw record manually"
+          description="Use when a source needs a hand-entered correction or a one-off record."
         />
         <div className="form-grid">
           <label className="form-field">
@@ -962,9 +965,9 @@ export function CurationDashboardShell() {
       <section className="curation-grid">
         <article className="surface-card">
           <PageHeader
-            eyebrow="Record states"
-            title="Filter by explicit lifecycle stage"
-            description="The workflow remains simple: raw, validated, published, or archived."
+            eyebrow="Records"
+            title="Filter by lifecycle state"
+            description="Raw → Validated → Published → Archived."
           />
           <div className="toggle-row">
             {FILTERS.map((filter) => (
@@ -989,7 +992,11 @@ export function CurationDashboardShell() {
             ))}
           </div>
           {state.isLoading ? (
-            <p className="body-copy">Loading curation records.</p>
+            <div className="curation-list">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.records.length > 0 ? (
             <div className="curation-list">
               {state.records.map((record) => (
@@ -1019,22 +1026,24 @@ export function CurationDashboardShell() {
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No records are in the `{state.filter}` state right now.
-              </p>
-            </div>
+            <EmptyState
+              title="No records found"
+              description={`There are currently no records in the ${state.filter} state.`}
+            />
           )}
         </article>
 
         <article className="surface-panel" data-testid="curation-record-detail">
           <PageHeader
-            eyebrow="Record review"
-            title="Inspect and correct one record at a time"
-            description="The internal review view focuses on provenance, canonical fields, and explicit state changes."
+            eyebrow="Detail"
+            title="Review one record"
+            description="Correct fields, add notes, then approve or reject."
           />
           {state.isDetailLoading ? (
-            <p className="body-copy">Loading selected record.</p>
+            <div className="form-grid">
+              <SkeletonLine count={6} />
+              <SkeletonLine count={4} />
+            </div>
           ) : state.selectedRecord ? (
             <div className="surface-list">
               <article>
@@ -1197,34 +1206,31 @@ export function CurationDashboardShell() {
               </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Select a record from the list to review it.
-              </p>
-            </div>
+            <EmptyState
+              title="No record selected"
+              description="Select a record from the list to review its fields and change its state."
+            />
           )}
         </article>
       </section>
 
       <section className="surface-card">
         <PageHeader
-          eyebrow="Traceability"
-          title="Why this workflow stays narrow"
-          description="The MVP focuses on state enforcement, provenance, and publish control rather than analytics-heavy admin tooling."
+          eyebrow="About"
+          title="Why this workflow is narrow"
+          description="State enforcement and publish control over analytics-heavy tooling."
         />
         <div className="split-panel">
           <article className="data-callout">
             <p className="list-label">Source-of-truth rule</p>
             <p className="body-copy">
-              Raw records stay internal. Only published records should reach
-              discovery, recommendations, and saved-opportunity flows.
+              Only published records reach users. Raw records stay internal.
             </p>
           </article>
           <article className="guidance-callout">
             <p className="list-label">Curator responsibility</p>
             <p className="body-copy">
-              Review notes, explicit state changes, and audit entries provide
-              the minimum traceability needed for MVP governance.
+              Review notes and explicit state changes provide minimum traceability.
             </p>
           </article>
         </div>

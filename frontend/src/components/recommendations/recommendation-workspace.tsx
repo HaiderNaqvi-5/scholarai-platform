@@ -5,8 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ShapWaterfallChart } from "@/components/recommendations/shap-waterfall-chart";
 import { apiRequest } from "@/lib/api";
 import type {
   ApiError,
@@ -166,7 +169,11 @@ export function RecommendationWorkspace() {
               description="Strong matches appear first. Each card shows what aligned and what needs verification."
             />
             {state.isLoading ? (
-              <p className="body-copy">Loading recommendations…</p>
+              <div className="collection-grid">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
             ) : state.items.length > 0 ? (
               <div className="recommendation-list">
                 {state.items.map((item) => {
@@ -228,6 +235,12 @@ export function RecommendationWorkspace() {
                         </section>
                       </div>
 
+                      {item.shap_explanation && (
+                        <ShapWaterfallChart
+                          shapExplanation={item.shap_explanation}
+                        />
+                      )}
+
                       <div className="dashboard-actions">
                         <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
                           View details
@@ -253,14 +266,15 @@ export function RecommendationWorkspace() {
                 })}
               </div>
             ) : (
-              <div className="empty-panel">
-                <p className="body-copy">
-                  No matches for your current profile. Adjust your target field, GPA, or country to broaden results.
-                </p>
-                <Link className="auth-link auth-link--primary" href="/profile">
-                  Edit profile
-                </Link>
-              </div>
+              <EmptyState
+                title="No recommendations found"
+                description="Adjust your target field, GPA, or country to broaden results."
+                action={
+                  <Link className="auth-link auth-link--primary" href="/profile">
+                    Edit profile
+                  </Link>
+                }
+              />
             )}
           </section>
         </div>
@@ -273,7 +287,10 @@ export function RecommendationWorkspace() {
               description="Recommendations are based on these profile fields."
             />
             {state.isLoading ? (
-              <p className="body-copy">Loading profile…</p>
+              <div className="surface-list">
+                <SkeletonLine count={3} />
+                <SkeletonLine count={2} />
+              </div>
             ) : state.profile ? (
               <div className="surface-list">
                 <article>
@@ -297,14 +314,15 @@ export function RecommendationWorkspace() {
                 </div>
               </div>
             ) : (
-              <div className="empty-panel">
-                <p className="body-copy">
-                  A profile is required to generate recommendations.
-                </p>
-                <Link className="auth-link auth-link--primary" href="/profile">
-                  Add profile
-                </Link>
-              </div>
+              <EmptyState
+                title="Profile incomplete"
+                description="Create a profile to generate your first recommendations."
+                action={
+                  <Link className="auth-link auth-link--primary" href="/profile">
+                    Add profile
+                  </Link>
+                }
+              />
             )}
           </section>
 

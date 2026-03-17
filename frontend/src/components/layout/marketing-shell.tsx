@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { AuthActions } from "@/components/auth/auth-actions";
+import { Footer } from "@/components/layout/footer";
 import { marketingNavLinks } from "@/lib/routes";
 
 type MarketingShellProps = {
@@ -24,9 +25,9 @@ export function MarketingShell({
   const pathname = usePathname();
 
   return (
-    <main className="marketing-shell">
+    <main className="marketing-shell" id="main-content">
       <div className="page-shell page-shell--marketing">
-        <nav className="shell-nav shell-nav--marketing">
+        <nav className="shell-nav shell-nav--marketing" aria-label="Main navigation">
           <Link className="brand-lockup brand-lockup--link" href="/">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
@@ -50,7 +51,7 @@ export function MarketingShell({
           </div>
           <AuthActions />
         </nav>
-        <header className="hero-block hero-block--marketing">
+        <header className="hero-block hero-block--marketing fade-in">
           <div className="hero-block__copy">
             <p className="section-eyebrow">{eyebrow}</p>
             <h1 className="hero-title">{title}</h1>
@@ -60,6 +61,7 @@ export function MarketingShell({
         </header>
         {children}
       </div>
+      <Footer />
     </main>
   );
 }

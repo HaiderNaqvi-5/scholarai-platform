@@ -4,6 +4,8 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -330,7 +332,10 @@ export function DocumentAssistanceShell() {
             description="Select a draft to view its feedback."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading drafts…</p>
+            <div className="surface-list">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.items.length > 0 ? (
             <div className="document-list">
               {state.items.map((item) => (
@@ -369,11 +374,10 @@ export function DocumentAssistanceShell() {
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No drafts submitted yet. Start with one SOP or essay.
-              </p>
-            </div>
+            <EmptyState
+              title="No drafts submitted"
+              description="Upload your first statement of purpose or scholarship essay for structured feedback."
+            />
           )}
         </article>
       </section>
@@ -386,11 +390,10 @@ export function DocumentAssistanceShell() {
             description="Structured feedback on strengths, revisions, and cautions."
           />
           {!selectedDocument ? (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Submit a draft to see feedback here.
-              </p>
-            </div>
+            <EmptyState
+              title="No draft selected"
+              description="Submit or select a draft to see feedback here."
+            />
           ) : selectedDocument.latest_feedback ? (
             <div className="surface-list">
               <article>
@@ -439,11 +442,10 @@ export function DocumentAssistanceShell() {
               </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Feedback is not ready yet for this draft.
-              </p>
-            </div>
+            <EmptyState
+              title="Analyzing draft"
+              description="Feedback is currently being generated. Check back shortly."
+            />
           )}
         </article>
 

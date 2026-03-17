@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonLine } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { AudioRecorder } from "@/components/interview/audio-recorder";
 import { apiRequest } from "@/lib/api";
 import type {
   ApiError,
@@ -26,6 +29,7 @@ type InterviewState = {
 export function InterviewPracticeShell() {
   const { accessToken } = useAuth();
   const [answerText, setAnswerText] = useState("");
+  const [audioB64, setAudioB64] = useState<string | null>(null);
   const [state, setState] = useState<InterviewState>({
     isLoading: true,
     isStarting: false,
@@ -95,6 +99,7 @@ export function InterviewPracticeShell() {
       });
       localStorage.setItem(LATEST_SESSION_KEY, session.session_id);
       setAnswerText("");
+      setAudioB64(null);
       setState({
         isLoading: false,
         isStarting: false,
@@ -114,10 +119,13 @@ export function InterviewPracticeShell() {
   const submitAnswer = async () => {
     if (!accessToken || !state.session) return;
 
-    if (answerText.trim().length < 50) {
+    const hasText = answerText.trim().length >= 50;
+    const hasAudio = Boolean(audioB64);
+
+    if (!hasText && !hasAudio) {
       setState((current) => ({
         ...current,
-        error: "Write at least 50 characters before submitting.",
+        error: "Either write at least 50 characters or provide a voice response.",
       }));
       return;
     }
@@ -128,12 +136,16 @@ export function InterviewPracticeShell() {
         `/interviews/${state.session.session_id}/responses`,
         {
           method: "POST",
-          body: JSON.stringify({ answer_text: answerText.trim() }),
+          body: JSON.stringify({
+            answer_text: hasText ? answerText.trim() : null,
+            audio_b64: audioB64,
+          }),
           token: accessToken,
         },
       );
       localStorage.setItem(LATEST_SESSION_KEY, session.session_id);
       setAnswerText("");
+      setAudioB64(null);
       setState((current) => ({
         ...current,
         isSubmitting: false,
@@ -151,12 +163,12 @@ export function InterviewPracticeShell() {
   return (
     <AppShell
       title="Practice scholarship interview answers."
-      description="Text-first practice with rubric-based scoring on clarity, relevance, confidence, and specificity."
+      description="Voice or text practice with rubric-based scoring on clarity, relevance, confidence, and specificity."
       eyebrow="Interview"
       intro={
         <div className="meta-row">
           <StatusBadge label="Rubric-based scoring" variant="validated" />
-          <StatusBadge label="Text practice" variant="generated" />
+          <StatusBadge label="Multimodal practice" variant="generated" />
         </div>
       }
     >
@@ -175,7 +187,9 @@ export function InterviewPracticeShell() {
           />
 
           {state.isLoading ? (
-            <p className="body-copy">Loading session…</p>
+            <div className="surface-list">
+              <SkeletonLine count={2} />
+            </div>
           ) : state.session ? (
             <div className="surface-list">
               <article>
@@ -210,20 +224,21 @@ export function InterviewPracticeShell() {
               </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No active session. Start a practice run to see questions and rubric feedback.
-              </p>
-              <button
-                className="auth-link auth-link--primary"
-                data-testid="interview-start-session"
-                disabled={state.isStarting}
-                onClick={() => void startSession()}
-                type="button"
-              >
-                {state.isStarting ? "Starting…" : "Start session"}
-              </button>
-            </div>
+            <EmptyState
+              title="No active session"
+              description="Start a practice run to receive questions and structured rubric feedback."
+              action={
+                <button
+                  className="auth-link auth-link--primary"
+                  data-testid="interview-start-session"
+                  disabled={state.isStarting}
+                  onClick={() => void startSession()}
+                  type="button"
+                >
+                  {state.isStarting ? "Starting…" : "Start session"}
+                </button>
+              }
+            />
           )}
         </article>
 
@@ -231,7 +246,7 @@ export function InterviewPracticeShell() {
           <PageHeader
             eyebrow="Question"
             title="Current prompt"
-            description="Respond with a clear, specific answer."
+            description="Respond verbally or via text. Concrete examples score highest."
           />
           {currentQuestion?.question_text ? (
             <div className="surface-list">
@@ -242,25 +257,29 @@ export function InterviewPracticeShell() {
                     {currentQuestion.total_questions} total
                   </span>
                 </div>
-                <p className="body-copy">{currentQuestion.question_text}</p>
+                <p className="body-copy leading-relaxed">{currentQuestion.question_text}</p>
               </article>
               {state.session?.status !== "completed" ? (
-                <label className="form-field">
-                  <span className="form-field__label">Your answer</span>
-                  <textarea
-                    className="text-area"
-                    data-testid="interview-answer-input"
-                    name="interview_answer"
-                    onChange={(event) => setAnswerText(event.target.value)}
-                    placeholder="Write a direct answer with one concrete example."
-                    rows={10}
-                    value={answerText}
-                  />
-                  <span className="field-note">Minimum 50 characters.</span>
-                </label>
+                <div className="flex flex-col gap-6">
+                  <AudioRecorder onRecordingComplete={(b64) => setAudioB64(b64)} />
+                  
+                  <label className="form-field">
+                    <span className="form-field__label">Text answer (Optional if voice provided)</span>
+                    <textarea
+                      className="text-area"
+                      data-testid="interview-answer-input"
+                      name="interview_answer"
+                      onChange={(event) => setAnswerText(event.target.value)}
+                      placeholder="Or write a direct answer with one concrete example..."
+                      rows={6}
+                      value={answerText}
+                    />
+                    <span className="field-note">Min 50 chars for text scoring.</span>
+                  </label>
+                </div>
               ) : null}
               {state.session?.status !== "completed" ? (
-                <div className="document-actions">
+                <div className="document-actions pt-4 border-t border-ink-950/5">
                   <button
                     className="auth-link auth-link--primary"
                     data-testid="interview-submit-answer"
@@ -268,19 +287,18 @@ export function InterviewPracticeShell() {
                     onClick={() => void submitAnswer()}
                     type="button"
                   >
-                    {state.isSubmitting ? "Scoring…" : "Submit answer"}
+                    {state.isSubmitting ? "Processing & Scoring…" : "Submit answer"}
                   </button>
                 </div>
               ) : null}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                {state.session?.status === "completed"
-                  ? "Session complete. Review results below or start a new one."
-                  : "Start a session to see the first question."}
-              </p>
-            </div>
+            <EmptyState
+              title={state.session?.status === "completed" ? "Session complete" : "Awaiting session"}
+              description={state.session?.status === "completed" 
+                ? "Review results below or start a new practice run."
+                : "Start a session to see the first question."}
+            />
           )}
         </article>
       </section>

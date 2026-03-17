@@ -5,6 +5,7 @@ from app.api.v1.routes import (
     auth,
     curation,
     documents,
+    health,
     interview,
     mentor,
     recommendations,
@@ -15,6 +16,7 @@ from app.api.v1.routes import (
 
 router = APIRouter()
 
+router.include_router(health.router, prefix="/health", tags=["System Health"])
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 router.include_router(students.router, prefix="/profile", tags=["Student Profile"])
 router.include_router(scholarships.router, prefix="/scholarships", tags=["Scholarships"])

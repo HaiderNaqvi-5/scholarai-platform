@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { SkeletonLine } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
 
 export function AdminRoute({
@@ -34,9 +35,7 @@ export function AdminRoute({
       <main className="app-shell">
         <div className="page-shell">
           <section className="surface-card">
-            <p className="section-eyebrow">Curator access</p>
-            <h1 className="page-title">Access check in progress.</h1>
-            <p className="page-description">{message}</p>
+            <SkeletonLine count={2} />
           </section>
         </div>
       </main>

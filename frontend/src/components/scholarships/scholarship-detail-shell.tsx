@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonLine } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -163,7 +164,9 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
 
       {state.isLoading ? (
         <section className="surface-card">
-          <p className="body-copy">Loading scholarship details…</p>
+          <SkeletonLine count={2} />
+          <br />
+          <SkeletonLine count={4} />
         </section>
       ) : state.item ? (
         <>

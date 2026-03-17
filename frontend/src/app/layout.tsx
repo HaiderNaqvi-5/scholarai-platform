@@ -22,9 +22,12 @@ const monoFont = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ScholarAI",
+  title: {
+    default: "ScholarAI — Scholarship Planning",
+    template: "%s | ScholarAI",
+  },
   description:
-    "A scholarship platform for discovery, eligibility-aware guidance, and application preparation.",
+    "Find scholarships that fit your profile. ScholarAI combines a curated catalog with profile-aware recommendations and structured preparation tools.",
 };
 
 export default function RootLayout({
@@ -37,6 +40,9 @@ export default function RootLayout({
       <body
         className={`${displayFont.variable} ${uiFont.variable} ${monoFont.variable} app-body`}
       >
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

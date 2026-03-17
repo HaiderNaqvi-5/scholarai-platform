@@ -51,3 +51,23 @@ async def _run_source_ingestion_async(
         )
         await session.commit()
         return detail.model_dump()
+
+
+@celery_app.task(name="tasks.run_nightly_ingestion")
+def run_nightly_ingestion() -> dict:
+    """
+    Automated nightly sync for major scholarship sources.
+    """
+    # System Reserved UUID
+    SYSTEM_ADMIN_ID = "00000000-0000-0000-0000-000000000000"
+    
+    return asyncio.run(
+        _run_source_ingestion_async(
+            source_key="nightly_sync_main",
+            actor_user_id=SYSTEM_ADMIN_ID,
+            source_display_name="Auto Nightly Ingestion",
+            source_base_url=None,
+            source_type="official",
+            max_records=50,
+        )
+    )

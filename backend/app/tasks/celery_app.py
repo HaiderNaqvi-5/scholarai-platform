@@ -1,5 +1,5 @@
 from celery import Celery
-
+from celery.schedules import crontab
 from app.core.config import settings
 
 celery_app = Celery(
@@ -17,3 +17,10 @@ celery_app.conf.update(
     enable_utc=True,
     task_default_queue="default",
 )
+
+celery_app.conf.beat_schedule = {
+    "nightly-scholarship-ingestion": {
+        "task": "tasks.run_nightly_ingestion",
+        "schedule": crontab(hour=2, minute=0),
+    },
+}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AuthActions } from "@/components/auth/auth-actions";
+import { Footer } from "@/components/layout/footer";
 import { appNavRoutes } from "@/lib/routes";
 
 type AppShellProps = {
@@ -29,9 +30,9 @@ export function AppShell({
   );
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" id="main-content">
       <div className="page-shell">
-        <nav className="shell-nav shell-nav--app">
+        <nav className="shell-nav shell-nav--app" aria-label="App navigation">
           <Link className="brand-lockup brand-lockup--link" href="/">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
@@ -56,7 +57,7 @@ export function AppShell({
           </div>
           <AuthActions />
         </nav>
-        <header className="hero-block hero-block--app">
+        <header className="hero-block hero-block--app fade-in">
           <div className="hero-block__copy">
             {eyebrow ? <p className="section-eyebrow">{eyebrow}</p> : null}
             <h1 className="page-title">{title}</h1>
@@ -66,6 +67,7 @@ export function AppShell({
         </header>
         {children}
       </div>
+      <Footer />
     </main>
   );
 }

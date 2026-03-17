@@ -19,7 +19,7 @@ export default function LandingPage() {
         </>
       }
     >
-      <section className="landing-hero">
+      <section className="landing-hero fade-in fade-in-d1">
         <div className="hero-trust-rail">
           <article className="data-point">
             <p className="data-point__label">Catalog</p>
@@ -45,7 +45,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="feature-grid" id="how-it-works">
+      <section className="feature-grid fade-in fade-in-d2" id="how-it-works">
         <article className="surface-card">
           <p className="section-eyebrow">How it works</p>
           <h2 className="section-title">A clear path from discovery to preparation.</h2>
@@ -62,7 +62,7 @@ export default function LandingPage() {
         </article>
       </section>
 
-      <section className="split-panel">
+      <section className="split-panel fade-in fade-in-d3">
         <article className="data-callout">
           <p className="list-label">Verified scholarship data</p>
           <p className="body-copy">

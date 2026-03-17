@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
@@ -199,7 +201,10 @@ export function DashboardShell() {
             description="The profile data used to rank and explain scholarship matches."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading profile…</p>
+            <div className="surface-list">
+              <SkeletonLine count={3} />
+              <SkeletonLine count={2} />
+            </div>
           ) : state.profile ? (
             <div className="surface-list">
               <article>
@@ -226,14 +231,15 @@ export function DashboardShell() {
               </div>
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                Set up your profile so ScholarAI can explain why scholarships match your background.
-              </p>
-              <Link className="auth-link auth-link--primary" href="/onboarding">
-                Complete profile
-              </Link>
-            </div>
+            <EmptyState
+              title="Profile incomplete"
+              description="Set up your profile so ScholarAI can explain why scholarships match your background."
+              action={
+                <Link className="auth-link auth-link--primary" href="/onboarding">
+                  Complete profile
+                </Link>
+              }
+            />
           )}
         </article>
 
@@ -244,7 +250,10 @@ export function DashboardShell() {
             description="Scholarships you&apos;re tracking for deadlines and follow-up."
           />
           {state.isLoading ? (
-            <p className="body-copy">Loading saved opportunities…</p>
+            <div className="opportunity-list">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
           ) : state.saved.length > 0 ? (
             <div className="opportunity-list">
               {state.saved.map((item) => (
@@ -275,14 +284,15 @@ export function DashboardShell() {
               ))}
             </div>
           ) : (
-            <div className="empty-panel">
-              <p className="body-copy">
-                No saved opportunities yet. Browse the catalog to start building your shortlist.
-              </p>
-              <Link className="nav-link" href="/scholarships">
-                Browse scholarships
-              </Link>
-            </div>
+            <EmptyState
+              title="No saved items"
+              description="Explore the catalog and save scholarships to track them here."
+              action={
+                <Link className="auth-link auth-link--primary" href="/scholarships">
+                  Browse catalog
+                </Link>
+              }
+            />
           )}
         </article>
       </section>

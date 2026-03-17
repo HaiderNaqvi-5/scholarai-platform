@@ -70,6 +70,7 @@ class ApplicationStatus(enum.StrEnum):
 class DocumentType(enum.StrEnum):
     SOP = "sop"
     ESSAY = "essay"
+    CV = "cv"
 
 
 class DocumentInputMethod(enum.StrEnum):

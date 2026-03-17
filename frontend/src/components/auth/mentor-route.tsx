@@ -6,24 +6,29 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
 
-export function ProtectedRoute({
+export function MentorRoute({
   children,
-  message = "Checking your workspace session.",
+  message = "Checking mentor access.",
 }: {
   children: React.ReactNode;
   message?: string;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { currentUser, isAuthenticated, isLoading } = useAuth();
   const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+      return;
     }
-  }, [isAuthenticated, isLoading, nextPath, router]);
+
+    if (!isLoading && isAuthenticated && currentUser?.role !== "mentor") {
+      router.replace("/dashboard");
+    }
+  }, [currentUser?.role, isAuthenticated, isLoading, nextPath, router]);
 
   if (isLoading) {
     return (
@@ -37,7 +42,7 @@ export function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || currentUser?.role !== "mentor") {
     return null;
   }
 

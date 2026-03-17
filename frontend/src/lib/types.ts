@@ -95,6 +95,7 @@ export type RecommendationItem = ScholarshipListItem & {
   constraint_notes: string[];
   top_reasons: string[];
   warnings: string[];
+  shap_explanation?: Record<string, number> | null;
 };
 
 export type RecommendationListResponse = {
@@ -314,4 +315,36 @@ export type ApiError = {
   message: string;
   request_id?: string;
   status: number;
+};
+
+export type MentorFeedbackRequest = {
+  summary: string;
+  strengths: string[];
+  revision_priorities: string[];
+  caution_notes: string[];
+};
+
+export type MentorFeedbackResponse = {
+  id: string;
+  document_id: string;
+  mentor_id: string;
+  summary: string;
+  strengths: string[];
+  revision_priorities: string[];
+  caution_notes: string[];
+  submitted_at: string | null;
+};
+
+export type PlatformAnalyticsResponse = {
+  total_users: number;
+  student_count: number;
+  mentor_count: number;
+  admin_count: number;
+  total_scholarships: number;
+  total_applications: number;
+  submitted_applications: number;
+  total_documents: number;
+  total_interview_sessions: number;
+  ingestion_runs_total: number;
+  ingestion_runs_failed: number;
 };
