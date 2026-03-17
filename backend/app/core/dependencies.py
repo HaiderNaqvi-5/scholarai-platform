@@ -7,6 +7,7 @@ Usage:
 Provides:
     - get_current_user   → returns authenticated User ORM object
     - require_admin      → additionally asserts role == "admin"
+    - require_mentor     → additionally asserts role == "mentor"
     - get_audit_service  → optional helper to inject AuditLogService
 """
 import uuid
@@ -95,9 +96,22 @@ async def require_student(
     return current_user
 
 
+async def require_mentor(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Assert that the authenticated user has the 'mentor' role."""
+    if current_user.role != UserRole.MENTOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Mentor privileges required",
+        )
+    return current_user
+
+
 # ── Convenience type aliases (use in route signatures) ────────────────────────
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser   = Annotated[User, Depends(require_admin)]
 StudentUser = Annotated[User, Depends(require_student)]
+MentorUser  = Annotated[User, Depends(require_mentor)]
 DBSession   = Annotated[AsyncSession, Depends(get_db)]

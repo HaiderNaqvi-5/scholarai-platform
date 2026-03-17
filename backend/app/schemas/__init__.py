@@ -49,6 +49,8 @@ from app.schemas.scholarships import (
     ScholarshipListResponse,
 )
 from app.schemas.students import StudentProfileResponse, StudentProfileUpsertRequest
+from app.schemas.mentor import MentorFeedbackRequest, MentorFeedbackResponse
+from app.schemas.analytics import PlatformAnalyticsResponse
 
 __all__ = [
     "DocumentDetailResponse",
@@ -90,4 +92,7 @@ __all__ = [
     "UserCreate",
     "UserLogin",
     "UserResponse",
+    "MentorFeedbackRequest",
+    "MentorFeedbackResponse",
+    "PlatformAnalyticsResponse",
 ]

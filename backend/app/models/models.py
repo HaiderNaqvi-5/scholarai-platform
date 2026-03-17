@@ -28,6 +28,7 @@ def enum_values(enum_cls: type[enum.StrEnum]) -> list[str]:
 class UserRole(enum.StrEnum):
     STUDENT = "student"
     ADMIN = "admin"
+    MENTOR = "mentor"
 
 
 class DegreeLevel(enum.StrEnum):

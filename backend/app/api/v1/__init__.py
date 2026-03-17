@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 
 from app.api.v1.routes import (
+    analytics,
     auth,
     curation,
     documents,
     interview,
+    mentor,
     recommendations,
     saved_opportunities,
     scholarships,
@@ -25,3 +27,5 @@ router.include_router(recommendations.router, prefix="/recommendations", tags=["
 router.include_router(documents.router, prefix="/documents", tags=["Documents"])
 router.include_router(interview.router, prefix="/interviews", tags=["Interview Practice"])
 router.include_router(curation.router, prefix="/curation", tags=["Curation"])
+router.include_router(mentor.router, prefix="/mentor", tags=["Mentor Dashboard"])
+router.include_router(analytics.router, prefix="/analytics", tags=["Admin Analytics"])
