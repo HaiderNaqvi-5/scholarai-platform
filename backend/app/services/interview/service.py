@@ -19,6 +19,7 @@ from app.schemas.interviews import (
     InterviewSessionSummaryResponse,
 )
 from app.services.interview.scoring import InterviewScoringService
+import os
 
 GENERAL_QUESTION_SET = [
     "Tell us about yourself and what led you to pursue graduate study in data science or analytics.",
@@ -31,6 +32,13 @@ class InterviewSessionService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.scoring_service = InterviewScoringService()
+        self.evaluator = None
+        if os.environ.get("GOOGLE_API_KEY"):
+            try:
+                from app.services.interview.evaluator import InterviewEvaluator
+                self.evaluator = InterviewEvaluator()
+            except Exception as e:
+                print(f"Failed to load AI Integrations: {e}")
 
     async def start_session(
         self,
@@ -96,11 +104,26 @@ class InterviewSessionService:
             )
 
         question_text = session.question_set[question_index]
-        feedback = self.scoring_service.score_answer(
-            question_index=question_index,
-            question_text=question_text,
-            answer_text=payload.answer_text,
-        )
+        
+        feedback = None
+        if self.evaluator:
+            try:
+                feedback = self.evaluator.evaluate(
+                    question_index=question_index,
+                    question_text=question_text,
+                    audio_b64=payload.audio_b64,
+                    text_answer=payload.answer_text,
+                )
+            except Exception as e:
+                print(f"Gemini evaluation failed, falling back to rules: {e}")
+        
+        if not feedback:
+            fallback_text = payload.answer_text or "The audio processing failed. This is a fallback."
+            feedback = self.scoring_service.score_answer(
+                question_index=question_index,
+                question_text=question_text,
+                answer_text=fallback_text,
+            )
 
         response = InterviewResponse(
             session_id=session.id,

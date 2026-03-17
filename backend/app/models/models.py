@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from app.core.database import Base
 
@@ -361,6 +362,11 @@ class Scholarship(Base):
         back_populates="scholarship",
         cascade="all, delete-orphan",
     )
+    chunks: Mapped[list["ScholarshipChunk"]] = relationship(
+        "ScholarshipChunk",
+        back_populates="scholarship",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_scholarships_record_state", "record_state"),
@@ -402,6 +408,38 @@ class ScholarshipRequirement(Base):
     )
 
     __table_args__ = (Index("ix_scholarship_requirements_type", "requirement_type"),)
+
+
+class ScholarshipChunk(Base):
+    __tablename__ = "scholarship_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    scholarship_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(768), nullable=True) # 768 for sentence-transformers
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    scholarship: Mapped["Scholarship"] = relationship(
+        "Scholarship",
+        back_populates="chunks",
+    )
+
+    __table_args__ = (
+        Index("ix_scholarship_chunks_embedding", "embedding", postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
+    )
 
 
 class Application(Base):

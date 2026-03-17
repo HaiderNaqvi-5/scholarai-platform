@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class InterviewSessionStartRequest(BaseModel):
@@ -21,15 +21,18 @@ class InterviewCurrentQuestionResponse(BaseModel):
 class InterviewAnswerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    answer_text: str = Field(min_length=50, max_length=4000)
+    answer_text: str | None = Field(default=None, max_length=4000)
+    audio_b64: str | None = Field(default=None)
 
-    @field_validator("answer_text")
-    @classmethod
-    def validate_answer_text(cls, value: str) -> str:
-        normalized = value.strip()
-        if len(normalized) < 50:
-            raise ValueError("Interview answers must contain at least 50 characters")
-        return normalized
+    @model_validator(mode='after')
+    def validate_content(self) -> 'InterviewAnswerRequest':
+        if not self.answer_text and not self.audio_b64:
+            raise ValueError("Must provide either answer_text or audio_b64")
+        if self.answer_text and len(self.answer_text.strip()) < 50:
+            raise ValueError("Text answers must contain at least 50 characters")
+        if self.answer_text:
+            self.answer_text = self.answer_text.strip()
+        return self
 
 
 class InterviewRubricDimension(BaseModel):
