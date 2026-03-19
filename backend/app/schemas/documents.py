@@ -3,6 +3,33 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class DocumentValidatedFact(BaseModel):
+    scholarship_id: str
+    scholarship_title: str
+    label: str
+    value: str
+    source_url: str
+
+
+class DocumentRetrievedGuidanceSnippet(BaseModel):
+    key: str
+    topic: str
+    snippet: str
+    applies_to: str
+
+
+class DocumentGeneratedGuidanceItem(BaseModel):
+    type: str
+    guidance: str
+
+
+class DocumentGroundedContextSections(BaseModel):
+    validated_facts: list[DocumentValidatedFact]
+    retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]
+    generated_guidance: list[DocumentGeneratedGuidanceItem]
+    limitations: list[str]
+
+
 class DocumentFeedbackResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -14,6 +41,11 @@ class DocumentFeedbackResponse(BaseModel):
     caution_notes: list[str]
     citations: list[str]
     grounded_context: list[str]
+    validated_facts: list[DocumentValidatedFact]
+    retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]
+    generated_guidance: list[DocumentGeneratedGuidanceItem]
+    limitations: list[str]
+    grounded_context_sections: DocumentGroundedContextSections
     limitation_notice: str
     completed_at: datetime | None
 
@@ -31,6 +63,7 @@ class DocumentRecordSummary(BaseModel):
     updated_at: datetime
     latest_feedback_at: datetime | None
     scholarship_id: str | None = None
+    scholarship_ids: list[str] | None = None
 
 
 class DocumentDetailResponse(DocumentRecordSummary):
@@ -58,6 +91,7 @@ class DocumentSubmissionValidation(BaseModel):
     document_type: str
     content_text: str | None = Field(default=None, min_length=50, max_length=12000)
     scholarship_id: str | None = Field(default=None)
+    scholarship_ids: list[str] = Field(default_factory=list, max_length=3)
     has_file: bool = False
 
     @model_validator(mode="after")
@@ -66,4 +100,6 @@ class DocumentSubmissionValidation(BaseModel):
             raise ValueError("Provide document text or upload a supported file")
         if self.content_text and self.has_file:
             raise ValueError("Choose either pasted text or a supported file upload")
+        if self.scholarship_id and self.scholarship_ids:
+            raise ValueError("Provide either scholarship_id or scholarship_ids, not both")
         return self

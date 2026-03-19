@@ -9,6 +9,14 @@ class InterviewSessionStartRequest(BaseModel):
     practice_mode: str = "general"
     scholarship_id: str | None = None
 
+    @model_validator(mode="after")
+    def validate_practice_mode(self) -> "InterviewSessionStartRequest":
+        normalized_mode = (self.practice_mode or "general").strip().lower()
+        if normalized_mode not in {"general", "scholarship"}:
+            raise ValueError("practice_mode must be 'general' or 'scholarship'")
+        self.practice_mode = normalized_mode
+        return self
+
 
 class InterviewCurrentQuestionResponse(BaseModel):
     session_id: str
@@ -58,8 +66,32 @@ class InterviewAnswerFeedback(BaseModel):
     created_at: datetime | None = None
 
 
+class InterviewHistorySummaryItem(BaseModel):
+    question_index: int
+    question_text: str
+    overall_score: float
+    weakest_dimension: str | None
+    strongest_dimension: str | None
+    improvement_focus: str | None
+
+
+class InterviewHistorySummary(BaseModel):
+    answered_count: int
+    recent_answers: list[InterviewHistorySummaryItem]
+
+
+class InterviewTrendSummary(BaseModel):
+    average_score: float | None
+    score_delta: float | None
+    score_direction: str
+    weakest_dimension_overall: str | None
+    latest_weakest_dimension: str | None
+    dimension_averages: dict[str, float]
+
+
 class InterviewSessionSummaryResponse(BaseModel):
     session_id: str
+    scholarship_id: str | None = None
     status: str
     practice_mode: str
     current_question_index: int
@@ -67,6 +99,8 @@ class InterviewSessionSummaryResponse(BaseModel):
     current_question: InterviewCurrentQuestionResponse | None
     responses: list[InterviewAnswerFeedback]
     latest_feedback: InterviewAnswerFeedback | None
+    history_summary: InterviewHistorySummary
+    trend_summary: InterviewTrendSummary
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime

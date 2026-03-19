@@ -78,7 +78,19 @@ docs/scholarai/
   - curation now includes manual raw import plus source-registry ingestion runs
   - migration-driven bootstrap and browser smoke checks in CI are implemented
   - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
-  - scholarship-specific preparation grounding and broader ingestion coverage are still incomplete
+  - Phase 2 adds scholarship-grounded bounded guidance for documents and interviews with explicit fact/guidance/limitation separation while keeping Canada-first scope fixed
+  - broader ingestion coverage is still incomplete
+
+## Phase 2 API Contract Updates (Canada-first Fixed)
+- `POST /api/v1/documents` now accepts optional scholarship grounding identifiers.
+- `POST /api/v1/documents/{id}/feedback` returns explicit grounded-context sections:
+  - validated scholarship facts
+  - retrieved writing guidance
+  - generated guidance
+  - limitations
+- `POST /api/v1/interviews` now accepts `practice_mode` and optional `scholarship_id`.
+- `GET /api/v1/interviews/{id}` now returns session history summary plus rubric trend summary.
+- Invalid grounding IDs are expected to fail cleanly with structured validation errors.
 
 ## Required Diagrams List
 1. Product context and actor map.

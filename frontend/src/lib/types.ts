@@ -184,6 +184,24 @@ export type DocumentProcessingStatus =
   | "completed"
   | "failed";
 
+export type DocumentGroundingEntry =
+  | string
+  | {
+      label?: string | null;
+      detail?: string | null;
+      value?: string | null;
+      source?: string | null;
+      citation?: string | null;
+      scholarship_id?: string | null;
+    };
+
+export type DocumentGeneratedGuidance = {
+  summary: string;
+  strengths: string[];
+  revision_priorities: string[];
+  caution_notes: string[];
+};
+
 export type DocumentFeedback = {
   id: string;
   status: DocumentProcessingStatus;
@@ -192,8 +210,18 @@ export type DocumentFeedback = {
   revision_priorities: string[];
   caution_notes: string[];
   citations: string[];
-  grounded_context: string[];
+  grounded_context: DocumentGroundingEntry[];
   limitation_notice: string;
+  validated_facts?: DocumentGroundingEntry[] | null;
+  retrieved_writing_guidance?: DocumentGroundingEntry[] | null;
+  generated_guidance?: DocumentGeneratedGuidance | null;
+  limitations?: string[] | null;
+  grounded_context_sections?: {
+    validated_facts: DocumentGroundingEntry[];
+    retrieved_writing_guidance: DocumentGroundingEntry[];
+    generated_guidance: Array<{ type: string; guidance: string }>;
+    limitations: string[];
+  } | null;
   completed_at: string | null;
 };
 
@@ -202,6 +230,7 @@ export type DocumentRecordSummary = {
   title: string;
   document_type: DocumentType;
   scholarship_id?: string | null;
+  scholarship_ids?: string[] | null;
   input_method: DocumentInputMethod;
   processing_status: DocumentProcessingStatus;
   original_filename: string | null;
@@ -229,7 +258,7 @@ export type InterviewSessionStatus =
   | "in_progress"
   | "completed";
 
-export type InterviewPracticeMode = "general";
+export type InterviewPracticeMode = "general" | "scholarship";
 
 export type InterviewRubricDimension = {
   dimension: "clarity" | "relevance" | "confidence" | "specificity";
@@ -272,6 +301,25 @@ export type InterviewSessionSummary = {
   current_question: InterviewCurrentQuestion | null;
   responses: InterviewAnswerFeedback[];
   latest_feedback: InterviewAnswerFeedback | null;
+  history_summary: {
+    answered_count: number;
+    recent_answers: Array<{
+      question_index: number;
+      question_text: string;
+      overall_score: number;
+      weakest_dimension: string | null;
+      strongest_dimension: string | null;
+      improvement_focus: string | null;
+    }>;
+  };
+  trend_summary: {
+    average_score: number | null;
+    score_delta: number | null;
+    score_direction: string;
+    weakest_dimension_overall: string | null;
+    latest_weakest_dimension: string | null;
+    dimension_averages: Record<string, number>;
+  };
   started_at: string | null;
   completed_at: string | null;
   created_at: string;

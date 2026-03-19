@@ -24,7 +24,11 @@ async def create_interview_session(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> InterviewSessionSummaryResponse:
     service = InterviewSessionService(db)
-    return await service.start_session(current_user.id, payload.practice_mode)
+    return await service.start_session(
+        current_user.id,
+        practice_mode=payload.practice_mode,
+        scholarship_id=payload.scholarship_id,
+    )
 
 
 @router.get("/{session_id}", response_model=InterviewSessionSummaryResponse)

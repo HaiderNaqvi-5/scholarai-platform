@@ -4,14 +4,15 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
-import { SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { apiRequest } from "@/lib/api";
 import type {
   ApiError,
   DocumentDetail,
+  DocumentGroundingEntry,
   DocumentInputMethod,
   DocumentListResponse,
   DocumentSubmissionResponse,
@@ -27,11 +28,19 @@ type DocumentState = {
   selectedId: string | null;
 };
 
+type NormalizedContextItem = {
+  key: string;
+  primary: string;
+  secondary: string | null;
+  meta: string | null;
+};
+
 export function DocumentAssistanceShell() {
   const { accessToken } = useAuth();
   const [inputMethod, setInputMethod] = useState<DocumentInputMethod>("text");
   const [documentType, setDocumentType] = useState<DocumentType>("sop");
   const [title, setTitle] = useState("");
+  const [scholarshipGrounding, setScholarshipGrounding] = useState("");
   const [contentText, setContentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -104,6 +113,10 @@ export function DocumentAssistanceShell() {
     () => state.items.find((item) => item.id === state.selectedId) ?? null,
     [state.items, state.selectedId],
   );
+  const groundingSelection = useMemo(
+    () => parseScholarshipGrounding(scholarshipGrounding),
+    [scholarshipGrounding],
+  );
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
@@ -114,7 +127,12 @@ export function DocumentAssistanceShell() {
   const handleSubmit = async () => {
     if (!accessToken) return;
 
-    const clientError = validateClientSubmission(inputMethod, contentText, file);
+    const clientError = validateClientSubmission(
+      inputMethod,
+      contentText,
+      file,
+      groundingSelection.error,
+    );
     if (clientError) {
       setFormError(clientError);
       return;
@@ -126,6 +144,14 @@ export function DocumentAssistanceShell() {
     const formData = new FormData();
     formData.append("document_type", documentType);
     if (title.trim()) formData.append("title", title.trim());
+    if (groundingSelection.ids.length === 1) {
+      formData.append("scholarship_id", groundingSelection.ids[0]);
+    }
+    if (groundingSelection.ids.length > 1) {
+      groundingSelection.ids.forEach((scholarshipId) => {
+        formData.append("scholarship_ids", scholarshipId);
+      });
+    }
     if (inputMethod === "text") formData.append("content_text", contentText.trim());
     if (inputMethod === "file" && file) formData.append("file", file);
 
@@ -149,6 +175,7 @@ export function DocumentAssistanceShell() {
         };
       });
       setTitle("");
+      setScholarshipGrounding("");
       setContentText("");
       setFile(null);
       setInputMethod("text");
@@ -190,6 +217,18 @@ export function DocumentAssistanceShell() {
       }));
     }
   };
+
+  const feedback = selectedDocument?.latest_feedback ?? null;
+  const generatedGuidance = getGeneratedGuidance(feedback);
+  const validatedFacts = normalizeGroundingEntries(feedback?.validated_facts);
+  const retrievedWritingGuidance = normalizeGroundingEntries(
+    feedback?.retrieved_writing_guidance ?? feedback?.grounded_context,
+  );
+  const limitations = getLimitations(feedback);
+  const citations = feedback?.citations ?? [];
+  const selectedGroundingCount =
+    selectedDocument?.scholarship_ids?.length ??
+    (selectedDocument?.scholarship_id ? 1 : 0);
 
   return (
     <AppShell
@@ -279,6 +318,27 @@ export function DocumentAssistanceShell() {
               </label>
             </div>
 
+            <label className="form-field">
+              <span className="form-field__label">Scholarship grounding (optional)</span>
+              <input
+                className="text-input"
+                name="scholarship_grounding"
+                onChange={(event) => setScholarshipGrounding(event.target.value)}
+                placeholder="Paste one scholarship ID or a few comma-separated IDs"
+                value={scholarshipGrounding}
+              />
+              <span className="field-note">
+                Use one scholarship ID or up to 3 IDs to ground feedback in
+                validated scholarship facts and writing guidance.
+              </span>
+              {groundingSelection.ids.length > 0 ? (
+                <span className="field-note">
+                  Grounding {groundingSelection.ids.length} scholarship
+                  {groundingSelection.ids.length === 1 ? "" : "s"} on submit.
+                </span>
+              ) : null}
+            </label>
+
             {inputMethod === "text" ? (
               <label className="form-field">
                 <span className="form-field__label">Draft text</span>
@@ -290,9 +350,7 @@ export function DocumentAssistanceShell() {
                   rows={14}
                   value={contentText}
                 />
-                <span className="field-note">
-                  50–12,000 characters.
-                </span>
+                <span className="field-note">50-12,000 characters.</span>
               </label>
             ) : (
               <label className="form-field">
@@ -387,14 +445,14 @@ export function DocumentAssistanceShell() {
           <PageHeader
             eyebrow="Feedback"
             title="Writing guidance"
-            description="Structured feedback on strengths, revisions, and cautions."
+            description="Generated guidance stays separate from validated scholarship facts and retrieved writing notes."
           />
           {!selectedDocument ? (
             <EmptyState
               title="No draft selected"
               description="Submit or select a draft to see feedback here."
             />
-          ) : selectedDocument.latest_feedback ? (
+          ) : feedback ? (
             <div className="surface-list">
               <article>
                 <div className="meta-row">
@@ -403,16 +461,24 @@ export function DocumentAssistanceShell() {
                     label={formatStatus(selectedDocument.processing_status)}
                     variant="validated"
                   />
-                  {selectedDocument.scholarship_id && (
-                    <StatusBadge label="Grounded in Scholarship" variant="validated" />
-                  )}
+                  {selectedGroundingCount > 0 ? (
+                    <StatusBadge
+                      label={
+                        selectedGroundingCount === 1
+                          ? "1 Scholarship Grounded"
+                          : `${selectedGroundingCount} Scholarships Grounded`
+                      }
+                      variant="validated"
+                    />
+                  ) : null}
                 </div>
-                <p className="body-copy">{selectedDocument.latest_feedback.summary}</p>
+                <p className="list-heading">Generated guidance</p>
+                <p className="body-copy">{generatedGuidance.summary}</p>
               </article>
               <article>
                 <p className="list-heading">Strengths</p>
                 <ul className="detail-list">
-                  {selectedDocument.latest_feedback.strengths.map((item) => (
+                  {generatedGuidance.strengths.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -420,7 +486,7 @@ export function DocumentAssistanceShell() {
               <article>
                 <p className="list-heading">Revision priorities</p>
                 <ul className="detail-list">
-                  {selectedDocument.latest_feedback.revision_priorities.map((item) => (
+                  {generatedGuidance.revision_priorities.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -428,7 +494,7 @@ export function DocumentAssistanceShell() {
               <article>
                 <p className="list-heading">Cautions</p>
                 <ul className="detail-list">
-                  {selectedDocument.latest_feedback.caution_notes.map((item) => (
+                  {generatedGuidance.caution_notes.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -456,32 +522,64 @@ export function DocumentAssistanceShell() {
           <PageHeader
             eyebrow="Context"
             title="About this feedback"
-            description="Writing guidance is advisory. Official scholarship requirements live in published records."
+            description="Validated scholarship facts, retrieved writing guidance, and limitations are displayed separately."
           />
-          {selectedDocument?.latest_feedback ? (
+          {feedback ? (
             <div className="surface-list">
               <article>
-                <p className="list-heading">Grounded context</p>
-                <ul className="detail-list">
-                  {selectedDocument.latest_feedback.grounded_context.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+                <p className="list-heading">Validated facts</p>
+                {validatedFacts.length > 0 ? (
+                  <ul className="detail-list">
+                    {validatedFacts.map((item) => (
+                      <li key={item.key}>
+                        {item.primary}
+                        {item.secondary ? <span> {item.secondary}</span> : null}
+                        {item.meta ? <span> ({item.meta})</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="body-copy">
+                    No validated scholarship facts were attached to this feedback.
+                  </p>
+                )}
               </article>
               <article>
-                <p className="list-heading">Citations</p>
+                <p className="list-heading">Retrieved writing guidance</p>
+                {retrievedWritingGuidance.length > 0 ? (
+                  <ul className="detail-list">
+                    {retrievedWritingGuidance.map((item) => (
+                      <li key={item.key}>
+                        {item.primary}
+                        {item.secondary ? <span> {item.secondary}</span> : null}
+                        {item.meta ? <span> ({item.meta})</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="body-copy">
+                    No retrieved writing guidance was returned for this draft.
+                  </p>
+                )}
+              </article>
+              <article className="guidance-callout">
+                <p className="list-heading">Limitations</p>
                 <ul className="detail-list">
-                  {selectedDocument.latest_feedback.citations.map((item) => (
+                  {limitations.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
               </article>
-              <article className="guidance-callout">
-                <p className="list-heading">Limitation</p>
-                <p className="body-copy">
-                  {selectedDocument.latest_feedback.limitation_notice}
-                </p>
-              </article>
+              {citations.length > 0 ? (
+                <article>
+                  <p className="list-heading">Citations</p>
+                  <ul className="detail-list">
+                    {citations.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
             </div>
           ) : (
             <div className="empty-panel">
@@ -500,7 +598,12 @@ function validateClientSubmission(
   inputMethod: DocumentInputMethod,
   contentText: string,
   file: File | null,
+  groundingError: string | null,
 ) {
+  if (groundingError) {
+    return groundingError;
+  }
+
   if (inputMethod === "text") {
     if (contentText.trim().length < 50) {
       return "Paste at least 50 characters before requesting feedback.";
@@ -527,4 +630,93 @@ function resolveErrorMessage(error: unknown) {
     return (error as ApiError).message;
   }
   return "Unexpected document assistance failure";
+}
+
+function parseScholarshipGrounding(value: string) {
+  const ids = value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const uniqueIds = Array.from(new Set(ids));
+
+  if (uniqueIds.length > 3) {
+    return {
+      ids: uniqueIds,
+      error: "Grounding supports up to 3 scholarship IDs per submission.",
+    };
+  }
+
+  return {
+    ids: uniqueIds,
+    error: null,
+  };
+}
+
+function getGeneratedGuidance(feedback: DocumentDetail["latest_feedback"]) {
+  if (!feedback) {
+    return {
+      summary: "",
+      strengths: [] as string[],
+      revision_priorities: [] as string[],
+      caution_notes: [] as string[],
+    };
+  }
+
+  return {
+    summary: feedback.generated_guidance?.summary ?? feedback.summary,
+    strengths: feedback.generated_guidance?.strengths ?? feedback.strengths,
+    revision_priorities:
+      feedback.generated_guidance?.revision_priorities ??
+      feedback.revision_priorities,
+    caution_notes:
+      feedback.generated_guidance?.caution_notes ?? feedback.caution_notes,
+  };
+}
+
+function getLimitations(feedback: DocumentDetail["latest_feedback"]) {
+  if (!feedback) {
+    return [];
+  }
+
+  if (feedback.limitations && feedback.limitations.length > 0) {
+    return feedback.limitations;
+  }
+
+  return feedback.limitation_notice ? [feedback.limitation_notice] : [];
+}
+
+function normalizeGroundingEntries(
+  entries?: DocumentGroundingEntry[] | null,
+): NormalizedContextItem[] {
+  if (!entries || entries.length === 0) {
+    return [];
+  }
+
+  return entries.map((entry, index) => {
+    if (typeof entry === "string") {
+      return {
+        key: `${index}-${entry}`,
+        primary: entry,
+        secondary: null,
+        meta: null,
+      };
+    }
+
+    const label = entry.label?.trim() ?? "";
+    const detail = entry.detail?.trim() ?? "";
+    const value = entry.value?.trim() ?? "";
+    const citation = entry.citation?.trim() ?? "";
+    const primary = label || detail || value || citation || "Context item";
+    const secondary = label && detail ? detail : value || null;
+    const meta = [entry.source, entry.scholarship_id, citation]
+      .filter((item): item is string => Boolean(item))
+      .join(" · ");
+
+    return {
+      key: `${index}-${primary}-${secondary ?? ""}-${meta}`,
+      primary,
+      secondary,
+      meta: meta || null,
+    };
+  });
 }

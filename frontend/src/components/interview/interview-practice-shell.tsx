@@ -28,6 +28,8 @@ type InterviewState = {
 
 export function InterviewPracticeShell() {
   const { accessToken } = useAuth();
+  const [practiceMode, setPracticeMode] = useState<"general" | "scholarship">("general");
+  const [scholarshipIdInput, setScholarshipIdInput] = useState("");
   const [answerText, setAnswerText] = useState("");
   const [audioB64, setAudioB64] = useState<string | null>(null);
   const [state, setState] = useState<InterviewState>({
@@ -90,11 +92,15 @@ export function InterviewPracticeShell() {
   const startSession = async () => {
     if (!accessToken) return;
 
+    const normalizedScholarshipId = scholarshipIdInput.trim();
     setState((current) => ({ ...current, isStarting: true, error: null }));
     try {
       const session = await apiRequest<InterviewSessionSummary>("/interviews", {
         method: "POST",
-        body: JSON.stringify({ practice_mode: "general" }),
+        body: JSON.stringify({
+          practice_mode: practiceMode,
+          scholarship_id: normalizedScholarshipId || null,
+        }),
         token: accessToken,
       });
       localStorage.setItem(LATEST_SESSION_KEY, session.session_id);
@@ -196,6 +202,14 @@ export function InterviewPracticeShell() {
                 <div className="meta-row">
                   <StatusBadge
                     label={
+                      state.session.practice_mode === "scholarship"
+                        ? "Scholarship mode"
+                        : "General mode"
+                    }
+                    variant="planned"
+                  />
+                  <StatusBadge
+                    label={
                       state.session.status === "completed"
                         ? "Completed"
                         : "In progress"
@@ -209,9 +223,9 @@ export function InterviewPracticeShell() {
                   <span className="route-card__label">
                     {state.session.current_question_index} of {state.session.total_questions} answered
                   </span>
-                  {state.session.scholarship_id && (
+                  {state.session.scholarship_id ? (
                     <StatusBadge label="Grounded in Scholarship" variant="validated" />
-                  )}
+                  ) : null}
                 </div>
               </article>
               <div className="document-actions">
@@ -231,15 +245,46 @@ export function InterviewPracticeShell() {
               title="No active session"
               description="Start a practice run to receive questions and structured rubric feedback."
               action={
-                <button
-                  className="auth-link auth-link--primary"
-                  data-testid="interview-start-session"
-                  disabled={state.isStarting}
-                  onClick={() => void startSession()}
-                  type="button"
-                >
-                  {state.isStarting ? "Starting…" : "Start session"}
-                </button>
+                <div className="document-form">
+                  <label className="form-field">
+                    <span className="form-field__label">Practice mode</span>
+                    <select
+                      className="text-input"
+                      onChange={(event) =>
+                        setPracticeMode(
+                          event.target.value as "general" | "scholarship",
+                        )
+                      }
+                      value={practiceMode}
+                    >
+                      <option value="general">General</option>
+                      <option value="scholarship">Scholarship-grounded</option>
+                    </select>
+                  </label>
+                  <label className="form-field">
+                    <span className="form-field__label">
+                      Scholarship ID (optional)
+                    </span>
+                    <input
+                      className="text-input"
+                      onChange={(event) => setScholarshipIdInput(event.target.value)}
+                      placeholder="Paste scholarship ID for grounded prompts"
+                      value={scholarshipIdInput}
+                    />
+                    <span className="field-note">
+                      If provided, the session uses validated scholarship context.
+                    </span>
+                  </label>
+                  <button
+                    className="auth-link auth-link--primary"
+                    data-testid="interview-start-session"
+                    disabled={state.isStarting}
+                    onClick={() => void startSession()}
+                    type="button"
+                  >
+                    {state.isStarting ? "Starting…" : "Start session"}
+                  </button>
+                </div>
               }
             />
           )}
@@ -358,6 +403,20 @@ export function InterviewPracticeShell() {
                   {state.session.latest_feedback.limitation_notice}
                 </p>
               </article>
+              <article>
+                <p className="list-heading">Trend summary</p>
+                <p className="body-copy">
+                  {state.session.trend_summary.average_score !== null
+                    ? `Average score ${state.session.trend_summary.average_score} with a ${state.session.trend_summary.score_direction} trajectory.`
+                    : "Not enough responses yet to calculate trend direction."}
+                </p>
+                {state.session.trend_summary.latest_weakest_dimension ? (
+                  <p className="code-note">
+                    Latest weakest dimension:{" "}
+                    {state.session.trend_summary.latest_weakest_dimension}
+                  </p>
+                ) : null}
+              </article>
             </div>
           ) : (
             <div className="empty-panel">
@@ -376,6 +435,13 @@ export function InterviewPracticeShell() {
           />
           {state.session?.responses.length ? (
             <div className="surface-list">
+              <article className="guidance-callout">
+                <p className="list-heading">History summary</p>
+                <p className="body-copy">
+                  Answered {state.session.history_summary.answered_count} question
+                  {state.session.history_summary.answered_count === 1 ? "" : "s"}.
+                </p>
+              </article>
               {state.session.responses.map((response) => (
                 <article key={`${response.question_index}-${response.created_at ?? "pending"}`}>
                   <div className="meta-row">

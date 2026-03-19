@@ -44,6 +44,8 @@ async def create_document(
     document_type: Annotated[str, Form(...)],
     title: Annotated[str | None, Form()] = None,
     content_text: Annotated[str | None, Form()] = None,
+    scholarship_id: Annotated[str | None, Form()] = None,
+    scholarship_ids: Annotated[list[str] | None, Form()] = None,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> DocumentSubmissionResponse:
     service = DocumentService(db)
@@ -52,6 +54,8 @@ async def create_document(
         document_type=document_type,
         title=title,
         content_text=content_text,
+        scholarship_id=scholarship_id,
+        scholarship_ids=scholarship_ids,
         upload=file,
     )
     return DocumentSubmissionResponse(document=document)

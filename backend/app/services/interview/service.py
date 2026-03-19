@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -19,14 +20,15 @@ from app.schemas.interviews import (
     InterviewCurrentQuestionResponse,
     InterviewSessionSummaryResponse,
 )
+from app.services.documents.grounding import validate_scholarship_grounding
+from app.services.interview.bounded_guidance import (
+    build_adaptive_question,
+    build_history_summary,
+    build_question_set,
+    build_trend_summary,
+    select_weakest_dimension,
+)
 from app.services.interview.scoring import InterviewScoringService
-import os
-
-GENERAL_QUESTION_SET = [
-    "Tell us about yourself and what led you to pursue graduate study in data science or analytics.",
-    "Describe a project or experience that shows how you solve problems under uncertainty.",
-    "Why would you be a strong fit for a scholarship that values academic promise and future impact?",
-]
 
 
 class InterviewSessionService:
@@ -37,38 +39,25 @@ class InterviewSessionService:
         if os.environ.get("GOOGLE_API_KEY"):
             try:
                 from app.services.interview.evaluator import InterviewEvaluator
+
                 self.evaluator = InterviewEvaluator()
-            except Exception as e:
-                print(f"Failed to load AI Integrations: {e}")
+            except Exception as exc:  # pragma: no cover
+                print(f"Failed to load AI integrations: {exc}")
 
     async def start_session(
         self,
         user_id: uuid.UUID,
         practice_mode: str = InterviewPracticeMode.GENERAL.value,
-        scholarship_id: uuid.UUID | None = None,
+        scholarship_id: str | uuid.UUID | None = None,
     ) -> InterviewSessionSummaryResponse:
         parsed_mode = self._parse_mode(practice_mode)
-        
-        question_set = list(GENERAL_QUESTION_SET)
-        
-        if scholarship_id and self.evaluator:
-            # Fetch scholarship context
-            result = await self.db.execute(
-                select(Scholarship).where(Scholarship.id == scholarship_id)
-            )
-            scholarship = result.scalar_one_or_none()
-            if scholarship:
-                from app.services.interview.prompts import get_prompts_for_category
-                prompts = get_prompts_for_category(scholarship.category or "general")
-                context = f"Category Context: {prompts['system_instruction']}\nTitle: {scholarship.title}\nSummary: {scholarship.summary}\nFunding: {scholarship.funding_summary}"
-                custom_questions = await self.evaluator.generate_questions(context)
-                if custom_questions:
-                    question_set = custom_questions
+        grounded_scholarships = await self._resolve_grounding(scholarship_id)
+        question_set = build_question_set(parsed_mode.value, grounded_scholarships)
 
         session = InterviewSession(
             user_id=user_id,
             practice_mode=parsed_mode,
-            scholarship_id=scholarship_id,
+            scholarship_id=grounded_scholarships[0].id if grounded_scholarships else None,
             status=InterviewSessionStatus.IN_PROGRESS,
             current_question_index=0,
             total_questions=len(question_set),
@@ -124,8 +113,8 @@ class InterviewSessionService:
             )
 
         question_text = session.question_set[question_index]
-        
         feedback = None
+
         if self.evaluator:
             try:
                 feedback = self.evaluator.evaluate(
@@ -134,9 +123,9 @@ class InterviewSessionService:
                     audio_b64=payload.audio_b64,
                     text_answer=payload.answer_text,
                 )
-            except Exception as e:
-                print(f"Gemini evaluation failed, falling back to rules: {e}")
-        
+            except Exception as exc:  # pragma: no cover
+                print(f"Gemini evaluation failed, falling back to rules: {exc}")
+
         if not feedback:
             fallback_text = payload.answer_text or "The audio processing failed. This is a fallback."
             feedback = self.scoring_service.score_answer(
@@ -154,23 +143,17 @@ class InterviewSessionService:
             summary_feedback=feedback.summary_feedback,
         )
         self.db.add(response)
-
         session.current_question_index += 1
-        
-        # Live Probing: Generate a follow-up for the NEXT question if applicable
-        if session.current_question_index < session.total_questions and self.evaluator:
-            try:
-                # We use the previous answer to 're-tune' the next question in the set
-                follow_up = await self.evaluator.generate_follow_up(
-                    question=question_text,
-                    answer=feedback.answer_text,
-                    context=f"Scholarship ID: {session.scholarship_id}"
-                )
-                if follow_up:
-                    # Replace the next placeholder question with this specific follow-up
-                    session.question_set[session.current_question_index] = follow_up
-            except Exception as e:
-                print(f"Follow-up generation failed: {e}")
+
+        if session.current_question_index < session.total_questions:
+            grounded_scholarships = await self._resolve_grounding(session.scholarship_id)
+            weakest_dimension = select_weakest_dimension(feedback)
+            base_next_question = session.question_set[session.current_question_index]
+            session.question_set[session.current_question_index] = build_adaptive_question(
+                base_next_question,
+                weakest_dimension,
+                grounded_scholarships,
+            )
 
         if session.current_question_index >= session.total_questions:
             session.status = InterviewSessionStatus.COMPLETED
@@ -204,6 +187,14 @@ class InterviewSessionService:
             )
         return session
 
+    async def _resolve_grounding(
+        self,
+        scholarship_id: str | uuid.UUID | None,
+    ) -> list[Scholarship]:
+        if scholarship_id is None:
+            return []
+        return await validate_scholarship_grounding(self.db, scholarship_id=scholarship_id)
+
     def _build_session_response(
         self,
         session: InterviewSession,
@@ -222,6 +213,8 @@ class InterviewSessionService:
             current_question=self._build_current_question(session),
             responses=response_items,
             latest_feedback=latest_feedback,
+            history_summary=build_history_summary(response_items),
+            trend_summary=build_trend_summary(response_items),
             started_at=session.started_at,
             completed_at=session.completed_at,
             created_at=session.created_at,
@@ -273,5 +266,5 @@ class InterviewSessionService:
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Interview practice mode must be 'general'",
+                detail="Interview practice mode must be 'general' or 'scholarship'",
             ) from exc

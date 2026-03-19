@@ -64,7 +64,15 @@ scholarai-platform/
   - curator workflow with `raw`, `validated`, and `published` states
   - source-registry ingestion runs that create raw records for curation
   - migration-driven bootstrap and browser smoke checks in CI
-- Remaining implementation depth is concentrated in scholarship-specific grounding for preparation tools, richer ingestion coverage, and recommendation evaluation/tuning beyond the new Phase 1 hybrid ranking baseline.
+- Phase 2 now adds scholarship-grounded bounded guidance in Documents and Interviews, with explicit API-level separation of validated scholarship facts, retrieved writing guidance, generated guidance, and limitations.
+- Remaining implementation depth is concentrated in richer ingestion coverage and recommendation evaluation/tuning beyond the new Phase 1 hybrid ranking baseline.
+
+## Phase 2 API Updates (Canada-first Fixed)
+- `POST /api/v1/documents` accepts optional scholarship grounding identifiers for Canada-scoped scholarship context.
+- `POST /api/v1/documents/{id}/feedback` returns explicit grounded-context sections for validated facts, retrieved writing guidance, generated guidance, and limitations.
+- `POST /api/v1/interviews` accepts `practice_mode` plus optional `scholarship_id`.
+- `GET /api/v1/interviews/{id}` returns session history summary and rubric trend summary used by adaptive follow-up.
+- Invalid grounding identifiers fail cleanly with structured error responses.
 
 ## Local MVP Run
 ### Env files

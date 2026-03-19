@@ -94,6 +94,7 @@ class InterviewSessionStatus(enum.StrEnum):
 
 class InterviewPracticeMode(enum.StrEnum):
     GENERAL = "general"
+    SCHOLARSHIP = "scholarship"
 
 
 class User(Base):
