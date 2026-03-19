@@ -31,6 +31,9 @@ class RecommendationService:
         limit: int = 10,
     ) -> list[RecommendationItem]:
         # Stage 1: Hybrid Search (Vector + BM25)
+        # Build search query from student profile
+        search_query = f"{profile.major} {profile.interests or ''}".strip()
+        
         # Generate real query embedding
         try:
             from sentence_transformers import SentenceTransformer
