@@ -86,10 +86,10 @@ def create_app() -> FastAPI:
             message=message,
         )
 
-    @app.exception_handler(SQLAlchemyError)
+    @app.exception_handler(exc.SQLAlchemyError)
     async def handle_database_exception(
         request: Request,
-        exc: SQLAlchemyError,
+        db_exc: exc.SQLAlchemyError,
     ) -> JSONResponse:
         return build_error_response(
             request=request,
