@@ -64,7 +64,7 @@ scholarai-platform/
   - curator workflow with `raw`, `validated`, and `published` states
   - source-registry ingestion runs that create raw records for curation
   - migration-driven bootstrap and browser smoke checks in CI
-- Remaining implementation depth is concentrated in recommendation stages beyond the rules-first baseline, scholarship-specific grounding for preparation tools, and richer ingestion coverage.
+- Remaining implementation depth is concentrated in scholarship-specific grounding for preparation tools, richer ingestion coverage, and recommendation evaluation/tuning beyond the new Phase 1 hybrid ranking baseline.
 
 ## Local MVP Run
 ### Env files

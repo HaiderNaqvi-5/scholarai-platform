@@ -8,7 +8,7 @@ This document records the current demo readiness of the repository based on the 
 2. Public scholarship browse and scholarship detail views over published records only.
 3. Authenticated dashboard access with saved opportunities.
 4. Profile save flow feeding published recommendation results.
-5. Recommendation shortlist with deterministic explanation panels.
+5. Recommendation shortlist with stage-aware rationale that separates validated facts from estimated ranking signals.
 6. Document assistance submission and structured feedback foundation.
 7. Interview practice session flow with rubric-based scoring.
 8. Curator dashboard with `raw`, `validated`, `published`, and unpublish actions.
@@ -20,7 +20,7 @@ This document records the current demo readiness of the repository based on the 
 | Auth and protected pages | Usable for MVP demo |
 | Dashboard shell | Usable for MVP demo |
 | Public scholarship browse and detail flow | Usable for MVP demo after a fresh frontend restart or rebuild |
-| Seeded published recommendation flow | Usable once the migration-driven bootstrap path is run |
+| Seeded published recommendation flow | Usable once migrations and embedding refresh are run for semantic retrieval; rules-only fallback remains available |
 | Document feedback shell | Usable as a bounded MVP workflow |
 | Interview practice shell | Usable as a bounded MVP workflow |
 | Curator review shell | Usable for internal admin demo |
@@ -36,7 +36,7 @@ This document records the current demo readiness of the repository based on the 
 |---|---|
 | Only the first Alembic revision exists so far | Schema evolution is not fully exercised yet |
 | Frontend/browser verification is not regularly executed in this repo | Demo confidence remains partially manual |
-| Search and browse discovery baseline is still narrow | Student-facing discovery remains intentionally constrained to a simple published-record browse surface |
+| Recommendation semantics depend on embedding availability | Without refreshed embeddings, recommendation ranking falls back to rules-only ordering |
 | Route-level frontend changes require a clean restart to avoid stale 404s in an already-running dev process | Demo rehearsals can produce false failures if the frontend is not rebuilt or restarted |
 
 ## Highest-risk demo blockers
@@ -44,6 +44,7 @@ This document records the current demo readiness of the repository based on the 
 2. If Node or Python dependencies are missing locally, browser-level verification and app startup will fail.
 3. If the frontend server was already running before route-level changes were pulled, the new pages may not be visible until the process is restarted.
 4. The repo still depends on a manual local demo checklist rather than a complete end-to-end automated rehearsal.
+5. If embedding refresh is skipped, recommendation stage status will show retrieval fallback and semantic factors will be absent.
 
 ## External demo recommendation
 For an external or thesis-facing demo, do not present the project unless:
@@ -58,7 +59,8 @@ For an external or thesis-facing demo, do not present the project unless:
 4. Restart or rebuild the frontend if route-level changes were pulled since the last run.
 5. Verify `/health` responds and the frontend loads.
 6. Run `backend/scripts/rehearse_seeded_demo.py` for API-level verification or `tests/e2e/playwright/rehearse_seeded_demo.py` for browser-level rehearsal.
-7. Verify public browse/detail, document feedback, interview practice, and curation access.
+7. Trigger recommendation embedding refresh task for semantic retrieval readiness.
+8. Verify public browse/detail, recommendation stage rationale, document feedback, interview practice, and curation access.
 
 ## MVP decision
 ScholarAI is close to a presentable internal MVP demo, with a migration-driven bootstrap path now available, but still requires rehearsal discipline before external presentation.

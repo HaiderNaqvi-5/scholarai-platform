@@ -96,11 +96,84 @@ export type RecommendationItem = ScholarshipListItem & {
   top_reasons: string[];
   warnings: string[];
   shap_explanation?: Record<string, number> | null;
+  retrieval_source?: string;
+  semantic_similarity?: number | null;
+  rule_pass_count?: number;
+  rule_total_count?: number;
+  heuristic_factors?: Record<string, number>;
+  fallback_reason?: string | null;
+  eligibility_graph?: Record<string, unknown>;
+  signal_language?: {
+    facts_label: string;
+    estimated_signals_label: string;
+    estimated_signals_notice: string;
+  } | null;
+  rationale?: {
+    summary: string;
+    facts: Array<{
+      code: string;
+      label: string;
+      detail: string;
+      stage: "scope" | "eligibility" | "retrieval" | "rerank" | "explanation";
+      source:
+        | "published_record"
+        | "validated_rule"
+        | "profile_input"
+        | "retrieval_model"
+        | "rerank_model";
+      direction: "supports" | "limits" | "neutral";
+      numeric_value?: number | null;
+      display_value?: string | null;
+    }>;
+    estimated_signals: Array<{
+      code: string;
+      label: string;
+      detail: string;
+      stage: "scope" | "eligibility" | "retrieval" | "rerank" | "explanation";
+      source:
+        | "published_record"
+        | "validated_rule"
+        | "profile_input"
+        | "retrieval_model"
+        | "rerank_model";
+      direction: "supports" | "limits" | "neutral";
+      numeric_value?: number | null;
+      display_value?: string | null;
+    }>;
+    stages: {
+      scope: {
+        status: "applied" | "fallback" | "skipped";
+        summary: string;
+      };
+      eligibility: {
+        status: "applied" | "fallback" | "skipped";
+        summary: string;
+      };
+      retrieval: {
+        status: "applied" | "fallback" | "skipped";
+        summary: string;
+      };
+      rerank: {
+        status: "applied" | "fallback" | "skipped";
+        summary: string;
+      };
+      explanation: {
+        status: "applied" | "fallback" | "skipped";
+        summary: string;
+      };
+    };
+  } | null;
 };
 
 export type RecommendationListResponse = {
   items: RecommendationItem[];
   total: number;
+  meta?: {
+    scope_policy: string;
+    allowed_country_codes: string[];
+    exception_policy: string;
+    pipeline_version: string;
+  };
 };
 
 export type DocumentType = "sop" | "essay";

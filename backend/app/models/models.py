@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -304,6 +305,7 @@ class Scholarship(Base):
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -377,6 +379,17 @@ class Scholarship(Base):
         Index("ix_scholarships_country_code", "country_code"),
         Index("ix_scholarships_deadline_at", "deadline_at"),
         Index("ix_scholarships_funding_type", "funding_type"),
+        Index(
+            "ix_scholarships_description_embedding_published",
+            "description_embedding",
+            postgresql_using="ivfflat",
+            postgresql_with={"lists": 100},
+            postgresql_ops={"description_embedding": "vector_cosine_ops"},
+            postgresql_where=text(
+                "record_state = 'published'::scholarship_record_state "
+                "AND description_embedding IS NOT NULL"
+            ),
+        ),
     )
 
 

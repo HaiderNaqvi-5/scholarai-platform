@@ -13,8 +13,8 @@ from sqlalchemy.dialects import postgresql
 import pgvector
 
 # revision identifiers, used by Alembic.
-revision: str = '0004_scholarship_chunks'
-down_revision: Union[str, None] = '0003_scholarship_discovery_fields'
+revision: str = "0004_scholarship_chunks"
+down_revision: Union[str, None] = "20260316_0003"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

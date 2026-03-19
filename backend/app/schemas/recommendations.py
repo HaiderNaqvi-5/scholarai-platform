@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7,6 +8,50 @@ class RecommendationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     limit: int = Field(default=10, ge=1, le=25)
+
+
+class RecommendationSignalLanguage(BaseModel):
+    facts_label: str
+    estimated_signals_label: str
+    estimated_signals_notice: str
+
+
+class RecommendationFactor(BaseModel):
+    code: str
+    label: str
+    detail: str
+    stage: Literal["scope", "eligibility", "retrieval", "rerank", "explanation"]
+    source: Literal[
+        "published_record",
+        "validated_rule",
+        "profile_input",
+        "retrieval_model",
+        "rerank_model",
+    ]
+    direction: Literal["supports", "limits", "neutral"]
+    numeric_value: float | None = None
+    display_value: str | None = None
+
+
+class RecommendationStageDetail(BaseModel):
+    status: Literal["applied", "fallback", "skipped"]
+    summary: str
+    factors: list[RecommendationFactor] = Field(default_factory=list)
+
+
+class RecommendationRationaleStages(BaseModel):
+    scope: RecommendationStageDetail
+    eligibility: RecommendationStageDetail
+    retrieval: RecommendationStageDetail
+    rerank: RecommendationStageDetail
+    explanation: RecommendationStageDetail
+
+
+class RecommendationRationale(BaseModel):
+    summary: str
+    facts: list[RecommendationFactor] = Field(default_factory=list)
+    estimated_signals: list[RecommendationFactor] = Field(default_factory=list)
+    stages: RecommendationRationaleStages
 
 
 class RecommendationItem(BaseModel):
@@ -23,7 +68,23 @@ class RecommendationItem(BaseModel):
     constraint_notes: list[str]
     top_reasons: list[str]
     warnings: list[str]
-    shap_explanation: dict[str, str] | None = None
+    shap_explanation: dict[str, float] | None = None
+    retrieval_source: str
+    semantic_similarity: float | None = None
+    rule_pass_count: int = Field(ge=0)
+    rule_total_count: int = Field(ge=0)
+    heuristic_factors: dict[str, float]
+    fallback_reason: str | None = None
+    eligibility_graph: dict[str, Any]
+    signal_language: RecommendationSignalLanguage | None = None
+    rationale: RecommendationRationale | None = None
+
+
+class RecommendationResponseMeta(BaseModel):
+    scope_policy: str
+    allowed_country_codes: list[str]
+    exception_policy: str
+    pipeline_version: str
 
 
 class RecommendationListResponse(BaseModel):
@@ -31,3 +92,4 @@ class RecommendationListResponse(BaseModel):
 
     items: list[RecommendationItem]
     total: int = Field(ge=0)
+    meta: RecommendationResponseMeta | None = None

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.schemas import RecommendationListResponse, RecommendationRequest
+from app.schemas.recommendations import RecommendationResponseMeta
 from app.services.recommendations import RecommendationService
 from app.services.students import StudentService
 
@@ -28,4 +29,13 @@ async def build_recommendations(
 
     service = RecommendationService(db)
     items = await service.build_for_profile(profile, limit=payload.limit)
-    return RecommendationListResponse(items=items, total=len(items))
+    return RecommendationListResponse(
+        items=items,
+        total=len(items),
+        meta=RecommendationResponseMeta(
+            scope_policy="canada_first",
+            allowed_country_codes=["CA"],
+            exception_policy="US_fulbright_only",
+            pipeline_version="recommendations.phase1.v1",
+        ),
+    )

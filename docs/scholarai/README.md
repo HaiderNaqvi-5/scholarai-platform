@@ -77,7 +77,8 @@ docs/scholarai/
   - dashboard, saved opportunities, document assistance, interview practice, and curation are implemented as narrow MVP slices
   - curation now includes manual raw import plus source-registry ingestion runs
   - migration-driven bootstrap and browser smoke checks in CI are implemented
-  - recommendation depth, scholarship-specific preparation grounding, and broader ingestion coverage are still incomplete
+  - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
+  - scholarship-specific preparation grounding and broader ingestion coverage are still incomplete
 
 ## Required Diagrams List
 1. Product context and actor map.

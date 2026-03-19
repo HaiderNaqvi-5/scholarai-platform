@@ -207,24 +207,55 @@ export function RecommendationWorkspace() {
                           </p>
                         </div>
                         <p className="recommendation-summary">{item.match_summary}</p>
+                        {item.rationale?.summary ? (
+                          <p className="body-copy">{item.rationale.summary}</p>
+                        ) : null}
                       </div>
 
                       <div className="recommendation-grid">
                         <section className="explanation-panel">
-                          <p className="list-label">What aligned</p>
+                          <p className="list-label">
+                            {item.signal_language?.facts_label ?? "What aligned"}
+                          </p>
                           <ul className="detail-list">
-                            {item.matched_criteria.map((criterion) => (
-                              <li key={criterion}>{criterion}</li>
-                            ))}
+                            {(item.rationale?.facts ?? []).length > 0
+                              ? item.rationale?.facts.map((factor) => (
+                                  <li key={`${item.scholarship_id}-${factor.code}`}>
+                                    <strong>{factor.label}:</strong> {factor.detail}
+                                  </li>
+                                ))
+                              : item.matched_criteria.map((criterion) => (
+                                  <li key={criterion}>{criterion}</li>
+                                ))}
                           </ul>
                         </section>
 
                         <section className="explanation-panel explanation-panel--caution">
+                          <p className="list-label">
+                            {item.signal_language?.estimated_signals_label ??
+                              "Estimated ranking signals"}
+                          </p>
+                          {(item.rationale?.estimated_signals ?? []).length > 0 ? (
+                            <ul className="detail-list">
+                              {item.rationale?.estimated_signals.map((factor) => (
+                                <li key={`${item.scholarship_id}-signal-${factor.code}`}>
+                                  <strong>{factor.label}:</strong> {factor.detail}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="body-copy">
+                              Semantic ranking signals were not available for this item.
+                            </p>
+                          )}
+                          {item.signal_language?.estimated_signals_notice ? (
+                            <p className="body-copy">{item.signal_language.estimated_signals_notice}</p>
+                          ) : null}
                           <p className="list-label">What to verify</p>
                           {item.constraint_notes.length > 0 ? (
                             <ul className="detail-list">
                               {item.constraint_notes.map((note) => (
-                                <li key={note}>{note}</li>
+                                <li key={`${item.scholarship_id}-constraint-${note}`}>{note}</li>
                               ))}
                             </ul>
                           ) : (
@@ -232,6 +263,42 @@ export function RecommendationWorkspace() {
                               No cautions found in the current record.
                             </p>
                           )}
+                          {item.fallback_reason ? (
+                            <p className="body-copy">{item.fallback_reason}</p>
+                          ) : null}
+                        </section>
+                      </div>
+
+                      <div className="recommendation-grid">
+                        <section className="explanation-panel">
+                          <p className="list-label">Stage status</p>
+                          <ul className="detail-list">
+                            {item.rationale ? (
+                              <>
+                                <li>Scope: {item.rationale.stages.scope.status}</li>
+                                <li>Eligibility: {item.rationale.stages.eligibility.status}</li>
+                                <li>Retrieval: {item.rationale.stages.retrieval.status}</li>
+                                <li>Rerank: {item.rationale.stages.rerank.status}</li>
+                              </>
+                            ) : (
+                              <li>Stage details are not available for this item.</li>
+                            )}
+                          </ul>
+                        </section>
+
+                        <section className="explanation-panel">
+                          <p className="list-label">Ranking features</p>
+                          <ul className="detail-list">
+                            {item.heuristic_factors ? (
+                              Object.entries(item.heuristic_factors).map(([key, value]) => (
+                                <li key={`${item.scholarship_id}-feature-${key}`}>
+                                  {key.replace(/_/g, " ")}: {value.toFixed(3)}
+                                </li>
+                              ))
+                            ) : (
+                              <li>Feature-level ranking details are not available.</li>
+                            )}
+                          </ul>
                         </section>
                       </div>
 

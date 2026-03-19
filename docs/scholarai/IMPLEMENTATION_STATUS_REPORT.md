@@ -1,7 +1,7 @@
 # ScholarAI Implementation Status Report
 
 ## Current Implementation Snapshot
-ScholarAI now has a real internal MVP path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. The largest remaining implementation gaps are recommendation depth beyond the rules-first baseline, stronger scholarship-specific grounding for preparation tools, broader ingestion coverage, and cleanup of intentionally thin non-core layers.
+ScholarAI now has a real internal MVP path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. The largest remaining implementation gaps are stronger scholarship-specific grounding for preparation tools, broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
 
 ## Implemented Features
 ### Backend and platform foundation
@@ -29,7 +29,7 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 | Profile save and load flow | `backend/app/api/v1/routes/students.py`, `backend/app/services/students/service.py`, `frontend/src/components/profile/profile-form-shell.tsx` |
 | Functional onboarding route | `frontend/src/app/onboarding/page.tsx` |
 | Public scholarship browse, search, filters, and detail | `backend/app/api/v1/routes/scholarships.py`, `frontend/src/components/scholarships/scholarship-browse-shell.tsx`, `frontend/src/components/scholarships/scholarship-detail-shell.tsx` |
-| Recommendation API and deterministic explanation payload | `backend/app/api/v1/routes/recommendations.py`, `backend/app/services/recommendations/eligibility.py`, `backend/app/services/recommendations/service.py` |
+| Recommendation API and stage-aware explanation payload | `backend/app/api/v1/routes/recommendations.py`, `backend/app/services/recommendations/eligibility.py`, `backend/app/services/recommendations/service.py` |
 | Recommendation workspace UI | `frontend/src/components/recommendations/recommendation-workspace.tsx` |
 | Saved opportunities | `backend/app/api/v1/routes/saved_opportunities.py`, `backend/app/services/saved_opportunities/service.py`, `frontend/src/components/dashboard/dashboard-shell.tsx` |
 | Dashboard shell | `frontend/src/components/dashboard/dashboard-shell.tsx` |
@@ -61,7 +61,7 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 |---|---|---|
 | Scholarship discovery experience | Public browse, query, field filter, deadline window, sort, save actions, and detail page | Filtering is still narrow and corpus-aware rather than broad search/discovery depth |
 | Core student journey | Public browse -> detail plus signup -> profile -> recommendations -> save now works | Compare workflows, deeper search refinement, and stronger action-planning surfaces are still thin |
-| Recommendation system | Deterministic rules-first ranking with summaries, criteria, warnings, and constraints | No vector retrieval, no graph-aware runtime filtering, no ML reranking, no runtime evaluation tooling |
+| Recommendation system | Phase 1 pipeline active: relational eligibility graph abstraction, pgvector retrieval over published scholarships, heuristic rerank factors, stage-aware rationale, and rules-only fallback parity | Runtime evaluation tooling, threshold tuning, and richer analytics remain incomplete |
 | Document assistance | Submission, processing state, recent drafts, structured feedback, limitation notice | No retrieval-backed grounding from validated scholarship records and no async larger-job orchestration |
 | Interview practice | Fixed session lifecycle, structured rubric, results view, stored responses | No scholarship-specific prompt bank, no adaptive interviewer behavior, no voice path, no richer history |
 | Ingestion pipeline | Source-registry run model, capture path, parsing, raw-record creation, and worker hook exist | Parser coverage is still heuristic and narrow; dedup and retry logic are not yet rich enough for broader source volume |
@@ -78,8 +78,8 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 ### Remaining MVP work
 | Feature | Gap |
 |---|---|
-| Vector retrieval stage | No pgvector-backed retrieval or embedding pipeline in runtime recommendation flow |
-| Graph-aware runtime filtering | Knowledge Graph Layer remains logical/documented rather than an explicit runtime filter layer |
+| Recommendation quality evaluation instrumentation | No continuous offline/online scoring harness for ranking quality drift yet |
+| Rerank calibration and guardrail tuning | Heuristic weights are implemented but not yet calibrated against judged datasets |
 | Scholarship-grounded document tailoring | Document feedback does not yet inject validated scholarship facts into guidance |
 | Scholarship-specific interview prompts | Interview practice is general-purpose within MVP scope, not scholarship-targeted yet |
 | Richer ingestion review controls | No queue assignment, bulk operations, run retry UI, or captured HTML snapshot management |
@@ -104,7 +104,7 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 
 ## MVP Blockers
 1. The ingestion path now exists, but it is still too heuristic and narrow to count as a mature trusted-data pipeline.
-2. Recommendation depth is still below the full target pipeline in `08_recommendation_and_ml.md`.
+2. Recommendation depth now covers the Phase 1 runtime pipeline, but evaluation and calibration depth are still below the full target in `08_recommendation_and_ml.md`.
 3. Document and interview tools are usable, but they are not yet scholarship-specific enough to fully match the intended preparation workflow.
 4. Shared and infra layers remain intentionally thin, so maintainability relies on discipline rather than stronger packaging boundaries.
 
@@ -136,7 +136,7 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 
 ## Recommended Next 3 Implementation Priorities
 1. Add scholarship-specific grounding to document assistance and interview practice.
-2. Implement the runtime vector-retrieval stage and keep the current heuristic rerank as fallback.
+2. Add recommendation evaluation tooling and calibrate rerank weights with judged samples.
 3. Strengthen ingestion coverage with richer parsers, retry handling, and curator-facing run diagnostics.
 
 ## MVP decision
