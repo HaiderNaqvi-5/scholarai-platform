@@ -30,7 +30,7 @@ class SavedOpportunityService:
             for application in saved_rows
             if application.scholarship is not None
             and application.scholarship.record_state == RecordState.PUBLISHED
-            and scholarship_in_scope(application.scholarship)
+            and self._is_in_scope(application.scholarship)
         ]
 
     async def save(self, user_id: uuid.UUID, scholarship_id: uuid.UUID) -> SavedOpportunityItem:
@@ -87,12 +87,16 @@ class SavedOpportunityService:
             )
         )
         scholarship = result.scalar_one_or_none()
-        if scholarship is None or not scholarship_in_scope(scholarship):
+        if scholarship is None or not self._is_in_scope(scholarship):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Published scholarship not found",
             )
         return scholarship
+
+    def _is_in_scope(self, scholarship: Scholarship) -> bool:
+        in_scope, _, _ = scholarship_in_scope(scholarship)
+        return in_scope
 
     def _serialize(self, application: Application) -> SavedOpportunityItem:
         scholarship = application.scholarship
