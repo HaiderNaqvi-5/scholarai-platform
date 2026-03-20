@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from app.core.security import hash_password
 from app.schemas.auth import UserCreate, UserLogin
 from app.services.auth import AuthService
+from scholarai_common.errors import ScholarAIException, ErrorCode
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,12 +63,13 @@ async def test_auth_service_login_rejects_invalid_password():
     session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
 
-    tokens, error_code = await service.login(
-        UserLogin(email="student@example.com", password="wrong-password")
-    )
+    with pytest.raises(ScholarAIException) as caught:
+        await service.login(
+            UserLogin(email="student@example.com", password="wrong-password")
+        )
 
-    assert tokens is None
-    assert error_code == "invalid_credentials"
+    assert caught.value.code == ErrorCode.AUTH_INVALID_CREDENTIALS
+    assert caught.value.status_code == 401
 
 
 async def test_auth_service_login_returns_tokens_for_valid_credentials():
@@ -81,11 +83,10 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
     session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
 
-    tokens, error_code = await service.login(
+    tokens = await service.login(
         UserLogin(email="student@example.com", password="correct-password")
     )
 
-    assert error_code is None
     assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
@@ -99,10 +100,10 @@ async def test_auth_service_refresh_session_returns_new_tokens():
         role=SimpleNamespace(value="student"),
         is_active=True,
     )
-    session = FakeSession([ScalarResult(one=user)])
+    session = FakeSession([ScalarResult(one=user), ScalarResult(one=user)])
     service = AuthService(session)
 
-    login_tokens, _ = await service.login(
+    login_tokens = await service.login(
         UserLogin(email="student@example.com", password="correct-password")
     )
     assert login_tokens is not None

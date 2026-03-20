@@ -15,6 +15,7 @@ import type {
   CurationRecordListResponse,
   CurationRawImportRequest,
   CurationRecordState,
+  IngestionExecutionMode,
   IngestionRunDetail,
   IngestionRunListResponse,
   IngestionRunStartRequest,
@@ -99,6 +100,7 @@ type IngestionState = {
   source_base_url: string;
   source_type: string;
   max_records: string;
+  execution_mode: IngestionExecutionMode;
 };
 
 const EMPTY_EDIT_STATE: EditState = {
@@ -134,6 +136,7 @@ const EMPTY_INGESTION_STATE: IngestionState = {
   source_base_url: CURATION_SOURCE_OPTIONS[0].source_base_url,
   source_type: CURATION_SOURCE_OPTIONS[0].source_type,
   max_records: "5",
+  execution_mode: "auto",
 };
 
 export function CurationDashboardShell() {
@@ -532,6 +535,7 @@ export function CurationDashboardShell() {
         source_base_url: emptyToNull(ingestionState.source_base_url),
         source_type: ingestionState.source_type.trim() || "official",
         max_records: Number(ingestionState.max_records) || 5,
+        execution_mode: ingestionState.execution_mode,
       };
 
       const detail = await apiRequest<IngestionRunDetail>("/curation/ingestion-runs", {
@@ -638,6 +642,7 @@ export function CurationDashboardShell() {
                     source_base_url: selected.source_base_url,
                     source_type: selected.source_type,
                     max_records: ingestionState.max_records,
+                    execution_mode: ingestionState.execution_mode,
                   });
                 }}
                 value={ingestionState.source_key}
@@ -715,6 +720,23 @@ export function CurationDashboardShell() {
                 value={ingestionState.max_records}
               />
             </label>
+            <label className="form-field">
+              <span className="form-field__label">Execution mode</span>
+              <select
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionState((current) => ({
+                    ...current,
+                    execution_mode: event.target.value as IngestionExecutionMode,
+                  }))
+                }
+                value={ingestionState.execution_mode}
+              >
+                <option value="auto">Auto (queue first)</option>
+                <option value="worker">Worker only</option>
+                <option value="inline">Inline only</option>
+              </select>
+            </label>
           </div>
           <div className="document-actions">
             <button
@@ -759,7 +781,8 @@ export function CurationDashboardShell() {
                   </div>
                   <h3 className="route-card__title">{run.source_display_name}</h3>
                   <p className="route-card__description">
-                    Created {run.records_created} · Skipped {run.records_skipped}
+                    Created {run.records_created} · Skipped {run.records_skipped} ·{" "}
+                    {run.execution_mode_selected ?? "mode-unknown"}
                   </p>
                 </button>
               ))}
@@ -782,6 +805,20 @@ export function CurationDashboardShell() {
                 <li>Found: {state.selectedRun.records_found}</li>
                 <li>Created: {state.selectedRun.records_created}</li>
                 <li>Skipped: {state.selectedRun.records_skipped}</li>
+                <li>
+                  Requested mode:{" "}
+                  {state.selectedRun.execution_mode_requested ?? "unspecified"}
+                </li>
+                <li>
+                  Selected mode:{" "}
+                  {state.selectedRun.execution_mode_selected ?? "unknown"}
+                </li>
+                <li>
+                  Dispatch status: {state.selectedRun.dispatch_status ?? "n/a"}
+                </li>
+                <li>
+                  Celery task id: {state.selectedRun.celery_task_id ?? "n/a"}
+                </li>
                 <li>
                   Completed:{" "}
                   {state.selectedRun.completed_at
