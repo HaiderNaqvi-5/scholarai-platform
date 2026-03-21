@@ -172,7 +172,7 @@ class IngestionService:
     async def start_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> IngestionRunDetail:
         created_run = await self.create_run(payload, actor_user_id)
         return await self.execute_run(
@@ -401,11 +401,18 @@ class IngestionService:
                 display_name=payload.source_display_name,
                 base_url=payload.source_base_url,
                 source_type=payload.source_type,
+                institution_id=actor_user.institution_id if self._is_university_scoped(actor_user) else None,
                 is_active=True,
             )
             self.db.add(source)
             await self.db.flush()
             return source
+
+        if self._is_university_scoped(actor_user) and source.institution_id != actor_user.institution_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Source is outside institution scope",
+            )
 
         if payload.source_display_name:
             source.display_name = payload.source_display_name
