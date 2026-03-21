@@ -20,7 +20,7 @@ def main() -> None:
         page.locator("text=View details").first.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="scholarship-detail-shell"]')
-        page.wait_for_selector("text=Requirement summary")
+        page.wait_for_selector("text=Requirements")
 
         page.goto("http://localhost:3000/login?next=/scholarships")
         page.wait_for_load_state("networkidle")
@@ -34,7 +34,7 @@ def main() -> None:
         page.wait_for_url("**/scholarships")
 
         page.wait_for_selector("text=Waterloo AI Graduate Scholarship")
-        page.locator("text=Save opportunity").first.click()
+        page.locator("text=Save to shortlist").first.click()
         page.wait_for_selector("text=Saved")
 
         browser.close()
