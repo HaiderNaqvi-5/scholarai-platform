@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import random
 import re
 import uuid
 from dataclasses import dataclass
@@ -63,6 +64,7 @@ TITLE_CANDIDATE_TAGS = ("h1", "h2", "h3", "h4", "strong", "b", "th")
 MAX_CONTEXT_TEXT_LENGTH = 1600
 MAX_SUMMARY_LENGTH = 350
 MAX_CAPTURE_ATTEMPTS = 2
+CAPTURE_RETRY_BASE_DELAY_SECONDS = 0.75
 DEFAULT_MAX_RECORDS = 5
 SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
@@ -459,6 +461,10 @@ class IngestionService:
                 capture = await self._capture_source_once(url, attempt)
                 capture.metadata = {
                     **capture.metadata,
+                    "retry_policy": {
+                        "max_attempts": MAX_CAPTURE_ATTEMPTS,
+                        "base_delay_seconds": CAPTURE_RETRY_BASE_DELAY_SECONDS,
+                    },
                     "attempt": attempt,
                     "max_attempts": MAX_CAPTURE_ATTEMPTS,
                     "retries_used": attempt - 1,
@@ -467,19 +473,66 @@ class IngestionService:
                 return capture
             except Exception as exc:
                 last_exception = exc
+                classification = self._classify_capture_error(exc)
+                retryable = self._is_retryable_capture_error(exc)
                 attempt_errors.append(
                     {
                         "attempt": attempt,
+                        "classification": classification,
+                        "retryable": retryable,
                         "error_type": exc.__class__.__name__,
                         "error_message": str(exc),
                     }
                 )
+                if not retryable:
+                    break
                 if attempt < MAX_CAPTURE_ATTEMPTS:
-                    await asyncio.sleep(float(attempt))
+                    await asyncio.sleep(self._capture_backoff_delay(attempt))
 
         assert last_exception is not None
         setattr(last_exception, "_capture_attempts", attempt_errors)
         raise last_exception
+
+    def _capture_backoff_delay(self, attempt: int) -> float:
+        exponential = CAPTURE_RETRY_BASE_DELAY_SECONDS * (2 ** max(attempt - 1, 0))
+        jitter = random.uniform(0.0, 0.25)
+        return round(exponential + jitter, 3)
+
+    def _classify_capture_error(self, exc: Exception) -> str:
+        if isinstance(exc, HTTPException):
+            return "http_exception"
+        if isinstance(exc, httpx.HTTPStatusError):
+            status_code = exc.response.status_code
+            if 500 <= status_code <= 599:
+                return "server_http_status"
+            if status_code in {408, 425, 429}:
+                return "rate_limited_or_timeout"
+            return "client_http_status"
+        if isinstance(
+            exc,
+            (
+                httpx.ConnectTimeout,
+                httpx.ReadTimeout,
+                httpx.WriteTimeout,
+                httpx.PoolTimeout,
+                TimeoutError,
+                asyncio.TimeoutError,
+            ),
+        ):
+            return "timeout"
+        if isinstance(exc, (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError, OSError)):
+            return "transient_network"
+        if isinstance(exc, (ValueError, TypeError)):
+            return "invalid_payload"
+        return "unknown"
+
+    def _is_retryable_capture_error(self, exc: Exception) -> bool:
+        classification = self._classify_capture_error(exc)
+        if classification in {"timeout", "transient_network", "rate_limited_or_timeout", "server_http_status"}:
+            return True
+        if isinstance(exc, httpx.HTTPStatusError):
+            return 500 <= exc.response.status_code <= 599
+        return False
 
     async def _capture_source_once(self, url: str, attempt: int) -> CaptureResult:
         transport_errors: list[dict[str, Any]] = []
