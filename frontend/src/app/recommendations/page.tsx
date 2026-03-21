@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { RecommendationWorkspace } from "@/components/recommendations/recommendation-workspace";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function RecommendationsPage() {
   return (
-    <ProtectedRoute>
-      <RecommendationWorkspace />
-    </ProtectedRoute>
+    <Suspense fallback={null}>
+      <ProtectedRoute>
+        <RecommendationWorkspace />
+      </ProtectedRoute>
+    </Suspense>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { ProfileFormShell } from "@/components/profile/profile-form-shell";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function ProfilePage() {
   return (
-    <ProtectedRoute>
-      <ProfileFormShell mode="profile" />
-    </ProtectedRoute>
+    <Suspense fallback={null}>
+      <ProtectedRoute>
+        <ProfileFormShell mode="profile" />
+      </ProtectedRoute>
+    </Suspense>
   );
 }
