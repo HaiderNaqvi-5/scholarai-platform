@@ -9,7 +9,7 @@ def main() -> None:
         page.goto("http://localhost:3000/scholarships")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="scholarship-browse-shell"]')
-        page.wait_for_selector("text=Published records only")
+        page.wait_for_selector("text=Published records")
 
         page.get_by_test_id("field-filter-ai").click()
         page.wait_for_load_state("networkidle")
