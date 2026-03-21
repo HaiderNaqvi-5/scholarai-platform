@@ -21,10 +21,7 @@ def main() -> None:
             "strongpass1"
         )
         page.locator('[data-testid="signup-form"] button[type="submit"]').click()
-        page.wait_for_load_state("networkidle")
-
-        page.goto("http://localhost:3000/profile")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_url("**/onboarding")
         page.wait_for_selector('[data-testid="profile-form"]')
 
         page.locator('[data-testid="profile-form"] input[name="citizenship_country_code"]').fill(
