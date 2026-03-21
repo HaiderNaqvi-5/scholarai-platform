@@ -55,9 +55,56 @@ This document defines the canonical MVP data model for ScholarAI. It covers the 
 | `id` | UUID PK | Primary identifier |
 | `email` | VARCHAR(255) UNIQUE | Login identity |
 | `password_hash` | VARCHAR(255) | Credential storage |
-| `role` | ENUM(`student`,`admin`) | MVP roles only |
+| `role` | ENUM(`ENDUSER_STUDENT`,`INTERNAL_USER`,`DEV`,`ADMIN`,`UNIVERSITY`,`OWNER`) | Legacy role claim remains during compatibility window |
+| `institution_id` | UUID FK -> `universities.id` NULL | Required for university-scoped users |
 | `created_at` | TIMESTAMP | Audit field |
 | `updated_at` | TIMESTAMP | Audit field |
+
+### Authorization supporting tables
+#### `capabilities`
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | Capability identifier |
+| `capability_key` | VARCHAR(128) UNIQUE | Stable machine-readable key |
+| `resource` | VARCHAR(64) | Domain module, for example `curation` |
+| `action` | VARCHAR(64) | Operation, for example `publish` |
+| `risk_tier` | ENUM(`low`,`medium`,`high`,`critical`) | Governance and review requirement |
+| `is_active` | BOOLEAN | Change control support |
+| `created_at` | TIMESTAMP | Audit field |
+| `updated_at` | TIMESTAMP | Audit field |
+
+#### `role_capabilities`
+| Field | Type | Notes |
+|---|---|---|
+| `role` | ENUM(`ENDUSER_STUDENT`,`INTERNAL_USER`,`DEV`,`ADMIN`,`UNIVERSITY`,`OWNER`) | Composite PK part |
+| `capability_id` | UUID FK -> `capabilities.id` | Composite PK part |
+| `granted_by` | UUID FK -> `users.id` NULL | Traceability for policy changes |
+| `created_at` | TIMESTAMP | Audit field |
+
+#### `user_capabilities`
+| Field | Type | Notes |
+|---|---|---|
+| `user_id` | UUID FK -> `users.id` | Composite PK part |
+| `capability_id` | UUID FK -> `capabilities.id` | Composite PK part |
+| `grant_reason` | TEXT NULL | Exception workflow note |
+| `expires_at` | TIMESTAMP NULL | Time-bounded elevated access |
+| `created_at` | TIMESTAMP | Audit field |
+
+#### `user_institution_access`
+| Field | Type | Notes |
+|---|---|---|
+| `user_id` | UUID FK -> `users.id` | Composite PK part |
+| `institution_id` | UUID FK -> `universities.id` | Composite PK part |
+| `access_level` | ENUM(`viewer`,`editor`,`reviewer`,`admin`) | Institution-local authority |
+| `created_at` | TIMESTAMP | Audit field |
+| `updated_at` | TIMESTAMP | Audit field |
+
+### Token claim compatibility window contract
+During migration, auth tokens may include both:
+- legacy role claim (`role`)
+- new capability claim set (`capabilities`)
+
+Runtime authorization must prefer capability evaluation and only use role fallback until the deprecation milestone is met.
 
 ### `student_profiles`
 | Field | Type | Notes |
@@ -276,6 +323,12 @@ This document defines the canonical MVP data model for ScholarAI. It covers the 
 | `applications.user_id` | `users.id` | many-to-one |
 | `applications.scholarship_id` | `scholarships.id` | many-to-one |
 | `audit_logs.actor_user_id` | `users.id` | many-to-one |
+| `users.institution_id` | `universities.id` | optional many-to-one |
+| `role_capabilities.capability_id` | `capabilities.id` | many-to-one |
+| `user_capabilities.user_id` | `users.id` | many-to-one |
+| `user_capabilities.capability_id` | `capabilities.id` | many-to-one |
+| `user_institution_access.user_id` | `users.id` | many-to-one |
+| `user_institution_access.institution_id` | `universities.id` | many-to-one |
 
 ## Important Indexes
 | Index | Target | Purpose |

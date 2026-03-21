@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import AuditLog, RecordState, Scholarship, SourceRegistry
+from app.models import AuditLog, RecordState, Scholarship, SourceRegistry, User, UserRole
 from app.schemas.curation import (
     CurationActionRequest,
     CurationRawImportRequest,
@@ -26,7 +26,7 @@ class CurationService:
     async def import_raw_record(
         self,
         payload: CurationRawImportRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
         # Content-hash deduplication
         content_string = f"{payload.title}|{payload.summary or ''}|{payload.provider_name or ''}"
@@ -50,11 +50,12 @@ class CurationService:
                 detail="A scholarship record already exists for this source URL",
             )
 
-        source_registry = await self._get_or_create_source_registry(payload)
+        source_registry = await self._get_or_create_source_registry(payload, actor_user)
         timestamp = datetime.now(timezone.utc)
 
         record = Scholarship(
             source_registry=source_registry,
+            institution_id=source_registry.institution_id,
             external_source_id=payload.external_source_id,
             title=payload.title,
             provider_name=payload.provider_name,
@@ -74,13 +75,13 @@ class CurationService:
             provenance_payload=payload.provenance_payload or {},
             source_last_seen_at=payload.source_last_seen_at or payload.imported_at or timestamp,
             review_notes=payload.review_notes,
-            reviewed_by_user_id=actor_user_id,
+            reviewed_by_user_id=actor_user.id,
             last_reviewed_at=timestamp,
         )
         self.db.add(record)
         await self.db.flush()
         await self._append_audit_log(
-            actor_user_id=actor_user_id,
+            actor_user_id=actor_user.id,
             record=record,
             action="curation.import_raw",
             before={},
@@ -91,15 +92,20 @@ class CurationService:
 
     async def list_records(
         self,
+        actor_user: User,
         state: str | None = None,
         limit: int = 50,
     ) -> list[CurationRecordSummary]:
+        self._assert_user_scope(actor_user)
         query = (
             select(Scholarship)
             .options(selectinload(Scholarship.source_registry))
             .order_by(Scholarship.updated_at.desc(), Scholarship.title.asc())
             .limit(limit)
         )
+
+        if self._is_university_scoped(actor_user):
+            query = query.where(Scholarship.institution_id == actor_user.institution_id)
 
         if state:
             parsed_state = self._parse_state(state)
@@ -108,29 +114,29 @@ class CurationService:
         result = await self.db.execute(query)
         return [self._build_summary(item) for item in result.scalars().all()]
 
-    async def get_record(self, record_id: uuid.UUID) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+    async def get_record(self, record_id: uuid.UUID, actor_user: User) -> CurationRecordDetail:
+        record = await self._load_record(record_id, actor_user)
         return self._build_detail(record)
 
     async def update_record(
         self,
         record_id: uuid.UUID,
         payload: CurationRecordUpdateRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+        record = await self._load_record(record_id, actor_user)
         before = self._snapshot(record)
         values = payload.model_dump(exclude_unset=True)
 
         for field, value in values.items():
             setattr(record, field, value)
 
-        record.reviewed_by_user_id = actor_user_id
+        record.reviewed_by_user_id = actor_user.id
         record.last_reviewed_at = datetime.now(timezone.utc)
 
         await self.db.flush()
         await self._append_audit_log(
-            actor_user_id=actor_user_id,
+            actor_user_id=actor_user.id,
             record=record,
             action="curation.update",
             before=before,
@@ -143,9 +149,9 @@ class CurationService:
         self,
         record_id: uuid.UUID,
         payload: CurationActionRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+        record = await self._load_record(record_id, actor_user)
         if record.record_state != RecordState.RAW:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -155,8 +161,8 @@ class CurationService:
         before = self._snapshot(record)
         timestamp = datetime.now(timezone.utc)
         record.record_state = RecordState.VALIDATED
-        record.reviewed_by_user_id = actor_user_id
-        record.validated_by_user_id = actor_user_id
+        record.reviewed_by_user_id = actor_user.id
+        record.validated_by_user_id = actor_user.id
         record.last_reviewed_at = timestamp
         record.validated_at = timestamp
         record.rejected_at = None
@@ -166,7 +172,7 @@ class CurationService:
 
         await self.db.flush()
         await self._append_audit_log(
-            actor_user_id=actor_user_id,
+            actor_user_id=actor_user.id,
             record=record,
             action="curation.approve",
             before=before,
@@ -179,9 +185,9 @@ class CurationService:
         self,
         record_id: uuid.UUID,
         payload: CurationActionRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+        record = await self._load_record(record_id, actor_user)
         if record.record_state not in {RecordState.RAW, RecordState.VALIDATED}:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -191,7 +197,7 @@ class CurationService:
         before = self._snapshot(record)
         timestamp = datetime.now(timezone.utc)
         record.record_state = RecordState.ARCHIVED
-        record.reviewed_by_user_id = actor_user_id
+        record.reviewed_by_user_id = actor_user.id
         record.last_reviewed_at = timestamp
         record.rejected_at = timestamp
         record.unpublished_at = None
@@ -200,7 +206,7 @@ class CurationService:
 
         await self.db.flush()
         await self._append_audit_log(
-            actor_user_id=actor_user_id,
+            actor_user_id=actor_user.id,
             record=record,
             action="curation.reject",
             before=before,
@@ -213,9 +219,9 @@ class CurationService:
         self,
         record_id: uuid.UUID,
         payload: CurationActionRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+        record = await self._load_record(record_id, actor_user)
         if record.record_state != RecordState.VALIDATED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -225,9 +231,9 @@ class CurationService:
         before = self._snapshot(record)
         timestamp = datetime.now(timezone.utc)
         record.record_state = RecordState.PUBLISHED
-        record.reviewed_by_user_id = actor_user_id
+        record.reviewed_by_user_id = actor_user.id
         record.last_reviewed_at = timestamp
-        record.published_by_user_id = actor_user_id
+        record.published_by_user_id = actor_user.id
         record.published_at = timestamp
         record.unpublished_at = None
         if payload.note is not None:
@@ -250,9 +256,9 @@ class CurationService:
         self,
         record_id: uuid.UUID,
         payload: CurationActionRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> CurationRecordDetail:
-        record = await self._load_record(record_id)
+        record = await self._load_record(record_id, actor_user)
         if record.record_state != RecordState.PUBLISHED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -262,7 +268,7 @@ class CurationService:
         before = self._snapshot(record)
         timestamp = datetime.now(timezone.utc)
         record.record_state = RecordState.VALIDATED
-        record.reviewed_by_user_id = actor_user_id
+        record.reviewed_by_user_id = actor_user.id
         record.last_reviewed_at = timestamp
         record.unpublished_at = timestamp
         if payload.note is not None:
@@ -278,12 +284,17 @@ class CurationService:
             
         return self._build_detail(record)
 
-    async def _load_record(self, record_id: uuid.UUID) -> Scholarship:
-        result = await self.db.execute(
+    async def _load_record(self, record_id: uuid.UUID, actor_user: User) -> Scholarship:
+        self._assert_user_scope(actor_user)
+        query = (
             select(Scholarship)
             .where(Scholarship.id == record_id)
             .options(selectinload(Scholarship.source_registry))
         )
+        if self._is_university_scoped(actor_user):
+            query = query.where(Scholarship.institution_id == actor_user.institution_id)
+
+        result = await self.db.execute(query)
         record = result.scalar_one_or_none()
         if record is None:
             raise HTTPException(
@@ -295,7 +306,9 @@ class CurationService:
     async def _get_or_create_source_registry(
         self,
         payload: CurationRawImportRequest,
+        actor_user: User,
     ) -> SourceRegistry:
+        self._assert_user_scope(actor_user)
         result = await self.db.execute(
             select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
         )
@@ -306,17 +319,34 @@ class CurationService:
                 display_name=payload.source_display_name,
                 base_url=str(payload.source_base_url),
                 source_type=payload.source_type,
+                institution_id=actor_user.institution_id if self._is_university_scoped(actor_user) else None,
                 is_active=True,
             )
             self.db.add(source_registry)
             await self.db.flush()
             return source_registry
 
+        if self._is_university_scoped(actor_user) and source_registry.institution_id != actor_user.institution_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Source is outside institution scope",
+            )
+
         source_registry.display_name = payload.source_display_name
         source_registry.base_url = str(payload.source_base_url)
         source_registry.source_type = payload.source_type
         source_registry.is_active = True
         return source_registry
+
+    def _is_university_scoped(self, actor_user: User) -> bool:
+        return actor_user.role == UserRole.UNIVERSITY
+
+    def _assert_user_scope(self, actor_user: User) -> None:
+        if self._is_university_scoped(actor_user) and actor_user.institution_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="University user requires institution scope",
+            )
 
     async def _append_audit_log(
         self,

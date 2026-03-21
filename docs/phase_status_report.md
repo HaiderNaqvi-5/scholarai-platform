@@ -1,5 +1,9 @@
 # ScholarAI Phase Status Report
 
+> Status: Historical snapshot (superseded).
+> Current implementation truth is tracked in docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md.
+> This file is preserved for timeline traceability only.
+
 **Date:** 2026-03-14
 **Branch:** `develop`
 **Commit:** `610483b`

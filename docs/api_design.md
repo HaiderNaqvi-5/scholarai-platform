@@ -1,5 +1,9 @@
 # ScholarAI — API Design
 
+> Status: Legacy draft (not canonical).
+> Canonical API contract lives in docs/scholarai/10_backend_api_and_repo.md and current FastAPI routes under backend/app/api/v1/routes/.
+> This file is kept for historical traceability and may describe endpoints that are no longer mounted.
+
 > **Framework:** FastAPI (Python 3.11+)  
 > **Base URL:** `/api/v1`  
 > **Authentication:** JWT Bearer tokens  

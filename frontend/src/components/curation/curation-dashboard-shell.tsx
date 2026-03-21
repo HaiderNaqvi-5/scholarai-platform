@@ -8,6 +8,7 @@ import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Capability, hasCapability } from "@/lib/authorization";
 import { apiRequest } from "@/lib/api";
 import type {
   ApiError,
@@ -140,7 +141,27 @@ const EMPTY_INGESTION_STATE: IngestionState = {
 };
 
 export function CurationDashboardShell() {
-  const { accessToken } = useAuth();
+  const { accessToken, currentUser } = useAuth();
+  const canRunIngestion = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.CurationIngestionRun,
+  );
+  const canImportRaw = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.CurationImportWrite,
+  );
+  const canEditRecord = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.CurationRecordEdit,
+  );
+  const canTransitionRecord = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.CurationRecordTransition,
+  );
   const [state, setState] = useState<CurationState>({
     isLoading: true,
     isDetailLoading: false,
@@ -416,6 +437,13 @@ export function CurationDashboardShell() {
     if (!accessToken || !state.selectedRecord) {
       return;
     }
+    if (!canEditRecord) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to edit curation records.",
+      }));
+      return;
+    }
 
     setState((current) => ({ ...current, isSaving: true, error: null }));
     try {
@@ -459,6 +487,13 @@ export function CurationDashboardShell() {
 
   const importRawRecord = async () => {
     if (!accessToken) {
+      return;
+    }
+    if (!canImportRaw) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to create raw records.",
+      }));
       return;
     }
 
@@ -526,6 +561,13 @@ export function CurationDashboardShell() {
     if (!accessToken) {
       return;
     }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to run ingestion.",
+      }));
+      return;
+    }
 
     setState((current) => ({ ...current, isSaving: true, error: null }));
     try {
@@ -565,6 +607,13 @@ export function CurationDashboardShell() {
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
     if (!accessToken || !state.selectedRecord) {
+      return;
+    }
+    if (!canTransitionRecord) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to transition curation records.",
+      }));
       return;
     }
 
@@ -742,7 +791,7 @@ export function CurationDashboardShell() {
             <button
               className="auth-link auth-link--primary"
               data-testid="curation-start-ingestion"
-              disabled={state.isSaving}
+              disabled={state.isSaving || !canRunIngestion}
               onClick={() => void startIngestionRun()}
               type="button"
             >
@@ -990,7 +1039,7 @@ export function CurationDashboardShell() {
           <button
             className="auth-link auth-link--primary"
             data-testid="curation-import"
-            disabled={state.isSaving}
+            disabled={state.isSaving || !canImportRaw}
             onClick={() => void importRawRecord()}
             type="button"
           >
@@ -1218,7 +1267,7 @@ export function CurationDashboardShell() {
                 <button
                   className="auth-link auth-link--secondary"
                   data-testid="curation-save"
-                  disabled={state.isSaving}
+                  disabled={state.isSaving || !canEditRecord}
                   onClick={() => void saveCorrections()}
                   type="button"
                 >
@@ -1228,7 +1277,7 @@ export function CurationDashboardShell() {
                   <button
                     className={`auth-link ${item.variant}`}
                     data-testid={`curation-${item.action}`}
-                    disabled={state.isSaving}
+                    disabled={state.isSaving || !canTransitionRecord}
                     key={item.action}
                     onClick={() =>
                       void runAction(

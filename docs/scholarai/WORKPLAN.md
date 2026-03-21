@@ -120,6 +120,43 @@ The first coding phase normalizes the repository in place around `frontend/` and
 4. Keep only one active prompt/governance file set under `docs/scholarai/`.
 5. Remove clearly empty placeholders only after archive snapshot is committed.
 
+## RBAC Expansion Program (March 2026)
+### Objective
+Start local implementation through a docs-first authorization rewrite that introduces a capability-based matrix, institution-scoped university access, and a zero-downtime claim migration path.
+
+### Locked Decisions
+1. Authorization model uses explicit capabilities, not deep role inheritance.
+2. University access is institution-scoped from the first contract draft.
+3. Migration uses a compatibility window mapping legacy role claims to capability claims.
+4. Canonical docs under `docs/scholarai/` are authoritative when conflicts exist.
+
+### Canonical Roles
+- `ENDUSER_STUDENT`
+- `INTERNAL_USER`
+- `DEV`
+- `ADMIN`
+- `UNIVERSITY`
+- `OWNER`
+
+### Phase-By-Phase Delivery (Docs First, Then Code)
+| Phase | Focus | Primary docs | Exit gate |
+|---|---|---|---|
+| 1 | Governance freeze and capability registry | `04_requirements_and_governance.md`, `06_data_models.md` | Capability IDs, deny-by-default rules, and owners approved |
+| 2 | Institution scope contract | `06_data_models.md`, `10_backend_api_and_repo.md` | `institution_id` scope rules and cross-institution deny behavior documented |
+| 3 | Endpoint-level authorization map | `10_backend_api_and_repo.md` | All mounted endpoint groups mapped to required capabilities |
+| 4 | Compatibility-window migration contract | `12_execution_plan.md`, `10_backend_api_and_repo.md` | Dual-claim strategy (`role` + `capabilities`) and cutover metrics approved |
+| 5 | Security and QA hardening contract | `13_qa_devops_and_risks.md`, `05_system_architecture.md` | Escalation tests, audit requirements, and rollback triggers documented |
+| 6 | Transitional conflict reconciliation | `README.md`, `docs/scholarai/README.md`, legacy docs notes | Canonical precedence markers added and conflicts resolved |
+| 7 | Implementation task pack | `12_execution_plan.md`, `IMPLEMENTATION_STATUS_REPORT.md` | Week-by-week owner tasks and acceptance criteria frozen |
+| 8 | Controlled rollout and deprecation | `12_execution_plan.md`, `14_future_roadmap.md` | Legacy role-only path removal date and post-cutover checks approved |
+
+### Non-Negotiable Acceptance Signals
+1. No endpoint remains without a documented capability requirement.
+2. Unauthorized and cross-institution access denial behavior is specified and testable.
+3. Compatibility window has explicit start, cutover, and deprecation milestones.
+4. Legacy docs that conflict with canonical contracts contain a clear transition note.
+5. Documentation updates are approved before broad implementation commits.
+
 ## MVP decision
 The full canonical documentation pack now exists and defines product, scope, design, data, architecture, evaluation, execution, QA, and roadmap before application code changes.
 

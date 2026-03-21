@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.models import IngestionRun, IngestionRunStatus, SourceRegistry
+from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, UserRole
 from app.schemas.curation import IngestionRunStartRequest
 from app.services.ingestion.service import (
     CaptureResult,
@@ -128,14 +128,14 @@ async def test_start_run_creates_raw_record_from_source_page(monkeypatch):
         actor_user_id,
     )
 
-    payload, imported_actor_id = captured_calls[0]
+    payload, imported_actor = captured_calls[0]
     assert detail.status == IngestionRunStatus.COMPLETED.value
     assert detail.records_found == 1
     assert detail.records_created == 1
     assert detail.records_skipped == 0
     assert detail.run_metadata["capture"]["status_code"] == 200
     assert detail.run_metadata["created_records"][0]["title"] == "Data Science Scholarship"
-    assert imported_actor_id == actor_user_id
+    assert getattr(imported_actor, "id", None) == actor_user_id
     assert payload.title == "Data Science Scholarship"
     assert str(payload.source_url).endswith("/awards/data-science-scholarship")
     assert payload.source_document_ref == "data-science-scholarship"
@@ -149,7 +149,7 @@ async def test_start_run_marks_duplicates_as_skipped(monkeypatch):
     session = FakeSession()
     session.source = make_source()
     service = IngestionService(session)
-    actor_user_id = uuid4()
+    actor_user = type("U", (), {"id": uuid4(), "role": UserRole.ADMIN, "institution_id": None})()
 
     async def fake_capture(_url: str) -> CaptureResult:
         return make_capture(
@@ -209,7 +209,7 @@ async def test_start_run_marks_duplicates_as_skipped(monkeypatch):
 
     detail = await service.start_run(
         IngestionRunStartRequest(source_key=session.source.source_key, max_records=5),
-        actor_user_id,
+        actor_user,
     )
 
     assert detail.status == IngestionRunStatus.PARTIAL.value

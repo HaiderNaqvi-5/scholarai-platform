@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.models import InterviewPracticeMode
+
 
 class InterviewSessionStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -11,9 +13,12 @@ class InterviewSessionStartRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_practice_mode(self) -> "InterviewSessionStartRequest":
-        normalized_mode = (self.practice_mode or "general").strip().lower()
-        if normalized_mode not in {"general", "scholarship"}:
-            raise ValueError("practice_mode must be 'general' or 'scholarship'")
+        default_mode = InterviewPracticeMode.GENERAL.value
+        normalized_mode = (self.practice_mode or default_mode).strip().lower()
+        allowed_modes = {member.value for member in InterviewPracticeMode}
+        if normalized_mode not in allowed_modes:
+            options = "' or '".join(sorted(allowed_modes))
+            raise ValueError(f"practice_mode must be '{options}'")
         self.practice_mode = normalized_mode
         return self
 

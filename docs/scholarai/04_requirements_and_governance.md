@@ -121,6 +121,48 @@ If real scholarship outcome labels are absent, all ranking and scoring outputs m
 | Architecture gate | The design remains feasible for 3 developers in 16 weeks |
 | Documentation gate | Terminology and section naming remain consistent |
 
+## Authorization Governance (RBAC Expansion)
+### Authorization model rule
+ScholarAI uses a capability-based authorization matrix. Roles are assignment bundles, but access decisions are evaluated through explicit capabilities.
+
+### Canonical role set
+1. `ENDUSER_STUDENT`
+2. `INTERNAL_USER`
+3. `DEV`
+4. `ADMIN`
+5. `UNIVERSITY`
+6. `OWNER`
+
+### Capability governance rules
+1. Deny by default for any endpoint or action without an explicit capability mapping.
+2. No implicit cross-role inheritance is assumed in runtime checks.
+3. High-risk capabilities require at least one secondary reviewer for assignment changes.
+4. Privileged operations must emit audit events with `actor_user_id`, `action_type`, and `request_id`.
+
+### Institution scope rule for university access
+`UNIVERSITY` access must be bound to explicit institution scope from first release of the contract.
+
+Required controls:
+- every university-bound query must enforce `institution_id` filtering
+- cross-institution reads and writes must fail with authorization errors
+- scope overrides are prohibited outside emergency break-glass flow
+
+### Migration governance rule
+Migration from legacy role-only claims to capability claims must use a compatibility window:
+1. accept legacy role claims
+2. issue capability claims in parallel
+3. compare runtime decisions for mismatch telemetry
+4. remove legacy fallback only after sustained stability
+
+### RBAC-specific review gates
+| Gate | Check |
+|---|---|
+| Capability gate | Every protected endpoint references explicit capabilities |
+| Scope isolation gate | Institution-scoped access is enforced for university actors |
+| Compatibility gate | Legacy/new auth decision mismatches are measured and bounded |
+| Audit gate | Privileged operations are fully traceable |
+| Deprecation gate | Legacy role-only path has a dated removal milestone |
+
 ## MVP decision
 ScholarAI governance prioritizes constrained scope, structured data authority, advisory-only AI framing, and modular-monolith feasibility over breadth or architectural ambition.
 

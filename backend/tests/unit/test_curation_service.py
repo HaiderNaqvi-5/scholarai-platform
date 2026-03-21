@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
-from app.models import RecordState, Scholarship, SourceRegistry
+from app.models import RecordState, Scholarship, SourceRegistry, UserRole
 from app.schemas.curation import CurationActionRequest, CurationRawImportRequest
 from app.services.curation import CurationService
 
@@ -64,17 +65,18 @@ async def test_curation_service_approve_moves_raw_to_validated():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
     actor_user_id = uuid4()
+    actor_user = SimpleNamespace(id=actor_user_id, role=UserRole.ADMIN, institution_id=None)
 
     result = await service.approve_record(
         record.id,
         CurationActionRequest(note="Reviewed and corrected"),
-        actor_user.id,
+        actor_user,
     )
 
     assert result.record_state == "validated"
@@ -88,17 +90,18 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     service = CurationService(session)
     record = make_record(RecordState.VALIDATED)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
     actor_user_id = uuid4()
+    actor_user = SimpleNamespace(id=actor_user_id, role=UserRole.ADMIN, institution_id=None)
 
     published = await service.publish_record(
         record.id,
         CurationActionRequest(note="Ready for students"),
-        actor_user.id,
+        actor_user,
     )
     assert published.record_state == "published"
     assert published.published_at is not None
@@ -106,7 +109,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     unpublished = await service.unpublish_record(
         record.id,
         CurationActionRequest(note="Pulled for revision"),
-        actor_user.id,
+        actor_user,
     )
     assert unpublished.record_state == "validated"
     assert unpublished.unpublished_at is not None
@@ -117,18 +120,19 @@ async def test_curation_service_rejects_invalid_publish_transition():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
     actor_user_id = uuid4()
+    actor_user = SimpleNamespace(id=actor_user_id, role=UserRole.ADMIN, institution_id=None)
 
     with pytest.raises(HTTPException) as caught:
         await service.publish_record(
             record.id,
             CurationActionRequest(note="Should fail"),
-            actor_user.id,
+            actor_user,
         )
 
     assert caught.value.status_code == 409
@@ -138,8 +142,9 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
     session = FakeSession()
     service = CurationService(session)
     actor_user_id = uuid4()
+    actor_user = SimpleNamespace(id=actor_user_id, role=UserRole.ADMIN, institution_id=None)
 
-    async def fake_source_registry(_payload):
+    async def fake_source_registry(_payload, _actor_user):
         return SourceRegistry(
             source_key="manual_demo_import",
             display_name="Manual demo import",
@@ -166,7 +171,7 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
             citizenship_rules=["PK"],
             review_notes="Imported for curator review",
         ),
-        actor_user.id,
+        actor_user,
     )
 
     assert result.record_state == "raw"

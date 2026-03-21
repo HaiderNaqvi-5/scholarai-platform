@@ -32,6 +32,37 @@ This document defines the MVP quality strategy, local and CI workflows, deployme
 | Document feedback | upload metadata, retrieval grounding, structured response |
 | Admin actions | audit logging and protected access |
 
+## Authorization And Scope Isolation Test Pack
+### Required RBAC test classes
+| Test class | Purpose |
+|---|---|
+| Capability allow tests | Confirm endpoints succeed only with required capability |
+| Capability deny tests | Confirm deny-by-default when mapping is absent |
+| Institution scope tests | Confirm university users cannot access cross-institution data |
+| Compatibility-window tests | Validate role fallback behavior while capability claims are present |
+| Privilege escalation tests | Block unsafe capability combinations and direct bypass attempts |
+
+### Required RBAC acceptance thresholds
+1. 100% protected endpoints mapped to at least one explicit capability.
+2. 100% cross-institution negative tests pass for university-scoped endpoints.
+3. 0 unresolved legacy-claim mismatch alerts at cutover decision point.
+4. 100% privileged mutation actions emit auditable events.
+
+### Current automated RBAC coverage (implemented)
+- `backend/tests/unit/test_rbac_dependencies.py`
+	- token capability precedence over role fallback
+	- role fallback behavior when token capability claim is absent
+- `backend/tests/unit/test_auth_claim_enforcement.py`
+	- rejects malformed `capabilities` claims
+	- rejects scope mismatch and missing university scope claims
+- `backend/tests/unit/test_authorization_matrix.py`
+	- capability matrix integrity checks and baseline hierarchy checks
+- `backend/tests/unit/test_institution_scope_enforcement.py`
+	- university users require institution scope
+	- cross-institution source access is denied in curation/ingestion
+- `backend/tests/integration/test_authorization_denials.py`
+	- route-level 401 and 403 deny-path assertions for protected endpoints
+
 ## End-To-End Testing
 ### MVP user-critical paths
 1. Search and filter scholarships.
@@ -105,6 +136,11 @@ Limited budget means MVP should avoid a large environment matrix.
 | Published scholarship records | Unpublish and restore last validated state |
 | Model artifact | Pin previous stable scorer and explanation formatter |
 
+### RBAC rollback additions
+1. Keep role fallback feature flag available until post-cutover stability is proven.
+2. If authorization mismatches spike, restore dual-evaluator mode before broad rollback.
+3. If scope isolation fails, disable university-scoped mutation endpoints until patched.
+
 ## Observability Basics
 ### Minimum signals
 - structured application logs
@@ -112,6 +148,12 @@ Limited budget means MVP should avoid a large environment matrix.
 - background task status
 - ingestion run summaries
 - health endpoints for frontend, backend, DB connectivity, and worker queue
+
+### RBAC observability signals
+- authorization denials by capability key and endpoint
+- legacy fallback invocation count during compatibility window
+- cross-institution deny events grouped by actor and institution
+- privileged action audit completeness checks
 
 This is enough for MVP without building a heavy observability stack.
 

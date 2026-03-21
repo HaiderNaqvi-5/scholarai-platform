@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import ProfileReadUser, ProfileWriteUser
 from app.schemas import StudentProfileResponse, StudentProfileUpsertRequest
 from app.services.students import StudentService
 
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("", response_model=StudentProfileResponse)
 async def get_profile(
-    current_user: CurrentUser,
+    current_user: ProfileReadUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> StudentProfileResponse:
     service = StudentService(db)
@@ -29,7 +29,7 @@ async def get_profile(
 @router.put("", response_model=StudentProfileResponse)
 async def upsert_profile(
     payload: StudentProfileUpsertRequest,
-    current_user: CurrentUser,
+    current_user: ProfileWriteUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> StudentProfileResponse:
     service = StudentService(db)

@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.authorization import get_role_capabilities
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -9,7 +12,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models import User
+from app.models import Capability, RoleCapability, User, UserCapability
 from app.schemas import TokenResponse, UserCreate, UserLogin
 from scholarai_common.errors import ScholarAIException, ErrorCode
 
@@ -51,7 +54,14 @@ class AuthService:
                 status_code=403
             )
 
-        token_data = {"sub": str(user.id), "role": user.role.value}
+        capabilities = await self._resolve_capabilities(user)
+        token_data = {
+            "sub": str(user.id),
+            "role": user.role.value,
+            "capabilities": capabilities,
+            "policy_version": "rbac.v1",
+            "institution_scope": str(user.institution_id) if user.institution_id else None,
+        }
         return TokenResponse(
             access_token=create_access_token(token_data),
             refresh_token=create_refresh_token(token_data),
@@ -84,9 +94,39 @@ class AuthService:
                 status_code=403
             )
 
-        token_data = {"sub": str(user.id), "role": user.role.value}
+        capabilities = await self._resolve_capabilities(user)
+        token_data = {
+            "sub": str(user.id),
+            "role": user.role.value,
+            "capabilities": capabilities,
+            "policy_version": "rbac.v1",
+            "institution_scope": str(user.institution_id) if user.institution_id else None,
+        }
         return TokenResponse(
             access_token=create_access_token(token_data),
             refresh_token=create_refresh_token(token_data),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+
+    async def _resolve_capabilities(self, user: User) -> list[str]:
+        role_result = await self.db.execute(
+            select(Capability.capability_key)
+            .join(RoleCapability, RoleCapability.capability_id == Capability.id)
+            .where(RoleCapability.role == user.role)
+            .where(Capability.is_active.is_(True))
+        )
+        db_role_capabilities = {row[0] for row in role_result.all()}
+        role_capabilities = db_role_capabilities or set(get_role_capabilities(user.role))
+        now_utc = datetime.now(timezone.utc)
+        result = await self.db.execute(
+            select(Capability.capability_key)
+            .join(UserCapability, UserCapability.capability_id == Capability.id)
+            .where(UserCapability.user_id == user.id)
+            .where(Capability.is_active.is_(True))
+            .where(
+                (UserCapability.expires_at.is_(None))
+                | (UserCapability.expires_at > now_utc)
+            )
+        )
+        user_capabilities = {row[0] for row in result.all()}
+        return sorted(role_capabilities | user_capabilities)

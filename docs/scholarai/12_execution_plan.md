@@ -39,6 +39,32 @@ This document defines the 16-week delivery plan for ScholarAI. It translates the
 | 15 | Prepare thesis evidence, demo scripts, and fallback-safe release candidate | All |
 | 16 | Final hardening, packaging, and roadmap handoff | All |
 
+## RBAC Expansion Workstream (Docs-First)
+This workstream starts immediately and must pass documentation gates before broad code implementation.
+
+### Week-by-week RBAC milestones
+| Week | RBAC milestone | Primary owner |
+|---|---|---|
+| 1 | Freeze role set and capability registry draft | A + B |
+| 2 | Finalize institution-scoped access contract and endpoint capability map | A |
+| 3 | Publish compatibility-window migration plan (`role` + `capabilities`) | A + B |
+| 4 | Complete backend authorization dependency design and error contract alignment | A |
+| 5 | Complete frontend role/capability UX visibility and navigation policy spec | C |
+| 6 | Finalize authorization test matrix (allow, deny, cross-institution, fallback) | B |
+| 7 | Run controlled local rollout with telemetry, mismatch logging, and rollback drill | All |
+| 8 | Lock cutover readiness and deprecate legacy role-only path (if thresholds met) | All |
+
+### RBAC phase gates
+1. **Docs gate**: contracts merged in canonical docs before implementation PRs.
+2. **Security gate**: privileged and cross-institution deny paths tested and auditable.
+3. **Compatibility gate**: mismatch telemetry remains below agreed threshold.
+4. **Cutover gate**: role fallback is removed only after sustained stability window.
+
+### Team split for RBAC work
+- Developer A: backend auth service updates, dependency guards, migration compatibility logic.
+- Developer B: capability matrix governance, policy test harness, telemetry checks.
+- Developer C: frontend role-aware routes, navigation guards, and regression UX checks.
+
 ## Phase Acceptance Criteria
 ### Phase 0 Foundation and planning
 - Canonical docs are complete through architecture, data, execution, and QA.

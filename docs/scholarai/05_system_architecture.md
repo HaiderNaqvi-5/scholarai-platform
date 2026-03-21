@@ -137,8 +137,15 @@ graph LR
 | Scholarship facts | Stored as structured records in PostgreSQL |
 | Embeddings | Stored in PostgreSQL through pgvector |
 | Background tasks | Isolated into Celery workers, not separate business services |
-| Admin workflows | Remain inside the same FastAPI backend, protected by role checks |
+| Admin workflows | Remain inside the same FastAPI backend, protected by capability checks |
 | Search system sprawl | Avoided in MVP; no separate OpenSearch layer by default |
+
+## Authorization Architecture Constraints
+1. Authorization uses a capability matrix evaluated in backend dependencies.
+2. Role labels are assignment bundles and must not bypass capability checks.
+3. University access is institution-scoped and must enforce `institution_id` filtering at service and query layers.
+4. During migration, legacy role claims can be read only through a compatibility window with deprecation milestones.
+5. High-risk capability decisions must be auditable.
 
 ## Deployment Topology
 ### MVP

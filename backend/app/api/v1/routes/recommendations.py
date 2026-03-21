@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import RecommendationUser
 from app.schemas import RecommendationListResponse, RecommendationRequest
 from app.schemas.recommendations import RecommendationResponseMeta
 from app.services.recommendations import RecommendationService
@@ -16,7 +16,7 @@ router = APIRouter()
 @router.post("", response_model=RecommendationListResponse)
 async def build_recommendations(
     payload: RecommendationRequest,
-    current_user: CurrentUser,
+    current_user: RecommendationUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RecommendationListResponse:
     student_service = StudentService(db)

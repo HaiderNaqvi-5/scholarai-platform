@@ -40,7 +40,7 @@ def main() -> None:
         page.locator('[data-testid="interview-submit-answer"]').click()
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="interview-result-view"]')
-        page.wait_for_selector("text=Structured rubric feedback")
+        page.wait_for_selector("text=Rubric scores")
 
         browser.close()
 

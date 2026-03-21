@@ -4,10 +4,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { Capability, hasAnyCapability, hasCapability } from "@/lib/authorization";
 
 export function AuthActions() {
   const router = useRouter();
-  const { currentUser, isAuthenticated, isLoading, logout } = useAuth();
+  const { accessToken, currentUser, isAuthenticated, isLoading, logout } = useAuth();
+  const canSeeCuration = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.CurationQueueRead,
+  );
+  const canSeeAdmin = hasAnyCapability(currentUser, accessToken, [
+    Capability.AdminAuditRead,
+    Capability.OwnerSystemRead,
+  ]);
 
   if (isLoading) {
     return <div className="auth-actions auth-actions--loading" />;
@@ -35,9 +45,14 @@ export function AuthActions() {
       <Link className="nav-link nav-link--quiet" href="/dashboard">
         Dashboard
       </Link>
-      {currentUser?.role === "admin" ? (
+      {canSeeCuration ? (
         <Link className="nav-link nav-link--quiet" href="/curation">
           Curation
+        </Link>
+      ) : null}
+      {canSeeAdmin ? (
+        <Link className="nav-link nav-link--quiet" href="/admin">
+          Admin
         </Link>
       ) : null}
       <button

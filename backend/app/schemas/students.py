@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.models import DegreeLevel
+
 
 class StudentProfileUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -23,8 +25,12 @@ class StudentProfileUpsertRequest(BaseModel):
     @field_validator("target_degree_level")
     @classmethod
     def enforce_mvp_degree_level(cls, value: str) -> str:
-        if value != "MS":
-            raise ValueError("ScholarAI MVP currently supports only MS degree targets")
+        allowed_levels = {member.value for member in DegreeLevel}
+        if value not in allowed_levels:
+            allowed_text = ", ".join(sorted(allowed_levels))
+            raise ValueError(
+                f"ScholarAI MVP currently supports only these degree targets: {allowed_text}"
+            )
         return value
 
     @model_validator(mode="after")

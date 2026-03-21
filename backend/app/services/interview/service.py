@@ -264,7 +264,9 @@ class InterviewSessionService:
         try:
             return InterviewPracticeMode(value.lower())
         except ValueError as exc:
+            allowed_modes = sorted(mode.value for mode in InterviewPracticeMode)
+            allowed_text = "' or '".join(allowed_modes)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Interview practice mode must be 'general' or 'scholarship'",
+                detail=f"Interview practice mode must be '{allowed_text}'",
             ) from exc

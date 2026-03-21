@@ -6,6 +6,8 @@ class ErrorCode(str, Enum):
     AUTH_INVALID_CREDENTIALS = "auth_invalid_credentials"
     AUTH_INACTIVE_ACCOUNT = "auth_inactive_account"
     AUTH_TOKEN_EXPIRED = "auth_token_expired"
+    AUTH_INSUFFICIENT_PERMISSIONS = "auth_insufficient_permissions"
+    AUTH_SCOPE_FORBIDDEN = "auth_scope_forbidden"
     VALIDATION_ERROR = "validation_error"
     NOT_FOUND = "not_found"
     INTERNAL_SERVER_ERROR = "internal_server_error"

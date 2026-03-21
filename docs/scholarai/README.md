@@ -70,6 +70,7 @@ docs/scholarai/
 - Demo-readiness audit: `DEMO_READINESS_AUDIT.md`
 - Internal handoff and presentation note: `INTERNAL_HANDOFF_PACKAGE.md`
 - Public-live readiness gap analysis: `PUBLIC_LIVE_HARDENING_PLAN.md`
+- Active implementation track: docs-first RBAC expansion (capability matrix, institution scope, compatibility-window migration)
 - Current codebase reality:
   - auth, protected routes, and session persistence are implemented
   - profile save/load and a functional onboarding route are implemented
