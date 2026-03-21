@@ -1,5 +1,6 @@
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1 import router as api_v1_router
+from app.api.v2 import router as api_v2_router
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.demo import seed_demo_data_if_enabled
@@ -46,6 +48,10 @@ def create_app() -> FastAPI:
         request.state.request_id = request_id
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        if settings.API_V1_DEPRECATION_ENABLED and request.url.path.startswith(settings.API_V1_PREFIX):
+            response.headers["Deprecation"] = "true"
+            response.headers["Sunset"] = _v1_sunset_header_value(settings.API_V1_DEPRECATION_DAYS)
+            response.headers["Link"] = f"<{settings.API_V2_PREFIX}>; rel=\"successor-version\""
         return response
 
     @app.exception_handler(ScholarAIException)
@@ -127,6 +133,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(api_v2_router, prefix=settings.API_V2_PREFIX)
     return app
 
 
@@ -162,3 +169,12 @@ def http_error_code(status_code: int) -> str:
         422: "REQUEST_VALIDATION_ERROR",
     }
     return mapping.get(status_code, "HTTP_ERROR")
+
+
+def _v1_sunset_header_value(deprecation_days: int) -> str:
+    from datetime import timedelta
+
+    sunset_at = (datetime.now(timezone.utc) + timedelta(days=max(deprecation_days, 1))).strftime(
+        "%a, %d %b %Y %H:%M:%S GMT"
+    )
+    return sunset_at
