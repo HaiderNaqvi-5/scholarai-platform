@@ -14,6 +14,13 @@ import type {
   MentorFeedbackRequest 
 } from "@/lib/types";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export function MentorDashboardShell() {
   const { accessToken } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -30,8 +37,8 @@ export function MentorDashboardShell() {
         setIsLoading(true);
         const data = await getMentorPendingReviews(accessToken);
         setPendingReviews(data.items);
-      } catch (err: any) {
-        setError(err.message || "Failed to load pending reviews.");
+      } catch (error: unknown) {
+        setError(getErrorMessage(error, "Failed to load pending reviews."));
       } finally {
         setIsLoading(false);
       }
@@ -46,8 +53,8 @@ export function MentorDashboardShell() {
       setSelectedDocument(null);
       const doc = await getMentorDocument(docId, accessToken);
       setSelectedDocument(doc);
-    } catch (err: any) {
-      setError(err.message || "Failed to load document content.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to load document content."));
     }
   };
 
@@ -60,8 +67,8 @@ export function MentorDashboardShell() {
       const data = await getMentorPendingReviews(accessToken);
       setPendingReviews(data.items);
       setSelectedDocument(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to submit feedback.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to submit feedback."));
     } finally {
       setIsSubmitting(false);
     }
