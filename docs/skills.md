@@ -45,8 +45,8 @@
 ### Frontend Engineer
 | Skill | Level | Used In |
 |---|---|---|
-| Next.js 14 | Advanced | Frontend application |
-| React 18 | Advanced | UI components |
+| Next.js 16 | Advanced | Frontend application |
+| React 19 | Advanced | UI components |
 | TypeScript | Advanced | Frontend type safety |
 | WebRTC | Intermediate | Audio capture (interview) |
 | CSS / Tailwind | Advanced | UI styling |
