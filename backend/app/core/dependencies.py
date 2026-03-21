@@ -11,6 +11,7 @@ Provides:
     - get_audit_service  → optional helper to inject AuditLogService
 """
 import uuid
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -23,7 +24,8 @@ from app.models import User, UserRole
 from scholarai_common.errors import ScholarAIException, ErrorCode
 from app.core.rate_limit import redis_client
 import json
-from pydantic import TypeAdapter
+
+logger = logging.getLogger(__name__)
 
 
 # ── Current user ─────────────────────────────────────────────────────────────
@@ -48,12 +50,27 @@ async def get_current_user(
         cached_user_json = await redis_client.get(cache_key)
         if cached_user_json:
             user_data = json.loads(cached_user_json)
-            # Create a mock-like object that behaves like a User model for the auth guards
-            # In a full-blown system, you might use a Pydantic model here.
-            # For now, we'll re-verify against DB if not found or corrupted.
-            pass
-    except Exception:
-        pass # Fallback to DB if Redis is down
+            required_fields = {"id", "email", "role", "is_active"}
+            if not required_fields.issubset(user_data):
+                raise ValueError(f"Cached user data missing fields: {required_fields - user_data.keys()}")
+            cached_user = User(
+                id=uuid.UUID(user_data["id"]),
+                email=user_data["email"],
+                role=UserRole(user_data["role"]),
+                is_active=user_data["is_active"],
+            )
+            if not cached_user.is_active:
+                logger.warning("get_current_user: cached user %s is inactive", user_id_raw)
+                raise ScholarAIException(
+                    code=ErrorCode.AUTH_INACTIVE_ACCOUNT,
+                    message="Account is disabled",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+            return cached_user
+    except ScholarAIException:
+        raise
+    except Exception as exc:
+        logger.debug("get_current_user: cache miss or error for %s — falling back to DB: %s", user_id_raw, exc)
 
     try:
         user_id = uuid.UUID(str(user_id_raw))

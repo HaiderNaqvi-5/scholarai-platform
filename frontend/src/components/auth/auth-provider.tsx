@@ -40,8 +40,12 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_KEY) : null,
+  );
+  const [refreshToken, setRefreshToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(REFRESH_TOKEN_KEY) : null,
+  );
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -98,9 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    
-    if (storedToken && !accessToken) setAccessToken(storedToken);
-    if (storedRefreshToken && !refreshToken) setRefreshToken(storedRefreshToken);
 
     if (!storedToken && !storedRefreshToken) {
       setIsLoading(false);
@@ -133,13 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [
-    accessToken,
-    refreshToken,
-    clearSession,
-    loadCurrentUser,
-    refreshSession,
-  ]);
+  }, [clearSession, loadCurrentUser, refreshSession]);
 
   const login = useCallback(
     async (payload: LoginPayload) => {

@@ -8,7 +8,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 
 export function ProtectedRoute({
   children,
-  message = "Checking your workspace session.",
+  message: _message = "Checking your workspace session.",
 }: {
   children: React.ReactNode;
   message?: string;
