@@ -27,6 +27,7 @@ docs/scholarai/
 ├── 12_execution_plan.md
 ├── 13_qa_devops_and_risks.md
 ├── 14_future_roadmap.md
+├── 15_frontend_integration_blueprint.md
 ├── IMPLEMENTATION_STATUS_REPORT.md
 ├── DEMO_READINESS_AUDIT.md
 ├── INTERNAL_HANDOFF_PACKAGE.md
@@ -50,6 +51,7 @@ docs/scholarai/
 | 16-week delivery sequence | `12_execution_plan.md` |
 | QA, DevOps, and risk controls | `13_qa_devops_and_risks.md` |
 | Future extensions and startup roadmap | `14_future_roadmap.md` |
+| Frontend page architecture and feature placement plan | `15_frontend_integration_blueprint.md` |
 
 ## Key Architecture Decisions Summary
 1. MVP architecture is a modular monolith.
