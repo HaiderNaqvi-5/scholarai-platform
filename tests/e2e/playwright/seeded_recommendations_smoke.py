@@ -1,4 +1,7 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
+
+RECOMMENDATION_CARD_TIMEOUT_MS = 8000
+ERROR_PANEL_TIMEOUT_MS = 2000
 
 
 def main() -> None:
@@ -18,7 +21,41 @@ def main() -> None:
         page.wait_for_url("**/recommendations")
 
         page.wait_for_selector('[data-testid="recommendations-workspace"]')
-        page.wait_for_selector('[data-testid="recommendation-card"]')
+        try:
+            page.wait_for_selector(
+                '[data-testid="recommendation-card"]',
+                timeout=RECOMMENDATION_CARD_TIMEOUT_MS,
+            )
+        except PlaywrightTimeoutError as timeout_error:
+            try:
+                page.wait_for_selector(
+                    '[data-testid="recommendations-error"]',
+                    timeout=ERROR_PANEL_TIMEOUT_MS,
+                )
+            except PlaywrightTimeoutError:
+                raise timeout_error
+            error_panel_profile_link = page.locator(
+                '[data-testid="recommendations-error"] a[href="/profile"]'
+            )
+            try:
+                error_panel_profile_link.wait_for(
+                    state="visible",
+                    timeout=ERROR_PANEL_TIMEOUT_MS,
+                )
+            except PlaywrightTimeoutError:
+                raise AssertionError(
+                    "Profile link not found in recommendations error panel within timeout period"
+                )
+            error_panel_profile_link.click()
+            page.wait_for_url("**/profile")
+            page.wait_for_selector('[data-testid="profile-form"]')
+            page.locator('[data-testid="profile-form"] button[type="submit"]').click()
+            page.wait_for_url("**/recommendations")
+            page.wait_for_selector('[data-testid="recommendations-workspace"]')
+            page.wait_for_selector(
+                '[data-testid="recommendation-card"]',
+                timeout=RECOMMENDATION_CARD_TIMEOUT_MS,
+            )
         page.wait_for_selector("text=What aligned")
         page.wait_for_selector("text=What to verify")
 
