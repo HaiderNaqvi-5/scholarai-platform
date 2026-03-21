@@ -65,11 +65,11 @@ async def start_ingestion_run(
 ) -> IngestionRunDetail:
     service = IngestionService(db)
     if payload.execution_mode == "inline":
-        detail = await service.start_run(payload, current_user.id)
+        detail = await service.start_run(payload, current_user)
         await db.commit()
         return _with_run_diagnostics(detail)
 
-    detail = await service.create_run(payload, current_user.id)
+    detail = await service.create_run(payload, current_user)
     run_id = uuid.UUID(detail.run_id)
     await db.commit()
 
@@ -114,7 +114,7 @@ async def list_ingestion_runs(
     limit: int = Query(default=20, ge=1, le=100),
 ) -> IngestionRunListResponse:
     service = IngestionService(db)
-    response = await service.list_runs(limit=limit)
+    response = await service.list_runs(current_user, limit=limit)
     hydrated_items = []
     for item in response.items:
         detail = await service.get_run(uuid.UUID(item.run_id))

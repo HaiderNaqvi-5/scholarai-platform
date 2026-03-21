@@ -1,7 +1,7 @@
 """add rbac capability and institution scope tables
 
-Revision ID: 20260321_0008
-Revises: 20260319_0007
+Revision ID: 20260321_0011
+Revises: 20260321_0008
 Create Date: 2026-03-21 18:30:00
 """
 
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = "20260321_0008"
-down_revision = "20260319_0007"
+revision = "20260321_0011"
+down_revision = "20260321_0008"
 branch_labels = None
 depends_on = None
 

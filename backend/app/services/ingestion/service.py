@@ -172,10 +172,10 @@ class IngestionService:
     async def start_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user_id: uuid.UUID | None,
+        actor_user: User | uuid.UUID | None,
     ) -> IngestionRunDetail:
         actor_user_id = self._extract_actor_user_id(actor_user)
-        created_run = await self.create_run(payload, actor_user_id)
+        created_run = await self.create_run(payload, actor_user)
         return await self.execute_run(
             uuid.UUID(created_run.run_id),
             actor_user_id=actor_user_id,
@@ -189,9 +189,11 @@ class IngestionService:
     async def create_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user_id: uuid.UUID | None,
+        actor_user: User | uuid.UUID | None,
     ) -> IngestionRunDetail:
-        source = await self._get_or_create_source(payload)
+        actor_user_id = self._extract_actor_user_id(actor_user)
+        full_user: User | None = actor_user if isinstance(actor_user, User) else None
+        source = await self._get_or_create_source(payload, full_user)
         run = IngestionRun(
             source_registry=source,
             triggered_by_user_id=actor_user_id,
@@ -255,13 +257,18 @@ class IngestionService:
         await self.db.flush()
         return self._build_detail(run)
 
-    async def list_runs(self, limit: int = 20) -> IngestionRunListResponse:
-        result = await self.db.execute(
+    async def list_runs(self, actor_user: User | None = None, limit: int = 20) -> IngestionRunListResponse:
+        if actor_user is not None:
+            self._assert_actor_scope(actor_user)
+        query = (
             select(IngestionRun)
             .options(selectinload(IngestionRun.source_registry))
             .order_by(IngestionRun.created_at.desc())
             .limit(limit)
         )
+        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
+            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
+        result = await self.db.execute(query)
         items = [self._build_summary(item) for item in self._result_items(result)]
         return IngestionRunListResponse(items=items, total=len(items))
 
@@ -387,7 +394,9 @@ class IngestionService:
             await self.db.flush()
             raise
 
-    async def _get_or_create_source(self, payload: IngestionRunStartRequest) -> SourceRegistry:
+    async def _get_or_create_source(
+        self, payload: IngestionRunStartRequest, actor_user: User | None = None
+    ) -> SourceRegistry:
         result = await self.db.execute(
             select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
         )
@@ -408,6 +417,17 @@ class IngestionService:
             self.db.add(source)
             await self.db.flush()
             return source
+
+        if (
+            actor_user is not None
+            and actor_user.role == UserRole.UNIVERSITY
+            and source.institution_id is not None
+            and source.institution_id != actor_user.institution_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Source is outside institution scope",
+            )
 
         if payload.source_display_name:
             source.display_name = payload.source_display_name
@@ -437,6 +457,13 @@ class IngestionService:
         if actor_user is not None:
             return actor_user.id
         return SYSTEM_ACTOR_ID
+
+    def _assert_actor_scope(self, actor_user: User) -> None:
+        if actor_user.role == UserRole.UNIVERSITY and not actor_user.institution_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="University user requires institution scope",
+            )
 
     def _build_actor_context(self, actor_user_id: uuid.UUID) -> User:
         return User(
