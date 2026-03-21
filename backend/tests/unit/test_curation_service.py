@@ -64,7 +64,7 @@ async def test_curation_service_approve_moves_raw_to_validated():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id, _actor_user):
+    async def fake_load_record(_record_id):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -88,7 +88,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     service = CurationService(session)
     record = make_record(RecordState.VALIDATED)
 
-    async def fake_load_record(_record_id, _actor_user):
+    async def fake_load_record(_record_id):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -117,7 +117,7 @@ async def test_curation_service_rejects_invalid_publish_transition():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id, _actor_user):
+    async def fake_load_record(_record_id):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -140,13 +140,12 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
     actor_user_id = uuid4()
     actor_user = type("U", (), {"id": actor_user_id, "role": UserRole.ADMIN, "institution_id": None})()
 
-    async def fake_source_registry(_payload, _actor_user):
+    async def fake_source_registry(_payload):
         return SourceRegistry(
             source_key="manual_demo_import",
             display_name="Manual demo import",
             base_url="https://example.edu",
             source_type="manual_import",
-            institution_id=None,
             is_active=True,
         )
 
@@ -168,7 +167,7 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
             citizenship_rules=["PK"],
             review_notes="Imported for curator review",
         ),
-        actor_user,
+        actor_user.id,
     )
 
     assert result.record_state == "raw"
