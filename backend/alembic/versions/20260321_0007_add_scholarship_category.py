@@ -1,7 +1,7 @@
 """add scholarship category column
 
 Revision ID: 20260321_0007
-Revises: 20260319_0006
+Revises: 20260319_0007
 Create Date: 2026-03-21 12:18:00
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260321_0007"
-down_revision = "20260319_0006"
+down_revision = "20260319_0007"
 branch_labels = None
 depends_on = None
 
