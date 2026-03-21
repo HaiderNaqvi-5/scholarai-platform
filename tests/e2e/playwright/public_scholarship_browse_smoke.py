@@ -9,7 +9,7 @@ def main() -> None:
         page.goto("http://localhost:3000/scholarships")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="scholarship-browse-shell"]')
-        page.wait_for_selector("text=Published records only")
+        page.wait_for_selector("text=Published records")
 
         page.get_by_test_id("field-filter-ai").click()
         page.wait_for_load_state("networkidle")
@@ -20,7 +20,7 @@ def main() -> None:
         page.locator("text=View details").first.click()
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="scholarship-detail-shell"]')
-        page.wait_for_selector("text=Requirement summary")
+        page.wait_for_selector("text=Requirements")
 
         page.goto("http://localhost:3000/login?next=/scholarships")
         page.wait_for_load_state("networkidle")
@@ -34,7 +34,9 @@ def main() -> None:
         page.wait_for_url("**/scholarships")
 
         page.wait_for_selector("text=Waterloo AI Graduate Scholarship")
-        page.locator("text=Save opportunity").first.click()
+        page.locator("text=View details").first.click()
+        page.wait_for_selector('[data-testid="scholarship-detail-shell"]')
+        page.get_by_role("button", name="Save to shortlist").click()
         page.wait_for_selector("text=Saved")
 
         browser.close()

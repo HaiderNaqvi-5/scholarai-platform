@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { isApiError, useAuth } from "@/components/auth/auth-provider";
 import { MarketingShell } from "@/components/layout/marketing-shell";
+import { isApiError, useAuth } from "@/components/auth/auth-provider";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading, login } = useAuth();
@@ -92,5 +92,13 @@ export default function LoginPage() {
         </article>
       </section>
     </MarketingShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

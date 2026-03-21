@@ -1,7 +1,7 @@
 import pytest
 
 from app.core.security import create_access_token, create_refresh_token, decode_token
-from scholarai_common.errors import ErrorCode, ScholarAIException
+from scholarai_common.errors import ScholarAIException, ErrorCode
 
 
 def test_decode_token_accepts_matching_token_type():

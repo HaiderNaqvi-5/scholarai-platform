@@ -58,7 +58,7 @@ export function ProfileFormShell({
       setError(null);
 
       try {
-        const existing = await apiRequest<StudentProfile>("/profile", {
+        const existing = await apiRequest<StudentProfile>("/profiles", {
           token: accessToken,
         });
         if (isActive) {
@@ -125,7 +125,7 @@ export function ProfileFormShell({
     setMessage(null);
 
     try {
-      await apiRequest<StudentProfile>("/profile", {
+      await apiRequest<StudentProfile>("/profiles", {
         method: "PUT",
         token: accessToken,
         body: JSON.stringify({

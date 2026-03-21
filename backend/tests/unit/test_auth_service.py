@@ -5,7 +5,7 @@ from app.core.security import hash_password
 from app.models import UserRole
 from app.schemas.auth import UserCreate, UserLogin
 from app.services.auth import AuthService
-from scholarai_common.errors import ErrorCode, ScholarAIException
+from scholarai_common.errors import ScholarAIException, ErrorCode
 
 pytestmark = pytest.mark.asyncio
 
@@ -75,6 +75,7 @@ async def test_auth_service_login_rejects_invalid_password():
         )
 
     assert caught.value.code == ErrorCode.AUTH_INVALID_CREDENTIALS
+    assert caught.value.status_code == 401
 
 
 async def test_auth_service_login_returns_tokens_for_valid_credentials():
@@ -99,6 +100,7 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
         UserLogin(email="student@example.com", password="correct-password")
     )
 
+    assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
 
@@ -122,6 +124,7 @@ async def test_auth_service_refresh_session_returns_new_tokens():
             ScalarResult(all_items=[]),
         ]
     )
+    session = FakeSession([ScalarResult(one=user), ScalarResult(one=user)])
     service = AuthService(session)
 
     login_tokens = await service.login(

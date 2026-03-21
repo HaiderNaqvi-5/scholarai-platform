@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -48,6 +49,7 @@ class IngestionRunStartRequest(BaseModel):
     source_base_url: str | None = Field(default=None, min_length=8, max_length=2000)
     source_type: str = Field(default="official", max_length=64)
     max_records: int = Field(default=5, ge=1, le=20)
+    execution_mode: Literal["inline", "worker", "auto"] = "inline"
 
 
 class CurationRecordUpdateRequest(BaseModel):
@@ -131,6 +133,10 @@ class IngestionRunSummary(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
+    execution_mode_requested: str | None = None
+    execution_mode_selected: str | None = None
+    dispatch_status: str | None = None
+    celery_task_id: str | None = None
 
 
 class IngestionRunDetail(IngestionRunSummary):

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DocumentAssistanceShell } from "@/components/documents/document-assistance-shell";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function DocumentFeedbackPage() {
   return (
-    <ProtectedRoute>
-      <DocumentAssistanceShell />
-    </ProtectedRoute>
+    <Suspense fallback={null}>
+      <ProtectedRoute>
+        <DocumentAssistanceShell />
+      </ProtectedRoute>
+    </Suspense>
   );
 }

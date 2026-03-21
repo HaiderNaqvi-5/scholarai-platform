@@ -48,7 +48,7 @@ export function DashboardShell() {
       setState((current) => ({ ...current, isLoading: true, error: null }));
 
       const [profileResult, savedResult, publishedResult] = await Promise.allSettled([
-        apiRequest<StudentProfile>("/profile", { token: accessToken }),
+        apiRequest<StudentProfile>("/profiles", { token: accessToken }),
         apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
           token: accessToken,
         }),

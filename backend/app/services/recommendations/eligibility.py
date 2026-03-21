@@ -134,20 +134,20 @@ def field_alignment_score(target_field: str, field_tags: list[str]) -> float:
 def scholarship_in_scope(scholarship: Scholarship) -> tuple[bool, str, float]:
     haystack = " ".join(
         [
-            scholarship.title or "",
-            scholarship.provider_name or "",
-            scholarship.source_url or "",
-            scholarship.summary or "",
+            getattr(scholarship, "title", "") or "",
+            getattr(scholarship, "provider_name", "") or "",
+            getattr(scholarship, "source_url", "") or "",
+            getattr(scholarship, "summary", "") or "",
         ]
     ).lower()
 
     if "daad" in haystack:
         return False, "DAAD records remain deferred in Phase 1.", 0.0
 
-    if scholarship.country_code == "CA":
+    if getattr(scholarship, "country_code", "").upper() == "CA":
         return True, "Canada remains the primary recommendation market in Phase 1.", 1.0
 
-    if scholarship.country_code == "US" and "fulbright" in haystack:
+    if getattr(scholarship, "country_code", "").upper() == "US" and "fulbright" in haystack:
         return True, "US scope is limited to Fulbright-adjacent records while Canada stays first.", 0.82
 
     return False, "Phase 1 scope keeps non-Canada records deferred unless they are Fulbright-related.", 0.0

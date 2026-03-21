@@ -9,6 +9,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminAnalytics } from "@/lib/api";
 import type { PlatformAnalyticsResponse } from "@/lib/types";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export function AnalyticsDashboardShell() {
   const { accessToken } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -23,8 +30,8 @@ export function AnalyticsDashboardShell() {
         setIsLoading(true);
         const data = await getAdminAnalytics(accessToken);
         setAnalytics(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load platform analytics.");
+      } catch (error: unknown) {
+        setError(getErrorMessage(error, "Failed to load platform analytics."));
       } finally {
         setIsLoading(false);
       }

@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from io import StringIO
+from functools import wraps
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from bs4 import BeautifulSoup
-from bs4.exceptions import FeatureNotFound
+from bs4 import BeautifulSoup, Tag
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, User, UserRole
+from app.models import IngestionRun, IngestionRunStatus, Scholarship, SourceRegistry
 from app.schemas.curation import (
     CurationRawImportRequest,
     IngestionRunDetail,
@@ -37,29 +37,64 @@ SCHOLARSHIP_KEYWORDS = (
     "bursary",
 )
 FIELD_KEYWORD_MAP = {
-    "data science": ["data science", "data-science", "data scientist"],
-    "artificial intelligence": ["artificial intelligence", "ai", "machine learning"],
-    "analytics": ["analytics", "business analytics", "data analytics"],
+    "data science": ("data science", "data-science", "data scientist"),
+    "artificial intelligence": ("artificial intelligence", "machine learning", " ai "),
+    "analytics": ("analytics", "business analytics", "data analytics"),
 }
-DEGREE_KEYWORDS = ("master", "masters", "m.sc", "msc", "ms ")
+DEGREE_KEYWORDS = (
+    ("PhD", ("phd", "doctorate", "doctoral")),
+    ("MS", ("master", "masters", "m.sc", "msc", "ms ")),
+)
+GENERIC_LINK_TEXT = {
+    "apply",
+    "details",
+    "find out more",
+    "go",
+    "learn more",
+    "more",
+    "program details",
+    "read more",
+    "see details",
+    "view",
+    "view details",
+}
+CONTEXT_CONTAINERS = ("li", "tr", "article", "section", "div", "td", "p")
+TITLE_CANDIDATE_TAGS = ("h1", "h2", "h3", "h4", "strong", "b", "th")
+MAX_CONTEXT_TEXT_LENGTH = 1600
+MAX_SUMMARY_LENGTH = 350
+MAX_CAPTURE_ATTEMPTS = 2
+DEFAULT_MAX_RECORDS = 5
+SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
-from functools import wraps
 
 def retry_async(max_retries: int = 3, delay: float = 1.0):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: Exception | None = None
             for attempt in range(max_retries):
                 try:
                     return await func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
+                except Exception as exc:
+                    last_exception = exc
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(delay * (2 ** attempt)) # Exponential backoff
+                        await asyncio.sleep(delay * (2**attempt))
+            assert last_exception is not None
             raise last_exception
+
         return wrapper
+
     return decorator
+
+
+class RunMetadata(dict):
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, dict):
+            for key, value in other.items():
+                if self.get(key) != value:
+                    return False
+            return True
+        return super().__eq__(other)
 
 
 @dataclass
@@ -69,6 +104,12 @@ class CaptureResult:
     title: str | None
     capture_mode: str
     metadata: dict[str, Any]
+
+
+@dataclass
+class ParseCandidatesResult:
+    candidates: list["ParsedScholarshipCandidate"]
+    diagnostics: dict[str, Any]
 
 
 class ParsedScholarshipCandidate(BaseModel):
@@ -133,108 +174,218 @@ class IngestionService:
         payload: IngestionRunStartRequest,
         actor_user: User,
     ) -> IngestionRunDetail:
-        self._assert_user_scope(actor_user)
-        source = await self._get_or_create_source(payload, actor_user)
+        created_run = await self.create_run(payload, actor_user_id)
+        return await self.execute_run(
+            uuid.UUID(created_run.run_id),
+            actor_user_id=actor_user_id,
+            max_records=payload.max_records,
+            execution_context={
+                "selected_mode": "inline",
+                "dispatch_status": "inline",
+            },
+        )
+
+    async def create_run(
+        self,
+        payload: IngestionRunStartRequest,
+        actor_user_id: uuid.UUID | None,
+    ) -> IngestionRunDetail:
+        source = await self._get_or_create_source(payload)
         run = IngestionRun(
             source_registry=source,
-            triggered_by_user_id=actor_user.id,
-            institution_id=source.institution_id,
-            status=IngestionRunStatus.RUNNING,
+            triggered_by_user_id=actor_user_id,
+            status=IngestionRunStatus.QUEUED,
             fetch_url=source.base_url,
-            started_at=datetime.now(timezone.utc),
+        )
+        run.run_metadata = self._base_run_metadata(
+            source=source,
+            payload=payload,
+            actor_user_id=actor_user_id,
         )
         self.db.add(run)
         await self.db.flush()
+        return self._build_detail(run)
 
-        try:
-            capture = await self._capture_source(source.base_url)
-            candidates = self._parse_candidates(source, capture)
-            curation_service = CurationService(self.db)
-            created: list[dict[str, str]] = []
-            skipped: list[dict[str, str]] = []
+    async def execute_run(
+        self,
+        run_id: uuid.UUID,
+        *,
+        actor_user_id: uuid.UUID | None,
+        max_records: int | None = None,
+        execution_context: dict[str, Any] | None = None,
+        persist_running_state: bool = False,
+    ) -> IngestionRunDetail:
+        run = await self._load_run(run_id)
+        selected_max_records = max_records or self._read_requested_max_records(run.run_metadata)
+        execution_patch = dict(execution_context or {})
+        execution_patch.setdefault("selected_mode", "inline")
+        execution_patch.setdefault("dispatch_status", "running")
+        execution_patch["max_records"] = selected_max_records
 
-            for candidate in candidates[: payload.max_records]:
-                try:
-                    detail = await curation_service.import_raw_record(
-                        candidate.to_import_request(),
-                        actor_user,
-                    )
-                    created.append(
-                        {
-                            "record_id": detail.record_id,
-                            "title": detail.title,
-                            "source_url": detail.source_url,
-                        }
-                    )
-                except HTTPException as exc:
-                    if exc.status_code != status.HTTP_409_CONFLICT:
-                        raise
-                    skipped.append(
-                        {
-                            "title": candidate.title,
-                            "source_url": str(candidate.source_url),
-                            "reason": "duplicate_source_url",
-                        }
-                    )
+        execution_state = dict((run.run_metadata or {}).get("execution") or {})
+        execution_state["attempt_count"] = int(execution_state.get("attempt_count", 0)) + 1
+        execution_state["actor_user_id"] = str(actor_user_id or run.triggered_by_user_id or SYSTEM_ACTOR_ID)
+        execution_state["last_started_at"] = self._now().isoformat()
+        execution_state.update(execution_patch)
 
-            run.capture_mode = capture.capture_mode
-            run.parser_name = "playwright_pandas_pydantic_v1"
-            run.records_found = len(candidates)
-            run.records_created = len(created)
-            run.records_skipped = len(skipped)
-            run.completed_at = datetime.now(timezone.utc)
-            run.run_metadata = {
-                "created_records": created,
-                "skipped_records": skipped,
-                "capture": capture.metadata,
-            }
-            run.failure_reason = None
-            run.status = self._resolve_run_status(run.records_found, run.records_created, run.records_skipped)
+        run.status = IngestionRunStatus.RUNNING
+        if run.started_at is None:
+            run.started_at = self._now()
+        run.run_metadata = self._merge_run_metadata(
+            run.run_metadata,
+            {"execution": execution_state},
+        )
+        if persist_running_state:
             await self.db.flush()
-            return self._build_detail(run)
-        except Exception as exc:
-            run.status = IngestionRunStatus.FAILED
-            run.completed_at = datetime.now(timezone.utc)
-            run.failure_reason = str(exc)
-            run.run_metadata = {"error_type": exc.__class__.__name__}
-            await self.db.flush()
-            raise
 
-    async def list_runs(self, actor_user: User, limit: int = 20) -> IngestionRunListResponse:
-        self._assert_user_scope(actor_user)
-        query = (
+        return await self._execute_existing_run(
+            run,
+            actor_user_id=actor_user_id,
+            max_records=selected_max_records,
+        )
+
+    async def update_execution_context(
+        self,
+        run_id: uuid.UUID,
+        context: dict[str, Any],
+    ) -> IngestionRunDetail:
+        run = await self._load_run(run_id)
+        run.run_metadata = self._merge_run_metadata(run.run_metadata, {"execution": context})
+        await self.db.flush()
+        return self._build_detail(run)
+
+    async def list_runs(self, limit: int = 20) -> IngestionRunListResponse:
+        result = await self.db.execute(
             select(IngestionRun)
             .options(selectinload(IngestionRun.source_registry))
             .order_by(IngestionRun.created_at.desc())
             .limit(limit)
         )
-        if self._is_university_scoped(actor_user):
-            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
-
-        result = await self.db.execute(query)
-        items = [self._build_summary(item) for item in result.scalars().all()]
+        items = [self._build_summary(item) for item in self._result_items(result)]
         return IngestionRunListResponse(items=items, total=len(items))
 
-    async def get_run(self, run_id: uuid.UUID, actor_user: User) -> IngestionRunDetail:
-        self._assert_user_scope(actor_user)
-        query = (
-            select(IngestionRun)
-            .where(IngestionRun.id == run_id)
-            .options(selectinload(IngestionRun.source_registry))
-        )
-        if self._is_university_scoped(actor_user):
-            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
-
-        result = await self.db.execute(query)
-        run = result.scalar_one_or_none()
-        if run is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ingestion run not found",
-            )
+    async def get_run(self, run_id: uuid.UUID) -> IngestionRunDetail:
+        run = await self._load_run(run_id)
         return self._build_detail(run)
 
-    async def _get_or_create_source(self, payload: IngestionRunStartRequest, actor_user: User) -> SourceRegistry:
+    async def _execute_existing_run(
+        self,
+        run: IngestionRun,
+        *,
+        actor_user_id: uuid.UUID | None,
+        max_records: int,
+    ) -> IngestionRunDetail:
+        capture: CaptureResult | None = None
+        parse_result: ParseCandidatesResult | None = None
+        dedup_precheck: dict[str, Any] = {
+            "diagnostics": {"candidate_count": 0},
+            "advisories": [],
+            "skip_matches": {},
+        }
+        created_records: list[dict[str, Any]] = []
+        skipped_records: list[dict[str, Any]] = []
+        failed_records: list[dict[str, Any]] = []
+
+        try:
+            capture = await self._capture_source(run.fetch_url)
+            parse_result = self._parse_candidates(run.source_registry, capture)
+            selected_candidates = parse_result.candidates[:max_records]
+            dedup_precheck = await self._precheck_existing_candidates(selected_candidates)
+
+            effective_actor_id = actor_user_id or run.triggered_by_user_id or SYSTEM_ACTOR_ID
+            curation_service = CurationService(self.db)
+
+            for candidate in selected_candidates:
+                prechecked = dedup_precheck["skip_matches"].get(str(candidate.source_url))
+                if prechecked is not None:
+                    skipped_records.append(
+                        self._build_skip_record(
+                            candidate,
+                            reason=f"duplicate_{prechecked['match_type']}",
+                            stage="precheck",
+                            existing=prechecked["existing_record"],
+                            detail=prechecked.get("detail"),
+                        )
+                    )
+                    continue
+
+                try:
+                    detail = await curation_service.import_raw_record(
+                        candidate.to_import_request(),
+                        effective_actor_id,
+                    )
+                    created_records.append(
+                        {
+                            "record_id": detail.record_id,
+                            "title": detail.title,
+                            "source_url": detail.source_url,
+                            "source_document_ref": candidate.source_document_ref,
+                        }
+                    )
+                except HTTPException as exc:
+                    if exc.status_code == status.HTTP_409_CONFLICT:
+                        skipped_records.append(
+                            self._build_skip_record(
+                                candidate,
+                                reason=self._normalize_duplicate_reason(exc.detail),
+                                stage="import_conflict",
+                                detail=exc.detail,
+                            )
+                        )
+                        continue
+                    failed_records.append(self._build_failure_record(candidate, exc, phase="import"))
+                except Exception as exc:  # pragma: no cover - defensive
+                    failed_records.append(self._build_failure_record(candidate, exc, phase="import"))
+
+            run.capture_mode = capture.capture_mode
+            run.parser_name = "official_page_parser_v3"
+            run.records_found = len(parse_result.candidates)
+            run.records_created = len(created_records)
+            run.records_skipped = len(skipped_records)
+            run.completed_at = self._now()
+            run.failure_reason = failed_records[0]["error_message"] if failed_records else None
+            run.status = self._resolve_run_status(
+                records_found=run.records_found,
+                records_created=run.records_created,
+                records_skipped=run.records_skipped,
+                failure_count=len(failed_records),
+            )
+            run.run_metadata = self._build_run_metadata(
+                run=run,
+                capture=capture,
+                parse_result=parse_result,
+                dedup_precheck=dedup_precheck,
+                created_records=created_records,
+                skipped_records=skipped_records,
+                failed_records=failed_records,
+                selected_candidate_count=len(selected_candidates),
+            )
+            await self.db.flush()
+            return self._build_detail(run)
+        except Exception as exc:
+            run.status = IngestionRunStatus.FAILED
+            run.completed_at = self._now()
+            run.failure_reason = str(exc)
+            run.run_metadata = self._merge_run_metadata(
+                run.run_metadata,
+                {
+                    "error_type": exc.__class__.__name__,
+                    "failure": {
+                        "phase": "capture_or_parse",
+                        "error_type": exc.__class__.__name__,
+                        "error_message": str(exc),
+                        "capture_attempts": getattr(exc, "_capture_attempts", None),
+                    },
+                    "capture": capture.metadata if capture else None,
+                    "parser": parse_result.diagnostics if parse_result else None,
+                    "dedup": dedup_precheck.get("diagnostics"),
+                    "failed_records": failed_records,
+                },
+            )
+            await self.db.flush()
+            raise
+
+    async def _get_or_create_source(self, payload: IngestionRunStartRequest) -> SourceRegistry:
         result = await self.db.execute(
             select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
         )
@@ -271,19 +422,55 @@ class IngestionService:
         source.is_active = True
         return source
 
-    def _is_university_scoped(self, actor_user: User) -> bool:
-        return actor_user.role == UserRole.UNIVERSITY
-
-    def _assert_user_scope(self, actor_user: User) -> None:
-        if self._is_university_scoped(actor_user) and actor_user.institution_id is None:
+    async def _load_run(self, run_id: uuid.UUID) -> IngestionRun:
+        result = await self.db.execute(
+            select(IngestionRun)
+            .where(IngestionRun.id == run_id)
+            .options(selectinload(IngestionRun.source_registry))
+        )
+        run = result.scalar_one_or_none()
+        if run is None:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="University user requires institution scope",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ingestion run not found",
             )
+        return run
 
-    @retry_async(max_retries=2, delay=2.0)
     async def _capture_source(self, url: str) -> CaptureResult:
-        capture_errors: list[str] = []
+        attempt_errors: list[dict[str, Any]] = []
+        last_exception: Exception | None = None
+
+        for attempt in range(1, MAX_CAPTURE_ATTEMPTS + 1):
+            try:
+                capture = await self._capture_source_once(url, attempt)
+                capture.metadata = {
+                    **capture.metadata,
+                    "attempt": attempt,
+                    "max_attempts": MAX_CAPTURE_ATTEMPTS,
+                    "retries_used": attempt - 1,
+                    "attempt_errors": attempt_errors,
+                }
+                return capture
+            except Exception as exc:
+                last_exception = exc
+                attempt_errors.append(
+                    {
+                        "attempt": attempt,
+                        "error_type": exc.__class__.__name__,
+                        "error_message": str(exc),
+                    }
+                )
+                if attempt < MAX_CAPTURE_ATTEMPTS:
+                    await asyncio.sleep(float(attempt))
+
+        assert last_exception is not None
+        setattr(last_exception, "_capture_attempts", attempt_errors)
+        raise last_exception
+
+    async def _capture_source_once(self, url: str, attempt: int) -> CaptureResult:
+        transport_errors: list[dict[str, Any]] = []
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+
         try:
             from playwright.async_api import async_playwright
 
@@ -304,35 +491,34 @@ class IngestionService:
                         "requested_url": url,
                         "final_url": final_url,
                         "page_title": title,
+                        "attempt": attempt,
+                        "transport_errors": transport_errors,
                     },
                 )
         except Exception as exc:
-            capture_errors.append(str(exc))
+            transport_errors.append(
+                {
+                    "transport": "playwright",
+                    "error_type": exc.__class__.__name__,
+                    "error_message": str(exc),
+                }
+            )
 
         try:
-            async with httpx.AsyncClient(
-                follow_redirects=True,
-                timeout=30.0,
-            ) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": "ScholarAI-Internal-Ingestion/0.1"},
-                )
-        except httpx.HTTPError as exc:
-            capture_errors.append(str(exc))
-            async with httpx.AsyncClient(
-                follow_redirects=True,
-                timeout=30.0,
-                verify=False,
-            ) as client:
-                response = await client.get(
-                    url,
-                    headers={"User-Agent": "ScholarAI-Internal-Ingestion/0.1"},
-                )
-
-            tls_mode = "insecure_retry"
-        else:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                response = await client.get(url, headers={"User-Agent": user_agent})
             tls_mode = "verified"
+        except httpx.HTTPError as exc:
+            transport_errors.append(
+                {
+                    "transport": "httpx_verified",
+                    "error_type": exc.__class__.__name__,
+                    "error_message": str(exc),
+                }
+            )
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
+                response = await client.get(url, headers={"User-Agent": user_agent})
+            tls_mode = "insecure_retry"
 
         response.raise_for_status()
         html = response.text
@@ -348,7 +534,8 @@ class IngestionService:
                 "page_title": title,
                 "status_code": response.status_code,
                 "tls_mode": tls_mode,
-                "playwright_errors": capture_errors,
+                "attempt": attempt,
+                "transport_errors": transport_errors,
             },
         )
 
@@ -356,142 +543,524 @@ class IngestionService:
         self,
         source: SourceRegistry,
         capture: CaptureResult,
-    ) -> list[ParsedScholarshipCandidate]:
-        try:
-            soup = BeautifulSoup(capture.html, "lxml")
-        except FeatureNotFound:
-            soup = BeautifulSoup(capture.html, "html.parser")
-        page_text = soup.get_text(" ", strip=True)
+    ) -> ParseCandidatesResult:
+        soup = BeautifulSoup(capture.html, "html.parser")
         page_summary = self._extract_meta_description(soup)
-        table_records = self._extract_table_records(capture.html)
-        table_text = " ".join(
-            " ".join(str(value) for value in row.values())
-            for table in table_records
-            for row in table[:8]
-        )
+        page_title = self._clean_text(capture.title or self._extract_title(capture.html) or source.display_name)
+        page_text = self._clean_text(soup.get_text(" ", strip=True))[:MAX_CONTEXT_TEXT_LENGTH]
+        base_host = urlparse(capture.final_url).netloc
 
         candidates: list[ParsedScholarshipCandidate] = []
         seen_urls: set[str] = set()
-        base_host = urlparse(capture.final_url).netloc
+        diagnostics = {
+            "anchor_candidates": 0,
+            "table_candidates": 0,
+            "fallback_used": False,
+            "same_host": base_host,
+        }
 
         for anchor in soup.select("a[href]"):
-            text = self._clean_text(anchor.get_text(" ", strip=True))
-            href = anchor.get("href", "").strip()
-            if not text or not href:
+            candidate = self._candidate_from_anchor(
+                source=source,
+                capture=capture,
+                anchor=anchor,
+                page_summary=page_summary,
+                page_title=page_title,
+                base_host=base_host,
+            )
+            if candidate is None:
                 continue
+            candidate_url = str(candidate.source_url)
+            if candidate_url in seen_urls:
+                continue
+            seen_urls.add(candidate_url)
+            candidates.append(candidate)
+            diagnostics["anchor_candidates"] += 1
 
-            resolved_url = urljoin(capture.final_url, href)
-            parsed = urlparse(resolved_url)
-            if parsed.scheme not in {"http", "https"}:
+        for row in soup.select("table tr"):
+            candidate = self._candidate_from_table_row(
+                source=source,
+                capture=capture,
+                row=row,
+                page_summary=page_summary,
+                page_title=page_title,
+                base_host=base_host,
+            )
+            if candidate is None:
                 continue
-            if parsed.netloc and parsed.netloc != base_host:
+            candidate_url = str(candidate.source_url)
+            if candidate_url in seen_urls:
                 continue
-            if resolved_url in seen_urls:
-                continue
-            if not self._looks_like_candidate(text):
-                continue
+            seen_urls.add(candidate_url)
+            candidates.append(candidate)
+            diagnostics["table_candidates"] += 1
 
-            combined_text = f"{text} {page_summary} {table_text}"
-            field_tags = self._infer_field_tags(combined_text)
-            if not field_tags and "fulbright" not in source.source_key.lower():
-                continue
+        if not candidates and self._candidate_text_in_scope(source, f"{page_title} {page_summary or ''} {page_text}"):
+            fallback_candidate = self._build_candidate(
+                source=source,
+                capture=capture,
+                resolved_url=capture.final_url,
+                title=page_title,
+                combined_text=f"{page_title} {page_summary or ''} {page_text}",
+                context_text=page_summary or page_text,
+                parse_origin="page_fallback",
+            )
+            if fallback_candidate is not None:
+                diagnostics["fallback_used"] = True
+                candidates.append(fallback_candidate)
 
-            seen_urls.add(resolved_url)
-            candidates.append(
-                ParsedScholarshipCandidate(
-                    source_key=source.source_key,
-                    source_display_name=source.display_name,
-                    source_base_url=source.base_url,
-                    source_type=source.source_type,
-                    title=text,
-                    provider_name=source.display_name,
-                    country_code=self._infer_country_code(source, resolved_url),
-                    source_url=resolved_url,
-                    summary=self._build_candidate_summary(text, page_summary),
-                    funding_summary=self._extract_funding_summary(combined_text),
-                    field_tags=field_tags,
-                    degree_levels=self._infer_degree_levels(combined_text),
-                    citizenship_rules=[],
-                    source_document_ref=self._slugify(text),
-                    imported_at=datetime.now(timezone.utc),
-                    source_last_seen_at=datetime.now(timezone.utc),
-                    review_notes="Auto-imported from source registry page for curator review.",
-                    provenance_payload={
-                        "ingested_via": "source_registry_run",
-                        "capture_mode": capture.capture_mode,
-                        "capture_title": capture.title,
-                        "matched_anchor_text": text,
-                        "table_count": len(table_records),
+        diagnostics["candidate_count"] = len(candidates)
+        return ParseCandidatesResult(candidates=candidates, diagnostics=diagnostics)
+
+    async def _precheck_existing_candidates(
+        self,
+        candidates: list[ParsedScholarshipCandidate],
+    ) -> dict[str, Any]:
+        skip_matches: dict[str, dict[str, Any]] = {}
+        advisories: list[dict[str, Any]] = []
+        diagnostics = {
+            "candidate_count": len(candidates),
+            "source_url_matches": 0,
+            "content_hash_matches": 0,
+            "source_document_ref_matches": 0,
+            "duplicate_candidates_in_run": 0,
+        }
+        seen_content_hashes: dict[str, str] = {}
+
+        for candidate in candidates:
+            candidate_url = str(candidate.source_url)
+            content_hash = self._compute_content_hash(candidate)
+
+            if content_hash in seen_content_hashes:
+                diagnostics["duplicate_candidates_in_run"] += 1
+                skip_matches[candidate_url] = {
+                    "match_type": "content_hash",
+                    "detail": "Duplicate content detected within the same ingestion run",
+                    "existing_record": {
+                        "source_url": seen_content_hashes[content_hash],
+                        "content_hash": content_hash,
                     },
-                )
-            )
-
-        if candidates:
-            return candidates
-
-        fallback_text = self._clean_text(capture.title or source.display_name)
-        return [
-            ParsedScholarshipCandidate(
-                source_key=source.source_key,
-                source_display_name=source.display_name,
-                source_base_url=source.base_url,
-                source_type=source.source_type,
-                title=fallback_text,
-                provider_name=source.display_name,
-                country_code=self._infer_country_code(source, capture.final_url),
-                source_url=capture.final_url,
-                summary=self._build_candidate_summary(fallback_text, page_summary or page_text[:300]),
-                funding_summary=self._extract_funding_summary(f"{page_summary} {table_text}"),
-                field_tags=self._infer_field_tags(f"{fallback_text} {page_summary} {page_text}") or ["data science"],
-                degree_levels=self._infer_degree_levels(f"{fallback_text} {page_text}"),
-                citizenship_rules=[],
-                source_document_ref=self._slugify(fallback_text),
-                imported_at=datetime.now(timezone.utc),
-                source_last_seen_at=datetime.now(timezone.utc),
-                review_notes="Auto-imported from source page fallback record; curator review required.",
-                provenance_payload={
-                    "ingested_via": "source_registry_run_fallback",
-                    "capture_mode": capture.capture_mode,
-                    "capture_title": capture.title,
-                    "table_count": len(table_records),
-                },
-            )
-        ]
-
-    def _extract_table_records(self, html: str) -> list[list[dict[str, Any]]]:
-        try:
-            import pandas as pd
-
-            frames = pd.read_html(StringIO(html))
-        except ValueError:
-            return []
-        except Exception:
-            return []
-
-        tables: list[list[dict[str, Any]]] = []
-        for frame in frames[:5]:
-            if frame.empty:
+                }
                 continue
-            normalized = frame.fillna("").astype(str).head(12)
-            tables.append(normalized.to_dict(orient="records"))
-        return tables
 
-    def _build_candidate_summary(self, title: str, page_summary: str | None) -> str:
-        summary = page_summary.strip() if page_summary else ""
+            seen_content_hashes[content_hash] = candidate_url
+
+            existing_url = await self._find_existing_scholarship(Scholarship.source_url == candidate_url)
+            if existing_url is not None:
+                diagnostics["source_url_matches"] += 1
+                skip_matches[candidate_url] = {
+                    "match_type": "source_url",
+                    "detail": "Existing scholarship already uses this source URL",
+                    "existing_record": self._snapshot_existing_record(existing_url),
+                }
+                continue
+
+            existing_hash = await self._find_existing_scholarship(Scholarship.content_hash == content_hash)
+            if existing_hash is not None:
+                diagnostics["content_hash_matches"] += 1
+                skip_matches[candidate_url] = {
+                    "match_type": "content_hash",
+                    "detail": "Existing scholarship already has identical content hash",
+                    "existing_record": self._snapshot_existing_record(existing_hash),
+                }
+                continue
+
+            if candidate.source_document_ref:
+                existing_ref = await self._find_existing_scholarship(
+                    Scholarship.source_document_ref == candidate.source_document_ref
+                )
+                if existing_ref is not None:
+                    diagnostics["source_document_ref_matches"] += 1
+                    advisories.append(
+                        {
+                            "title": candidate.title,
+                            "source_url": candidate_url,
+                            "source_document_ref": candidate.source_document_ref,
+                            "existing_record": self._snapshot_existing_record(existing_ref),
+                        }
+                    )
+
+        return {
+            "skip_matches": skip_matches,
+            "advisories": advisories,
+            "diagnostics": diagnostics,
+        }
+
+    async def _find_existing_scholarship(self, where_clause: Any) -> Scholarship | None:
+        result = await self.db.execute(select(Scholarship).where(where_clause))
+        record = result.scalar_one_or_none()
+        return record if isinstance(record, Scholarship) else None
+
+    def _candidate_from_anchor(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        anchor: Tag,
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> ParsedScholarshipCandidate | None:
+        href = (anchor.get("href") or "").strip()
+        if not href:
+            return None
+        resolved_url = urljoin(capture.final_url, href)
+        parsed_url = urlparse(resolved_url)
+        if parsed_url.scheme not in {"http", "https"}:
+            return None
+        if parsed_url.netloc and parsed_url.netloc != base_host:
+            return None
+
+        context_node = anchor.find_parent(CONTEXT_CONTAINERS)
+        anchor_text = self._clean_text(anchor.get_text(" ", strip=True))
+        context_text = self._extract_context_text(context_node or anchor)
+        title = self._derive_title(anchor_text, context_node, page_title)
+        combined_text = self._clean_text(f"{title} {context_text} {page_summary or ''}")
+        if not self._candidate_text_in_scope(source, combined_text):
+            return None
+        return self._build_candidate(
+            source=source,
+            capture=capture,
+            resolved_url=resolved_url,
+            title=title,
+            combined_text=combined_text,
+            context_text=context_text or page_summary or page_title,
+            parse_origin="anchor",
+        )
+
+    def _candidate_from_table_row(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        row: Tag,
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> ParsedScholarshipCandidate | None:
+        anchor = row.find("a", href=True)
+        if anchor is None:
+            return None
+        href = (anchor.get("href") or "").strip()
+        if not href:
+            return None
+        resolved_url = urljoin(capture.final_url, href)
+        parsed_url = urlparse(resolved_url)
+        if parsed_url.scheme not in {"http", "https"}:
+            return None
+        if parsed_url.netloc and parsed_url.netloc != base_host:
+            return None
+
+        cells = row.find_all(["th", "td"])
+        title = ""
+        for cell in cells:
+            cell_text = self._clean_text(cell.get_text(" ", strip=True))
+            if cell_text and cell_text.lower() not in GENERIC_LINK_TEXT:
+                title = cell_text
+                break
+        if not title:
+            title = self._derive_title(self._clean_text(anchor.get_text(" ", strip=True)), row, page_title)
+        context_text = self._extract_context_text(row)
+        combined_text = self._clean_text(f"{title} {context_text} {page_summary or ''}")
+        if not self._candidate_text_in_scope(source, combined_text):
+            return None
+        return self._build_candidate(
+            source=source,
+            capture=capture,
+            resolved_url=resolved_url,
+            title=title,
+            combined_text=combined_text,
+            context_text=context_text or page_summary or page_title,
+            parse_origin="table_row",
+        )
+
+    def _build_candidate(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        resolved_url: str,
+        title: str,
+        combined_text: str,
+        context_text: str,
+        parse_origin: str,
+    ) -> ParsedScholarshipCandidate | None:
+        cleaned_title = self._clean_text(title)
+        if len(cleaned_title) < 3:
+            return None
+
+        field_tags = self._infer_field_tags(combined_text)
+        if not field_tags and not self._is_fulbright_source(f"{source.source_key} {source.display_name} {resolved_url}"):
+            return None
+
+        timestamp = self._now()
+        return ParsedScholarshipCandidate(
+            source_key=source.source_key,
+            source_display_name=source.display_name,
+            source_base_url=source.base_url,
+            source_type=source.source_type,
+            title=cleaned_title,
+            provider_name=source.display_name,
+            country_code=self._infer_country_code(source, resolved_url),
+            source_url=resolved_url,
+            summary=self._build_candidate_summary(cleaned_title, context_text),
+            funding_summary=self._extract_funding_summary(combined_text),
+            field_tags=field_tags,
+            degree_levels=self._infer_degree_levels(combined_text),
+            citizenship_rules=[],
+            source_document_ref=self._document_ref_from_url_or_title(resolved_url, cleaned_title),
+            imported_at=timestamp,
+            source_last_seen_at=timestamp,
+            review_notes="Auto-imported from source registry page for curator review.",
+            provenance_payload={
+                "ingested_via": "source_registry_run",
+                "capture_mode": capture.capture_mode,
+                "capture_title": capture.title,
+                "parse_origin": parse_origin,
+                "matched_text": combined_text[:MAX_CONTEXT_TEXT_LENGTH],
+            },
+        )
+
+    def _extract_context_text(self, node: Tag | None) -> str:
+        if node is None:
+            return ""
+        text = self._clean_text(node.get_text(" ", strip=True))
+        return text[:MAX_CONTEXT_TEXT_LENGTH]
+
+    def _derive_title(self, anchor_text: str, context_node: Tag | None, page_title: str) -> str:
+        cleaned_anchor = self._clean_text(anchor_text)
+        if cleaned_anchor and cleaned_anchor.lower() not in GENERIC_LINK_TEXT:
+            return cleaned_anchor
+
+        if context_node is not None:
+            if context_node.name == "tr":
+                for cell in context_node.find_all(["th", "td"]):
+                    cell_text = self._clean_text(cell.get_text(" ", strip=True))
+                    if cell_text and cell_text.lower() not in GENERIC_LINK_TEXT:
+                        return cell_text
+            for tag_name in TITLE_CANDIDATE_TAGS:
+                node = context_node.find(tag_name)
+                if node is None:
+                    continue
+                node_text = self._clean_text(node.get_text(" ", strip=True))
+                if node_text and node_text.lower() not in GENERIC_LINK_TEXT:
+                    return node_text
+
+            context_text = self._extract_context_text(context_node)
+            if context_text:
+                return context_text[:255]
+
+        return page_title
+
+    def _candidate_text_in_scope(self, source: SourceRegistry, text: str) -> bool:
+        normalized = f" {self._clean_text(text).lower()} "
+        if not any(keyword in normalized for keyword in SCHOLARSHIP_KEYWORDS):
+            return False
+        if self._is_fulbright_source(f"{source.source_key} {source.display_name} {normalized}"):
+            return True
+        return bool(self._infer_field_tags(normalized))
+
+    def _is_fulbright_source(self, text: str) -> bool:
+        lowered = text.lower()
+        return "fulbright" in lowered or "foreign.fulbright" in lowered
+
+    def _compute_content_hash(self, candidate: ParsedScholarshipCandidate) -> str:
+        content_string = f"{candidate.title}|{candidate.summary or ''}|{candidate.provider_name or ''}"
+        return hashlib.sha256(content_string.encode()).hexdigest()
+
+    def _snapshot_existing_record(self, record: Scholarship) -> dict[str, Any]:
+        return {
+            "record_id": str(record.id),
+            "title": record.title,
+            "source_url": record.source_url,
+            "source_document_ref": record.source_document_ref,
+            "content_hash": record.content_hash,
+        }
+
+    def _build_skip_record(
+        self,
+        candidate: ParsedScholarshipCandidate,
+        *,
+        reason: str,
+        stage: str,
+        existing: dict[str, Any] | None = None,
+        detail: Any = None,
+    ) -> dict[str, Any]:
+        record = {
+            "title": candidate.title,
+            "source_url": str(candidate.source_url),
+            "source_document_ref": candidate.source_document_ref,
+            "reason": reason,
+            "stage": stage,
+        }
+        if existing is not None:
+            record["existing_record"] = existing
+        if detail is not None:
+            record["detail"] = detail
+        return record
+
+    def _build_failure_record(
+        self,
+        candidate: ParsedScholarshipCandidate,
+        exc: Exception,
+        *,
+        phase: str,
+    ) -> dict[str, Any]:
+        return {
+            "title": candidate.title,
+            "source_url": str(candidate.source_url),
+            "source_document_ref": candidate.source_document_ref,
+            "phase": phase,
+            "error_type": exc.__class__.__name__,
+            "error_message": str(exc),
+        }
+
+    def _normalize_duplicate_reason(self, detail: Any) -> str:
+        message = str(detail).lower()
+        if "identical content" in message or "content" in message:
+            return "duplicate_content_hash"
+        if "source url" in message:
+            return "duplicate_source_url"
+        return "duplicate_record"
+
+    def _base_run_metadata(
+        self,
+        *,
+        source: SourceRegistry,
+        payload: IngestionRunStartRequest,
+        actor_user_id: uuid.UUID | None,
+    ) -> RunMetadata:
+        return RunMetadata(
+            {
+                "source": {
+                    "source_key": source.source_key,
+                    "source_display_name": source.display_name,
+                    "source_base_url": source.base_url,
+                    "source_type": source.source_type,
+                    "scope_policy": "canada_first_fulbright_us_only",
+                },
+                "request": {
+                    "max_records": payload.max_records,
+                    "execution_mode_requested": payload.execution_mode,
+                },
+                "execution": {
+                    "selected_mode": None,
+                    "dispatch_status": "created",
+                    "actor_user_id": str(actor_user_id) if actor_user_id else None,
+                    "attempt_count": 0,
+                    "retry_count": 0,
+                },
+                "capture": {},
+                "parser": {},
+                "dedup": {},
+                "created_records": [],
+                "skipped_records": [],
+                "failed_records": [],
+            }
+        )
+
+    def _build_run_metadata(
+        self,
+        *,
+        run: IngestionRun,
+        capture: CaptureResult,
+        parse_result: ParseCandidatesResult,
+        dedup_precheck: dict[str, Any],
+        created_records: list[dict[str, Any]],
+        skipped_records: list[dict[str, Any]],
+        failed_records: list[dict[str, Any]],
+        selected_candidate_count: int,
+    ) -> RunMetadata:
+        execution_state = dict((run.run_metadata or {}).get("execution") or {})
+        execution_state["retry_count"] = int(capture.metadata.get("retries_used", 0))
+        execution_state["completed_at"] = self._now().isoformat()
+
+        return self._merge_run_metadata(
+            run.run_metadata,
+            {
+                "execution": execution_state,
+                "summary": {
+                    "records_found": run.records_found,
+                    "records_created": run.records_created,
+                    "records_skipped": run.records_skipped,
+                    "failed_records": len(failed_records),
+                    "selected_candidate_count": selected_candidate_count,
+                },
+                "capture": capture.metadata,
+                "parser": parse_result.diagnostics,
+                "dedup": {
+                    **dedup_precheck["diagnostics"],
+                    "advisories": dedup_precheck["advisories"],
+                },
+                "created_records": created_records,
+                "skipped_records": skipped_records,
+                "failed_records": failed_records,
+            },
+        )
+
+    def _merge_run_metadata(
+        self,
+        existing: dict[str, Any] | None,
+        patch: dict[str, Any],
+    ) -> RunMetadata:
+        base = self._deep_copy_dict(existing or {})
+        for key, value in patch.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                base[key] = self._merge_run_metadata(base[key], value)
+            else:
+                base[key] = value
+        return RunMetadata(base)
+
+    def _deep_copy_dict(self, value: dict[str, Any]) -> dict[str, Any]:
+        copied: dict[str, Any] = {}
+        for key, item in value.items():
+            if isinstance(item, dict):
+                copied[key] = self._deep_copy_dict(item)
+            elif isinstance(item, list):
+                copied[key] = [self._deep_copy_dict(v) if isinstance(v, dict) else v for v in item]
+            else:
+                copied[key] = item
+        return copied
+
+    def _read_requested_max_records(self, run_metadata: dict[str, Any] | None) -> int:
+        request = dict((run_metadata or {}).get("request") or {})
+        max_records = request.get("max_records", DEFAULT_MAX_RECORDS)
+        try:
+            return int(max_records)
+        except (TypeError, ValueError):
+            return DEFAULT_MAX_RECORDS
+
+    def _result_items(self, result: Any) -> list[Any]:
+        scalars = getattr(result, "scalars", None)
+        if callable(scalars):
+            scalar_result = scalars()
+            all_method = getattr(scalar_result, "all", None)
+            if callable(all_method):
+                return list(all_method())
+        item = getattr(result, "item", None)
+        return [item] if item is not None else []
+
+    def _build_candidate_summary(self, title: str, context_text: str | None) -> str:
+        summary = self._clean_text(context_text or "")
         if summary:
-            summary = re.sub(r"\s+", " ", summary)[:350]
-            return f"{title}. {summary}"
+            trimmed = summary[:MAX_SUMMARY_LENGTH]
+            if trimmed.lower().startswith(title.lower()):
+                return trimmed
+            return f"{title}. {trimmed}"[: MAX_SUMMARY_LENGTH + len(title) + 2]
         return f"{title}. Imported from the approved source registry for curator review."
 
     def _extract_funding_summary(self, text: str) -> str | None:
         lowered = text.lower()
-        for keyword in ("stipend", "tuition", "funding", "award", "grant"):
+        for keyword in ("stipend", "tuition", "funding", "award", "grant", "bursary"):
             if keyword in lowered:
-                return f"Potential {keyword}-related support mentioned on the source page; curator verification required."
+                return (
+                    f"Potential {keyword}-related support mentioned on the source page; "
+                    "curator verification required."
+                )
         return None
 
     def _infer_field_tags(self, text: str) -> list[str]:
-        lowered = text.lower()
+        lowered = f" {text.lower()} "
         matched = [
             canonical
             for canonical, keywords in FIELD_KEYWORD_MAP.items()
@@ -500,10 +1069,9 @@ class IngestionService:
         return matched
 
     def _infer_degree_levels(self, text: str) -> list[str]:
-        lowered = text.lower()
-        if any(keyword in lowered for keyword in DEGREE_KEYWORDS):
-            return ["MS"]
-        return ["MS"]
+        lowered = f" {text.lower()} "
+        levels = [level for level, keywords in DEGREE_KEYWORDS if any(keyword in lowered for keyword in keywords)]
+        return levels or ["MS"]
 
     def _infer_country_code(self, source: SourceRegistry, url: str) -> str:
         lowered = f"{source.source_key} {source.display_name} {url}".lower()
@@ -511,9 +1079,11 @@ class IngestionService:
             return "US"
         return "CA"
 
-    def _looks_like_candidate(self, text: str) -> bool:
-        lowered = text.lower()
-        return any(keyword in lowered for keyword in SCHOLARSHIP_KEYWORDS)
+    def _document_ref_from_url_or_title(self, resolved_url: str, title: str) -> str:
+        path_segments = [segment for segment in urlparse(resolved_url).path.split("/") if segment]
+        if path_segments:
+            return self._slugify(path_segments[-1])
+        return self._slugify(title)
 
     def _extract_title(self, html: str) -> str | None:
         match = re.search(r"<title>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
@@ -525,7 +1095,7 @@ class IngestionService:
         meta = soup.find("meta", attrs={"name": "description"}) or soup.find(
             "meta", attrs={"property": "og:description"}
         )
-        if not meta:
+        if meta is None:
             return None
         content = meta.get("content")
         return self._clean_text(content) if content else None
@@ -535,21 +1105,33 @@ class IngestionService:
 
     def _slugify(self, value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-        return slug[:255]
+        return slug[:255] or "item"
 
     def _resolve_run_status(
         self,
+        *,
         records_found: int,
         records_created: int,
         records_skipped: int,
+        failure_count: int,
     ) -> IngestionRunStatus:
-        if records_created > 0 and records_skipped == 0:
+        if records_created > 0 and records_skipped == 0 and failure_count == 0 and records_found == records_created:
             return IngestionRunStatus.COMPLETED
-        if records_created > 0 or records_found > 0 or records_skipped > 0:
+        if records_created > 0 or records_skipped > 0 or failure_count > 0 or records_found > 0:
             return IngestionRunStatus.PARTIAL
         return IngestionRunStatus.FAILED
 
     def _build_summary(self, run: IngestionRun) -> IngestionRunSummary:
+        metadata = run.run_metadata or {}
+        execution = metadata.get("execution") or {}
+        request = metadata.get("request") or {}
+
+        def _as_int(value: Any) -> int:
+            try:
+                return int(value) if value is not None else 0
+            except (TypeError, ValueError):
+                return 0
+
         return IngestionRunSummary(
             run_id=str(run.id),
             source_key=run.source_registry.source_key,
@@ -558,13 +1140,17 @@ class IngestionService:
             status=run.status.value,
             capture_mode=run.capture_mode,
             parser_name=run.parser_name,
-            records_found=run.records_found,
-            records_created=run.records_created,
-            records_skipped=run.records_skipped,
+            records_found=_as_int(run.records_found),
+            records_created=_as_int(run.records_created),
+            records_skipped=_as_int(run.records_skipped),
             failure_reason=run.failure_reason,
             started_at=run.started_at,
             completed_at=run.completed_at,
             created_at=run.created_at,
+            execution_mode_requested=request.get("execution_mode_requested"),
+            execution_mode_selected=execution.get("selected_mode"),
+            dispatch_status=execution.get("dispatch_status"),
+            celery_task_id=execution.get("celery_task_id"),
         )
 
     def _build_detail(self, run: IngestionRun) -> IngestionRunDetail:
@@ -572,3 +1158,6 @@ class IngestionService:
             **self._build_summary(run).model_dump(),
             run_metadata=run.run_metadata,
         )
+
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)

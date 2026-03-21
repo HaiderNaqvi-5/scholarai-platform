@@ -375,6 +375,8 @@ export type IngestionRunStatus =
   | "partial"
   | "failed";
 
+export type IngestionExecutionMode = "inline" | "worker" | "auto";
+
 export type IngestionRunSummary = {
   run_id: string;
   source_key: string;
@@ -390,6 +392,10 @@ export type IngestionRunSummary = {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  execution_mode_requested: IngestionExecutionMode | null;
+  execution_mode_selected: IngestionExecutionMode | null;
+  dispatch_status: string | null;
+  celery_task_id: string | null;
 };
 
 export type IngestionRunDetail = IngestionRunSummary & {
@@ -407,6 +413,7 @@ export type IngestionRunStartRequest = {
   source_base_url?: string | null;
   source_type: string;
   max_records: number;
+  execution_mode?: IngestionExecutionMode;
 };
 
 export type CurationRawImportRequest = {
