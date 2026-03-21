@@ -74,7 +74,7 @@ async def test_curation_service_approve_moves_raw_to_validated():
     result = await service.approve_record(
         record.id,
         CurationActionRequest(note="Reviewed and corrected"),
-        actor_user,
+        actor_user.id,
     )
 
     assert result.record_state == "validated"
@@ -98,7 +98,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     published = await service.publish_record(
         record.id,
         CurationActionRequest(note="Ready for students"),
-        actor_user,
+        actor_user.id,
     )
     assert published.record_state == "published"
     assert published.published_at is not None
@@ -106,7 +106,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     unpublished = await service.unpublish_record(
         record.id,
         CurationActionRequest(note="Pulled for revision"),
-        actor_user,
+        actor_user.id,
     )
     assert unpublished.record_state == "validated"
     assert unpublished.unpublished_at is not None
@@ -128,7 +128,7 @@ async def test_curation_service_rejects_invalid_publish_transition():
         await service.publish_record(
             record.id,
             CurationActionRequest(note="Should fail"),
-            actor_user,
+            actor_user.id,
         )
 
     assert caught.value.status_code == 409
