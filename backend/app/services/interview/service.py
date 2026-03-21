@@ -18,6 +18,7 @@ from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
     InterviewCurrentQuestionResponse,
+    InterviewProgressionMetrics,
     InterviewSessionSummaryResponse,
 )
 from app.services.documents.grounding import validate_scholarship_grounding
@@ -215,10 +216,50 @@ class InterviewSessionService:
             latest_feedback=latest_feedback,
             history_summary=build_history_summary(response_items),
             trend_summary=build_trend_summary(response_items),
+            progression_metrics=self._build_progression_metrics(response_items),
             started_at=session.started_at,
             completed_at=session.completed_at,
             created_at=session.created_at,
             updated_at=session.updated_at,
+        )
+
+    def _build_progression_metrics(
+        self,
+        responses: list[InterviewAnswerFeedback],
+    ) -> InterviewProgressionMetrics:
+        if not responses:
+            return InterviewProgressionMetrics(
+                answered_count=0,
+                average_score=None,
+                first_score=None,
+                latest_score=None,
+                score_delta=None,
+                improvement_ratio=0.0,
+                needs_focus_ratio=0.0,
+            )
+
+        scores = [response.overall_score for response in responses]
+        first_score = scores[0]
+        latest_score = scores[-1]
+        score_delta = round(latest_score - first_score, 3)
+        average_score = round(sum(scores) / len(scores), 3)
+        improving_steps = 0
+        for index in range(1, len(scores)):
+            if scores[index] > scores[index - 1]:
+                improving_steps += 1
+        improvement_ratio = round(improving_steps / max(len(scores) - 1, 1), 4)
+
+        needs_focus_count = sum(1 for score in scores if score < 3.0)
+        needs_focus_ratio = round(needs_focus_count / len(scores), 4)
+
+        return InterviewProgressionMetrics(
+            answered_count=len(scores),
+            average_score=average_score,
+            first_score=first_score,
+            latest_score=latest_score,
+            score_delta=score_delta,
+            improvement_ratio=improvement_ratio,
+            needs_focus_ratio=needs_focus_ratio,
         )
 
     def _build_current_question(

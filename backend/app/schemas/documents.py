@@ -23,6 +23,15 @@ class DocumentGeneratedGuidanceItem(BaseModel):
     guidance: str
 
 
+class DocumentQualityMetrics(BaseModel):
+    citation_coverage_ratio: float = Field(ge=0.0, le=1.0)
+    validated_fact_count: int = Field(ge=0)
+    retrieved_guidance_count: int = Field(ge=0)
+    generated_guidance_count: int = Field(ge=0)
+    caution_note_count: int = Field(ge=0)
+    review_flag: bool
+
+
 class DocumentGroundedContextSections(BaseModel):
     validated_facts: list[DocumentValidatedFact]
     retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]
@@ -46,6 +55,7 @@ class DocumentFeedbackResponse(BaseModel):
     generated_guidance: list[DocumentGeneratedGuidanceItem]
     limitations: list[str]
     grounded_context_sections: DocumentGroundedContextSections
+    quality_metrics: DocumentQualityMetrics
     limitation_notice: str
     completed_at: datetime | None
 
