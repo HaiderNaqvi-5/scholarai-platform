@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import asyncio
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -207,6 +208,9 @@ async def test_refresh_task_invokes_async_pipeline(monkeypatch):
         FakeRefresher,
     )
 
-    result = recommendation_tasks.refresh_published_scholarship_embeddings(limit=7)
+    result = await asyncio.to_thread(
+        recommendation_tasks.refresh_published_scholarship_embeddings,
+        limit=7,
+    )
 
     assert result == {"limit": 7, "status": "ok"}

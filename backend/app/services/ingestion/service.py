@@ -11,13 +11,14 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+from bs4.exceptions import FeatureNotFound
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import IngestionRun, IngestionRunStatus, SourceRegistry
+from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, User, UserRole
 from app.schemas.curation import (
     CurationRawImportRequest,
     IngestionRunDetail,
@@ -130,12 +131,14 @@ class IngestionService:
     async def start_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user_id: uuid.UUID,
+        actor_user: User,
     ) -> IngestionRunDetail:
-        source = await self._get_or_create_source(payload)
+        self._assert_user_scope(actor_user)
+        source = await self._get_or_create_source(payload, actor_user)
         run = IngestionRun(
             source_registry=source,
-            triggered_by_user_id=actor_user_id,
+            triggered_by_user_id=actor_user.id,
+            institution_id=source.institution_id,
             status=IngestionRunStatus.RUNNING,
             fetch_url=source.base_url,
             started_at=datetime.now(timezone.utc),
@@ -154,7 +157,7 @@ class IngestionService:
                 try:
                     detail = await curation_service.import_raw_record(
                         candidate.to_import_request(),
-                        actor_user_id,
+                        actor_user,
                     )
                     created.append(
                         {
@@ -197,22 +200,32 @@ class IngestionService:
             await self.db.flush()
             raise
 
-    async def list_runs(self, limit: int = 20) -> IngestionRunListResponse:
-        result = await self.db.execute(
+    async def list_runs(self, actor_user: User, limit: int = 20) -> IngestionRunListResponse:
+        self._assert_user_scope(actor_user)
+        query = (
             select(IngestionRun)
             .options(selectinload(IngestionRun.source_registry))
             .order_by(IngestionRun.created_at.desc())
             .limit(limit)
         )
+        if self._is_university_scoped(actor_user):
+            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
+
+        result = await self.db.execute(query)
         items = [self._build_summary(item) for item in result.scalars().all()]
         return IngestionRunListResponse(items=items, total=len(items))
 
-    async def get_run(self, run_id: uuid.UUID) -> IngestionRunDetail:
-        result = await self.db.execute(
+    async def get_run(self, run_id: uuid.UUID, actor_user: User) -> IngestionRunDetail:
+        self._assert_user_scope(actor_user)
+        query = (
             select(IngestionRun)
             .where(IngestionRun.id == run_id)
             .options(selectinload(IngestionRun.source_registry))
         )
+        if self._is_university_scoped(actor_user):
+            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
+
+        result = await self.db.execute(query)
         run = result.scalar_one_or_none()
         if run is None:
             raise HTTPException(
@@ -221,7 +234,7 @@ class IngestionService:
             )
         return self._build_detail(run)
 
-    async def _get_or_create_source(self, payload: IngestionRunStartRequest) -> SourceRegistry:
+    async def _get_or_create_source(self, payload: IngestionRunStartRequest, actor_user: User) -> SourceRegistry:
         result = await self.db.execute(
             select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
         )
@@ -237,11 +250,18 @@ class IngestionService:
                 display_name=payload.source_display_name,
                 base_url=payload.source_base_url,
                 source_type=payload.source_type,
+                institution_id=actor_user.institution_id if self._is_university_scoped(actor_user) else None,
                 is_active=True,
             )
             self.db.add(source)
             await self.db.flush()
             return source
+
+        if self._is_university_scoped(actor_user) and source.institution_id != actor_user.institution_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Source is outside institution scope",
+            )
 
         if payload.source_display_name:
             source.display_name = payload.source_display_name
@@ -250,6 +270,16 @@ class IngestionService:
         source.source_type = payload.source_type or source.source_type
         source.is_active = True
         return source
+
+    def _is_university_scoped(self, actor_user: User) -> bool:
+        return actor_user.role == UserRole.UNIVERSITY
+
+    def _assert_user_scope(self, actor_user: User) -> None:
+        if self._is_university_scoped(actor_user) and actor_user.institution_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="University user requires institution scope",
+            )
 
     @retry_async(max_retries=2, delay=2.0)
     async def _capture_source(self, url: str) -> CaptureResult:
@@ -327,7 +357,10 @@ class IngestionService:
         source: SourceRegistry,
         capture: CaptureResult,
     ) -> list[ParsedScholarshipCandidate]:
-        soup = BeautifulSoup(capture.html, "lxml")
+        try:
+            soup = BeautifulSoup(capture.html, "lxml")
+        except FeatureNotFound:
+            soup = BeautifulSoup(capture.html, "html.parser")
         page_text = soup.get_text(" ", strip=True)
         page_summary = self._extract_meta_description(soup)
         table_records = self._extract_table_records(capture.html)

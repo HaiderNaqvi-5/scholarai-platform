@@ -25,13 +25,17 @@ class SavedOpportunityService:
             .order_by(Application.created_at.desc())
         )
         saved_rows = result.scalars().all()
-        return [
-            self._serialize(application)
-            for application in saved_rows
-            if application.scholarship is not None
-            and application.scholarship.record_state == RecordState.PUBLISHED
-            and scholarship_in_scope(application.scholarship)
-        ]
+        serialized: list[SavedOpportunityItem] = []
+        for application in saved_rows:
+            if application.scholarship is None:
+                continue
+            if application.scholarship.record_state != RecordState.PUBLISHED:
+                continue
+            in_scope, _, _ = scholarship_in_scope(application.scholarship)
+            if not in_scope:
+                continue
+            serialized.append(self._serialize(application))
+        return serialized
 
     async def save(self, user_id: uuid.UUID, scholarship_id: uuid.UUID) -> SavedOpportunityItem:
         scholarship = await self._load_published_scholarship(scholarship_id)
@@ -87,7 +91,14 @@ class SavedOpportunityService:
             )
         )
         scholarship = result.scalar_one_or_none()
-        if scholarship is None or not scholarship_in_scope(scholarship):
+        if scholarship is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Published scholarship not found",
+            )
+
+        in_scope, _, _ = scholarship_in_scope(scholarship)
+        if not in_scope:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Published scholarship not found",

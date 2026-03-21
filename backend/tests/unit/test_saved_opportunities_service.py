@@ -57,6 +57,7 @@ async def test_saved_opportunities_service_filters_to_published_records():
         deadline_at=None,
         record_state=RecordState.PUBLISHED,
         source_url="https://example.com/ca/scholarship",
+        summary="Published summary",
     )
     validated = SimpleNamespace(
         id=uuid4(),
@@ -66,6 +67,7 @@ async def test_saved_opportunities_service_filters_to_published_records():
         deadline_at=None,
         record_state=RecordState.VALIDATED,
         source_url="https://example.com/ca/validated",
+        summary="Validated summary",
     )
     session = FakeSession(
         [
@@ -112,6 +114,7 @@ async def test_saved_opportunities_service_save_creates_entry_for_published_reco
         deadline_at=None,
         record_state=RecordState.PUBLISHED,
         source_url="https://example.com/ca/scholarship",
+        summary="Published summary",
     )
     session = FakeSession(
         [

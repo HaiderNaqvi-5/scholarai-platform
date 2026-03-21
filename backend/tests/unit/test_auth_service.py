@@ -2,18 +2,24 @@ import pytest
 from types import SimpleNamespace
 
 from app.core.security import hash_password
+from app.models import UserRole
 from app.schemas.auth import UserCreate, UserLogin
 from app.services.auth import AuthService
+from scholarai_common.errors import ErrorCode, ScholarAIException
 
 pytestmark = pytest.mark.asyncio
 
 
 class ScalarResult:
-    def __init__(self, one=None):
+    def __init__(self, one=None, all_items=None):
         self.one = one
+        self.all_items = all_items or []
 
     def scalar_one_or_none(self):
         return self.one
+
+    def all(self):
+        return self.all_items
 
 
 class FakeSession:
@@ -56,18 +62,19 @@ async def test_auth_service_login_rejects_invalid_password():
         id="user-1",
         email="student@example.com",
         password_hash=hash_password("correct-password"),
-        role=SimpleNamespace(value="student"),
+        role=UserRole.STUDENT,
         is_active=True,
+        institution_id=None,
     )
     session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
 
-    tokens, error_code = await service.login(
-        UserLogin(email="student@example.com", password="wrong-password")
-    )
+    with pytest.raises(ScholarAIException) as caught:
+        await service.login(
+            UserLogin(email="student@example.com", password="wrong-password")
+        )
 
-    assert tokens is None
-    assert error_code == "invalid_credentials"
+    assert caught.value.code == ErrorCode.AUTH_INVALID_CREDENTIALS
 
 
 async def test_auth_service_login_returns_tokens_for_valid_credentials():
@@ -75,18 +82,23 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
         id="user-1",
         email="student@example.com",
         password_hash=hash_password("correct-password"),
-        role=SimpleNamespace(value="student"),
+        role=UserRole.STUDENT,
         is_active=True,
+        institution_id=None,
     )
-    session = FakeSession([ScalarResult(one=user)])
+    session = FakeSession(
+        [
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+        ]
+    )
     service = AuthService(session)
 
-    tokens, error_code = await service.login(
+    tokens = await service.login(
         UserLogin(email="student@example.com", password="correct-password")
     )
 
-    assert error_code is None
-    assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
 
@@ -96,16 +108,25 @@ async def test_auth_service_refresh_session_returns_new_tokens():
         id="user-1",
         email="student@example.com",
         password_hash=hash_password("correct-password"),
-        role=SimpleNamespace(value="student"),
+        role=UserRole.STUDENT,
         is_active=True,
+        institution_id=None,
     )
-    session = FakeSession([ScalarResult(one=user)])
+    session = FakeSession(
+        [
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+        ]
+    )
     service = AuthService(session)
 
-    login_tokens, _ = await service.login(
+    login_tokens = await service.login(
         UserLogin(email="student@example.com", password="correct-password")
     )
-    assert login_tokens is not None
 
     refreshed = await service.refresh_session(login_tokens.refresh_token)
 
