@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   return (
-    <ProtectedRoute>
-      <DashboardShell />
-    </ProtectedRoute>
+    <Suspense fallback={null}>
+      <ProtectedRoute>
+        <DashboardShell />
+      </ProtectedRoute>
+    </Suspense>
   );
 }

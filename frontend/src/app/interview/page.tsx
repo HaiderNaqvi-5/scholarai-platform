@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { InterviewPracticeShell } from "@/components/interview/interview-practice-shell";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function InterviewPage() {
   return (
-    <ProtectedRoute>
-      <InterviewPracticeShell />
-    </ProtectedRoute>
+    <Suspense fallback={null}>
+      <ProtectedRoute>
+        <InterviewPracticeShell />
+      </ProtectedRoute>
+    </Suspense>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { AdminRoute } from "@/components/auth/admin-route";
 import { CurationDashboardShell } from "@/components/curation/curation-dashboard-shell";
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function CurationPage() {
   return (
-    <AdminRoute>
-      <CurationDashboardShell />
-    </AdminRoute>
+    <Suspense fallback={null}>
+      <AdminRoute>
+        <CurationDashboardShell />
+      </AdminRoute>
+    </Suspense>
   );
 }

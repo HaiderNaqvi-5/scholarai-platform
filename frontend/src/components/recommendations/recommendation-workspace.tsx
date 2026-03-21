@@ -47,7 +47,7 @@ export function RecommendationWorkspace() {
       setState((current) => ({ ...current, isLoading: true, error: null }));
 
       try {
-        const profile = await apiRequest<StudentProfile>("/profile", {
+        const profile = await apiRequest<StudentProfile>("/profiles", {
           token: accessToken,
         });
         const [recommendations, saved] = await Promise.all([
