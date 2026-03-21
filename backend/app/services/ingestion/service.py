@@ -172,7 +172,7 @@ class IngestionService:
     async def start_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user: User | uuid.UUID | None,
+        actor_user_id: uuid.UUID | None,
     ) -> IngestionRunDetail:
         actor_user_id = self._extract_actor_user_id(actor_user)
         created_run = await self.create_run(payload, actor_user_id)
@@ -403,7 +403,6 @@ class IngestionService:
                 display_name=payload.source_display_name,
                 base_url=payload.source_base_url,
                 source_type=payload.source_type,
-                institution_id=None,
                 is_active=True,
             )
             self.db.add(source)

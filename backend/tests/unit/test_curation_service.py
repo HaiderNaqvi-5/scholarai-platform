@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models import RecordState, Scholarship, SourceRegistry, UserRole
+from app.models import RecordState, Scholarship, SourceRegistry
 from app.schemas.curation import CurationActionRequest, CurationRawImportRequest
 from app.services.curation import CurationService
 
@@ -69,7 +69,7 @@ async def test_curation_service_approve_moves_raw_to_validated():
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
-    actor_user = type("U", (), {"id": uuid4(), "role": UserRole.ADMIN, "institution_id": None})()
+    actor_user_id = uuid4()
 
     result = await service.approve_record(
         record.id,
@@ -93,7 +93,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
-    actor_user = type("U", (), {"id": uuid4(), "role": UserRole.ADMIN, "institution_id": None})()
+    actor_user_id = uuid4()
 
     published = await service.publish_record(
         record.id,
@@ -122,7 +122,7 @@ async def test_curation_service_rejects_invalid_publish_transition():
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
 
-    actor_user = type("U", (), {"id": uuid4(), "role": UserRole.ADMIN, "institution_id": None})()
+    actor_user_id = uuid4()
 
     with pytest.raises(HTTPException) as caught:
         await service.publish_record(
@@ -138,7 +138,6 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
     session = FakeSession()
     service = CurationService(session)
     actor_user_id = uuid4()
-    actor_user = type("U", (), {"id": actor_user_id, "role": UserRole.ADMIN, "institution_id": None})()
 
     async def fake_source_registry(_payload, _actor_user):
         return SourceRegistry(
