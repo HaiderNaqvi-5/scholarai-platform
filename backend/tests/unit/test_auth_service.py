@@ -26,8 +26,10 @@ class FakeSession:
     def __init__(self, results):
         self.results = list(results)
         self.added = []
+        self.execute_count = 0
 
     async def execute(self, _query):
+        self.execute_count += 1
         return self.results.pop(0)
 
     def add(self, value):
@@ -87,13 +89,7 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
         is_active=True,
         institution_id=None,
     )
-    session = FakeSession(
-        [
-            ScalarResult(one=user),
-            ScalarResult(all_items=[]),
-            ScalarResult(all_items=[]),
-        ]
-    )
+    session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
 
     tokens = await service.login(
@@ -103,6 +99,8 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
     assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
+    assert session.execute_count == 1
+    assert not session.results
 
 
 async def test_auth_service_refresh_session_returns_new_tokens():
@@ -113,16 +111,6 @@ async def test_auth_service_refresh_session_returns_new_tokens():
         role=UserRole.STUDENT,
         is_active=True,
         institution_id=None,
-    )
-    session = FakeSession(
-        [
-            ScalarResult(one=user),
-            ScalarResult(all_items=[]),
-            ScalarResult(all_items=[]),
-            ScalarResult(one=user),
-            ScalarResult(all_items=[]),
-            ScalarResult(all_items=[]),
-        ]
     )
     session = FakeSession([ScalarResult(one=user), ScalarResult(one=user)])
     service = AuthService(session)
@@ -136,3 +124,5 @@ async def test_auth_service_refresh_session_returns_new_tokens():
     assert refreshed.access_token
     assert refreshed.refresh_token
     assert refreshed.expires_in > 0
+    assert session.execute_count == 2
+    assert not session.results
