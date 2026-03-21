@@ -10,6 +10,29 @@ class RecommendationRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=25)
 
 
+class RecommendationEvaluationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    predicted_ids: list[str] = Field(min_length=1)
+    judged_relevance: dict[str, int] = Field(min_length=1)
+    k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10], min_length=1)
+
+
+class RecommendationMetricItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k: float = Field(ge=0.0, le=1.0)
+    recall_at_k: float = Field(ge=0.0, le=1.0)
+    ndcg_at_k: float = Field(ge=0.0, le=1.0)
+
+
+class RecommendationEvaluationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metrics: list[RecommendationMetricItem]
+    metric_set: str
+    pipeline_version: str
+
+
 class RecommendationSignalLanguage(BaseModel):
     facts_label: str
     estimated_signals_label: str
