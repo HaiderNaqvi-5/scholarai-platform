@@ -1,5 +1,9 @@
 # ScholarAI — Deployment & Development Guide
 
+> Status: Legacy draft (not canonical).
+> Canonical deployment and runtime guidance is maintained in docs/scholarai/13_qa_devops_and_risks.md and the root docker-compose.yml.
+> This document may reference deferred infrastructure components.
+
 ---
 
 ## 1. Deployment Architecture

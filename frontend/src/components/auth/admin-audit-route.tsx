@@ -3,25 +3,20 @@
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { SkeletonLine } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
-import { Capability, hasCapability } from "@/lib/authorization";
+import { SkeletonLine } from "@/components/ui/skeleton";
+import { Capability, hasAnyCapability } from "@/lib/authorization";
 
-export function AdminRoute({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AdminAuditRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { accessToken, currentUser, isAuthenticated, isLoading } = useAuth();
   const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-  const hasCurationAccess = hasCapability(
-    currentUser,
-    accessToken,
-    Capability.CurationQueueRead,
-  );
+  const hasAdminAnalyticsAccess = hasAnyCapability(currentUser, accessToken, [
+    Capability.AdminAuditRead,
+    Capability.OwnerSystemRead,
+  ]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -29,10 +24,10 @@ export function AdminRoute({
       return;
     }
 
-    if (!isLoading && isAuthenticated && !hasCurationAccess) {
+    if (!isLoading && isAuthenticated && !hasAdminAnalyticsAccess) {
       router.replace("/dashboard");
     }
-  }, [hasCurationAccess, isAuthenticated, isLoading, nextPath, router]);
+  }, [hasAdminAnalyticsAccess, isAuthenticated, isLoading, nextPath, router]);
 
   if (isLoading) {
     return (
@@ -46,7 +41,7 @@ export function AdminRoute({
     );
   }
 
-  if (!isAuthenticated || !hasCurationAccess) {
+  if (!isAuthenticated || !hasAdminAnalyticsAccess) {
     return null;
   }
 

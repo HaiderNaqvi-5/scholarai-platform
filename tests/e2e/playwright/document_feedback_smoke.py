@@ -37,7 +37,7 @@ def main() -> None:
         page.locator('[data-testid="document-submission-form"] button[type="submit"]').click()
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="document-feedback-result"]')
-        page.wait_for_selector("text=Structured writing guidance")
+        page.wait_for_selector("text=Writing guidance")
 
         browser.close()
 

@@ -53,6 +53,7 @@ scholarai-platform/
 ## Implementation Status
 - Repository status: active internal MVP implementation with documentation-led scope control.
 - Canonical docs `01` through `14` define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
+- Active implementation track: docs-first RBAC expansion with capability-based access, institution-scoped university permissions, and compatibility-window migration.
 - The current implementation includes:
   - auth and session persistence
   - public scholarship browse, search/filter, and scholarship detail pages backed by published-only routes

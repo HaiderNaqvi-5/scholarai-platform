@@ -11,6 +11,7 @@ This document separates near-term post-MVP improvements from longer-horizon rese
 | Explanation UX | Improve explanation comparisons and transparency around uncertainty |
 | Document assistance | Better workflows for revision tracking and version comparison |
 | Admin tooling | Better queue management and curation productivity features |
+| Authorization operations | Add policy automation, access recertification, and capability drift monitoring |
 
 ## Future Research Extensions
 | Area | Research direction |
@@ -27,8 +28,19 @@ This document separates near-term post-MVP improvements from longer-horizon rese
 | Geography expansion | Broaden beyond Canada once curation operations are stable |
 | Additional degree levels | Expand to other postgraduate programs before undergraduate breadth |
 | Provider tooling | Provider-submitted scholarship data with review workflows |
-| Institution tooling | Dashboards for scholarship offices and program admins |
+| Institution tooling | Advanced multi-tenant dashboards and reporting beyond MVP scoped university panel |
 | Student workflow | Reminder systems, planning timelines, and collaboration features |
+
+## Authorization Growth Path
+### MVP scope
+- Capability-based authorization matrix with six role bundles.
+- Institution-scoped university access for relevant endpoints.
+- Compatibility-window migration from legacy role claims.
+
+### Post-MVP scope
+- policy automation and periodic access recertification workflows
+- advanced tenant administration and delegated institution controls
+- higher-granularity owner analytics for operational governance
 
 ## Data Moat Strategy
 ### Near-term

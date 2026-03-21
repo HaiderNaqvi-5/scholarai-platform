@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import SessionReadUser
 from app.core.rate_limit import RateLimiter
 from app.models import User
 from app.schemas import (
@@ -44,7 +44,7 @@ async def login(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: CurrentUser) -> User:
+async def get_current_user_info(current_user: SessionReadUser) -> User:
     return current_user
 
 

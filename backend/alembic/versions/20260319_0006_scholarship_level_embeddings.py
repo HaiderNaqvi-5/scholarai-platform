@@ -18,10 +18,15 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    op.add_column(
-        "scholarships",
-        sa.Column("description_embedding", pgvector.sqlalchemy.Vector(dim=768), nullable=True),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    column_names = {column["name"] for column in inspector.get_columns("scholarships")}
+
+    if "description_embedding" not in column_names:
+        op.add_column(
+            "scholarships",
+            sa.Column("description_embedding", pgvector.sqlalchemy.Vector(dim=768), nullable=True),
+        )
 
     # Build the ANN index outside the transaction to avoid long write blocking.
     with op.get_context().autocommit_block():

@@ -1,5 +1,9 @@
 # ScholarAI — Product Requirements Document (PRD)
 
+> Status: Legacy draft (not canonical).
+> Canonical product scope and requirements are maintained in docs/scholarai/02_prd_and_scope.md and docs/scholarai/04_requirements_and_governance.md.
+> This file is retained as historical background.
+
 > **Version:** 1.0 — **Date:** 2026-03-08  
 > **Project Type:** Final Year Project (FYP)
 

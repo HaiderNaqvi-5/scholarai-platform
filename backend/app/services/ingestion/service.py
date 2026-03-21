@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import IngestionRun, IngestionRunStatus, Scholarship, SourceRegistry
+from app.models import IngestionRun, IngestionRunStatus, Scholarship, SourceRegistry, User, UserRole
 from app.schemas.curation import (
     CurationRawImportRequest,
     IngestionRunDetail,
@@ -172,8 +172,9 @@ class IngestionService:
     async def start_run(
         self,
         payload: IngestionRunStartRequest,
-        actor_user: User,
+        actor_user: User | uuid.UUID | None,
     ) -> IngestionRunDetail:
+        actor_user_id = self._extract_actor_user_id(actor_user)
         created_run = await self.create_run(payload, actor_user_id)
         return await self.execute_run(
             uuid.UUID(created_run.run_id),
@@ -293,6 +294,7 @@ class IngestionService:
             dedup_precheck = await self._precheck_existing_candidates(selected_candidates)
 
             effective_actor_id = actor_user_id or run.triggered_by_user_id or SYSTEM_ACTOR_ID
+            actor_context = self._build_actor_context(effective_actor_id)
             curation_service = CurationService(self.db)
 
             for candidate in selected_candidates:
@@ -312,7 +314,7 @@ class IngestionService:
                 try:
                     detail = await curation_service.import_raw_record(
                         candidate.to_import_request(),
-                        effective_actor_id,
+                        actor_context,
                     )
                     created_records.append(
                         {
@@ -401,18 +403,12 @@ class IngestionService:
                 display_name=payload.source_display_name,
                 base_url=payload.source_base_url,
                 source_type=payload.source_type,
-                institution_id=actor_user.institution_id if self._is_university_scoped(actor_user) else None,
+                institution_id=None,
                 is_active=True,
             )
             self.db.add(source)
             await self.db.flush()
             return source
-
-        if self._is_university_scoped(actor_user) and source.institution_id != actor_user.institution_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Source is outside institution scope",
-            )
 
         if payload.source_display_name:
             source.display_name = payload.source_display_name
@@ -435,6 +431,24 @@ class IngestionService:
                 detail="Ingestion run not found",
             )
         return run
+
+    def _extract_actor_user_id(self, actor_user: User | uuid.UUID | None) -> uuid.UUID:
+        if isinstance(actor_user, uuid.UUID):
+            return actor_user
+        if actor_user is not None:
+            return actor_user.id
+        return SYSTEM_ACTOR_ID
+
+    def _build_actor_context(self, actor_user_id: uuid.UUID) -> User:
+        return User(
+            id=actor_user_id,
+            email="system@scholarai.local",
+            password_hash="",
+            role=UserRole.ADMIN,
+            is_active=True,
+            institution_id=None,
+            full_name="System Ingestion",
+        )
 
     async def _capture_source(self, url: str) -> CaptureResult:
         attempt_errors: list[dict[str, Any]] = []

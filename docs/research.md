@@ -1,5 +1,9 @@
 # ScholarAI — Academic Research Contribution
 
+> Status: Legacy draft (not canonical).
+> Canonical research and evaluation scope is maintained in docs/scholarai/11_research_and_evaluation.md and docs/scholarai/13_qa_devops_and_risks.md.
+> This file is retained for historical reference.
+
 > **Primary Research Areas:** Explainable Artificial Intelligence (XAI), Knowledge Graph-Augmented Recommendation Systems, AI Interview Simulation
 
 ---

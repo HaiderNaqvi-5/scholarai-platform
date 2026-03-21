@@ -5,19 +5,22 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-provider";
+import { Capability, hasAnyCapability } from "@/lib/authorization";
 
 export function MentorRoute({
   children,
-  message = "Checking mentor access.",
 }: {
   children: React.ReactNode;
-  message?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { currentUser, isAuthenticated, isLoading } = useAuth();
+  const { accessToken, currentUser, isAuthenticated, isLoading } = useAuth();
   const nextPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+  const hasMentorAccess = hasAnyCapability(currentUser, accessToken, [
+    Capability.DocumentMentorReview,
+    Capability.DocumentMentorSubmit,
+  ]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -25,10 +28,10 @@ export function MentorRoute({
       return;
     }
 
-    if (!isLoading && isAuthenticated && currentUser?.role !== "mentor") {
+    if (!isLoading && isAuthenticated && !hasMentorAccess) {
       router.replace("/dashboard");
     }
-  }, [currentUser?.role, isAuthenticated, isLoading, nextPath, router]);
+  }, [hasMentorAccess, isAuthenticated, isLoading, nextPath, router]);
 
   if (isLoading) {
     return (
@@ -42,7 +45,7 @@ export function MentorRoute({
     );
   }
 
-  if (!isAuthenticated || currentUser?.role !== "mentor") {
+  if (!isAuthenticated || !hasMentorAccess) {
     return null;
   }
 

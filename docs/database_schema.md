@@ -1,5 +1,9 @@
 # ScholarAI — PostgreSQL Database Schema & ER Diagram
 
+> Status: Legacy draft (not canonical).
+> Canonical data model is maintained in docs/scholarai/06_data_models.md plus Alembic migrations in backend/alembic/versions/.
+> This file is preserved for historical context and includes pre-RBAC and pre-institution-scope structures.
+
 > **Description:** Primary relational database schema supporting users, scholarships, applications, RAG conversational memory, and Mentorship features. Includes `pgvector` extensions for semantic search.
 
 ---

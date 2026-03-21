@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 
-import { AdminRoute } from "@/components/auth/admin-route";
+import { AdminAuditRoute } from "@/components/auth/admin-audit-route";
 import { AnalyticsDashboardShell } from "@/components/admin/analytics-dashboard-shell";
 import { SkeletonLine } from "@/components/ui/skeleton";
 
@@ -21,9 +21,9 @@ function AdminPageFallback() {
 export default function AdminPage() {
   return (
     <Suspense fallback={<AdminPageFallback />}>
-      <AdminRoute>
+      <AdminAuditRoute>
         <AnalyticsDashboardShell />
-      </AdminRoute>
+      </AdminAuditRoute>
     </Suspense>
   );
 }

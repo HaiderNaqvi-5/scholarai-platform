@@ -7,6 +7,7 @@ import { SkeletonLine, SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Capability, hasCapability } from "@/lib/authorization";
 import { getMentorPendingReviews, getMentorDocument, submitMentorFeedback } from "@/lib/api";
 import type { 
   DocumentRecordSummary, 
@@ -22,7 +23,17 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function MentorDashboardShell() {
-  const { accessToken } = useAuth();
+  const { accessToken, currentUser } = useAuth();
+  const canReviewDocuments = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.DocumentMentorReview,
+  );
+  const canSubmitFeedback = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.DocumentMentorSubmit,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingReviews, setPendingReviews] = useState<DocumentRecordSummary[]>([]);
@@ -31,6 +42,12 @@ export function MentorDashboardShell() {
 
   useEffect(() => {
     if (!accessToken) return;
+    if (!canReviewDocuments) {
+      setPendingReviews([]);
+      setSelectedDocument(null);
+      setIsLoading(false);
+      return;
+    }
 
     const loadData = async () => {
       try {
@@ -45,10 +62,10 @@ export function MentorDashboardShell() {
     };
 
     void loadData();
-  }, [accessToken]);
+  }, [accessToken, canReviewDocuments]);
 
   const handleSelectDocument = async (docId: string) => {
-    if (!accessToken) return;
+    if (!accessToken || !canReviewDocuments) return;
     try {
       setSelectedDocument(null);
       const doc = await getMentorDocument(docId, accessToken);
@@ -60,6 +77,10 @@ export function MentorDashboardShell() {
 
   const handleSubmitFeedback = async (feedback: MentorFeedbackRequest) => {
     if (!accessToken || !selectedDocument) return;
+    if (!canSubmitFeedback) {
+      setError("You do not have permission to submit mentor feedback.");
+      return;
+    }
     try {
       setIsSubmitting(true);
       await submitMentorFeedback(selectedDocument.id, feedback, accessToken);
@@ -87,7 +108,12 @@ export function MentorDashboardShell() {
             title="Pending Reviews"
             description="Documents awaiting your human feedback."
           />
-          {isLoading ? (
+          {!canReviewDocuments ? (
+            <EmptyState
+              title="Review access required"
+              description="You do not have permission to open mentor review documents."
+            />
+          ) : isLoading ? (
             <div className="surface-list">
               <SkeletonLine count={3} />
             </div>
@@ -97,6 +123,7 @@ export function MentorDashboardShell() {
                 <button
                   key={doc.id}
                   className={`list-item-btn ${selectedDocument?.id === doc.id ? "active" : ""}`}
+                  disabled={!canReviewDocuments}
                   onClick={() => void handleSelectDocument(doc.id)}
                 >
                   <div className="meta-row">
@@ -124,6 +151,7 @@ export function MentorDashboardShell() {
               document={selectedDocument}
               onSubmit={handleSubmitFeedback}
               isSubmitting={isSubmitting}
+              canSubmitFeedback={canSubmitFeedback}
             />
           ) : (
             <div className="empty-panel h-full flex items-center justify-center">
@@ -146,10 +174,12 @@ function MentorReviewWorkspace({
   document,
   onSubmit,
   isSubmitting,
+  canSubmitFeedback,
 }: {
   document: DocumentDetail;
   onSubmit: (feedback: MentorFeedbackRequest) => void;
   isSubmitting: boolean;
+  canSubmitFeedback: boolean;
 }) {
   const [formData, setFormData] = useState<MentorFeedbackRequest>({
     summary: "",
@@ -214,6 +244,7 @@ function MentorReviewWorkspace({
                 <button
                   type="button"
                   className="nav-link text-xs"
+                  disabled={!canSubmitFeedback}
                   onClick={() => handleAddField(field)}
                 >
                   + Add Point
@@ -234,7 +265,7 @@ function MentorReviewWorkspace({
 
           <button
             className="auth-link auth-link--primary w-full"
-            disabled={isSubmitting || !formData.summary}
+            disabled={isSubmitting || !formData.summary || !canSubmitFeedback}
             onClick={() => onSubmit(formData)}
           >
             {isSubmitting ? "Submitting..." : "Publish Feedback"}

@@ -94,7 +94,13 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
         is_active=True,
         institution_id=None,
     )
-    session = FakeSession([ScalarResult(one=user)])
+    session = FakeSession(
+        [
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+        ]
+    )
     service = AuthService(session)
 
     tokens = await service.login(
@@ -104,7 +110,7 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
     assert tokens is not None
     assert tokens.access_token
     assert tokens.refresh_token
-    assert session.execute_count == 1
+    assert session.execute_count == 3
     assert not session.results
 
 
@@ -117,7 +123,16 @@ async def test_auth_service_refresh_session_returns_new_tokens():
         is_active=True,
         institution_id=None,
     )
-    session = FakeSession([ScalarResult(one=user), ScalarResult(one=user)])
+    session = FakeSession(
+        [
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+            ScalarResult(one=user),
+            ScalarResult(all_items=[]),
+            ScalarResult(all_items=[]),
+        ]
+    )
     service = AuthService(session)
 
     login_tokens = await service.login(
@@ -129,5 +144,5 @@ async def test_auth_service_refresh_session_returns_new_tokens():
     assert refreshed.access_token
     assert refreshed.refresh_token
     assert refreshed.expires_in > 0
-    assert session.execute_count == 2
+    assert session.execute_count == 6
     assert not session.results

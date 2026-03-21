@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
+from app.core.dependencies import DocumentCreateUser, DocumentFeedbackUser, DocumentReadUser
 from app.schemas import (
     DocumentDetailResponse,
     DocumentFeedbackRefreshResponse,
@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
-    current_user: CurrentUser,
+    current_user: DocumentReadUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DocumentListResponse:
     service = DocumentService(db)
@@ -30,7 +30,7 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentDetailResponse)
 async def get_document(
     document_id: uuid.UUID,
-    current_user: CurrentUser,
+    current_user: DocumentReadUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DocumentDetailResponse:
     service = DocumentService(db)
@@ -39,7 +39,7 @@ async def get_document(
 
 @router.post("", response_model=DocumentSubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def create_document(
-    current_user: CurrentUser,
+    current_user: DocumentCreateUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     document_type: Annotated[str, Form(...)],
     title: Annotated[str | None, Form()] = None,
@@ -67,7 +67,7 @@ async def create_document(
 )
 async def request_document_feedback(
     document_id: uuid.UUID,
-    current_user: CurrentUser,
+    current_user: DocumentFeedbackUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DocumentFeedbackRefreshResponse:
     service = DocumentService(db)

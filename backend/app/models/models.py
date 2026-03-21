@@ -27,9 +27,28 @@ def enum_values(enum_cls: type[enum.StrEnum]) -> list[str]:
 
 
 class UserRole(enum.StrEnum):
+    ENDUSER_STUDENT = "enduser_student"
+    INTERNAL_USER = "internal_user"
+    DEV = "dev"
     STUDENT = "student"
     ADMIN = "admin"
     MENTOR = "mentor"
+    UNIVERSITY = "university"
+    OWNER = "owner"
+
+
+class CapabilityRiskTier(enum.StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class InstitutionAccessLevel(enum.StrEnum):
+    VIEWER = "viewer"
+    EDITOR = "editor"
+    REVIEWER = "reviewer"
+    ADMIN = "admin"
 
 
 class DegreeLevel(enum.StrEnum):
@@ -97,6 +116,36 @@ class InterviewPracticeMode(enum.StrEnum):
     SCHOLARSHIP = "scholarship"
 
 
+class Institution(Base):
+    __tablename__ = "institutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    users: Mapped[list["User"]] = relationship("User", back_populates="institution")
+    user_access_assignments: Mapped[list["UserInstitutionAccess"]] = relationship(
+        "UserInstitutionAccess",
+        back_populates="institution",
+        cascade="all, delete-orphan",
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -112,6 +161,12 @@ class User(Base):
         Enum(UserRole, name="user_role", values_callable=enum_values),
         default=UserRole.STUDENT,
         nullable=False,
+    )
+    institution_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -146,6 +201,156 @@ class User(Base):
         "InterviewSession",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    institution: Mapped["Institution | None"] = relationship("Institution", back_populates="users")
+    capability_overrides: Mapped[list["UserCapability"]] = relationship(
+        "UserCapability",
+        foreign_keys="UserCapability.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    institution_access_assignments: Mapped[list["UserInstitutionAccess"]] = relationship(
+        "UserInstitutionAccess",
+        foreign_keys="UserInstitutionAccess.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class Capability(Base):
+    __tablename__ = "capabilities"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    capability_key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_tier: Mapped[CapabilityRiskTier] = mapped_column(
+        Enum(CapabilityRiskTier, name="capability_risk_tier", values_callable=enum_values),
+        nullable=False,
+        default=CapabilityRiskTier.LOW,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    role_assignments: Mapped[list["RoleCapability"]] = relationship(
+        "RoleCapability",
+        back_populates="capability",
+        cascade="all, delete-orphan",
+    )
+    user_assignments: Mapped[list["UserCapability"]] = relationship(
+        "UserCapability",
+        back_populates="capability",
+        cascade="all, delete-orphan",
+    )
+
+
+class RoleCapability(Base):
+    __tablename__ = "role_capabilities"
+
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=enum_values),
+        primary_key=True,
+    )
+    capability_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("capabilities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    granted_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    capability: Mapped["Capability"] = relationship("Capability", back_populates="role_assignments")
+
+
+class UserCapability(Base):
+    __tablename__ = "user_capabilities"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    capability_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("capabilities.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    grant_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[user_id],
+        back_populates="capability_overrides",
+    )
+    capability: Mapped["Capability"] = relationship("Capability", back_populates="user_assignments")
+
+
+class UserInstitutionAccess(Base):
+    __tablename__ = "user_institution_access"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    institution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    access_level: Mapped[InstitutionAccessLevel] = mapped_column(
+        Enum(InstitutionAccessLevel, name="institution_access_level", values_callable=enum_values),
+        nullable=False,
+        default=InstitutionAccessLevel.VIEWER,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[user_id],
+        back_populates="institution_access_assignments",
+    )
+    institution: Mapped["Institution"] = relationship(
+        "Institution",
+        back_populates="user_access_assignments",
     )
 
 
@@ -207,6 +412,12 @@ class SourceRegistry(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     base_url: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(String(64), nullable=False, default="official")
+    institution_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -248,6 +459,12 @@ class IngestionRun(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    institution_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     status: Mapped[IngestionRunStatus] = mapped_column(
         Enum(IngestionRunStatus, name="ingestion_run_status", values_callable=enum_values),
@@ -299,6 +516,12 @@ class Scholarship(Base):
         UUID(as_uuid=True),
         ForeignKey("source_registry.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    institution_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     external_source_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)

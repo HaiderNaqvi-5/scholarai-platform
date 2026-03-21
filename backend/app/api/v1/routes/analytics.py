@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import AdminUser
+from app.core.dependencies import AdminAuditUser
 from app.models import (
     Application,
     ApplicationStatus,
@@ -30,7 +30,7 @@ router = APIRouter()
 
 @router.get("", response_model=PlatformAnalyticsResponse)
 async def get_platform_analytics(
-    current_user: AdminUser,
+    current_user: AdminAuditUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PlatformAnalyticsResponse:
     """Return aggregate platform metrics for the admin dashboard."""
@@ -39,17 +39,23 @@ async def get_platform_analytics(
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     student_count = (
         await db.execute(
-            select(func.count(User.id)).where(User.role == UserRole.STUDENT)
+            select(func.count(User.id)).where(
+                User.role.in_([UserRole.STUDENT, UserRole.ENDUSER_STUDENT])
+            )
         )
     ).scalar() or 0
     mentor_count = (
         await db.execute(
-            select(func.count(User.id)).where(User.role == UserRole.MENTOR)
+            select(func.count(User.id)).where(
+                User.role.in_([UserRole.MENTOR, UserRole.INTERNAL_USER])
+            )
         )
     ).scalar() or 0
     admin_count = (
         await db.execute(
-            select(func.count(User.id)).where(User.role == UserRole.ADMIN)
+            select(func.count(User.id)).where(
+                User.role.in_([UserRole.ADMIN, UserRole.DEV, UserRole.OWNER])
+            )
         )
     ).scalar() or 0
 

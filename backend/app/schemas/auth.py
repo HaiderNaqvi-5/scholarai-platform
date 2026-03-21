@@ -34,7 +34,13 @@ class UserResponse(BaseModel):
     id: UUID = Field(..., description="Unique user identifier (UUID)")
     email: str = Field(..., description="User's primary email address")
     full_name: str = Field(..., description="User's full name")
-    role: str = Field(..., description="Assigned role (e.g., student, admin, mentor)")
+    role: str = Field(
+        ...,
+        description=(
+            "Assigned role (legacy: student/admin/mentor; expanded: "
+            "ENDUSER_STUDENT, INTERNAL_USER, DEV, ADMIN, UNIVERSITY, OWNER)"
+        ),
+    )
     is_active: bool = Field(..., description="Whether the account is enabled")
 
 

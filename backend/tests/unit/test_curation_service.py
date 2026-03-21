@@ -64,7 +64,7 @@ async def test_curation_service_approve_moves_raw_to_validated():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -74,7 +74,7 @@ async def test_curation_service_approve_moves_raw_to_validated():
     result = await service.approve_record(
         record.id,
         CurationActionRequest(note="Reviewed and corrected"),
-        actor_user.id,
+        actor_user,
     )
 
     assert result.record_state == "validated"
@@ -88,7 +88,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     service = CurationService(session)
     record = make_record(RecordState.VALIDATED)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -98,7 +98,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     published = await service.publish_record(
         record.id,
         CurationActionRequest(note="Ready for students"),
-        actor_user.id,
+        actor_user,
     )
     assert published.record_state == "published"
     assert published.published_at is not None
@@ -106,7 +106,7 @@ async def test_curation_service_publish_and_unpublish_follow_allowed_path():
     unpublished = await service.unpublish_record(
         record.id,
         CurationActionRequest(note="Pulled for revision"),
-        actor_user.id,
+        actor_user,
     )
     assert unpublished.record_state == "validated"
     assert unpublished.unpublished_at is not None
@@ -117,7 +117,7 @@ async def test_curation_service_rejects_invalid_publish_transition():
     service = CurationService(session)
     record = make_record(RecordState.RAW)
 
-    async def fake_load_record(_record_id):
+    async def fake_load_record(_record_id, _actor_user):
         return record
 
     service._load_record = fake_load_record  # type: ignore[method-assign]
@@ -128,7 +128,7 @@ async def test_curation_service_rejects_invalid_publish_transition():
         await service.publish_record(
             record.id,
             CurationActionRequest(note="Should fail"),
-            actor_user.id,
+            actor_user,
         )
 
     assert caught.value.status_code == 409
@@ -140,7 +140,7 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
     actor_user_id = uuid4()
     actor_user = type("U", (), {"id": actor_user_id, "role": UserRole.ADMIN, "institution_id": None})()
 
-    async def fake_source_registry(_payload):
+    async def fake_source_registry(_payload, _actor_user):
         return SourceRegistry(
             source_key="manual_demo_import",
             display_name="Manual demo import",
@@ -167,7 +167,7 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
             citizenship_rules=["PK"],
             review_notes="Imported for curator review",
         ),
-        actor_user.id,
+        actor_user,
     )
 
     assert result.record_state == "raw"
