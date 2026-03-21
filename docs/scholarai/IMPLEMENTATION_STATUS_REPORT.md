@@ -3,6 +3,20 @@
 ## Current Implementation Snapshot
 ScholarAI now has a real internal MVP path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. Phase 2 now adds scholarship-grounded bounded guidance for Documents and Interviews with explicit separation of facts, retrieved guidance, generated guidance, and limitations while keeping Canada-first scope fixed. The largest remaining implementation gaps are broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
 
+## Active Documentation-First Implementation Track
+The current implementation pass has started locally with a docs-first RBAC expansion covering:
+1. capability-based authorization matrix
+2. six-role bundle model (`ENDUSER_STUDENT`, `INTERNAL_USER`, `DEV`, `ADMIN`, `UNIVERSITY`, `OWNER`)
+3. institution-scoped university access rules
+4. compatibility-window migration from legacy role claims to capability claims
+
+This track is in-progress at contract and governance documentation level before broad code changes.
+
+Current local rollout status:
+- Backend capability dependencies, claim validation, and institution-scope controls are implemented.
+- Frontend route-level and navigation-level capability checks are implemented.
+- Frontend component-level action controls inside curation and mentor dashboards are in progress (button-level gating pass active).
+
 ## Implemented Features
 ### Backend and platform foundation
 | Area | Current implementation evidence |
@@ -128,7 +142,7 @@ ScholarAI now has a real internal MVP path rather than only isolated slices. The
 - A real source-registry ingestion run path now exists.
 
 ### Where implementation still diverges from docs
-- `docs/scholarai/10_backend_api_and_repo.md` still describes `profiles` rather than the active `/profile` route shape.
+- `docs/scholarai/10_backend_api_and_repo.md` still uses the conceptual module label `profiles` while implementation routes are mounted from `students.py` under `/profile` (with `/profiles` alias).
 - The docs describe a fuller recommendation pipeline than the current rules-first runtime implementation exposes.
 - The docs describe a richer ingestion stack and queue model than the current heuristic MVP ingestion run path.
 
