@@ -28,8 +28,13 @@ class FakeSession:
         self.added = []
         self.execute_count = 0
 
-    async def execute(self, _query):
+    async def execute(self, query):
         self.execute_count += 1
+        if not self.results:
+            raise AssertionError(
+                f"FakeSession.execute called {self.execute_count} times but no "
+                f"result was configured for query: {query!r}"
+            )
         return self.results.pop(0)
 
     def add(self, value):
