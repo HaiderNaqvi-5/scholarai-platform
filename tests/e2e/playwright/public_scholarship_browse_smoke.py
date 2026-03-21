@@ -34,7 +34,9 @@ def main() -> None:
         page.wait_for_url("**/scholarships")
 
         page.wait_for_selector("text=Waterloo AI Graduate Scholarship")
-        page.locator("text=Save to shortlist").first.click()
+        page.locator("text=View details").first.click()
+        page.wait_for_selector('[data-testid="scholarship-detail-shell"]')
+        page.get_by_role("button", name="Save to shortlist").click()
         page.wait_for_selector("text=Saved")
 
         browser.close()
