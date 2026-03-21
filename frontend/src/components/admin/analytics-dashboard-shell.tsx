@@ -23,8 +23,8 @@ export function AnalyticsDashboardShell() {
         setIsLoading(true);
         const data = await getAdminAnalytics(accessToken);
         setAnalytics(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load platform analytics.");
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, "Failed to load platform analytics."));
       } finally {
         setIsLoading(false);
       }
@@ -141,4 +141,11 @@ export function AnalyticsDashboardShell() {
       )}
     </AppShell>
   );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return fallback;
 }
