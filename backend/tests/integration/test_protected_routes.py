@@ -1,3 +1,6 @@
+from app.core.config import settings
+
+
 def test_saved_opportunities_requires_authentication(client):
     response = client.get("/api/v1/saved-opportunities")
 
@@ -23,8 +26,7 @@ def test_v1_deprecation_headers_and_v2_route_available(client):
     assert "/api/v2" in (v1_response.headers.get("Link") or "")
     assert v1_response.headers.get("X-API-Contract-Version") == "v1"
     deprecation_window = v1_response.headers.get("X-API-V1-Deprecation-Window-Days")
-    assert deprecation_window is not None
-    assert deprecation_window.strip().isdigit()
+    assert deprecation_window == str(max(settings.API_V1_DEPRECATION_DAYS, 1))
 
     v2_response = client.post(
         "/api/v2/recommendations/evaluate",
