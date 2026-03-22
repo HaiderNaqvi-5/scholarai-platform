@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
+    API_V2_PREFIX: str = "/api/v2"
+    API_V1_DEPRECATION_ENABLED: bool = True
+    API_V1_DEPRECATION_DAYS: int = 90
 
     DATABASE_URL: str = (
         "postgresql+asyncpg://scholarai:password@localhost:5432/scholarai"
