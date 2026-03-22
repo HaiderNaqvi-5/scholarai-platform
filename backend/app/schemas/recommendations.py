@@ -16,6 +16,8 @@ class RecommendationEvaluationRequest(BaseModel):
     predicted_ids: list[str] = Field(min_length=1)
     judged_relevance: dict[str, int] = Field(min_length=1)
     k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10], min_length=1)
+    thresholds: list["RecommendationMetricThresholdItem"] = Field(default_factory=list)
+    baseline_metrics: list["RecommendationMetricItem"] = Field(default_factory=list)
 
 
 class RecommendationMetricItem(BaseModel):
@@ -25,10 +27,30 @@ class RecommendationMetricItem(BaseModel):
     ndcg_at_k: float = Field(ge=0.0, le=1.0)
 
 
+class RecommendationMetricThresholdItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    recall_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    ndcg_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    ndcg_delta_min: float | None = None
+
+
+class RecommendationKPIGateItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k_pass: bool | None = None
+    recall_at_k_pass: bool | None = None
+    ndcg_at_k_pass: bool | None = None
+    ndcg_delta_pass: bool | None = None
+    ndcg_delta_value: float | None = None
+    all_passed: bool
+
+
 class RecommendationEvaluationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     metrics: list[RecommendationMetricItem]
+    kpi_gates: list[RecommendationKPIGateItem] = Field(default_factory=list)
+    kpi_passed: bool | None = None
     metric_set: str
     pipeline_version: str
 
