@@ -474,24 +474,17 @@ class DocumentService:
             retrieved_writing_guidance=sections_model.retrieved_writing_guidance,
             generated_guidance=sections_model.generated_guidance,
             limitations=sections_model.limitations,
-            grounded_context_sections=DocumentGroundedContextSections(
-                validated_facts=sections_model.validated_facts,
-                retrieved_writing_guidance=sections_model.retrieved_writing_guidance,
-                generated_guidance=sections_model.generated_guidance,
-                limitations=sections_model.limitations,
-            ),
-            quality_metrics=self._build_quality_metrics(payload, sections),
-            quality_gate=self._build_quality_gate(payload, sections),
+            grounded_context_sections=sections_model,
+            quality_metrics=(quality_metrics := self._build_quality_metrics(payload, sections)),
+            quality_gate=self._build_quality_gate(quality_metrics),
             limitation_notice=feedback.limitation_notice,
             completed_at=feedback.completed_at,
         )
 
     def _build_quality_gate(
         self,
-        payload: dict[str, Any],
-        sections: dict[str, Any],
+        metrics: DocumentQualityMetrics,
     ) -> DocumentQualityGate:
-        metrics = self._build_quality_metrics(payload, sections)
         thresholds = DOCUMENT_QUALITY_THRESHOLDS
 
         citation_coverage_pass = (

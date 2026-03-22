@@ -228,8 +228,8 @@ class InterviewSessionService:
             latest_feedback=latest_feedback,
             history_summary=InterviewHistorySummary(**build_history_summary(response_items)),
             trend_summary=InterviewTrendSummary(**build_trend_summary(response_items)),
-            progression_metrics=self._build_progression_metrics(response_items),
-            progression_gate=self._build_progression_gate(response_items),
+            progression_metrics=(progression_metrics := self._build_progression_metrics(response_items)),
+            progression_gate=self._build_progression_gate(progression_metrics),
             started_at=session.started_at,
             completed_at=session.completed_at,
             created_at=session.created_at,
@@ -238,10 +238,9 @@ class InterviewSessionService:
 
     def _build_progression_gate(
         self,
-        responses: list[InterviewAnswerFeedback],
+        metrics: InterviewProgressionMetrics,
     ) -> InterviewProgressionGate:
         thresholds = self.INTERVIEW_PROGRESSION_THRESHOLDS
-        metrics = self._build_progression_metrics(responses)
 
         answered_count_pass = metrics.answered_count >= thresholds.min_answered_count
         average_score_pass = (metrics.average_score or 0.0) >= thresholds.min_average_score
