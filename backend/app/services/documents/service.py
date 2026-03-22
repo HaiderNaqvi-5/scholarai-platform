@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -18,7 +18,10 @@ from app.models import (
 from app.schemas.documents import (
     DocumentDetailResponse,
     DocumentFeedbackResponse,
+    DocumentGroundedContextSections,
+    DocumentQualityGate,
     DocumentQualityMetrics,
+    DocumentQualityThresholds,
     DocumentRecordSummary,
     DocumentSubmissionValidation,
 )
@@ -34,6 +37,12 @@ MAX_FILE_SIZE_BYTES = 512 * 1024
 MAX_TEXT_LENGTH = 12000
 ALLOWED_EXTENSIONS = {".txt", ".md"}
 RUNTIME_STORAGE_ROOT = Path(__file__).resolve().parents[3] / "runtime" / "documents"
+DOCUMENT_QUALITY_THRESHOLDS = DocumentQualityThresholds(
+    min_citation_coverage_ratio=0.8,
+    max_caution_note_count=1,
+    min_retrieved_guidance_count=1,
+    min_generated_guidance_count=1,
+)
 
 
 class DocumentService:
@@ -445,7 +454,13 @@ class DocumentService:
 
     def _build_feedback(self, feedback: DocumentFeedback) -> DocumentFeedbackResponse:
         payload = feedback.feedback_payload or {}
-        sections = payload.get("grounded_context_sections") or self._legacy_grounded_sections(payload)
+        raw_sections = payload.get("grounded_context_sections")
+        sections = (
+            cast(dict[str, Any], raw_sections)
+            if isinstance(raw_sections, dict)
+            else self._legacy_grounded_sections(payload)
+        )
+        sections_model = DocumentGroundedContextSections(**sections)
         return DocumentFeedbackResponse(
             id=str(feedback.id),
             status=feedback.status.value,
@@ -455,14 +470,55 @@ class DocumentService:
             caution_notes=list(payload.get("caution_notes", [])),
             citations=list(payload.get("citations", [])),
             grounded_context=list(payload.get("grounded_context", [])),
-            validated_facts=list(sections.get("validated_facts", [])),
-            retrieved_writing_guidance=list(sections.get("retrieved_writing_guidance", [])),
-            generated_guidance=list(sections.get("generated_guidance", [])),
-            limitations=list(sections.get("limitations", [])),
-            grounded_context_sections=sections,
+            validated_facts=sections_model.validated_facts,
+            retrieved_writing_guidance=sections_model.retrieved_writing_guidance,
+            generated_guidance=sections_model.generated_guidance,
+            limitations=sections_model.limitations,
+            grounded_context_sections=DocumentGroundedContextSections(
+                validated_facts=sections_model.validated_facts,
+                retrieved_writing_guidance=sections_model.retrieved_writing_guidance,
+                generated_guidance=sections_model.generated_guidance,
+                limitations=sections_model.limitations,
+            ),
             quality_metrics=self._build_quality_metrics(payload, sections),
+            quality_gate=self._build_quality_gate(payload, sections),
             limitation_notice=feedback.limitation_notice,
             completed_at=feedback.completed_at,
+        )
+
+    def _build_quality_gate(
+        self,
+        payload: dict[str, Any],
+        sections: dict[str, Any],
+    ) -> DocumentQualityGate:
+        metrics = self._build_quality_metrics(payload, sections)
+        thresholds = DOCUMENT_QUALITY_THRESHOLDS
+
+        citation_coverage_pass = (
+            metrics.citation_coverage_ratio >= thresholds.min_citation_coverage_ratio
+        )
+        caution_note_count_pass = (
+            metrics.caution_note_count <= thresholds.max_caution_note_count
+        )
+        retrieved_guidance_pass = (
+            metrics.retrieved_guidance_count >= thresholds.min_retrieved_guidance_count
+        )
+        generated_guidance_pass = (
+            metrics.generated_guidance_count >= thresholds.min_generated_guidance_count
+        )
+
+        return DocumentQualityGate(
+            thresholds=thresholds,
+            citation_coverage_pass=citation_coverage_pass,
+            caution_note_count_pass=caution_note_count_pass,
+            retrieved_guidance_pass=retrieved_guidance_pass,
+            generated_guidance_pass=generated_guidance_pass,
+            all_passed=(
+                citation_coverage_pass
+                and caution_note_count_pass
+                and retrieved_guidance_pass
+                and generated_guidance_pass
+            ),
         )
 
     def _build_quality_metrics(
