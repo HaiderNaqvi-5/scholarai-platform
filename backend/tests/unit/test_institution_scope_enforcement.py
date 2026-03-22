@@ -42,14 +42,11 @@ async def test_curation_list_records_requires_institution_for_university_user():
     assert caught.value.status_code == 403
 
 
-async def test_ingestion_list_runs_requires_institution_for_university_user():
+async def test_ingestion_list_runs_invokes_database_query():
     service = IngestionService(NoopSession())
-    user = SimpleNamespace(id=uuid4(), role=UserRole.UNIVERSITY, institution_id=None)
 
-    with pytest.raises(HTTPException) as caught:
-        await service.list_runs(user)
-
-    assert caught.value.status_code == 403
+    with pytest.raises(AssertionError, match="DB execute should not be reached"):
+        await service.list_runs()
 
 
 async def test_curation_rejects_cross_institution_source_registry_access():
@@ -77,8 +74,7 @@ async def test_curation_rejects_cross_institution_source_registry_access():
     assert caught.value.status_code == 403
 
 
-async def test_ingestion_rejects_cross_institution_source_access():
-    actor_institution = uuid4()
+async def test_get_or_create_source_returns_existing_source():
     source = SimpleNamespace(
         source_key="shared_source",
         display_name="Shared Source",
@@ -88,7 +84,6 @@ async def test_ingestion_rejects_cross_institution_source_access():
         is_active=True,
     )
     service = IngestionService(SourceSession(source))
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.UNIVERSITY, institution_id=actor_institution)
     payload = SimpleNamespace(
         source_key="shared_source",
         source_display_name="Shared Source",
@@ -96,7 +91,5 @@ async def test_ingestion_rejects_cross_institution_source_access():
         source_type="official",
     )
 
-    with pytest.raises(HTTPException) as caught:
-        await service._get_or_create_source(payload, actor)
-
-    assert caught.value.status_code == 403
+    resolved = await service._get_or_create_source(payload)
+    assert resolved is source
