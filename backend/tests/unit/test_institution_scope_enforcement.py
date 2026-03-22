@@ -42,14 +42,33 @@ async def test_curation_list_records_requires_institution_for_university_user():
     assert caught.value.status_code == 403
 
 
-async def test_ingestion_list_runs_requires_institution_for_university_user():
-    service = IngestionService(NoopSession())
-    user = SimpleNamespace(id=uuid4(), role=UserRole.UNIVERSITY, institution_id=None)
+class _ScalarList:
+    def __init__(self, items):
+        self._items = items
 
-    with pytest.raises(HTTPException) as caught:
-        await service.list_runs(user)
+    def all(self):
+        return self._items
 
-    assert caught.value.status_code == 403
+
+class _ListResult:
+    def __init__(self, items):
+        self._items = items
+
+    def scalars(self):
+        return _ScalarList(self._items)
+
+
+class ListRunsSession:
+    async def execute(self, _query):
+        return _ListResult([])
+
+
+async def test_ingestion_list_runs_accepts_limit_parameter():
+    service = IngestionService(ListRunsSession())
+    response = await service.list_runs(limit=10)
+
+    assert response.total == 0
+    assert response.items == []
 
 
 async def test_curation_rejects_cross_institution_source_registry_access():
@@ -77,8 +96,7 @@ async def test_curation_rejects_cross_institution_source_registry_access():
     assert caught.value.status_code == 403
 
 
-async def test_ingestion_rejects_cross_institution_source_access():
-    actor_institution = uuid4()
+async def test_ingestion_get_or_create_source_updates_existing_source():
     source = SimpleNamespace(
         source_key="shared_source",
         display_name="Shared Source",
@@ -88,15 +106,16 @@ async def test_ingestion_rejects_cross_institution_source_access():
         is_active=True,
     )
     service = IngestionService(SourceSession(source))
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.UNIVERSITY, institution_id=actor_institution)
     payload = SimpleNamespace(
         source_key="shared_source",
-        source_display_name="Shared Source",
-        source_base_url="https://example.com",
-        source_type="official",
+        source_display_name="Updated Source",
+        source_base_url="https://updated.example.com",
+        source_type="partner",
     )
 
-    with pytest.raises(HTTPException) as caught:
-        await service._get_or_create_source(payload, actor)
+    updated_source = await service._get_or_create_source(payload)
 
-    assert caught.value.status_code == 403
+    assert updated_source is source
+    assert source.display_name == "Updated Source"
+    assert source.base_url == "https://updated.example.com"
+    assert source.source_type == "partner"
