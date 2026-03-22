@@ -59,16 +59,24 @@ class _ListResult:
 
 
 class ListRunsSession:
+    def __init__(self):
+        self.last_query = None
+
     async def execute(self, _query):
+        self.last_query = _query
         return _ListResult([])
 
 
 async def test_ingestion_list_runs_accepts_limit_parameter():
-    service = IngestionService(ListRunsSession())
+    session = ListRunsSession()
+    service = IngestionService(session)
     response = await service.list_runs(limit=10)
 
     assert response.total == 0
     assert response.items == []
+    limit_clause = getattr(session.last_query, "_limit_clause", None)
+    assert limit_clause is not None
+    assert getattr(limit_clause, "value", None) == 10
 
 
 async def test_curation_rejects_cross_institution_source_registry_access():
@@ -96,7 +104,7 @@ async def test_curation_rejects_cross_institution_source_registry_access():
     assert caught.value.status_code == 403
 
 
-async def test_ingestion_get_or_create_source_updates_existing_source():
+async def test_ingestion_get_or_create_source_updates_fields_on_existing_source():
     source = SimpleNamespace(
         source_key="shared_source",
         display_name="Shared Source",
