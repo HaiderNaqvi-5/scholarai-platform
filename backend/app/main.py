@@ -48,10 +48,18 @@ def create_app() -> FastAPI:
         request.state.request_id = request_id
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        if request.url.path.startswith(settings.API_V1_PREFIX):
+            response.headers["X-API-Contract-Version"] = "v1"
+        elif request.url.path.startswith(settings.API_V2_PREFIX):
+            response.headers["X-API-Contract-Version"] = "v2"
+
         if settings.API_V1_DEPRECATION_ENABLED and request.url.path.startswith(settings.API_V1_PREFIX):
             response.headers["Deprecation"] = "true"
             response.headers["Sunset"] = _v1_sunset_header_value(settings.API_V1_DEPRECATION_DAYS)
             response.headers["Link"] = f"<{settings.API_V2_PREFIX}>; rel=\"successor-version\""
+            response.headers["X-API-V1-Sunset-Days"] = _v1_sunset_days_remaining(
+                settings.API_V1_DEPRECATION_DAYS
+            )
         return response
 
     @app.exception_handler(ScholarAIException)
@@ -178,3 +186,7 @@ def _v1_sunset_header_value(deprecation_days: int) -> str:
         "%a, %d %b %Y %H:%M:%S GMT"
     )
     return sunset_at
+
+
+def _v1_sunset_days_remaining(deprecation_days: int) -> str:
+    return str(max(deprecation_days, 1))
