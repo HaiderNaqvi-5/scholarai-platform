@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+import httpx
 
 from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, UserRole
 from app.schemas.curation import IngestionRunStartRequest
@@ -268,3 +269,59 @@ async def test_start_run_records_failure_metadata_when_capture_fails(monkeypatch
     assert run.run_metadata["error_type"] == "RuntimeError"
     assert run.run_metadata["failure"]["phase"] == "capture_or_parse"
     assert run.run_metadata["failure"]["error_message"] == "capture unavailable"
+
+
+async def test_capture_source_stops_retrying_on_non_retryable_error(monkeypatch):
+    session = FakeSession()
+    service = IngestionService(session)
+    attempts = {"count": 0}
+
+    async def always_bad_request(_url: str, _attempt: int):
+        attempts["count"] += 1
+        request = SimpleNamespace(url="https://example.com/scholarships")
+        response = SimpleNamespace(status_code=400)
+        raise ExceptionWrapper.http_status_error(request=request, response=response)
+
+    monkeypatch.setattr(service, "_capture_source_once", always_bad_request)
+
+    with pytest.raises(ExceptionWrapper.http_status_error_type):
+        await service._capture_source("https://example.com/scholarships")
+
+    assert attempts["count"] == 1
+
+
+async def test_capture_source_retries_retryable_error_and_includes_retry_policy(monkeypatch):
+    session = FakeSession()
+    service = IngestionService(session)
+    attempts = {"count": 0}
+    sleep_calls = []
+
+    async def flaky_capture(_url: str, _attempt: int):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise httpx.ReadTimeout("temporary timeout")
+        return make_capture("<html><title>OK</title></html>")
+
+    async def fake_sleep(delay):
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr(service, "_capture_source_once", flaky_capture)
+    monkeypatch.setattr("app.services.ingestion.service.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("app.services.ingestion.service.random.uniform", lambda _a, _b: 0.0)
+
+    capture = await service._capture_source("https://example.com/scholarships")
+
+    assert attempts["count"] == 2
+    assert sleep_calls == [0.75]
+    assert capture.metadata["retry_policy"]["max_attempts"] == 2
+    assert capture.metadata["retry_policy"]["base_delay_seconds"] == 0.75
+    assert capture.metadata["attempt_errors"][0]["classification"] == "timeout"
+    assert capture.metadata["attempt_errors"][0]["retryable"] is True
+
+
+class ExceptionWrapper:
+    http_status_error_type = httpx.HTTPStatusError
+
+    @staticmethod
+    def http_status_error(*, request, response):
+        return httpx.HTTPStatusError("bad request", request=request, response=response)
