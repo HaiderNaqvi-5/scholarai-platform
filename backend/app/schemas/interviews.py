@@ -113,6 +113,7 @@ class InterviewProgressionThresholds(BaseModel):
 
 class InterviewProgressionGate(BaseModel):
     thresholds: InterviewProgressionThresholds
+    policy_version: str
     answered_count_pass: bool
     average_score_pass: bool
     score_delta_pass: bool

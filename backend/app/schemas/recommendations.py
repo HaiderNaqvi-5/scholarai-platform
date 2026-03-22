@@ -51,6 +51,7 @@ class RecommendationEvaluationResponse(BaseModel):
     metrics: list[RecommendationMetricItem]
     kpi_gates: list[RecommendationKPIGateItem] = Field(default_factory=list)
     kpi_passed: bool | None = None
+    policy_version: str
     metric_set: str
     pipeline_version: str
 

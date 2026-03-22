@@ -21,7 +21,6 @@ from app.schemas.documents import (
     DocumentGroundedContextSections,
     DocumentQualityGate,
     DocumentQualityMetrics,
-    DocumentQualityThresholds,
     DocumentRecordSummary,
     DocumentSubmissionValidation,
 )
@@ -32,19 +31,15 @@ from app.services.documents.grounding import (
     retrieve_bounded_writing_guidance,
     validate_scholarship_grounding,
 )
+from app.services.kpi_policy import (
+    get_document_quality_policy_version,
+    get_document_quality_thresholds,
+)
 
 MAX_FILE_SIZE_BYTES = 512 * 1024
 MAX_TEXT_LENGTH = 12000
 ALLOWED_EXTENSIONS = {".txt", ".md"}
 RUNTIME_STORAGE_ROOT = Path(__file__).resolve().parents[3] / "runtime" / "documents"
-DOCUMENT_QUALITY_THRESHOLDS = DocumentQualityThresholds(
-    min_citation_coverage_ratio=0.8,
-    max_caution_note_count=1,
-    min_retrieved_guidance_count=1,
-    min_generated_guidance_count=1,
-)
-
-
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -492,7 +487,7 @@ class DocumentService:
         sections: dict[str, Any],
     ) -> DocumentQualityGate:
         metrics = self._build_quality_metrics(payload, sections)
-        thresholds = DOCUMENT_QUALITY_THRESHOLDS
+        thresholds = get_document_quality_thresholds()
 
         citation_coverage_pass = (
             metrics.citation_coverage_ratio >= thresholds.min_citation_coverage_ratio
@@ -509,6 +504,7 @@ class DocumentService:
 
         return DocumentQualityGate(
             thresholds=thresholds,
+            policy_version=get_document_quality_policy_version(),
             citation_coverage_pass=citation_coverage_pass,
             caution_note_count_pass=caution_note_count_pass,
             retrieved_guidance_pass=retrieved_guidance_pass,
