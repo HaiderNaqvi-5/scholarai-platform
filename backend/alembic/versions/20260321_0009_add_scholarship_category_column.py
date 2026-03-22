@@ -1,7 +1,7 @@
 """add scholarship category column
 
-Revision ID: 20260321_0009
-Revises: 20260321_0008
+Revision ID: 20260321_0010
+Revises: 20260321_0009
 Create Date: 2026-03-21 00:00:09
 """
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "20260321_0009"
-down_revision: Union[str, None] = "20260321_0008"
+revision: str = "20260321_0010"
+down_revision: Union[str, None] = "20260321_0009"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
