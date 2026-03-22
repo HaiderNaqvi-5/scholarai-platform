@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
             response.headers["Deprecation"] = "true"
             response.headers["Sunset"] = _v1_sunset_header_value(settings.API_V1_DEPRECATION_DAYS)
             response.headers["Link"] = f"<{settings.API_V2_PREFIX}>; rel=\"successor-version\""
-            response.headers["X-API-V1-Sunset-Days"] = _v1_sunset_days_remaining(
+            response.headers["X-API-V1-Deprecation-Window-Days"] = _v1_sunset_days_remaining(
                 settings.API_V1_DEPRECATION_DAYS
             )
         return response

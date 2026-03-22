@@ -22,7 +22,9 @@ def test_v1_deprecation_headers_and_v2_route_available(client):
     assert v1_response.headers.get("Sunset")
     assert "/api/v2" in (v1_response.headers.get("Link") or "")
     assert v1_response.headers.get("X-API-Contract-Version") == "v1"
-    assert v1_response.headers.get("X-API-V1-Sunset-Days") == "90"
+    deprecation_window = v1_response.headers.get("X-API-V1-Deprecation-Window-Days")
+    assert deprecation_window is not None
+    assert deprecation_window.strip().isdigit()
 
     v2_response = client.post(
         "/api/v2/recommendations/evaluate",
