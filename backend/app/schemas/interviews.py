@@ -104,6 +104,22 @@ class InterviewProgressionMetrics(BaseModel):
     needs_focus_ratio: float = Field(ge=0.0, le=1.0)
 
 
+class InterviewProgressionThresholds(BaseModel):
+    min_answered_count: int = Field(ge=0)
+    min_average_score: float
+    min_score_delta: float
+    max_needs_focus_ratio: float = Field(ge=0.0, le=1.0)
+
+
+class InterviewProgressionGate(BaseModel):
+    thresholds: InterviewProgressionThresholds
+    answered_count_pass: bool
+    average_score_pass: bool
+    score_delta_pass: bool
+    needs_focus_ratio_pass: bool
+    all_passed: bool
+
+
 class InterviewSessionSummaryResponse(BaseModel):
     session_id: str
     scholarship_id: str | None = None
@@ -117,6 +133,7 @@ class InterviewSessionSummaryResponse(BaseModel):
     history_summary: InterviewHistorySummary
     trend_summary: InterviewTrendSummary
     progression_metrics: InterviewProgressionMetrics
+    progression_gate: InterviewProgressionGate
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime

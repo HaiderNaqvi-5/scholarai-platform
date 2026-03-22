@@ -32,6 +32,22 @@ class DocumentQualityMetrics(BaseModel):
     review_flag: bool
 
 
+class DocumentQualityThresholds(BaseModel):
+    min_citation_coverage_ratio: float = Field(ge=0.0, le=1.0)
+    max_caution_note_count: int = Field(ge=0)
+    min_retrieved_guidance_count: int = Field(ge=0)
+    min_generated_guidance_count: int = Field(ge=0)
+
+
+class DocumentQualityGate(BaseModel):
+    thresholds: DocumentQualityThresholds
+    citation_coverage_pass: bool
+    caution_note_count_pass: bool
+    retrieved_guidance_pass: bool
+    generated_guidance_pass: bool
+    all_passed: bool
+
+
 class DocumentGroundedContextSections(BaseModel):
     validated_facts: list[DocumentValidatedFact]
     retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]
@@ -56,6 +72,7 @@ class DocumentFeedbackResponse(BaseModel):
     limitations: list[str]
     grounded_context_sections: DocumentGroundedContextSections
     quality_metrics: DocumentQualityMetrics
+    quality_gate: DocumentQualityGate
     limitation_notice: str
     completed_at: datetime | None
 
