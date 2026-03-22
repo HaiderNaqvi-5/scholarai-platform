@@ -34,8 +34,11 @@ from app.schemas.interviews import (
     InterviewSessionSummaryResponse,
 )
 from app.schemas.recommendations import (
+    RecommendationEvaluationRequest,
+    RecommendationEvaluationResponse,
     RecommendationItem,
     RecommendationListResponse,
+    RecommendationMetricItem,
     RecommendationRequest,
 )
 from app.schemas.saved_opportunities import (
@@ -78,6 +81,9 @@ __all__ = [
     "InterviewSessionSummaryResponse",
     "RecommendationItem",
     "RecommendationListResponse",
+    "RecommendationEvaluationRequest",
+    "RecommendationEvaluationResponse",
+    "RecommendationMetricItem",
     "RecommendationRequest",
     "SavedOpportunityItem",
     "SavedOpportunityListResponse",

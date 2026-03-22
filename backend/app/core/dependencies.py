@@ -247,6 +247,16 @@ SavedOpportunityWriteUser = Annotated[
 RecommendationUser = Annotated[
     User, Depends(require_capability(Capability.RECOMMENDATION_SELF_GENERATE))
 ]
+RecommendationEvaluationUser = Annotated[
+    User,
+    Depends(
+        require_any_capability(
+            Capability.RECOMMENDATION_EVALUATE,
+            Capability.ADMIN_AUDIT_READ,
+            Capability.OWNER_SYSTEM_READ,
+        )
+    ),
+]
 
 DocumentReadUser = Annotated[User, Depends(require_capability(Capability.DOCUMENT_SELF_READ))]
 DocumentCreateUser = Annotated[User, Depends(require_capability(Capability.DOCUMENT_SELF_CREATE))]

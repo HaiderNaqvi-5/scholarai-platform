@@ -16,6 +16,7 @@ class Capability(enum.StrEnum):
     SAVED_OPPORTUNITY_SELF_WRITE = "saved_opportunity.self.write"
 
     RECOMMENDATION_SELF_GENERATE = "recommendation.self.generate"
+    RECOMMENDATION_EVALUATE = "recommendation.evaluate"
 
     DOCUMENT_SELF_READ = "document.self.read"
     DOCUMENT_SELF_CREATE = "document.self.create"
@@ -68,6 +69,7 @@ INTERNAL_VIEW_CAPABILITIES: set[str] = {
 DEV_CAPABILITIES: set[str] = {
     Capability.CURATION_RECORD_VALIDATE,
     Capability.CURATION_RECORD_PUBLISH,
+    Capability.RECOMMENDATION_EVALUATE,
 }
 
 ADMIN_CAPABILITIES: set[str] = {
