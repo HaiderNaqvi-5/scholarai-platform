@@ -75,3 +75,18 @@ def test_recommendation_evaluation_kpi_gates_ndcg_delta_requires_baseline():
     assert results_with_baseline[0].ndcg_delta_value == 0.03
     assert results_with_baseline[0].ndcg_delta_pass is True
     assert results_with_baseline[0].all_passed is True
+
+
+def test_recommendation_evaluation_single_threshold_k_filters_results():
+    service = RecommendationEvaluationService()
+    metrics = [
+        RecommendationMetricResult(k=1, precision_at_k=1.0, recall_at_k=0.4, ndcg_at_k=1.0),
+        RecommendationMetricResult(k=3, precision_at_k=0.67, recall_at_k=0.67, ndcg_at_k=0.9),
+    ]
+
+    thresholds = [RecommendationMetricThreshold(k=1, precision_at_k_min=0.5)]
+    results = service.evaluate_kpi_gates(metrics=metrics, thresholds=thresholds)
+
+    assert len(results) == 1
+    assert results[0].k == 1
+    assert results[0].precision_at_k_pass is True

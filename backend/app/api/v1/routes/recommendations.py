@@ -18,6 +18,10 @@ from app.schemas.recommendations import (
 )
 from app.services.recommendations import RecommendationEvaluationService, RecommendationService
 from app.services.recommendations.evaluation import RecommendationMetricResult, RecommendationMetricThreshold
+from app.services.kpi_policy import (
+    get_recommendation_default_thresholds,
+    get_recommendation_kpi_policy_version,
+)
 from app.services.students import StudentService
 
 router = APIRouter()
@@ -73,6 +77,8 @@ async def evaluate_recommendations(
         )
         for threshold in payload.thresholds
     ]
+    if not threshold_models:
+        threshold_models = get_recommendation_default_thresholds()
     baseline_metric_results = [
         RecommendationMetricResult(
             k=metric.k,
@@ -114,6 +120,7 @@ async def evaluate_recommendations(
             for gate in kpi_gates
         ],
         kpi_passed=kpi_passed,
+        policy_version=get_recommendation_kpi_policy_version(),
         metric_set="precision_at_k,recall_at_k,ndcg_at_k",
         pipeline_version="recommendations.phase1.v1",
     )

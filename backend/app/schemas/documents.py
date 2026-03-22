@@ -41,6 +41,7 @@ class DocumentQualityThresholds(BaseModel):
 
 class DocumentQualityGate(BaseModel):
     thresholds: DocumentQualityThresholds
+    policy_version: str
     citation_coverage_pass: bool
     caution_note_count_pass: bool
     retrieved_guidance_pass: bool
