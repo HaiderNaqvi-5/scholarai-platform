@@ -266,6 +266,12 @@ async def test_interview_service_session_history_and_trend_summary():
     assert result.trend_summary.average_score == 2.75
     assert result.trend_summary.score_direction == "improving"
     assert result.trend_summary.latest_weakest_dimension in {"relevance", "confidence", "specificity", "clarity"}
+    assert result.progression_metrics.answered_count == 2
+    assert result.progression_metrics.first_score == 2.0
+    assert result.progression_metrics.latest_score == 3.5
+    assert result.progression_metrics.score_delta == 1.5
+    assert result.progression_metrics.improvement_ratio == 1.0
+    assert result.progression_metrics.needs_focus_ratio == 0.5
 
 
 async def test_interview_invalid_scholarship_grounding_fails_cleanly():

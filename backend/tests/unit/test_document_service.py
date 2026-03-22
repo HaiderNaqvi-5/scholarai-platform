@@ -161,6 +161,9 @@ async def test_grounded_feedback_uses_validated_scholarship_facts_and_sections()
     assert feedback.limitations
     assert feedback.grounded_context_sections.validated_facts
     assert feedback.grounded_context_sections.generated_guidance
+    assert feedback.quality_metrics.validated_fact_count == len(feedback.validated_facts)
+    assert feedback.quality_metrics.citation_coverage_ratio > 0
+    assert isinstance(feedback.quality_metrics.review_flag, bool)
 
 
 async def test_invalid_scholarship_grounding_id_fails_cleanly():

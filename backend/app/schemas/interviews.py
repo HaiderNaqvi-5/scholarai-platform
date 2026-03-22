@@ -94,6 +94,16 @@ class InterviewTrendSummary(BaseModel):
     dimension_averages: dict[str, float]
 
 
+class InterviewProgressionMetrics(BaseModel):
+    answered_count: int = Field(ge=0)
+    average_score: float | None = None
+    first_score: float | None = None
+    latest_score: float | None = None
+    score_delta: float | None = None
+    improvement_ratio: float = Field(ge=0.0, le=1.0)
+    needs_focus_ratio: float = Field(ge=0.0, le=1.0)
+
+
 class InterviewSessionSummaryResponse(BaseModel):
     session_id: str
     scholarship_id: str | None = None
@@ -106,6 +116,7 @@ class InterviewSessionSummaryResponse(BaseModel):
     latest_feedback: InterviewAnswerFeedback | None
     history_summary: InterviewHistorySummary
     trend_summary: InterviewTrendSummary
+    progression_metrics: InterviewProgressionMetrics
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime

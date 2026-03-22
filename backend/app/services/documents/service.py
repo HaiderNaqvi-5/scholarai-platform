@@ -18,6 +18,7 @@ from app.models import (
 from app.schemas.documents import (
     DocumentDetailResponse,
     DocumentFeedbackResponse,
+    DocumentQualityMetrics,
     DocumentRecordSummary,
     DocumentSubmissionValidation,
 )
@@ -459,8 +460,32 @@ class DocumentService:
             generated_guidance=list(sections.get("generated_guidance", [])),
             limitations=list(sections.get("limitations", [])),
             grounded_context_sections=sections,
+            quality_metrics=self._build_quality_metrics(payload, sections),
             limitation_notice=feedback.limitation_notice,
             completed_at=feedback.completed_at,
+        )
+
+    def _build_quality_metrics(
+        self,
+        payload: dict[str, Any],
+        sections: dict[str, Any],
+    ) -> DocumentQualityMetrics:
+        citations = list(payload.get("citations", []))
+        validated_facts = list(sections.get("validated_facts", []))
+        retrieved = list(sections.get("retrieved_writing_guidance", []))
+        generated = list(sections.get("generated_guidance", []))
+        caution_notes = list(payload.get("caution_notes", []))
+
+        citation_coverage_ratio = 1.0 if not validated_facts else min(len(citations) / len(validated_facts), 1.0)
+        review_flag = citation_coverage_ratio < 0.8 or len(caution_notes) >= 2
+
+        return DocumentQualityMetrics(
+            citation_coverage_ratio=round(citation_coverage_ratio, 4),
+            validated_fact_count=len(validated_facts),
+            retrieved_guidance_count=len(retrieved),
+            generated_guidance_count=len(generated),
+            caution_note_count=len(caution_notes),
+            review_flag=review_flag,
         )
 
     def _legacy_grounded_sections(self, payload: dict[str, Any]) -> dict[str, Any]:
