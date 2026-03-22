@@ -12,6 +12,26 @@ class RecommendationMetricResult:
     ndcg_at_k: float
 
 
+@dataclass(frozen=True)
+class RecommendationMetricThreshold:
+    k: int
+    precision_at_k_min: float | None = None
+    recall_at_k_min: float | None = None
+    ndcg_at_k_min: float | None = None
+    ndcg_delta_min: float | None = None
+
+
+@dataclass(frozen=True)
+class RecommendationKPIGateResult:
+    k: int
+    precision_at_k_pass: bool | None
+    recall_at_k_pass: bool | None
+    ndcg_at_k_pass: bool | None
+    ndcg_delta_pass: bool | None
+    ndcg_delta_value: float | None
+    all_passed: bool
+
+
 class RecommendationEvaluationService:
     def evaluate(
         self,
@@ -32,6 +52,62 @@ class RecommendationEvaluationService:
             )
             for k in normalized_k_values
         ]
+
+    def evaluate_kpi_gates(
+        self,
+        *,
+        metrics: list[RecommendationMetricResult],
+        thresholds: list[RecommendationMetricThreshold],
+        baseline_metrics: list[RecommendationMetricResult] | None = None,
+    ) -> list[RecommendationKPIGateResult]:
+        metric_by_k = {metric.k: metric for metric in metrics}
+        baseline_by_k = {metric.k: metric for metric in (baseline_metrics or [])}
+        results: list[RecommendationKPIGateResult] = []
+
+        for threshold in thresholds:
+            metric = metric_by_k.get(threshold.k)
+            if metric is None:
+                continue
+
+            precision_pass = self._gte_or_none(metric.precision_at_k, threshold.precision_at_k_min)
+            recall_pass = self._gte_or_none(metric.recall_at_k, threshold.recall_at_k_min)
+            ndcg_pass = self._gte_or_none(metric.ndcg_at_k, threshold.ndcg_at_k_min)
+
+            baseline_metric = baseline_by_k.get(threshold.k)
+            ndcg_delta_value = None
+            ndcg_delta_pass = None
+            if threshold.ndcg_delta_min is not None:
+                if baseline_metric is not None:
+                    ndcg_delta_value = round(metric.ndcg_at_k - baseline_metric.ndcg_at_k, 4)
+                    ndcg_delta_pass = ndcg_delta_value >= threshold.ndcg_delta_min
+                else:
+                    ndcg_delta_pass = False
+
+            checks = [
+                value
+                for value in (precision_pass, recall_pass, ndcg_pass, ndcg_delta_pass)
+                if value is not None
+            ]
+            all_passed = all(checks) if checks else True
+
+            results.append(
+                RecommendationKPIGateResult(
+                    k=threshold.k,
+                    precision_at_k_pass=precision_pass,
+                    recall_at_k_pass=recall_pass,
+                    ndcg_at_k_pass=ndcg_pass,
+                    ndcg_delta_pass=ndcg_delta_pass,
+                    ndcg_delta_value=ndcg_delta_value,
+                    all_passed=all_passed,
+                )
+            )
+
+        return results
+
+    def _gte_or_none(self, actual: float, minimum: float | None) -> bool | None:
+        if minimum is None:
+            return None
+        return actual >= minimum
 
     def _normalize_k_values(self, k_values: list[int], prediction_count: int) -> list[int]:
         if not k_values:
