@@ -272,6 +272,7 @@ async def test_interview_service_session_history_and_trend_summary():
     assert result.progression_metrics.score_delta == 1.5
     assert result.progression_metrics.improvement_ratio == 1.0
     assert result.progression_metrics.needs_focus_ratio == 0.5
+    assert result.progression_gate.policy_version == "interview.progression.v1"
     assert result.progression_gate.thresholds.min_answered_count == 2
     assert result.progression_gate.answered_count_pass is True
     assert result.progression_gate.average_score_pass is False

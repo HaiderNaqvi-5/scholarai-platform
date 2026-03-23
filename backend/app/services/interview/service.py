@@ -21,11 +21,14 @@ from app.schemas.interviews import (
     InterviewHistorySummary,
     InterviewProgressionGate,
     InterviewProgressionMetrics,
-    InterviewProgressionThresholds,
     InterviewSessionSummaryResponse,
     InterviewTrendSummary,
 )
 from app.services.documents.grounding import validate_scholarship_grounding
+from app.services.kpi_policy import (
+    get_interview_progression_policy_version,
+    get_interview_progression_thresholds,
+)
 from app.services.interview.bounded_guidance import (
     build_adaptive_question,
     build_history_summary,
@@ -49,13 +52,6 @@ class InterviewSessionService:
             except Exception as exc:  # pragma: no cover
                 print(f"Failed to load AI integrations: {exc}")
 
-
-    INTERVIEW_PROGRESSION_THRESHOLDS = InterviewProgressionThresholds(
-        min_answered_count=2,
-        min_average_score=3.0,
-        min_score_delta=0.0,
-        max_needs_focus_ratio=0.5,
-    )
 
     async def start_session(
         self,
@@ -240,7 +236,7 @@ class InterviewSessionService:
         self,
         responses: list[InterviewAnswerFeedback],
     ) -> InterviewProgressionGate:
-        thresholds = self.INTERVIEW_PROGRESSION_THRESHOLDS
+        thresholds = get_interview_progression_thresholds()
         metrics = self._build_progression_metrics(responses)
 
         answered_count_pass = metrics.answered_count >= thresholds.min_answered_count
@@ -250,6 +246,7 @@ class InterviewSessionService:
 
         return InterviewProgressionGate(
             thresholds=thresholds,
+            policy_version=get_interview_progression_policy_version(),
             answered_count_pass=answered_count_pass,
             average_score_pass=average_score_pass,
             score_delta_pass=score_delta_pass,

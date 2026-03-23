@@ -30,7 +30,8 @@ docs/scholarai/
 ├── IMPLEMENTATION_STATUS_REPORT.md
 ├── DEMO_READINESS_AUDIT.md
 ├── INTERNAL_HANDOFF_PACKAGE.md
-└── PUBLIC_LIVE_HARDENING_PLAN.md
+├── PUBLIC_LIVE_HARDENING_PLAN.md
+└── KPI_MATURITY_STATUS_20260322.md
 ```
 
 ## Section-To-File Mapping
@@ -70,7 +71,17 @@ docs/scholarai/
 - Demo-readiness audit: `DEMO_READINESS_AUDIT.md`
 - Internal handoff and presentation note: `INTERNAL_HANDOFF_PACKAGE.md`
 - Public-live readiness gap analysis: `PUBLIC_LIVE_HARDENING_PLAN.md`
+- KPI maturity status and remaining gate backlog: `KPI_MATURITY_STATUS_20260322.md`
 - Active implementation track: docs-first RBAC expansion (capability matrix, institution scope, compatibility-window migration)
+- Active KPI stack order (latest first):
+  - `feat/api-contract-kpi-signals`
+  - `feat/coach-kpi-gates`
+  - `feat/reco-kpi-gates`
+  - `feat/docs-convergence`
+  - `feat/api-v2-contracts`
+  - `feat/docs-interview-depth`
+  - `feat/reco-eval-harness`
+  - `feat/ingestion-hardening`
 - Current codebase reality:
   - auth, protected routes, and session persistence are implemented
   - profile save/load and a functional onboarding route are implemented
