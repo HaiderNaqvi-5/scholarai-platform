@@ -52,7 +52,7 @@ docker compose up --build
 
 ### Local Run (Direct)
 ```bash
-# Terminal 1: Backend (Python 3.11)
+# Terminal 1: Backend (Python 3.12)
 cd backend
 pip install -r requirements.txt
 python scripts/bootstrap_local.py  # Apply migrations + seed
@@ -69,6 +69,11 @@ npm run dev  # http://localhost:3000
 - **Lint**: `eslint` in frontend; `ruff` or `black` for backend (check setup files)
 - **Migrations**: `alembic revision -m "description"` → `alembic upgrade head`
 - **Celery worker**: `celery -A app.celery_app worker --loglevel=info` (from `backend/`)
+
+### Backend Test Runtime Recommendation
+- Prefer Python `3.12` for backend tests and local backend execution consistency.
+- Example: `py -3.12 -m venv .venv312` then run tests via
+  - `\.venv312\Scripts\python -m pytest backend/tests/unit backend/tests/integration -q`
 
 ### Important Local Note
 After editing route files or app structure, restart the Next.js dev server to avoid stale `404`s.

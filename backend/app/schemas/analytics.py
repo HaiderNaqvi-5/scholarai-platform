@@ -17,3 +17,15 @@ class PlatformAnalyticsResponse(BaseModel):
     total_interview_sessions: int = Field(ge=0)
     ingestion_runs_total: int = Field(ge=0)
     ingestion_runs_failed: int = Field(ge=0)
+    kpi_trends: list["KPISnapshotTrendItem"] = Field(default_factory=list)
+
+
+class KPISnapshotTrendItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metric_domain: str
+    policy_version: str
+    total_snapshots: int = Field(ge=0)
+    passed_snapshots: int = Field(ge=0)
+    failed_snapshots: int = Field(ge=0)
+    pass_rate: float = Field(ge=0.0, le=1.0)

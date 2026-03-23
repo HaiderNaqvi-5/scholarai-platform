@@ -971,3 +971,112 @@ class InterviewResponse(Base):
     __table_args__ = (
         Index("ix_interview_responses_session_index", "session_id", "question_index", unique=True),
     )
+
+
+class RecommendationKPISnapshot(Base):
+    __tablename__ = "recommendation_kpi_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    kpi_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metrics_payload: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    gates_payload: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_recommendation_kpi_snapshots_user_created_at",
+            "user_id",
+            "created_at",
+        ),
+        Index(
+            "ix_recommendation_kpi_snapshots_policy_version",
+            "policy_version",
+        ),
+    )
+
+
+class DocumentKPISnapshot(Base):
+    __tablename__ = "document_kpi_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    kpi_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metrics_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    gate_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_document_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_document_kpi_snapshots_document_id", "document_id"),
+    )
+
+
+class InterviewKPISnapshot(Base):
+    __tablename__ = "interview_kpi_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    kpi_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metrics_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    gate_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_interview_kpi_snapshots_session_id", "session_id"),
+    )

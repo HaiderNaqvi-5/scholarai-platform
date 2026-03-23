@@ -91,7 +91,20 @@ docs/scholarai/
   - migration-driven bootstrap and browser smoke checks in CI are implemented
   - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
   - Phase 2 adds scholarship-grounded bounded guidance for documents and interviews with explicit fact/guidance/limitation separation while keeping Canada-first scope fixed
-  - broader ingestion coverage is still incomplete
+- broader ingestion coverage is still incomplete
+
+## KPI Operations Index (Canonical)
+- Canonical KPI status and gate backlog: `KPI_MATURITY_STATUS_20260322.md`
+- Authoritative current KPI stack order:
+  1. `feat/kpi-snapshot-persistence` (in progress): snapshot persistence, trend analytics, CI KPI gate, v2 parity expansion
+  2. `feat/kpi-status-report`: KPI policy centralization and policy-version contract exposure
+  3. `feat/api-contract-kpi-signals`
+  4. `feat/coach-kpi-gates`
+  5. `feat/reco-kpi-gates`
+- KPI observability hooks:
+  - `/health` now includes `kpi_alerts` and reports `degraded` when sustained KPI degradation is detected.
+  - Alert thresholds are config-driven via `backend/app/core/config.py` (`KPI_ALERT_*`, `KPI_HEALTH_LOOKBACK_DAYS`).
+  - KPI snapshot retention cleanup runs as Celery beat task `tasks.run_kpi_snapshot_retention_cleanup` with config-driven schedule and retention days (`KPI_SNAPSHOT_RETENTION_*`).
 
 ## Phase 2 API Contract Updates (Canada-first Fixed)
 - `POST /api/v1/documents` now accepts optional scholarship grounding identifiers.

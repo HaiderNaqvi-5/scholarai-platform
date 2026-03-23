@@ -15,7 +15,8 @@ from app.api.v2 import router as api_v2_router
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.demo import seed_demo_data_if_enabled
-from app.schemas import ErrorEnvelope, HealthResponse
+from app.schemas import ErrorDetail, ErrorEnvelope, HealthResponse
+from app.services.kpi_snapshot_service import KPISnapshotService
 from scholarai_common.errors import ScholarAIException
 
 
@@ -127,17 +128,28 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     async def health_check() -> HealthResponse:
         db_ok = False
+        kpi_alerts: list[str] = []
         try:
             async with async_session_factory() as db:
                 await db.execute(text("SELECT 1"))
+                if settings.KPI_OBSERVABILITY_ENABLED:
+                    snapshot_service = KPISnapshotService(db)
+                    kpi_alerts = await snapshot_service.alert_messages(
+                        lookback_days=settings.KPI_HEALTH_LOOKBACK_DAYS,
+                        min_snapshots_per_domain=settings.KPI_ALERT_MIN_SNAPSHOTS_PER_DOMAIN,
+                        recommendation_pass_rate_min=settings.KPI_ALERT_RECOMMENDATION_PASS_RATE_MIN,
+                        document_pass_rate_min=settings.KPI_ALERT_DOCUMENT_PASS_RATE_MIN,
+                        interview_pass_rate_min=settings.KPI_ALERT_INTERVIEW_PASS_RATE_MIN,
+                    )
             db_ok = True
         except Exception:
             db_ok = False
 
         return HealthResponse(
-            status="healthy" if db_ok else "degraded",
+            status="healthy" if db_ok and not kpi_alerts else "degraded",
             version=settings.APP_VERSION,
             database="ok" if db_ok else "error",
+            kpi_alerts=kpi_alerts,
         )
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
@@ -157,12 +169,12 @@ def build_error_response(
 ) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     payload = ErrorEnvelope(
-        error={
-            "code": code,
-            "message": message,
-            "request_id": request_id,
-            "status": status_code,
-        }
+        error=ErrorDetail(
+            code=code,
+            message=message,
+            request_id=request_id,
+            status=status_code,
+        )
     )
     return JSONResponse(status_code=status_code, content=payload.model_dump())
 

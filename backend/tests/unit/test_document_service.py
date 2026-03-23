@@ -100,7 +100,9 @@ async def test_document_service_submit_text_generates_feedback():
     assert result.latest_feedback is not None
     assert result.latest_feedback.status == "completed"
     assert "validated scholarship records" in result.latest_feedback.limitation_notice
-    assert len(session.added) == 2
+    assert len(session.added) == 3
+    snapshot = session.added[2]
+    assert snapshot.policy_version == "document.quality.v1"
 
 
 async def test_document_service_rejects_unsupported_file_types():

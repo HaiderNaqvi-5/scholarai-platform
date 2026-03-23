@@ -1,7 +1,7 @@
 import pytest
 from types import SimpleNamespace
 
-from app.core.security import hash_password
+from app.core.security import create_refresh_token, hash_password
 from app.models import UserRole
 from app.schemas.auth import UserCreate, UserLogin
 from app.services.auth import AuthService
@@ -146,3 +146,54 @@ async def test_auth_service_refresh_session_returns_new_tokens():
     assert refreshed.expires_in > 0
     assert session.execute_count == 6
     assert not session.results
+
+
+async def test_auth_service_refresh_session_rejects_missing_subject_claim():
+    session = FakeSession([])
+    service = AuthService(session)
+    refresh_token = create_refresh_token({"role": UserRole.STUDENT.value})
+
+    with pytest.raises(ScholarAIException) as caught:
+        await service.refresh_session(refresh_token)
+
+    assert caught.value.code == ErrorCode.AUTH_TOKEN_EXPIRED
+    assert caught.value.status_code == 401
+    assert session.execute_count == 0
+
+
+async def test_auth_service_refresh_session_rejects_unknown_user():
+    session = FakeSession([ScalarResult(one=None)])
+    service = AuthService(session)
+    refresh_token = create_refresh_token(
+        {"sub": "missing-user", "role": UserRole.STUDENT.value}
+    )
+
+    with pytest.raises(ScholarAIException) as caught:
+        await service.refresh_session(refresh_token)
+
+    assert caught.value.code == ErrorCode.NOT_FOUND
+    assert caught.value.status_code == 401
+    assert session.execute_count == 1
+
+
+async def test_auth_service_refresh_session_rejects_inactive_user():
+    user = SimpleNamespace(
+        id="user-2",
+        email="student@example.com",
+        password_hash=hash_password("correct-password"),
+        role=UserRole.STUDENT,
+        is_active=False,
+        institution_id=None,
+    )
+    session = FakeSession([ScalarResult(one=user)])
+    service = AuthService(session)
+    refresh_token = create_refresh_token(
+        {"sub": str(user.id), "role": user.role.value}
+    )
+
+    with pytest.raises(ScholarAIException) as caught:
+        await service.refresh_session(refresh_token)
+
+    assert caught.value.code == ErrorCode.AUTH_INACTIVE_ACCOUNT
+    assert caught.value.status_code == 403
+    assert session.execute_count == 1

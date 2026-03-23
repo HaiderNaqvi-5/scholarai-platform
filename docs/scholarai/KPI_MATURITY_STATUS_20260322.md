@@ -43,57 +43,47 @@ It answers two questions:
   - V1 deprecation window is machine-readable (`X-API-V1-Sunset-Days`).
   - Test coverage verifies v1/v2 header behavior.
 
+## Current Status Update (Post-Stack Continuation)
+
+### Completed after this report was first drafted
+
+#### KPI Policy Centralization
+- Status: done
+- Implemented:
+  - Centralized policy thresholds and versions in settings/policy helpers.
+  - API responses expose `policy_version` for recommendation/document/interview KPI outputs.
+
+#### KPI Persistence and Trend Visibility
+- Status: done (baseline)
+- Implemented:
+  - KPI snapshots persisted for recommendation, document, and interview domains.
+  - Analytics endpoint includes KPI trend items by domain and policy version.
+
+#### Release Gate Automation
+- Status: done (baseline)
+- Implemented:
+  - CI adds a KPI regression gate job that runs KPI-critical test suites and fails on regression.
+
+#### API v2 Functional Parity Expansion
+- Status: done (baseline critical set)
+- Implemented:
+  - v2 router now includes recommendations, documents, interviews, profile, scholarships, and analytics routes.
+
+#### Production Observability Hooks
+- Status: done (baseline)
+- Implemented:
+  - Health endpoints include `kpi_alerts` and degrade status on sustained KPI pass-rate drops.
+  - Alert thresholds/volume/lookback are config-driven.
+
+#### KPI Snapshot Retention Hardening
+- Status: done (baseline)
+- Implemented:
+  - Added periodic Celery cleanup task `tasks.run_kpi_snapshot_retention_cleanup`.
+  - Added configurable retention controls (`KPI_SNAPSHOT_RETENTION_*`) and beat schedule wiring.
+
 ## What Is Left (Detailed)
 
-### 1) KPI Policy Centralization (High Priority)
-Current state:
-- Thresholds are hardcoded in service modules.
-
-Remaining work:
-- Move KPI thresholds to a centralized config source (env/settings or policy table).
-- Add policy versioning so KPI evaluations can be reproduced against exact gate versions.
-- Emit policy version in API responses for recommendation/doc/interview KPI outputs.
-
-Acceptance signal:
-- Gate outputs include a `policy_version` and do not require code edits to change thresholds.
-
-### 2) KPI Persistence and Trend Visibility (High Priority)
-Current state:
-- KPI evaluation is computed per request/session response only.
-
-Remaining work:
-- Persist KPI snapshots for recommendation evaluations and coaching sessions.
-- Add aggregate trend endpoints (rolling pass rate, median deltas, failure drivers by gate).
-- Define retention policy for KPI snapshots.
-
-Acceptance signal:
-- Team can query KPI pass-rate trends over time without replaying historical payloads.
-
-### 3) Release Gate Automation (High Priority)
-Current state:
-- KPIs are available but not enforced in CI/CD or merge policy.
-
-Remaining work:
-- Add CI job(s) that fail on KPI regression thresholds.
-- Define branch/PR gate policy (block merge when KPI baseline deltas fail).
-- Document approved override/escalation path for emergency merges.
-
-Acceptance signal:
-- A KPI regression reliably fails CI and blocks merge unless an explicit override path is used.
-
-### 4) API v2 Functional Parity Expansion (Medium Priority)
-Current state:
-- `v2` namespace exists for recommendations evaluate path only.
-
-Remaining work:
-- Expand v2 route parity to additional critical endpoints used by clients.
-- Add parity checklist and per-route migration completion status.
-- Publish migration examples for client teams.
-
-Acceptance signal:
-- All client-critical paths have v2 equivalents with migration docs.
-
-### 5) KPI Backtest Dataset Discipline (Medium Priority)
+### 1) KPI Backtest Dataset Discipline (High Priority)
 Current state:
 - Request-level baseline comparison is possible, but no standardized judged-set registry is enforced.
 
@@ -105,40 +95,51 @@ Remaining work:
 Acceptance signal:
 - KPI regressions are measured against approved, versioned benchmark sets.
 
-### 6) Docs Convergence Completion (Medium Priority)
+### 2) Docs Convergence Completion (High Priority)
 Current state:
-- Canonical docs are strong, but KPI status is distributed across reports/branches.
+- KPI docs are now linked from canonical entry points, but legacy references outside the canonical index still exist.
 
 Remaining work:
-- Link this KPI report from canonical docs entry points.
-- Add an "authoritative current stack" section with branch order and PR links.
-- Mark legacy references as historical if they conflict with KPI-driven process.
+- Mark non-canonical KPI references as historical where they conflict.
+- Add PR links once branch stack is merged.
+- Keep one live KPI operations index and archive dated snapshots.
 
 Acceptance signal:
-- New contributors can find current KPI posture and remaining work from one canonical entry point.
+- New contributors can find current KPI posture and active stack from one canonical index.
 
-### 7) Production Observability Hooks (Medium Priority)
+### 3) Observability and Alert Routing Hardening (Medium Priority)
 Current state:
-- KPI values are returned via APIs but not fully integrated with monitoring/alerting.
+- KPI alerts are surfaced in health payloads.
+- KPI snapshot retention cleanup is automated through Celery beat.
 
 Remaining work:
-- Emit KPI pass/fail metrics to observability stack.
-- Add alerts for sustained KPI degradation.
-- Add dashboard tiles for recommendation/doc/interview/API contract KPI health.
+- Route KPI degradation alerts to external channels.
+- Add dashboard tiles/charts for KPI trends and alert state.
 
 Acceptance signal:
-- KPI incidents are discoverable from monitoring without manual API polling.
+- KPI incidents are discoverable in monitoring channels without polling health manually.
+
+### 4) KPI Override / Escalation Policy (Medium Priority)
+Current state:
+- CI gate exists, but emergency override process is not yet documented in canonical runbooks.
+
+Remaining work:
+- Document explicit override policy and required approvals.
+- Add rollback/fix-forward expectations for KPI gate bypass events.
+
+Acceptance signal:
+- Emergency gate bypasses are auditable and consistently handled.
 
 ## Remaining Work by Phase
 | Phase | Status | Remaining |
 |---|---|---|
 | Ingestion hardening | Implemented baseline | broaden source adapters and parser resilience KPIs |
-| Recommendation harness | Implemented with gates | persistent KPI snapshots and benchmark governance |
-| Document/interview depth | Implemented with gates | trend persistence, policy versioning, observability |
-| API long-term standardization | Implemented signal layer | expand v2 parity and automate release gates |
-| Docs convergence | In progress | consolidate all KPI process docs into single canonical index |
+| Recommendation harness | Implemented with persistence + gates | benchmark dataset governance |
+| Document/interview depth | Implemented with persistence + gates | alert routing hardening |
+| API long-term standardization | Implemented with expanded v2 parity | client migration completion tracking |
+| Docs convergence | In progress | finalize historical tagging and branch-to-PR traceability |
 
 ## Immediate Next Slice Recommendation
-1. KPI policy centralization (`policy_version`, config-driven thresholds).
-2. KPI persistence model + trend endpoint.
-3. CI merge gate enforcement using persisted benchmark checks.
+1. KPI benchmark dataset governance and versioned baseline registry.
+2. Alert routing + dashboard tiles for sustained KPI degradation.
+3. Canonical override/escalation policy for CI KPI gate bypass.
