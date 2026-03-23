@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { ErrorState, FeedbackNotice } from "@/components/ui/feedback-state";
 import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,6 +27,9 @@ type RecommendationState = {
   profile: StudentProfile | null;
   items: RecommendationItem[];
   savedItems: SavedOpportunityItem[];
+  actionError: string | null;
+  actionNotice: string | null;
+  activeSaveId: string | null;
 };
 
 export function RecommendationWorkspace() {
@@ -36,6 +40,9 @@ export function RecommendationWorkspace() {
     profile: null,
     items: [],
     savedItems: [],
+    actionError: null,
+    actionNotice: null,
+    activeSaveId: null,
   });
 
   useEffect(() => {
@@ -69,6 +76,9 @@ export function RecommendationWorkspace() {
           profile,
           items: recommendations.items,
           savedItems: saved.items,
+          actionError: null,
+          actionNotice: null,
+          activeSaveId: null,
         });
       } catch (caught) {
         if (!isActive) return;
@@ -79,6 +89,9 @@ export function RecommendationWorkspace() {
           profile: null,
           items: [],
           savedItems: [],
+          actionError: null,
+          actionNotice: null,
+          activeSaveId: null,
         });
       }
     };
@@ -97,40 +110,72 @@ export function RecommendationWorkspace() {
 
   const handleSave = async (scholarshipId: string) => {
     if (!accessToken) return;
-
-    const item = await apiRequest<SavedOpportunityItem>(
-      `/saved-opportunities/${scholarshipId}`,
-      {
-        method: "POST",
-        token: accessToken,
-      },
-    );
-
     setState((current) => ({
       ...current,
-      savedItems: [
-        item,
-        ...current.savedItems.filter(
-          (savedItem) => savedItem.scholarship_id !== scholarshipId,
-        ),
-      ],
+      actionError: null,
+      actionNotice: null,
+      activeSaveId: scholarshipId,
     }));
+    try {
+      const item = await apiRequest<SavedOpportunityItem>(
+        `/saved-opportunities/${scholarshipId}`,
+        {
+          method: "POST",
+          token: accessToken,
+        },
+      );
+
+      setState((current) => ({
+        ...current,
+        savedItems: [
+          item,
+          ...current.savedItems.filter(
+            (savedItem) => savedItem.scholarship_id !== scholarshipId,
+          ),
+        ],
+        actionNotice: "Saved to your shortlist.",
+        activeSaveId: null,
+      }));
+    } catch (caught) {
+      const error = caught as ApiError;
+      setState((current) => ({
+        ...current,
+        actionError: error.message,
+        activeSaveId: null,
+      }));
+    }
   };
 
   const handleUnsave = async (scholarshipId: string) => {
     if (!accessToken) return;
-
-    await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
-      method: "DELETE",
-      token: accessToken,
-    });
-
     setState((current) => ({
       ...current,
-      savedItems: current.savedItems.filter(
-        (item) => item.scholarship_id !== scholarshipId,
-      ),
+      actionError: null,
+      actionNotice: null,
+      activeSaveId: scholarshipId,
     }));
+    try {
+      await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
+        method: "DELETE",
+        token: accessToken,
+      });
+
+      setState((current) => ({
+        ...current,
+        savedItems: current.savedItems.filter(
+          (item) => item.scholarship_id !== scholarshipId,
+        ),
+        actionNotice: "Removed from your shortlist.",
+        activeSaveId: null,
+      }));
+    } catch (caught) {
+      const error = caught as ApiError;
+      setState((current) => ({
+        ...current,
+        actionError: error.message,
+        activeSaveId: null,
+      }));
+    }
   };
 
   return (
@@ -148,18 +193,18 @@ export function RecommendationWorkspace() {
       <section className="workspace-layout" data-testid="recommendations-workspace">
         <div className="collection-grid">
           {state.error ? (
-            <section className="surface-card" data-testid="recommendations-error">
-              <PageHeader
-                eyebrow="Status"
-                title="Recommendations are not available."
-                description={state.error}
-              />
-              {!state.profile ? (
-                <Link className="auth-link auth-link--primary" href="/profile">
-                  Complete profile first
-                </Link>
-              ) : null}
-            </section>
+            <ErrorState
+              testId="recommendations-error"
+              title="Recommendations are not available."
+              description={state.error}
+              action={
+                !state.profile ? (
+                  <Link className="auth-link auth-link--primary" href="/profile">
+                    Complete profile first
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : null}
 
           <section className="surface-card">
@@ -168,6 +213,16 @@ export function RecommendationWorkspace() {
               title="Your matches"
               description="Strong matches appear first. Each card shows what aligned and what needs verification."
             />
+            {state.actionError ? (
+              <div aria-live="assertive">
+                <FeedbackNotice message={state.actionError} variant="error" />
+              </div>
+            ) : null}
+            {state.actionNotice ? (
+              <div aria-live="polite">
+                <FeedbackNotice message={state.actionNotice} variant="success" />
+              </div>
+            ) : null}
             {state.isLoading ? (
               <div className="collection-grid">
                 <SkeletonCard />
@@ -318,14 +373,21 @@ export function RecommendationWorkspace() {
                               ? "auth-link auth-link--secondary"
                               : "auth-link auth-link--primary"
                           }
+                          disabled={state.activeSaveId === item.scholarship_id}
                           onClick={() =>
                             void (isSaved
                               ? handleUnsave(item.scholarship_id)
                               : handleSave(item.scholarship_id))
                           }
                           type="button"
+                          aria-pressed={isSaved}
+                          aria-label={isSaved ? `Remove ${item.title} from shortlist` : `Save ${item.title} to shortlist`}
                         >
-                          {isSaved ? "Saved" : "Save"}
+                          {state.activeSaveId === item.scholarship_id
+                            ? "Updating…"
+                            : isSaved
+                              ? "Saved"
+                              : "Save"}
                         </button>
                       </div>
                     </article>

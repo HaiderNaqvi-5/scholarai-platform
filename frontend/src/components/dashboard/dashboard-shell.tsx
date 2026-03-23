@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { FeedbackNotice } from "@/components/ui/feedback-state";
 import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -29,6 +30,13 @@ type DashboardDataState = {
 
 export function DashboardShell() {
   const { accessToken, currentUser } = useAuth();
+  const [pendingActionByScholarshipId, setPendingActionByScholarshipId] = useState<
+    Record<string, "save" | "unsave" | undefined>
+  >({});
+  const [actionFeedback, setActionFeedback] = useState<{
+    message: string;
+    variant: "error" | "success";
+  } | null>(null);
   const [state, setState] = useState<DashboardDataState>({
     isLoading: true,
     error: null,
@@ -109,21 +117,34 @@ export function DashboardShell() {
       return;
     }
 
-    const savedItem = await apiRequest<SavedOpportunityItem>(
-      `/saved-opportunities/${scholarshipId}`,
-      {
-        method: "POST",
-        token: accessToken,
-      },
-    );
+    setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: "save" }));
+    setActionFeedback(null);
 
-    setState((current) => ({
-      ...current,
-      saved: [
-        savedItem,
-        ...current.saved.filter((item) => item.scholarship_id !== scholarshipId),
-      ],
-    }));
+    try {
+      const savedItem = await apiRequest<SavedOpportunityItem>(
+        `/saved-opportunities/${scholarshipId}`,
+        {
+          method: "POST",
+          token: accessToken,
+        },
+      );
+
+      setState((current) => ({
+        ...current,
+        saved: [
+          savedItem,
+          ...current.saved.filter((item) => item.scholarship_id !== scholarshipId),
+        ],
+      }));
+      setActionFeedback({ message: "Scholarship saved.", variant: "success" });
+    } catch (error) {
+      setActionFeedback({
+        message: getApiErrorMessage(error, "Unable to save scholarship right now."),
+        variant: "error",
+      });
+    } finally {
+      setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: undefined }));
+    }
   };
 
   const handleUnsave = async (scholarshipId: string) => {
@@ -131,15 +152,31 @@ export function DashboardShell() {
       return;
     }
 
-    await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
-      method: "DELETE",
-      token: accessToken,
-    });
+    setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: "unsave" }));
+    setActionFeedback(null);
 
-    setState((current) => ({
-      ...current,
-      saved: current.saved.filter((item) => item.scholarship_id !== scholarshipId),
-    }));
+    try {
+      await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
+        method: "DELETE",
+        token: accessToken,
+      });
+
+      setState((current) => ({
+        ...current,
+        saved: current.saved.filter((item) => item.scholarship_id !== scholarshipId),
+      }));
+      setActionFeedback({
+        message: "Scholarship removed from saved opportunities.",
+        variant: "success",
+      });
+    } catch (error) {
+      setActionFeedback({
+        message: getApiErrorMessage(error, "Unable to remove scholarship right now."),
+        variant: "error",
+      });
+    } finally {
+      setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: undefined }));
+    }
   };
 
   return (
@@ -169,6 +206,9 @@ export function DashboardShell() {
             description={state.error}
           />
         </section>
+      ) : null}
+      {actionFeedback ? (
+        <FeedbackNotice message={actionFeedback.message} variant={actionFeedback.variant} />
       ) : null}
 
       <section className="metrics-grid" data-testid="dashboard-shell">
@@ -256,32 +296,37 @@ export function DashboardShell() {
             </div>
           ) : state.saved.length > 0 ? (
             <div className="opportunity-list">
-              {state.saved.map((item) => (
-                <article className="opportunity-card" key={item.scholarship_id}>
-                  <div className="meta-row">
-                    <StatusBadge label="Published" variant="validated" />
-                    <span className="route-card__label">
-                      Saved {new Date(item.saved_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="route-card__title">{item.title}</h3>
-                  <p className="route-card__description">
-                    {item.provider_name ?? "Provider not listed"} · {item.country_code}
-                  </p>
-                  <div className="dashboard-actions">
-                    <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
-                      View details
-                    </Link>
-                    <button
-                      className="auth-link auth-link--secondary"
-                      onClick={() => void handleUnsave(item.scholarship_id)}
-                      type="button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </article>
-              ))}
+              {state.saved.map((item) => {
+                const pendingAction = pendingActionByScholarshipId[item.scholarship_id];
+                const isPending = Boolean(pendingAction);
+                return (
+                  <article className="opportunity-card" key={item.scholarship_id}>
+                    <div className="meta-row">
+                      <StatusBadge label="Published" variant="validated" />
+                      <span className="route-card__label">
+                        Saved {new Date(item.saved_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h3 className="route-card__title">{item.title}</h3>
+                    <p className="route-card__description">
+                      {item.provider_name ?? "Provider not listed"} · {item.country_code}
+                    </p>
+                    <div className="dashboard-actions">
+                      <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
+                        View details
+                      </Link>
+                      <button
+                        className="auth-link auth-link--secondary"
+                        onClick={() => void handleUnsave(item.scholarship_id)}
+                        disabled={isPending}
+                        type="button"
+                      >
+                        {pendingAction === "unsave" ? "Removing..." : "Remove"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <EmptyState
@@ -334,6 +379,8 @@ export function DashboardShell() {
           <div className="opportunity-list">
             {state.published.map((item) => {
               const isSaved = savedIds.has(item.scholarship_id);
+              const pendingAction = pendingActionByScholarshipId[item.scholarship_id];
+              const isPending = Boolean(pendingAction);
               return (
                 <article className="opportunity-card" key={item.scholarship_id}>
                   <div className="meta-row">
@@ -363,9 +410,16 @@ export function DashboardShell() {
                           ? handleUnsave(item.scholarship_id)
                           : handleSave(item.scholarship_id))
                       }
+                      disabled={isPending}
                       type="button"
                     >
-                      {isSaved ? "Saved" : "Save"}
+                      {pendingAction === "save"
+                        ? "Saving..."
+                        : pendingAction === "unsave"
+                          ? "Removing..."
+                          : isSaved
+                            ? "Saved"
+                            : "Save"}
                     </button>
                   </div>
                 </article>
@@ -411,4 +465,16 @@ function is404(error: unknown): error is ApiError {
     "status" in error &&
     (error as ApiError).status === 404
   );
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return fallback;
 }

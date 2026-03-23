@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SkeletonCard, SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState, FeedbackNotice } from "@/components/ui/feedback-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Capability, hasCapability } from "@/lib/authorization";
@@ -60,7 +61,15 @@ type CurationState = {
   isDetailLoading: boolean;
   isRunsLoading: boolean;
   isSaving: boolean;
+  activeAction: "save" | "import" | "ingestion" | "transition" | null;
   error: string | null;
+  errorContext: "records" | "runs" | "detail" | "action" | null;
+  actionFeedback:
+    | {
+        variant: "error" | "success";
+        message: string;
+      }
+    | null;
   filter: CurationRecordState;
   records: CurationRecordListResponse["items"];
   selectedRecord: CurationRecordDetail | null;
@@ -167,7 +176,10 @@ export function CurationDashboardShell() {
     isDetailLoading: false,
     isRunsLoading: true,
     isSaving: false,
+    activeAction: null,
     error: null,
+    errorContext: null,
+    actionFeedback: null,
     filter: "raw",
     records: [],
     selectedRecord: null,
@@ -191,6 +203,7 @@ export function CurationDashboardShell() {
         ...current,
         isLoading: true,
         error: null,
+        errorContext: null,
         selectedRecord: null,
       }));
 
@@ -221,12 +234,18 @@ export function CurationDashboardShell() {
           isLoading: false,
           records: [],
           error: resolveErrorMessage(error),
+          errorContext: "records",
         }));
       }
     };
 
     const loadRuns = async () => {
-      setState((current) => ({ ...current, isRunsLoading: true, error: null }));
+      setState((current) => ({
+        ...current,
+        isRunsLoading: true,
+        error: null,
+        errorContext: null,
+      }));
       try {
         const response = await apiRequest<IngestionRunListResponse>(
           "/curation/ingestion-runs?limit=8",
@@ -262,6 +281,7 @@ export function CurationDashboardShell() {
           ...current,
           isRunsLoading: false,
           error: resolveErrorMessage(error),
+          errorContext: "runs",
         }));
       }
     };
@@ -271,6 +291,7 @@ export function CurationDashboardShell() {
         ...current,
         isDetailLoading: !initial,
         error: null,
+        errorContext: null,
       }));
       try {
         const detail = await apiRequest<CurationRecordDetail>(
@@ -294,6 +315,7 @@ export function CurationDashboardShell() {
           ...current,
           isDetailLoading: false,
           error: resolveErrorMessage(error),
+          errorContext: "detail",
         }));
       }
     };
@@ -345,7 +367,12 @@ export function CurationDashboardShell() {
     }
 
     const activeFilter = filterOverride ?? state.filter;
-    setState((current) => ({ ...current, isLoading: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isLoading: true,
+      error: null,
+      errorContext: null,
+    }));
     try {
       const response = await apiRequest<CurationRecordListResponse>(
         `/curation/records?state=${activeFilter}`,
@@ -379,6 +406,7 @@ export function CurationDashboardShell() {
         ...current,
         isLoading: false,
         error: resolveErrorMessage(error),
+        errorContext: "records",
       }));
     }
   };
@@ -388,7 +416,12 @@ export function CurationDashboardShell() {
       return;
     }
 
-    setState((current) => ({ ...current, isDetailLoading: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isDetailLoading: true,
+      error: null,
+      errorContext: null,
+    }));
     try {
       const detail = await apiRequest<CurationRecordDetail>(`/curation/records/${recordId}`, {
         token: accessToken,
@@ -404,6 +437,7 @@ export function CurationDashboardShell() {
         ...current,
         isDetailLoading: false,
         error: resolveErrorMessage(error),
+        errorContext: "detail",
       }));
     }
   };
@@ -413,7 +447,12 @@ export function CurationDashboardShell() {
       return;
     }
 
-    setState((current) => ({ ...current, isRunsLoading: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isRunsLoading: true,
+      error: null,
+      errorContext: null,
+    }));
     try {
       const detail = await apiRequest<IngestionRunDetail>(
         `/curation/ingestion-runs/${runId}`,
@@ -429,23 +468,36 @@ export function CurationDashboardShell() {
         ...current,
         isRunsLoading: false,
         error: resolveErrorMessage(error),
+        errorContext: "runs",
       }));
     }
   };
 
   const saveCorrections = async () => {
-    if (!accessToken || !state.selectedRecord) {
+    if (!accessToken || !state.selectedRecord || state.isSaving) {
       return;
     }
     if (!canEditRecord) {
       setState((current) => ({
         ...current,
         error: "You do not have permission to edit curation records.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to edit curation records.",
+        },
       }));
       return;
     }
 
-    setState((current) => ({ ...current, isSaving: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "save",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
     try {
       const detail = await apiRequest<CurationRecordDetail>(
         `/curation/records/${state.selectedRecord.record_id}`,
@@ -471,7 +523,9 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         selectedRecord: detail,
+        actionFeedback: { variant: "success", message: "Corrections saved." },
         records: current.records.map((item) =>
           item.record_id === detail.record_id ? detail : item,
         ),
@@ -480,24 +534,42 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
       }));
     }
   };
 
   const importRawRecord = async () => {
-    if (!accessToken) {
+    if (!accessToken || state.isSaving) {
       return;
     }
     if (!canImportRaw) {
       setState((current) => ({
         ...current,
         error: "You do not have permission to create raw records.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to create raw records.",
+        },
       }));
       return;
     }
 
-    setState((current) => ({ ...current, isSaving: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "import",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
     try {
       const payload: CurationRawImportRequest = {
         source_key: importState.source_key.trim(),
@@ -541,8 +613,10 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         filter: "raw",
         selectedRecord: detail,
+        actionFeedback: { variant: "success", message: "Raw record created." },
         records:
           current.filter === "raw"
             ? [detail, ...current.records.filter((item) => item.record_id !== detail.record_id)]
@@ -552,24 +626,42 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
       }));
     }
   };
 
   const startIngestionRun = async () => {
-    if (!accessToken) {
+    if (!accessToken || state.isSaving) {
       return;
     }
     if (!canRunIngestion) {
       setState((current) => ({
         ...current,
         error: "You do not have permission to run ingestion.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to run ingestion.",
+        },
       }));
       return;
     }
 
-    setState((current) => ({ ...current, isSaving: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
     try {
       const payload: IngestionRunStartRequest = {
         source_key: ingestionState.source_key.trim(),
@@ -589,8 +681,10 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         filter: "raw",
         selectedRun: detail,
+        actionFeedback: { variant: "success", message: "Ingestion run started." },
         runs: [detail, ...current.runs.filter((item) => item.run_id !== detail.run_id)],
       }));
       await refreshCurrentFilter(undefined, "raw");
@@ -598,7 +692,13 @@ export function CurationDashboardShell() {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
       }));
     }
   };
@@ -606,18 +706,30 @@ export function CurationDashboardShell() {
   const runAction = async (
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
-    if (!accessToken || !state.selectedRecord) {
+    if (!accessToken || !state.selectedRecord || state.isSaving) {
       return;
     }
     if (!canTransitionRecord) {
       setState((current) => ({
         ...current,
         error: "You do not have permission to transition curation records.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to transition curation records.",
+        },
       }));
       return;
     }
 
-    setState((current) => ({ ...current, isSaving: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "transition",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
     try {
       await apiRequest<CurationRecordDetail>(
         `/curation/records/${state.selectedRecord.record_id}/${action}`,
@@ -627,13 +739,24 @@ export function CurationDashboardShell() {
           body: JSON.stringify({ note: emptyToNull(editState.review_notes) }),
         },
       );
-      setState((current) => ({ ...current, isSaving: false }));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        actionFeedback: { variant: "success", message: transitionSuccessMessage(action) },
+      }));
       await refreshCurrentFilter();
     } catch (error) {
       setState((current) => ({
         ...current,
         isSaving: false,
+        activeAction: null,
         error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
       }));
     }
   };
@@ -660,12 +783,19 @@ export function CurationDashboardShell() {
         </div>
       </section>
 
-      {state.error ? (
-        <section className="surface-card" data-testid="curation-error">
-          <p className="section-eyebrow">Curation error</p>
-          <h2 className="section-title">The review workspace needs attention.</h2>
-          <p className="body-copy">{state.error}</p>
-        </section>
+      {state.actionFeedback ? (
+        <FeedbackNotice
+          message={state.actionFeedback.message}
+          variant={state.actionFeedback.variant}
+        />
+      ) : null}
+
+      {state.error && state.errorContext === "action" ? (
+        <ErrorState
+          description={state.error}
+          testId="curation-error"
+          title="The review workspace needs attention."
+        />
       ) : null}
 
       <section className="page-grid">
@@ -795,7 +925,7 @@ export function CurationDashboardShell() {
               onClick={() => void startIngestionRun()}
               type="button"
             >
-              {state.isSaving ? "Running import" : "Run ingestion"}
+              {state.activeAction === "ingestion" ? "Running import" : "Run ingestion"}
             </button>
           </div>
         </article>
@@ -811,6 +941,12 @@ export function CurationDashboardShell() {
               <SkeletonCard />
               <SkeletonCard />
             </div>
+          ) : state.error && state.errorContext === "runs" ? (
+            <ErrorState
+              description={state.error}
+              title="Unable to load ingestion runs."
+              testId="curation-runs-error"
+            />
           ) : state.runs.length > 0 ? (
             <div className="curation-list">
               {state.runs.map((run) => (
@@ -1043,7 +1179,7 @@ export function CurationDashboardShell() {
             onClick={() => void importRawRecord()}
             type="button"
           >
-            {state.isSaving ? "Importing" : "Create raw record"}
+            {state.activeAction === "import" ? "Importing" : "Create raw record"}
           </button>
         </div>
       </section>
@@ -1083,6 +1219,12 @@ export function CurationDashboardShell() {
               <SkeletonCard />
               <SkeletonCard />
             </div>
+          ) : state.error && state.errorContext === "records" ? (
+            <ErrorState
+              description={state.error}
+              title="Unable to load curation records."
+              testId="curation-records-error"
+            />
           ) : state.records.length > 0 ? (
             <div className="curation-list">
               {state.records.map((record) => (
@@ -1130,8 +1272,14 @@ export function CurationDashboardShell() {
               <SkeletonLine count={6} />
               <SkeletonLine count={4} />
             </div>
-          ) : state.selectedRecord ? (
-            <div className="surface-list">
+           ) : state.error && state.errorContext === "detail" ? (
+             <ErrorState
+               description={state.error}
+               title="Unable to load record detail."
+               testId="curation-detail-error"
+             />
+           ) : state.selectedRecord ? (
+             <div className="surface-list">
               <article>
                 <div className="meta-row">
                   <StatusBadge
@@ -1271,7 +1419,7 @@ export function CurationDashboardShell() {
                   onClick={() => void saveCorrections()}
                   type="button"
                 >
-                  {state.isSaving ? "Saving" : "Save corrections"}
+                  {state.activeAction === "save" ? "Saving" : "Save corrections"}
                 </button>
                 {actionButtons.map((item) => (
                   <button
@@ -1376,6 +1524,19 @@ function runBadgeVariant(status: IngestionRunSummary["status"]) {
     return "warning";
   }
   return "planned";
+}
+
+function transitionSuccessMessage(action: "approve" | "reject" | "publish" | "unpublish") {
+  if (action === "approve") {
+    return "Record approved successfully.";
+  }
+  if (action === "reject") {
+    return "Record rejected successfully.";
+  }
+  if (action === "publish") {
+    return "Record published successfully.";
+  }
+  return "Record unpublished successfully.";
 }
 
 function resolveErrorMessage(error: unknown) {

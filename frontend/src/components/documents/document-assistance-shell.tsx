@@ -5,6 +5,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState, FeedbackNotice } from "@/components/ui/feedback-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -26,6 +27,7 @@ type DocumentState = {
   error: string | null;
   items: DocumentDetail[];
   selectedId: string | null;
+  notice: string | null;
 };
 
 type NormalizedContextItem = {
@@ -51,6 +53,7 @@ export function DocumentAssistanceShell() {
     error: null,
     items: [],
     selectedId: null,
+    notice: null,
   });
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export function DocumentAssistanceShell() {
             isLoading: false,
             items: [],
             selectedId: null,
+            notice: null,
           }));
           return;
         }
@@ -91,6 +95,7 @@ export function DocumentAssistanceShell() {
           isLoading: false,
           items: detailResponses,
           selectedId: current.selectedId ?? detailResponses[0]?.id ?? null,
+          notice: null,
         }));
       } catch (error) {
         if (!isActive) return;
@@ -139,7 +144,7 @@ export function DocumentAssistanceShell() {
     }
 
     setFormError(null);
-    setState((current) => ({ ...current, isSubmitting: true, error: null }));
+      setState((current) => ({ ...current, isSubmitting: true, error: null }));
 
     const formData = new FormData();
     formData.append("document_type", documentType);
@@ -172,6 +177,7 @@ export function DocumentAssistanceShell() {
           isSubmitting: false,
           items: nextItems,
           selectedId: response.document.id,
+          notice: "Draft submitted. Feedback is now available in history.",
         };
       });
       setTitle("");
@@ -208,6 +214,7 @@ export function DocumentAssistanceShell() {
           item.id === response.document.id ? response.document : item,
         ),
         selectedId: response.document.id,
+        notice: "Feedback refreshed.",
       }));
     } catch (error) {
       setState((current) => ({
@@ -243,9 +250,11 @@ export function DocumentAssistanceShell() {
       }
     >
       {state.error ? (
-        <section className="surface-card" data-testid="document-error">
-          <p className="form-error">{state.error}</p>
-        </section>
+        <ErrorState
+          testId="document-error"
+          title="Document feedback is temporarily unavailable."
+          description={state.error}
+        />
       ) : null}
 
       <section className="document-grid" data-testid="document-assistance-shell">
@@ -265,6 +274,7 @@ export function DocumentAssistanceShell() {
               }
               onClick={() => setInputMethod("text")}
               type="button"
+              aria-pressed={inputMethod === "text"}
             >
               Paste text
             </button>
@@ -276,6 +286,7 @@ export function DocumentAssistanceShell() {
               }
               onClick={() => setInputMethod("file")}
               type="button"
+              aria-pressed={inputMethod === "file"}
             >
               Upload file
             </button>
@@ -289,6 +300,11 @@ export function DocumentAssistanceShell() {
               void handleSubmit();
             }}
           >
+            {state.notice ? (
+              <div aria-live="polite">
+                <FeedbackNotice message={state.notice} variant="success" />
+              </div>
+            ) : null}
             <div className="form-grid">
               <label className="form-field">
                 <span className="form-field__label">Document type</span>
@@ -369,7 +385,11 @@ export function DocumentAssistanceShell() {
               </label>
             )}
 
-            {formError ? <p className="form-error">{formError}</p> : null}
+            {formError ? (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            ) : null}
 
             <div className="document-actions">
               <button
@@ -408,6 +428,7 @@ export function DocumentAssistanceShell() {
                     setState((current) => ({ ...current, selectedId: item.id }))
                   }
                   type="button"
+                  aria-pressed={item.id === state.selectedId}
                 >
                   <div className="meta-row">
                     <StatusBadge
@@ -505,6 +526,7 @@ export function DocumentAssistanceShell() {
                   disabled={state.isRefreshing}
                   onClick={() => void handleRefreshFeedback()}
                   type="button"
+                  aria-busy={state.isRefreshing}
                 >
                   {state.isRefreshing ? "Refreshing…" : "Refresh feedback"}
                 </button>

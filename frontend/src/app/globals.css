@@ -731,6 +731,29 @@ textarea {
   line-height: 1.6;
 }
 
+.feedback-notice {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+
+.feedback-notice--error {
+  border-color: rgba(185, 74, 72, 0.24);
+  background: var(--coral-100);
+}
+
+.feedback-notice--success {
+  border-color: rgba(66, 107, 90, 0.24);
+  background: var(--sage-100);
+}
+
+.feedback-notice--info {
+  border-color: rgba(46, 91, 154, 0.2);
+  background: var(--sky-100);
+}
+
 /* ── Toggle chips ────────────────────────────── */
 
 .toggle-chip {

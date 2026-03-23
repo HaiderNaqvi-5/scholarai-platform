@@ -33,7 +33,7 @@ export function AppShell({
     <main className="app-shell" id="main-content">
       <div className="page-shell">
         <nav className="shell-nav shell-nav--app" aria-label="App navigation">
-          <Link className="brand-lockup brand-lockup--link" href="/">
+          <Link className="brand-lockup brand-lockup--link" href="/" aria-label="ScholarAI home">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
               <span className="brand-title">ScholarAI</span>
@@ -49,6 +49,7 @@ export function AppShell({
                   key={route.href}
                   className={isActive ? "shell-nav__link shell-nav__link--active" : "shell-nav__link"}
                   href={route.href}
+                  aria-current={isActive ? "page" : undefined}
                 >
                   {route.label}
                 </Link>
