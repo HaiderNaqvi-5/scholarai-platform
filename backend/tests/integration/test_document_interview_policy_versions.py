@@ -123,18 +123,19 @@ def test_document_feedback_response_includes_policy_version(app, client):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_db] = override_db
 
-    response = client.post(
-        "/api/v1/documents",
-        data={
-            "document_type": "sop",
-            "title": "Doc",
-            "content_text": "This is a sufficiently long document text for testing policy version output.",
-        },
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    app.dependency_overrides.clear()
-    DocumentService.submit_document = original_submit
+    try:
+        response = client.post(
+            "/api/v1/documents",
+            data={
+                "document_type": "sop",
+                "title": "Doc",
+                "content_text": "This is a sufficiently long document text for testing policy version output.",
+            },
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        DocumentService.submit_document = original_submit
 
     assert response.status_code == 201
     payload = response.json()
@@ -221,14 +222,15 @@ def test_interview_summary_response_includes_policy_version(app, client):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_db] = override_db
 
-    response = client.post(
-        "/api/v1/interviews",
-        json={"practice_mode": "general"},
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    app.dependency_overrides.clear()
-    InterviewSessionService.start_session = original_start
+    try:
+        response = client.post(
+            "/api/v1/interviews",
+            json={"practice_mode": "general"},
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        InterviewSessionService.start_session = original_start
 
     assert response.status_code == 201
     payload = response.json()
