@@ -6,7 +6,11 @@ celery_app = Celery(
     "scholarai",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.recommendation_tasks", "app.tasks.scraper_tasks"],
+    include=[
+        "app.tasks.recommendation_tasks",
+        "app.tasks.scraper_tasks",
+        "app.tasks.kpi_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -24,3 +28,12 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=0),
     },
 }
+
+if settings.KPI_SNAPSHOT_RETENTION_ENABLED:
+    celery_app.conf.beat_schedule["kpi-snapshot-retention-cleanup"] = {
+        "task": "tasks.run_kpi_snapshot_retention_cleanup",
+        "schedule": crontab(
+            hour=settings.KPI_SNAPSHOT_RETENTION_CRON_HOUR,
+            minute=settings.KPI_SNAPSHOT_RETENTION_CRON_MINUTE,
+        ),
+    }

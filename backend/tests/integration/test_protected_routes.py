@@ -35,3 +35,31 @@ def test_v1_deprecation_headers_and_v2_route_available(client):
     assert v2_response.status_code == 401
     assert v2_response.headers.get("X-API-Contract-Version") == "v2"
     assert v2_response.headers.get("Deprecation") is None
+
+
+def test_api_v2_route_inventory_snapshot_from_openapi(client):
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json().get("paths", {})
+
+    expected_v2_prefixes = [
+        "/api/v2/recommendations",
+        "/api/v2/documents",
+        "/api/v2/interviews",
+        "/api/v2/profile",
+        "/api/v2/scholarships",
+        "/api/v2/analytics",
+    ]
+    for prefix in expected_v2_prefixes:
+        assert any(path == prefix or path.startswith(f"{prefix}/") for path in paths)
+
+    known_non_parity_surfaces = [
+        "/api/v2/auth",
+        "/api/v2/curation",
+        "/api/v2/saved-opportunities",
+        "/api/v2/mentor",
+        "/api/v2/health",
+    ]
+    for prefix in known_non_parity_surfaces:
+        assert not any(path == prefix or path.startswith(f"{prefix}/") for path in paths)

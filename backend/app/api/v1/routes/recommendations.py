@@ -22,6 +22,7 @@ from app.services.kpi_policy import (
     get_recommendation_default_thresholds,
     get_recommendation_kpi_policy_version,
 )
+from app.services.kpi_snapshot_service import KPISnapshotService
 from app.services.students import StudentService
 
 router = APIRouter()
@@ -62,6 +63,7 @@ async def evaluate_recommendations(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RecommendationEvaluationResponse:
     service = RecommendationEvaluationService()
+    snapshot_service = KPISnapshotService(db)
     metric_results = service.evaluate(
         predicted_ids=payload.predicted_ids,
         judged_relevance=payload.judged_relevance,
@@ -96,6 +98,35 @@ async def evaluate_recommendations(
     )
 
     kpi_passed = all(gate.all_passed for gate in kpi_gates) if threshold_models else None
+    policy_version = get_recommendation_kpi_policy_version()
+
+    if kpi_passed is not None:
+        await snapshot_service.record_recommendation_snapshot(
+            user_id=current_user.id,
+            policy_version=policy_version,
+            kpi_passed=kpi_passed,
+            metrics_payload=[
+                {
+                    "k": metric.k,
+                    "precision_at_k": metric.precision_at_k,
+                    "recall_at_k": metric.recall_at_k,
+                    "ndcg_at_k": metric.ndcg_at_k,
+                }
+                for metric in metric_results
+            ],
+            gates_payload=[
+                {
+                    "k": gate.k,
+                    "precision_at_k_pass": gate.precision_at_k_pass,
+                    "recall_at_k_pass": gate.recall_at_k_pass,
+                    "ndcg_at_k_pass": gate.ndcg_at_k_pass,
+                    "ndcg_delta_pass": gate.ndcg_delta_pass,
+                    "ndcg_delta_value": gate.ndcg_delta_value,
+                    "all_passed": gate.all_passed,
+                }
+                for gate in kpi_gates
+            ],
+        )
 
     return RecommendationEvaluationResponse(
         metrics=[
@@ -120,7 +151,7 @@ async def evaluate_recommendations(
             for gate in kpi_gates
         ],
         kpi_passed=kpi_passed,
-        policy_version=get_recommendation_kpi_policy_version(),
+        policy_version=policy_version,
         metric_set="precision_at_k,recall_at_k,ndcg_at_k",
         pipeline_version="recommendations.phase1.v1",
     )

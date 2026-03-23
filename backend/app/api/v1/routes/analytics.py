@@ -24,6 +24,7 @@ from app.models import (
     UserRole,
 )
 from app.schemas.analytics import PlatformAnalyticsResponse
+from app.services.kpi_snapshot_service import KPISnapshotService
 
 router = APIRouter()
 
@@ -34,6 +35,7 @@ async def get_platform_analytics(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> PlatformAnalyticsResponse:
     """Return aggregate platform metrics for the admin dashboard."""
+    kpi_snapshot_service = KPISnapshotService(db)
 
     # ── User counts ───────────────────────────────────────────────────────
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
@@ -98,6 +100,11 @@ async def get_platform_analytics(
         )
     ).scalar() or 0
 
+    recommendation_trends = await kpi_snapshot_service.recommendation_trends()
+    document_trends = await kpi_snapshot_service.document_trends()
+    interview_trends = await kpi_snapshot_service.interview_trends()
+    kpi_trends = recommendation_trends + document_trends + interview_trends
+
     return PlatformAnalyticsResponse(
         total_users=total_users,
         student_count=student_count,
@@ -110,4 +117,5 @@ async def get_platform_analytics(
         total_interview_sessions=total_interview_sessions,
         ingestion_runs_total=total_runs,
         ingestion_runs_failed=failed_runs,
+        kpi_trends=kpi_trends,
     )

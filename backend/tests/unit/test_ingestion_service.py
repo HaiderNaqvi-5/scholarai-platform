@@ -92,7 +92,7 @@ async def test_start_run_creates_raw_record_from_source_page(monkeypatch):
     captured_calls = []
 
     async def fake_capture(_url: str) -> CaptureResult:
-        return make_capture(
+        capture = make_capture(
             """
             <html>
               <head>
@@ -105,6 +105,19 @@ async def test_start_run_creates_raw_record_from_source_page(monkeypatch):
             </html>
             """
         )
+        capture.metadata.update(
+            {
+                "retry_policy": {
+                    "max_attempts": 2,
+                    "base_delay_seconds": 0.75,
+                },
+                "attempt": 1,
+                "max_attempts": 2,
+                "retries_used": 0,
+                "attempt_errors": [],
+            }
+        )
+        return capture
 
     class RecordingCurationService:
         def __init__(self, _db):
@@ -135,6 +148,12 @@ async def test_start_run_creates_raw_record_from_source_page(monkeypatch):
     assert detail.records_created == 1
     assert detail.records_skipped == 0
     assert detail.run_metadata["capture"]["status_code"] == 200
+    assert detail.run_metadata["capture"]["attempt"] == 1
+    assert detail.run_metadata["capture"]["max_attempts"] == 2
+    assert detail.run_metadata["capture"]["retries_used"] == 0
+    assert detail.run_metadata["capture"]["retry_policy"]["max_attempts"] == 2
+    assert detail.run_metadata["execution"]["attempt_count"] == 1
+    assert detail.run_metadata["execution"]["retry_count"] == 0
     assert detail.run_metadata["created_records"][0]["title"] == "Data Science Scholarship"
     assert getattr(imported_actor, "id", None) == actor_user_id
     assert payload.title == "Data Science Scholarship"
@@ -288,6 +307,29 @@ async def test_capture_source_stops_retrying_on_non_retryable_error(monkeypatch)
         await service._capture_source("https://example.com/scholarships")
 
     assert attempts["count"] == 1
+
+
+async def test_capture_source_non_retryable_error_attaches_classified_attempt_metadata(monkeypatch):
+    session = FakeSession()
+    service = IngestionService(session)
+
+    async def always_bad_request(_url: str, attempt: int):
+        assert attempt == 1
+        request = SimpleNamespace(url="https://example.com/scholarships")
+        response = SimpleNamespace(status_code=400)
+        raise ExceptionWrapper.http_status_error(request=request, response=response)
+
+    monkeypatch.setattr(service, "_capture_source_once", always_bad_request)
+
+    with pytest.raises(ExceptionWrapper.http_status_error_type) as caught:
+        await service._capture_source("https://example.com/scholarships")
+
+    attempt_errors = getattr(caught.value, "_capture_attempts", None)
+    assert attempt_errors is not None
+    assert len(attempt_errors) == 1
+    assert attempt_errors[0]["attempt"] == 1
+    assert attempt_errors[0]["classification"] == "client_http_status"
+    assert attempt_errors[0]["retryable"] is False
 
 
 async def test_capture_source_retries_retryable_error_and_includes_retry_policy(monkeypatch):

@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.services.kpi_policy import (
     get_document_quality_policy_version,
     get_document_quality_thresholds,
@@ -30,3 +31,19 @@ def test_document_and_interview_thresholds_are_config_backed():
     interview_thresholds = get_interview_progression_thresholds()
     assert interview_thresholds.min_answered_count == 2
     assert interview_thresholds.min_average_score == 3.0
+
+
+def test_recommendation_default_thresholds_follow_settings(monkeypatch):
+    monkeypatch.setattr(settings, "RECOMMENDATION_KPI_DEFAULT_K_VALUES", "2,4,4,invalid,0")
+    monkeypatch.setattr(settings, "RECOMMENDATION_KPI_PRECISION_MIN", 0.51)
+    monkeypatch.setattr(settings, "RECOMMENDATION_KPI_RECALL_MIN", 0.31)
+    monkeypatch.setattr(settings, "RECOMMENDATION_KPI_NDCG_MIN", 0.61)
+    monkeypatch.setattr(settings, "RECOMMENDATION_KPI_NDCG_DELTA_MIN", 0.05)
+
+    thresholds = get_recommendation_default_thresholds()
+
+    assert [threshold.k for threshold in thresholds] == [2, 4]
+    assert all(threshold.precision_at_k_min == 0.51 for threshold in thresholds)
+    assert all(threshold.recall_at_k_min == 0.31 for threshold in thresholds)
+    assert all(threshold.ndcg_at_k_min == 0.61 for threshold in thresholds)
+    assert all(threshold.ndcg_delta_min == 0.05 for threshold in thresholds)

@@ -35,6 +35,7 @@ from app.services.kpi_policy import (
     get_document_quality_policy_version,
     get_document_quality_thresholds,
 )
+from app.services.kpi_snapshot_service import KPISnapshotService
 
 MAX_FILE_SIZE_BYTES = 512 * 1024
 MAX_TEXT_LENGTH = 12000
@@ -43,6 +44,7 @@ RUNTIME_STORAGE_ROOT = Path(__file__).resolve().parents[3] / "runtime" / "docume
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.kpi_snapshot_service = KPISnapshotService(db)
 
     async def list_documents(self, user_id: uuid.UUID) -> list[DocumentRecordSummary]:
         result = await self.db.execute(
@@ -149,7 +151,15 @@ class DocumentService:
             ) from exc
 
         document = await self._load_document(user_id, document.id)
-        return self._build_detail(document)
+        detail = self._build_detail(document)
+        if detail.latest_feedback is not None:
+            await self._record_document_kpi_snapshot(
+                user_id=user_id,
+                document_id=document.id,
+                quality_metrics=detail.latest_feedback.quality_metrics,
+                quality_gate=detail.latest_feedback.quality_gate,
+            )
+        return detail
 
     async def regenerate_feedback(
         self,
@@ -181,7 +191,15 @@ class DocumentService:
             raise
 
         document = await self._load_document(user_id, document.id)
-        return self._build_detail(document)
+        detail = self._build_detail(document)
+        if detail.latest_feedback is not None:
+            await self._record_document_kpi_snapshot(
+                user_id=user_id,
+                document_id=document.id,
+                quality_metrics=detail.latest_feedback.quality_metrics,
+                quality_gate=detail.latest_feedback.quality_gate,
+            )
+        return detail
 
     async def _load_document(
         self,
@@ -479,6 +497,23 @@ class DocumentService:
             quality_gate=self._build_quality_gate(payload, sections),
             limitation_notice=feedback.limitation_notice,
             completed_at=feedback.completed_at,
+        )
+
+    async def _record_document_kpi_snapshot(
+        self,
+        *,
+        user_id: uuid.UUID,
+        document_id: uuid.UUID,
+        quality_metrics: DocumentQualityMetrics,
+        quality_gate: DocumentQualityGate,
+    ) -> None:
+        await self.kpi_snapshot_service.record_document_snapshot(
+            user_id=user_id,
+            document_id=document_id,
+            policy_version=quality_gate.policy_version,
+            kpi_passed=quality_gate.all_passed,
+            metrics_payload=quality_metrics.model_dump(),
+            gate_payload=quality_gate.model_dump(),
         )
 
     def _build_quality_gate(

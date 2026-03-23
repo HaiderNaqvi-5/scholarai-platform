@@ -29,6 +29,7 @@ from app.services.kpi_policy import (
     get_interview_progression_policy_version,
     get_interview_progression_thresholds,
 )
+from app.services.kpi_snapshot_service import KPISnapshotService
 from app.services.interview.bounded_guidance import (
     build_adaptive_question,
     build_history_summary,
@@ -43,6 +44,7 @@ class InterviewSessionService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.scoring_service = InterviewScoringService()
+        self.kpi_snapshot_service = KPISnapshotService(db)
         self.evaluator = None
         if os.environ.get("GOOGLE_API_KEY"):
             try:
@@ -173,7 +175,14 @@ class InterviewSessionService:
         await self.db.flush()
         await self.db.refresh(session)
         session = await self._load_session(user_id, session.id)
-        return self._build_session_response(session)
+        response = self._build_session_response(session)
+        await self._record_interview_kpi_snapshot(
+            user_id=user_id,
+            session_id=session.id,
+            progression_metrics=response.progression_metrics,
+            progression_gate=response.progression_gate,
+        )
+        return response
 
     async def _load_session(
         self,
@@ -230,6 +239,23 @@ class InterviewSessionService:
             completed_at=session.completed_at,
             created_at=session.created_at,
             updated_at=session.updated_at,
+        )
+
+    async def _record_interview_kpi_snapshot(
+        self,
+        *,
+        user_id: uuid.UUID,
+        session_id: uuid.UUID,
+        progression_metrics: InterviewProgressionMetrics,
+        progression_gate: InterviewProgressionGate,
+    ) -> None:
+        await self.kpi_snapshot_service.record_interview_snapshot(
+            user_id=user_id,
+            session_id=session_id,
+            policy_version=progression_gate.policy_version,
+            kpi_passed=progression_gate.all_passed,
+            metrics_payload=progression_metrics.model_dump(),
+            gate_payload=progression_gate.model_dump(),
         )
 
     def _build_progression_gate(

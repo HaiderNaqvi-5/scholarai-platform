@@ -90,11 +90,18 @@ scholarai-platform/
 
 ### Direct local path
 1. Start PostgreSQL and Redis locally.
-2. In `backend/`, use Python `3.11` and run `pip install -r requirements.txt`.
+2. In `backend/`, use Python `3.12` and run `pip install -r requirements.txt`.
 3. In `frontend/`, run `npm ci`.
 4. From `backend/`, run `python scripts/bootstrap_local.py`.
 5. Start the backend with `uvicorn app.main:app --reload`.
 6. Start the frontend with `npm run dev`.
+
+### Backend test environment (recommended)
+- Use Python `3.12` for backend unit/integration tests.
+- Example local venv flow:
+  1. `py -3.12 -m venv .venv312`
+  2. `.\.venv312\Scripts\python -m pip install -r backend/requirements.txt`
+  3. `.\.venv312\Scripts\python -m pytest backend/tests/unit backend/tests/integration -q`
 
 ### Important local run note
 - If route files or app-structure files changed after the frontend server started, restart the Next.js process or rerun `docker compose up --build`. A stale dev process can serve false `404` responses for newly added routes.

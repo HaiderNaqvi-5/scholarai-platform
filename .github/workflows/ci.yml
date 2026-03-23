@@ -15,7 +15,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install backend dependencies
         run: |
@@ -27,6 +27,34 @@ jobs:
 
       - name: Run backend sanity tests
         run: pytest backend/tests/unit backend/tests/integration -q
+
+  kpi-regression-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run KPI regression gate tests
+        run: |
+          pytest \
+            backend/tests/integration/test_recommendation_policy_version.py \
+            backend/tests/integration/test_analytics_kpi_trends.py \
+            backend/tests/integration/test_document_interview_policy_versions.py \
+            backend/tests/unit/test_kpi_policy.py \
+            backend/tests/unit/test_kpi_snapshot_service.py \
+            backend/tests/unit/test_recommendation_evaluation.py \
+            backend/tests/unit/test_document_service.py \
+            backend/tests/unit/test_interview_service.py -q
 
   frontend-sanity:
     runs-on: ubuntu-latest
@@ -91,7 +119,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install backend and smoke dependencies
         run: |

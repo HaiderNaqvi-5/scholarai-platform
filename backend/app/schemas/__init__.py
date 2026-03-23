@@ -24,7 +24,7 @@ from app.schemas.documents import (
     DocumentRecordSummary,
     DocumentSubmissionResponse,
 )
-from app.schemas.health import ErrorEnvelope, HealthResponse
+from app.schemas.health import ErrorDetail, ErrorEnvelope, HealthResponse
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
@@ -72,6 +72,7 @@ __all__ = [
     "CurationRecordSummary",
     "CurationRecordUpdateRequest",
     "ErrorEnvelope",
+    "ErrorDetail",
     "HealthResponse",
     "InterviewAnswerFeedback",
     "InterviewAnswerRequest",
