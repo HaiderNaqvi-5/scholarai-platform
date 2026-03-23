@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { ErrorState, FeedbackNotice } from "@/components/ui/feedback-state";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,6 +25,7 @@ type InterviewState = {
   isSubmitting: boolean;
   error: string | null;
   session: InterviewSessionSummary | null;
+  notice: string | null;
 };
 
 export function InterviewPracticeShell() {
@@ -38,6 +40,7 @@ export function InterviewPracticeShell() {
     isSubmitting: false,
     error: null,
     session: null,
+    notice: null,
   });
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function InterviewPracticeShell() {
           isSubmitting: false,
           error: null,
           session,
+          notice: null,
         });
       } catch (error) {
         if (!isActive) return;
@@ -73,6 +77,7 @@ export function InterviewPracticeShell() {
           isLoading: false,
           error: resolveErrorMessage(error),
           session: null,
+          notice: null,
         }));
       }
     };
@@ -93,7 +98,12 @@ export function InterviewPracticeShell() {
     if (!accessToken) return;
 
     const normalizedScholarshipId = scholarshipIdInput.trim();
-    setState((current) => ({ ...current, isStarting: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isStarting: true,
+      error: null,
+      notice: null,
+    }));
     try {
       const session = await apiRequest<InterviewSessionSummary>("/interviews", {
         method: "POST",
@@ -112,6 +122,7 @@ export function InterviewPracticeShell() {
         isSubmitting: false,
         error: null,
         session,
+        notice: "Session started.",
       });
     } catch (error) {
       setState((current) => ({
@@ -156,6 +167,7 @@ export function InterviewPracticeShell() {
         ...current,
         isSubmitting: false,
         session,
+        notice: "Answer submitted and scored.",
       }));
     } catch (error) {
       setState((current) => ({
@@ -179,9 +191,16 @@ export function InterviewPracticeShell() {
       }
     >
       {state.error ? (
-        <section className="surface-card" data-testid="interview-error">
-          <p className="form-error">{state.error}</p>
-        </section>
+        <ErrorState
+          testId="interview-error"
+          title="Interview practice is temporarily unavailable."
+          description={state.error}
+        />
+      ) : null}
+      {state.notice ? (
+        <div aria-live="polite">
+          <FeedbackNotice message={state.notice} variant="success" />
+        </div>
       ) : null}
 
       <section className="interview-grid" data-testid="interview-practice-shell">
@@ -229,15 +248,16 @@ export function InterviewPracticeShell() {
                 </div>
               </article>
               <div className="document-actions">
-                <button
-                  className="auth-link auth-link--secondary"
-                  data-testid="interview-start-new-session"
-                  disabled={state.isStarting}
-                  onClick={() => void startSession()}
-                  type="button"
-                >
-                  {state.isStarting ? "Starting…" : "New session"}
-                </button>
+                  <button
+                    className="auth-link auth-link--secondary"
+                    data-testid="interview-start-new-session"
+                    disabled={state.isStarting}
+                    onClick={() => void startSession()}
+                    type="button"
+                    aria-busy={state.isStarting}
+                  >
+                    {state.isStarting ? "Starting…" : "New session"}
+                  </button>
               </div>
             </div>
           ) : (
@@ -267,6 +287,7 @@ export function InterviewPracticeShell() {
                     </span>
                     <input
                       className="text-input"
+                      id="interview-scholarship-id"
                       onChange={(event) => setScholarshipIdInput(event.target.value)}
                       placeholder="Paste scholarship ID for grounded prompts"
                       value={scholarshipIdInput}
@@ -275,15 +296,16 @@ export function InterviewPracticeShell() {
                       If provided, the session uses validated scholarship context.
                     </span>
                   </label>
-                  <button
-                    className="auth-link auth-link--primary"
-                    data-testid="interview-start-session"
-                    disabled={state.isStarting}
-                    onClick={() => void startSession()}
-                    type="button"
-                  >
-                    {state.isStarting ? "Starting…" : "Start session"}
-                  </button>
+                    <button
+                      className="auth-link auth-link--primary"
+                      data-testid="interview-start-session"
+                      disabled={state.isStarting}
+                      onClick={() => void startSession()}
+                      type="button"
+                      aria-busy={state.isStarting}
+                    >
+                      {state.isStarting ? "Starting…" : "Start session"}
+                    </button>
                 </div>
               }
             />
@@ -334,6 +356,7 @@ export function InterviewPracticeShell() {
                     disabled={state.isSubmitting}
                     onClick={() => void submitAnswer()}
                     type="button"
+                    aria-busy={state.isSubmitting}
                   >
                     {state.isSubmitting ? "Processing & Scoring…" : "Submit answer"}
                   </button>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { ErrorState, FeedbackNotice } from "@/components/ui/feedback-state";
 import { SkeletonLine } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -22,6 +23,7 @@ type DetailState = {
   item: ScholarshipDetail | null;
   isSaved: boolean;
   isSaving: boolean;
+  notice: string | null;
 };
 
 export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: string }) {
@@ -32,13 +34,14 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
     item: null,
     isSaved: false,
     isSaving: false,
+    notice: null,
   });
 
   useEffect(() => {
     let isActive = true;
 
     const loadDetail = async () => {
-      setState((current) => ({ ...current, isLoading: true, error: null }));
+        setState((current) => ({ ...current, isLoading: true, error: null }));
       try {
         const detailPromise = apiRequest<ScholarshipDetail>(`/scholarships/${scholarshipId}`);
         const savedPromise = accessToken
@@ -60,6 +63,7 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
           item: detail,
           isSaved: saved.items.some((entry) => entry.scholarship_id === scholarshipId),
           isSaving: false,
+          notice: null,
         });
       } catch (caught) {
         if (!isActive) return;
@@ -70,6 +74,7 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
           item: null,
           isSaved: false,
           isSaving: false,
+          notice: null,
         });
       }
     };
@@ -84,14 +89,24 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
   const handleSaveToggle = async () => {
     if (!accessToken || !state.item) return;
 
-    setState((current) => ({ ...current, isSaving: true, error: null }));
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      error: null,
+      notice: null,
+    }));
     try {
       if (state.isSaved) {
         await apiRequest<void>(`/saved-opportunities/${scholarshipId}`, {
           method: "DELETE",
           token: accessToken,
         });
-        setState((current) => ({ ...current, isSaved: false, isSaving: false }));
+        setState((current) => ({
+          ...current,
+          isSaved: false,
+          isSaving: false,
+          notice: "Removed from your shortlist.",
+        }));
         return;
       }
 
@@ -99,7 +114,12 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
         method: "POST",
         token: accessToken,
       });
-      setState((current) => ({ ...current, isSaved: true, isSaving: false }));
+      setState((current) => ({
+        ...current,
+        isSaved: true,
+        isSaving: false,
+        notice: "Saved to your shortlist.",
+      }));
     } catch (caught) {
       const error = caught as ApiError;
       setState((current) => ({ ...current, error: error.message, isSaving: false }));
@@ -150,16 +170,16 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
       description="Official facts from the published record. Actions are secondary."
     >
       {state.error ? (
-        <section className="surface-card" data-testid="scholarship-detail-error">
-          <PageHeader
-            eyebrow="Error"
-            title="Could not load this scholarship."
-            description={state.error}
-          />
-          <Link className="nav-link" href="/scholarships">
-            Back to scholarships
-          </Link>
-        </section>
+        <ErrorState
+          testId="scholarship-detail-error"
+          title="Could not load this scholarship."
+          description={state.error}
+          action={
+            <Link className="nav-link" href="/scholarships">
+              Back to scholarships
+            </Link>
+          }
+        />
       ) : null}
 
       {state.isLoading ? (
@@ -170,7 +190,11 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
         </section>
       ) : state.item ? (
         <>
-          <section className="recommendation-hero" data-testid="scholarship-detail-shell">
+          <section
+            className="recommendation-hero"
+            data-testid="scholarship-detail-shell"
+            aria-busy={state.isSaving}
+          >
             <div className="dashboard-hero__intro">
               <h2 className="section-title">{state.item.title}</h2>
               <p className="body-copy">
@@ -270,8 +294,19 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
               </article>
 
               <article className="surface-card">
+                {state.notice ? (
+                  <div aria-live="polite">
+                    <FeedbackNotice message={state.notice} variant="success" />
+                  </div>
+                ) : null}
                 <div className="dashboard-actions">
-                  <a className="nav-link" href={state.item.source_url} rel="noreferrer" target="_blank">
+                  <a
+                    className="nav-link"
+                    href={state.item.source_url}
+                    rel="noreferrer"
+                    target="_blank"
+                    aria-label="View original scholarship source (opens in a new tab)"
+                  >
                     View original source
                   </a>
                   {isAuthenticated ? (
@@ -284,6 +319,8 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
                       disabled={state.isSaving}
                       onClick={() => void handleSaveToggle()}
                       type="button"
+                      aria-pressed={state.isSaved}
+                      aria-label={state.isSaved ? "Remove from shortlist" : "Save to shortlist"}
                     >
                       {state.isSaving
                         ? "Updating…"
