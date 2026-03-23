@@ -30,6 +30,7 @@ export function ProtectedRoute({
       <main className="app-shell">
         <div className="page-shell">
           <section className="surface-card">
+            <p className="body-copy mb-4">{message}</p>
             <SkeletonLine count={2} />
           </section>
         </div>
