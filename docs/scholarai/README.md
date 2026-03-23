@@ -91,7 +91,7 @@ docs/scholarai/
   - migration-driven bootstrap and browser smoke checks in CI are implemented
   - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
   - Phase 2 adds scholarship-grounded bounded guidance for documents and interviews with explicit fact/guidance/limitation separation while keeping Canada-first scope fixed
-- broader ingestion coverage is still incomplete
+  - broader ingestion coverage is still incomplete
 
 ## KPI Operations Index (Canonical)
 - Canonical KPI status and gate backlog: `KPI_MATURITY_STATUS_20260322.md`
