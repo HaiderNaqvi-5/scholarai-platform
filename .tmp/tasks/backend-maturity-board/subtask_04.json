@@ -1,0 +1,54 @@
+{
+  "id": "backend-maturity-board-04",
+  "seq": "04",
+  "title": "Recommendation benchmark governance: policy versioning and threshold source consolidation",
+  "status": "completed",
+  "depends_on": [
+    "01"
+  ],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    ".opencode/context/core/standards/code-quality.md",
+    ".opencode/context/core/standards/test-coverage.md"
+  ],
+  "reference_files": [
+    "backend/app/services/kpi_policy.py",
+    "backend/app/api/v1/routes/recommendations.py",
+    "backend/app/core/config.py",
+    "backend/tests/unit/test_kpi_policy.py",
+    "backend/tests/unit/test_recommendation_evaluation.py",
+    "backend/tests/integration/test_recommendation_policy_version.py"
+  ],
+  "acceptance_criteria": [
+    "Recommendation KPI threshold defaults come from a single policy helper source",
+    "Policy version propagation in recommendation responses remains deterministic and test-covered",
+    "Targeted recommendation KPI tests pass",
+    "Full backend unit/integration suite passes",
+    "KPI suite passes",
+    "Commit gate checklist is fully satisfied before commit"
+  ],
+  "deliverables": [
+    "backend/app/services/kpi_policy.py",
+    "backend/app/api/v1/routes/recommendations.py",
+    "backend/tests/unit/test_kpi_policy.py",
+    "backend/tests/unit/test_recommendation_evaluation.py",
+    "backend/tests/integration/test_recommendation_policy_version.py"
+  ],
+  "validation_commands": {
+    "targeted": "pytest backend/tests/unit/test_kpi_policy.py backend/tests/unit/test_recommendation_evaluation.py backend/tests/integration/test_recommendation_policy_version.py -q",
+    "full_backend_unit_integration": "pytest backend/tests/unit backend/tests/integration -q",
+    "kpi_suite": "pytest backend/tests/integration/test_recommendation_policy_version.py backend/tests/integration/test_analytics_kpi_trends.py backend/tests/integration/test_document_interview_policy_versions.py backend/tests/unit/test_kpi_policy.py backend/tests/unit/test_kpi_snapshot_service.py backend/tests/unit/test_recommendation_evaluation.py backend/tests/unit/test_document_service.py backend/tests/unit/test_interview_service.py -q"
+  },
+  "commit_gate": [
+    "Run targeted validation command and confirm zero failures",
+    "Run full backend unit/integration command and confirm zero failures",
+    "Run KPI suite command and confirm zero failures",
+    "Confirm no hardcoded KPI thresholds remain in routes/services outside policy helpers",
+    "Attach command outputs to task completion summary before commit"
+  ],
+  "agent_id": null,
+  "started_at": "2026-03-23T00:00:00Z",
+  "completed_at": "2026-03-23T00:00:00Z",
+  "completion_summary": "Completed recommendation KPI threshold source consolidation verification and maturity hardening by adding settings-backed behavior test coverage in backend/tests/unit/test_kpi_policy.py (test_recommendation_default_thresholds_follow_settings). Existing route/service implementation already sourced defaults via app.services.kpi_policy. Validation passed: targeted 9 passed; full backend 89 passed; KPI suite 24 passed."
+}

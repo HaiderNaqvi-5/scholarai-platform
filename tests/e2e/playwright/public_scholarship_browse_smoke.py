@@ -36,8 +36,14 @@ def main() -> None:
         page.wait_for_selector("text=Waterloo AI Graduate Scholarship")
         page.locator("text=View details").first.click()
         page.wait_for_selector('[data-testid="scholarship-detail-shell"]')
-        page.get_by_role("button", name="Save to shortlist").click()
-        page.wait_for_selector("text=Saved")
+        save_toggle = page.locator(
+            'button[aria-label="Save to shortlist"], button[aria-label="Remove from shortlist"]'
+        ).first
+        save_toggle.wait_for(state="visible")
+        save_toggle.click()
+        page.wait_for_selector(
+            'button[aria-label="Save to shortlist"], button[aria-label="Remove from shortlist"]'
+        )
 
         browser.close()
 

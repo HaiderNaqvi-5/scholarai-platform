@@ -1,0 +1,57 @@
+{
+  "id": "backend-maturity-board-07",
+  "seq": "07",
+  "title": "API v2 contract normalization for recommendations/auth/documents/interview",
+  "status": "pending",
+  "depends_on": [
+    "06"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    ".opencode/context/core/standards/code-quality.md",
+    ".opencode/context/core/standards/test-coverage.md"
+  ],
+  "reference_files": [
+    "backend/app/api/v1/routes/recommendations.py",
+    "backend/app/api/v1/routes/auth.py",
+    "backend/app/api/v1/routes/documents.py",
+    "backend/app/api/v1/routes/interview.py",
+    "backend/app/api/v2/__init__.py",
+    "backend/tests/integration/test_document_interview_policy_versions.py",
+    "backend/tests/integration/test_protected_routes.py"
+  ],
+  "acceptance_criteria": [
+    "v2 route contracts are normalized for envelope/policy/metadata behavior without breaking existing v1 consumers",
+    "Protected and policy-versioned flows across recommendations, documents, and interview remain integration-tested",
+    "Targeted v2 contract tests pass",
+    "Full backend unit/integration suite passes",
+    "KPI suite passes",
+    "Commit gate checklist is fully satisfied before commit"
+  ],
+  "deliverables": [
+    "backend/app/api/v2/__init__.py",
+    "backend/app/api/v1/routes/recommendations.py",
+    "backend/app/api/v1/routes/auth.py",
+    "backend/app/api/v1/routes/documents.py",
+    "backend/app/api/v1/routes/interview.py",
+    "backend/tests/integration/test_document_interview_policy_versions.py",
+    "backend/tests/integration/test_protected_routes.py"
+  ],
+  "validation_commands": {
+    "targeted": "pytest backend/tests/integration/test_document_interview_policy_versions.py backend/tests/integration/test_protected_routes.py backend/tests/integration/test_recommendation_policy_version.py -q",
+    "full_backend_unit_integration": "pytest backend/tests/unit backend/tests/integration -q",
+    "kpi_suite": "pytest backend/tests/integration/test_recommendation_policy_version.py backend/tests/integration/test_analytics_kpi_trends.py backend/tests/integration/test_document_interview_policy_versions.py backend/tests/unit/test_kpi_policy.py backend/tests/unit/test_kpi_snapshot_service.py backend/tests/unit/test_recommendation_evaluation.py backend/tests/unit/test_document_service.py backend/tests/unit/test_interview_service.py -q"
+  },
+  "commit_gate": [
+    "Run targeted validation command and confirm zero failures",
+    "Run full backend unit/integration command and confirm zero failures",
+    "Run KPI suite command and confirm zero failures",
+    "Confirm contract changes are reflected in integration tests for each affected route family",
+    "Attach command outputs to task completion summary before commit"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

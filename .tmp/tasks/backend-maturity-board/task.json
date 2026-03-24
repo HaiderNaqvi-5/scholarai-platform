@@ -1,0 +1,30 @@
+{
+  "id": "backend-maturity-board",
+  "name": "Backend Maturity Implementation Board",
+  "status": "active",
+  "objective": "Deliver backend maturity epics with strict targeted, full-suite, and KPI test-before-commit gates across runtime, contracts, auth, observability, and release readiness.",
+  "context_files": [
+    ".opencode/context/core/standards/code-quality.md",
+    ".opencode/context/core/standards/test-coverage.md",
+    ".opencode/context/core/task-management/standards/task-schema.md",
+    ".opencode/context/core/task-management/guides/splitting-tasks.md",
+    ".opencode/context/core/task-management/guides/managing-tasks.md"
+  ],
+  "reference_files": [
+    ".opencode/context/project-intelligence/technical-domain.md",
+    ".github/workflows/ci.yml",
+    "backend/app/main.py",
+    "backend/app/core/config.py",
+    "backend/tests"
+  ],
+  "exit_criteria": [
+    "All epic subtasks completed with evidence of targeted + full backend unit/integration + KPI suite execution before commit",
+    "API v2 parity and contract normalization verified via integration tests and response-contract assertions",
+    "Auth/session, ingestion, and observability hardening validated with unit + integration coverage",
+    "Release readiness report documents risks, pass/fail matrix, and deployment go/no-go recommendation"
+  ],
+  "subtask_count": 15,
+  "completed_count": 5,
+  "created_at": "2026-03-23T00:00:00Z",
+  "completed_at": null
+}
