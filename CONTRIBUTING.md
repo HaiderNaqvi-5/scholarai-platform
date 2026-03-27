@@ -40,6 +40,17 @@ The process described here has several goals: maintain code quality, fix problem
 5. Make sure your code conforms to the existing style guidelines of the project.
 6. Submit your pull request with a clear description of the changes.
 
+### SLC Governance Requirements
+
+All feature work must follow the ScholarAI stage contract.
+
+1. Every feature issue and PR must include one stage label: `v0.1`, `v0.2`, `v0.3`, or `v1.x`.
+2. No stage label means no sprint entry.
+3. PRs must explicitly describe SLC impact and deferred-stage impact.
+4. UI-affecting changes must include evidence links for desktop and mobile (or a justified `N/A`).
+5. PRs must map to acceptance checklist IDs from `docs/scholarai/v0_1_slc_acceptance_checklist.md`.
+6. Canonical product/governance docs live under `docs/scholarai/` and must remain terminology-consistent with the SLC model.
+
 ## Development Setup
 
 To set up your local development environment, please follow these general steps:

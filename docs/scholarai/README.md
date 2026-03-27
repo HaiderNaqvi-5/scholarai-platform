@@ -1,7 +1,7 @@
-﻿# ScholarAI Documentation Pack
+# ScholarAI Documentation Pack
 
 ## Purpose
-This folder is the canonical documentation source of truth for ScholarAI product scope, architecture, research framing, and execution planning. It is written for a 3-developer, 16-week, v0.1-first delivery model.
+This folder is the canonical documentation source of truth for ScholarAI product scope, architecture, research framing, and execution planning. It is written for a 3-developer, 16-week, stage-first delivery model.
 
 ## Implementation Note
 The first coding phase normalizes the repository in place around the existing `frontend/` and `backend/` roots. A future `apps/*` migration remains optional and deferred until the v0.1 foundation is stable.
@@ -27,6 +27,9 @@ docs/scholarai/
 ├── 12_execution_plan.md
 ├── 13_qa_devops_and_risks.md
 ├── 14_future_roadmap.md
+├── v0_1_slc_acceptance_checklist.md
+├── role_capability_conformance_matrix.md
+├── role_auth_gap_report_template.md
 ├── IMPLEMENTATION_STATUS_REPORT.md
 ├── DEMO_READINESS_AUDIT.md
 ├── INTERNAL_HANDOFF_PACKAGE.md
@@ -51,6 +54,20 @@ docs/scholarai/
 | 16-week delivery sequence | `12_execution_plan.md` |
 | QA, DevOps, and risk controls | `13_qa_devops_and_risks.md` |
 | Future extensions and startup roadmap | `14_future_roadmap.md` |
+
+## Execution Governance
+- Stage taxonomy is fixed: `v0.1`, `v0.2`, `v0.3`, `v1.x`.
+- Every feature issue and PR must declare one stage label.
+- No stage label means no sprint entry.
+- PRs must include:
+  - SLC decision impact
+  - Deferred By Stage impact
+  - UI evidence (desktop/mobile links or justified `N/A`)
+  - acceptance checklist item IDs from `v0_1_slc_acceptance_checklist.md`
+- CI enforces docs-governance checks for:
+  - blocked terminology drift from legacy pre-SLC naming
+  - local markdown link integrity
+  - canonical-tail section consistency in canonical docs
 
 ## Key Architecture Decisions Summary
 1. v0.1 architecture is a modular monolith.
@@ -91,7 +108,7 @@ docs/scholarai/
   - migration-driven bootstrap and browser smoke checks in CI are implemented
   - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
   - Phase 2 adds scholarship-grounded bounded guidance for documents and interviews with explicit fact/guidance/limitation separation while keeping Canada-first scope fixed
-  - broader ingestion coverage is still incomplete
+- broader ingestion coverage is still incomplete
 
 ## KPI Operations Index (Canonical)
 - Canonical KPI status and gate backlog: `KPI_MATURITY_STATUS_20260322.md`
@@ -140,9 +157,9 @@ docs/scholarai/
 | Application Competitiveness Score | Non-causal estimate of application strength relative to scholarship requirements. |
 | RAG | Retrieval-Augmented Generation limited to writing guidance and feedback, not policy truth. |
 | Future Research Extensions | Deferred research-focused capabilities outside v0.1 scope. |
-| Deferred By Stage Startup Features | Commercial expansion features after v0.1 stabilization and validation. |
+| Deferred By Stage | Commercial expansion features after v0.1 stabilization and validation. |
 
-## v0.1 decision
+## SLC decision (v0.1)
 `docs/scholarai/` is the canonical home for active ScholarAI documentation, and migration proceeds through this pack.
 
 ## Deferred items
