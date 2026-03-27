@@ -7,6 +7,12 @@ assignees: ''
 
 ---
 
+**Requested Stage (required)**
+- [ ] `v0.1`
+- [ ] `v0.2`
+- [ ] `v0.3`
+- [ ] `v1.x`
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
@@ -19,6 +25,14 @@ Steps to reproduce the behavior:
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
+
+**Acceptance Evidence Needed (required)**
+- Evidence type (UI/API/logs):
+- Required desktop/mobile screenshots or reason N/A:
+- Related acceptance checklist item ID(s):
+
+**Acceptance Criteria Reference (if regression)**
+- Related checklist item ID(s) from `docs/scholarai/v0_1_slc_acceptance_checklist.md`:
 
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
