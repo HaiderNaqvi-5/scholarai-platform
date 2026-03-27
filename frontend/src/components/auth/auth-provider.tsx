@@ -108,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (!storedToken && !storedRefreshToken) {
+      setIsLoading(false);
       return;
     }
 

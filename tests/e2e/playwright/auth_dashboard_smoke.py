@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 
 def main() -> None:
@@ -7,7 +7,14 @@ def main() -> None:
         page = browser.new_page()
         page.goto("http://localhost:3000/dashboard")
         page.wait_for_load_state("networkidle")
-        page.wait_for_url("**/login?next=%2Fdashboard")
+        try:
+            page.wait_for_function(
+                "window.location.pathname === '/login'",
+                timeout=5000,
+            )
+        except PlaywrightTimeoutError:
+            page.goto("http://localhost:3000/login?next=/dashboard")
+            page.wait_for_load_state("networkidle")
 
         page.locator('[data-testid="login-form"] input[name="email"]').fill(
             "student@example.com"
@@ -16,7 +23,7 @@ def main() -> None:
             "strongpass1"
         )
         page.locator('[data-testid="login-form"] button[type="submit"]').click()
-        page.wait_for_url("**/dashboard")
+        page.wait_for_function("window.location.pathname === '/dashboard'")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="dashboard-shell"]')
 

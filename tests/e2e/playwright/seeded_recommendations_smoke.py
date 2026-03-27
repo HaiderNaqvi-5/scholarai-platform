@@ -18,7 +18,7 @@ def main() -> None:
             "strongpass1"
         )
         page.locator('[data-testid="login-form"] button[type="submit"]').click()
-        page.wait_for_url("**/recommendations")
+        page.wait_for_function("window.location.pathname === '/recommendations'")
         page.wait_for_load_state("networkidle")
 
         page.wait_for_selector('[data-testid="recommendations-workspace"]')
@@ -33,7 +33,7 @@ def main() -> None:
                 return
             if page.locator('[data-testid="profile-form"]').count():
                 page.locator('[data-testid="profile-form"] button[type="submit"]').click()
-                page.wait_for_url("**/recommendations")
+                page.wait_for_function("window.location.pathname === '/recommendations'")
                 page.wait_for_load_state("networkidle")
                 if page.get_by_text("No recommendations found").count():
                     browser.close()
@@ -66,7 +66,7 @@ def main() -> None:
             page.wait_for_url("**/profile")
             page.wait_for_selector('[data-testid="profile-form"]')
             page.locator('[data-testid="profile-form"] button[type="submit"]').click()
-            page.wait_for_url("**/recommendations")
+            page.wait_for_function("window.location.pathname === '/recommendations'")
             page.wait_for_selector('[data-testid="recommendations-workspace"]')
             page.wait_for_selector(
                 '[data-testid="recommendation-card"]',
