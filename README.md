@@ -136,4 +136,3 @@ ScholarAI implementation will follow a documentation-first path, with `docs/scho
 - Early code work before canonical docs are complete can lock in conflicting assumptions.
 
 
-Validation check injection: MVP
