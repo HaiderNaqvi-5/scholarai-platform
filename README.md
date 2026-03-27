@@ -135,3 +135,5 @@ ScholarAI implementation will follow a documentation-first path, with `docs/scho
 - Scope creep into deferred startup features can break v0.1 feasibility.
 - Early code work before canonical docs are complete can lock in conflicting assumptions.
 
+
+Validation check injection: MVP
