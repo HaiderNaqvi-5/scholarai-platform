@@ -1,4 +1,4 @@
-﻿# ScholarAI Platform
+# ScholarAI Platform
 
 ScholarAI is an AI-powered scholarship platform focused on helping students discover scholarships, evaluate eligibility, plan application strategy, improve application documents, and practice scholarship interviews.
 
@@ -136,4 +136,3 @@ ScholarAI implementation will follow a documentation-first path, with `docs/scho
 - Early code work before canonical docs are complete can lock in conflicting assumptions.
 
 
-Validation recheck injection: MVP
