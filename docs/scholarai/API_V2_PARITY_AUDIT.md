@@ -1,4 +1,4 @@
-# API v2 Parity Audit (Taskboard Subtask 06)
+﻿# API v2 Parity Audit (Taskboard Subtask 06)
 
 Date: 2026-03-23
 
@@ -76,3 +76,4 @@ Relevant test file:
 3. **Saved opportunities parity** (Backend/Student domain): schedule endpoint migration for dashboard consumers.
 4. **Mentor parity** (Backend/Mentor): align aliases and capability checks under v2 strategy.
 5. **Health route strategy** (Platform): retain root health contract or add `/api/v2/health` with identical semantics.
+

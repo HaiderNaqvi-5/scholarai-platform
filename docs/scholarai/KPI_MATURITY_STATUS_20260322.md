@@ -1,4 +1,4 @@
-# ScholarAI KPI Maturity Status (2026-03-22)
+﻿# ScholarAI KPI Maturity Status (2026-03-22)
 
 ## Purpose
 This report tracks outcome-based maturity gates across the stacked delivery sequence.
@@ -143,3 +143,4 @@ Acceptance signal:
 1. KPI benchmark dataset governance and versioned baseline registry.
 2. Alert routing + dashboard tiles for sustained KPI degradation.
 3. Canonical override/escalation policy for CI KPI gate bypass.
+

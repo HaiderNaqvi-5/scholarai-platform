@@ -1,7 +1,7 @@
-# ScholarAI Demo Readiness Audit
+﻿# ScholarAI Demo Readiness Audit
 
 ## Purpose
-This document records the current demo readiness of the repository based on the implemented codebase, local run surface, and MVP constraints. It is operational, not aspirational.
+This document records the current demo readiness of the repository based on the implemented codebase, local run surface, and v0.1 constraints. It is operational, not aspirational.
 
 ## Working demo flows
 1. Signup and login with token-backed session handling.
@@ -17,9 +17,9 @@ This document records the current demo readiness of the repository based on the 
 ## What is stable enough for a local demo
 | Area | Current state |
 |---|---|
-| Auth and protected pages | Usable for MVP demo |
-| Dashboard shell | Usable for MVP demo |
-| Public scholarship browse and detail flow | Usable for MVP demo after a fresh frontend restart or rebuild |
+| Auth and protected pages | Usable for v0.1 demo |
+| Dashboard shell | Usable for v0.1 demo |
+| Public scholarship browse and detail flow | Usable for v0.1 demo after a fresh frontend restart or rebuild |
 | Seeded published recommendation flow | Usable once migrations and embedding refresh are run for semantic retrieval; rules-only fallback remains available |
 | Document feedback shell | Usable as a bounded, scholarship-grounded workflow with explicit context separation |
 | Interview practice shell | Usable as a bounded workflow with mode selection plus history/trend summary output |
@@ -64,8 +64,8 @@ For an external or thesis-facing demo, do not present the project unless:
 7. Trigger recommendation embedding refresh task for semantic retrieval readiness.
 8. Verify public browse/detail, recommendation stage rationale, document grounded-context sections, interview mode behavior, and curation access.
 
-## MVP decision
-ScholarAI is close to a presentable internal MVP demo, with a migration-driven bootstrap path now available, but still requires rehearsal discipline before external presentation.
+## v0.1 decision
+ScholarAI is close to a presentable internal v0.1 demo, with a migration-driven bootstrap path now available, but still requires rehearsal discipline before external presentation.
 
 ## Deferred items
 - Multi-revision migration coverage and rollback rehearsal.
@@ -81,3 +81,4 @@ ScholarAI is close to a presentable internal MVP demo, with a migration-driven b
 - A clean machine run can still fail if the bootstrap step is skipped.
 - Browser-level regressions can slip through because local dependencies are not always installed.
 - External demos remain vulnerable until the discovery and scholarship detail path is completed.
+

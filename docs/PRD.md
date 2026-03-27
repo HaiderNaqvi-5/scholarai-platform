@@ -1,4 +1,4 @@
-# ScholarAI — Product Requirements Document (PRD)
+﻿# ScholarAI — Product Requirements Document (PRD)
 
 > Status: Legacy draft (not canonical).
 > Canonical product scope and requirements are maintained in docs/scholarai/02_prd_and_scope.md and docs/scholarai/04_requirements_and_governance.md.
@@ -15,15 +15,15 @@ An AI-driven platform that helps students prioritize scholarships through an exp
 
 ---
 
-## Strict MVP Data Constraint
+## Strict v0.1 Data Constraint
 
-To guarantee high data quality, the MVP is forcefully locked to:
+To guarantee high data quality, the v0.1 is forcefully locked to:
 - **Location:** Canada
 - **Degree:** MS (Master's)
 - **Fields:** Data Science, Artificial Intelligence, Analytics
 - **Providers:** DAAD, Fulbright, and specifically targeted university portals.
 
-Global scraping is explicitly disabled for the MVP timeline.
+Global scraping is explicitly disabled for the v0.1 timeline.
 
 ---
 
@@ -51,7 +51,7 @@ Global scraping is explicitly disabled for the MVP timeline.
 ### 5. AI Mock Interview System
 - **Pipeline:** Speech/Text Input → Gemini 2.0 Flash (Multimodal) → Feedback Generation.
 - **Metrics Evaluated:** Answer clarity, content relevance, and confidence.
-- **Infrastructure Note:** Uses Google Gemini Free Tier for MVP to avoid local Whisper GPU requirements. Must upgrade to a paid API tier for production scaling.
+- **Infrastructure Note:** Uses Google Gemini Free Tier for v0.1 to avoid local Whisper GPU requirements. Must upgrade to a paid API tier for production scaling.
 
 ### 6. Role-Based Dashboards
 - **Roles:** Student (discovery, interviews, tracking), Mentor (SOP reviews, feedback), and Admin (scraper health monitors, analytics).
@@ -78,4 +78,17 @@ Global scraping is explicitly disabled for the MVP timeline.
 - **Gemini 2.0 Flash:** Primary multimodal engine for mock interviews (audio-to-text evaluation) and RAG document assistance.
 - **Claude 3.5 / GPT-4o (Deferred):** Optional future integrations for deep, long-form SOP review or complex logical routing.
 
-**Scaling Requirement:** The MVP relies on the Gemini API Free Tier (15 RPM limits). To deploy for a wider student body, the project must migrate to a paid Google AI Studio or Vertex AI billing account.
+**Scaling Requirement:** The v0.1 relies on the Gemini API Free Tier (15 RPM limits). To deploy for a wider student body, the project must migrate to a paid Google AI Studio or Vertex AI billing account.
+
+
+## SLC decision (v0.1)
+TBD (baseline governance alignment).
+
+## Deferred By Stage
+TBD (baseline governance alignment).
+
+## Assumptions
+TBD (baseline governance alignment).
+
+## Risks
+TBD (baseline governance alignment).

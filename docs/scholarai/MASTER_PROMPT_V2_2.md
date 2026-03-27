@@ -101,11 +101,11 @@ System must be realistically implementable by:
 
 Strictly separate all outputs into:
 
-• MVP
+• v0.1
 • Future Research Extensions
-• Post-MVP Startup Features
+• Deferred By Stage Startup Features
 
-Any feature not essential for MVP must be explicitly marked as deferred.
+Any feature not essential for v0.1 must be explicitly marked as deferred.
 
 When trade-offs are required prioritize:
 
@@ -118,11 +118,11 @@ maintainability
 security
 cost control.
 
-No feature may be included in MVP unless it is realistically buildable within the stated constraints.
+No feature may be included in v0.1 unless it is realistically buildable within the stated constraints.
 
-2. MVP IMPLEMENTATION STYLE
+2. v0.1 IMPLEMENTATION STYLE
 
-For MVP, ScholarAI must be designed as a MODULAR MONOLITH, not a distributed microservice system.
+For v0.1, ScholarAI must be designed as a MODULAR MONOLITH, not a distributed microservice system.
 
 Use:
 
@@ -133,7 +133,7 @@ Use:
 • PostgreSQL as the primary transactional database
 • Redis for queueing and caching only where justified
 
-Separate deployable services are post-MVP unless absolutely necessary and strongly justified.
+Separate deployable services are Deferred By Stage unless absolutely necessary and strongly justified.
 
 3. DOCUMENTATION-FIRST RULE
 
@@ -160,7 +160,7 @@ When working inside a repository, perform a documentation migration process with
 • archive or remove conflicting obsolete docs with explicit justification
 • produce a migration summary of files updated, created, rewritten, archived, or removed
 
-STRICT MVP DATA CONSTRAINT
+STRICT v0.1 DATA CONSTRAINT
 
 Programs:
 • MS Data Science
@@ -168,9 +168,9 @@ Programs:
 • MS Analytics
 
 Geographic scope:
-• Canada is the PRIMARY university and program corpus for MVP
+• Canada is the PRIMARY university and program corpus for v0.1
 • USA is permitted only for Fulbright-related scholarship provider information, directly relevant funding rules, or explicitly scoped cross-border scholarship logic
-• broad USA discovery is not MVP unless explicitly justified
+• broad USA discovery is not v0.1 unless explicitly justified
 • DAAD is DEFERRED to Future Research Extensions
 
 REQUIRED DOCUMENT SET
@@ -200,7 +200,7 @@ REQUIRED DOCUMENT FOOTER
 
 Every documentation file must end with:
 
-• MVP decision
+• v0.1 decision
 • Deferred items
 • Assumptions
 • Risks
@@ -212,3 +212,4 @@ Do not stop at generic advice.
 Produce a complete, structured, detailed documentation pack that a 3-person FYP team can immediately use as the foundation for product planning, design consistency, implementation, research evaluation, and eventual startup scaling.
 
 The output must also update or migrate repository documentation so that README.md and active docs align with the new documentation pack, while conflicting older docs are rewritten, archived, or removed with explicit justification.
+

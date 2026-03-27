@@ -1,4 +1,4 @@
-# ScholarAI — API Design
+﻿# ScholarAI — API Design
 
 > Status: Legacy draft (not canonical).
 > Canonical API contract lives in docs/scholarai/10_backend_api_and_repo.md and current FastAPI routes under backend/app/api/v1/routes/.
@@ -170,3 +170,4 @@
 All list endpoints support:
 - `?page=1&per_page=20` — offset-based pagination
 - Response includes `total`, `page`, `per_page`, `total_pages`
+

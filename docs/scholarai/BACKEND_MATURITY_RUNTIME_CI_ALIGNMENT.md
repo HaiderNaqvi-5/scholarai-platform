@@ -1,4 +1,4 @@
-# Backend Runtime and CI Alignment (Taskboard Subtask 01)
+﻿# Backend Runtime and CI Alignment (Taskboard Subtask 01)
 
 Date: 2026-03-23
 
@@ -45,3 +45,4 @@ Use these commands before commit for backend maturity tasks:
 
 - `backend/pytest.ini` already defines `asyncio_default_fixture_loop_scope = function`, reducing async fixture warning noise.
 - Existing `python-jose` `datetime.utcnow()` deprecation warning is dependency-origin and non-blocking for this step.
+

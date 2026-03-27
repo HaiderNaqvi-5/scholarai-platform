@@ -1,9 +1,9 @@
-# ScholarAI Future Roadmap
+﻿# ScholarAI Future Roadmap
 
 ## Purpose
-This document separates near-term post-MVP improvements from longer-horizon research and startup opportunities so that the MVP remains disciplined while still preserving a growth path.
+This document separates near-term Deferred By Stage improvements from longer-horizon research and startup opportunities so that the v0.1 remains disciplined while still preserving a growth path.
 
-## Short-Term Post-MVP Improvements
+## Short-Term Deferred By Stage Improvements
 | Area | Improvement |
 |---|---|
 | Corpus quality | Expand validated Canadian scholarship coverage within the same MS scope |
@@ -28,16 +28,16 @@ This document separates near-term post-MVP improvements from longer-horizon rese
 | Geography expansion | Broaden beyond Canada once curation operations are stable |
 | Additional degree levels | Expand to other postgraduate programs before undergraduate breadth |
 | Provider tooling | Provider-submitted scholarship data with review workflows |
-| Institution tooling | Advanced multi-tenant dashboards and reporting beyond MVP scoped university panel |
+| Institution tooling | Advanced multi-tenant dashboards and reporting beyond v0.1 scoped university panel |
 | Student workflow | Reminder systems, planning timelines, and collaboration features |
 
 ## Authorization Growth Path
-### MVP scope
+### v0.1 scope
 - Capability-based authorization matrix with six role bundles.
 - Institution-scoped university access for relevant endpoints.
 - Compatibility-window migration from legacy role claims.
 
-### Post-MVP scope
+### Deferred By Stage scope
 - policy automation and periodic access recertification workflows
 - advanced tenant administration and delegated institution controls
 - higher-granularity owner analytics for operational governance
@@ -60,10 +60,10 @@ This document separates near-term post-MVP improvements from longer-horizon rese
 |---|---|---|
 | Universities | Structured scholarship updates and program-specific funding data | Must remain curator-reviewed |
 | Scholarship providers | Direct record submission and correction workflows | Needs moderation and audit trail |
-| Advisors or mentors | Feedback or review workflows | Not part of MVP |
+| Advisors or mentors | Feedback or review workflows | Not part of v0.1 |
 
 ## Monetization-Supporting Capabilities
-### Post-MVP possibilities
+### Deferred By Stage possibilities
 - premium application-planning workflows
 - institution or provider analytics dashboards
 - sponsored but clearly labeled scholarship visibility
@@ -72,7 +72,7 @@ This document separates near-term post-MVP improvements from longer-horizon rese
 Monetization should not distort source-of-truth governance or ranking transparency.
 
 ## Roadmap Separation
-### MVP
+### v0.1
 - Canada-first validated scholarship discovery
 - eligibility-aware ranking
 - grounded preparation support
@@ -82,7 +82,7 @@ Monetization should not distort source-of-truth governance or ranking transparen
 - graph-comparison studies
 - richer evaluation and label collection
 
-### Post-MVP Startup Features
+### Deferred By Stage Startup Features
 - market expansion
 - partner integrations
 - monetization-supporting tooling
@@ -93,8 +93,8 @@ Monetization should not distort source-of-truth governance or ranking transparen
 3. Do not add startup-scale infrastructure before product reliability is proven.
 4. Keep the Knowledge Graph Layer and explanation discipline intact as the product grows.
 
-## MVP decision
-ScholarAI will treat the current MVP as a trust-and-data foundation, while using the roadmap to sequence research expansion and startup opportunities without leaking them into the core deliverable.
+## v0.1 decision
+ScholarAI will treat the current v0.1 as a trust-and-data foundation, while using the roadmap to sequence research expansion and startup opportunities without leaking them into the core deliverable.
 
 ## Deferred items
 - DAAD and broad international expansion.
@@ -107,6 +107,7 @@ ScholarAI will treat the current MVP as a trust-and-data foundation, while using
 - Provider partnerships are only useful if moderation and provenance remain strong.
 
 ## Risks
-- Premature expansion can destroy the data-quality advantage of the MVP.
+- Premature expansion can destroy the data-quality advantage of the v0.1.
 - Monetization features can bias ranking or trust if governance is weak.
 - Partner-submitted data can become noisy unless curator review remains mandatory.
+

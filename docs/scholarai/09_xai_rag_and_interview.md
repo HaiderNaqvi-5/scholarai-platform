@@ -1,4 +1,4 @@
-# ScholarAI XAI, RAG, And Interview
+﻿# ScholarAI XAI, RAG, And Interview
 
 ## Purpose
 This document defines the explainability layer, bounded RAG workflows, and interview-practice subsystem for ScholarAI. It keeps user-facing AI assistance aligned with the product's trust model: validated scholarship facts remain authoritative, while generated outputs remain advisory.
@@ -59,7 +59,7 @@ RAG must not be the authority for:
 - official requirement truth
 
 ## RAG Knowledge Sources
-### MVP sources
+### v0.1 sources
 | Source type | Allowed in RAG | Notes |
 |---|---|---|
 | User-uploaded SOPs and essays | Yes | Core document-feedback source |
@@ -120,8 +120,8 @@ User-facing citations should be compact and readable, for example:
 ### Product goal
 Give students a safe practice environment for scholarship-style questions and structured, rubric-based feedback.
 
-### MVP delivery stance
-- Text-based interview practice is the guaranteed MVP path.
+### v0.1 delivery stance
+- Text-based interview practice is the guaranteed v0.1 path.
 - Audio upload and transcription are optional enhancements if time and infrastructure allow.
 
 ### Interview flow
@@ -152,7 +152,7 @@ The rubric should use ordinal bands or constrained numeric bands for consistency
 | Concurrency | Queue non-urgent document analysis if load spikes |
 
 ## Request Budgeting
-### MVP budgeting rules
+### v0.1 budgeting rules
 - Limit the number of retrieved chunks per RAG request.
 - Limit interview sessions to a small fixed question count.
 - Cache embeddings and reusable prompt scaffolds.
@@ -180,7 +180,7 @@ To stay aligned with the brand and design docs:
 | RAG | Citation coverage and grounded-response rate |
 | Interview | Rubric consistency and user-rated usefulness |
 
-## MVP
+## v0.1
 - Explanation payloads for recommendations.
 - Document-assistance RAG with grounded citations.
 - Text-first interview practice with rubric-based scoring.
@@ -190,13 +190,13 @@ To stay aligned with the brand and design docs:
 - Audio-first interview evaluation and human correlation studies.
 - More advanced grounded generation with richer internal knowledge sources.
 
-## Post-MVP Startup Features
+## Deferred By Stage Startup Features
 - Longitudinal coaching histories.
 - Personalized writing and interview improvement plans.
 - Team or advisor review workflows around AI-generated feedback.
 
-## MVP decision
-ScholarAI MVP will provide explanation-oriented recommendations, grounded document-assistance RAG, and rubric-based interview practice while keeping validated scholarship facts separate from generated guidance.
+## v0.1 decision
+ScholarAI v0.1 will provide explanation-oriented recommendations, grounded document-assistance RAG, and rubric-based interview practice while keeping validated scholarship facts separate from generated guidance.
 
 ## Deferred items
 - Audio-first interview as a guaranteed requirement.
@@ -204,7 +204,7 @@ ScholarAI MVP will provide explanation-oriented recommendations, grounded docume
 - Advanced explanation visualizations beyond the core structured panel design.
 
 ## Assumptions
-- Text-first interview practice is sufficient for MVP value if audio support slips.
+- Text-first interview practice is sufficient for v0.1 value if audio support slips.
 - Structured scholarship facts can be injected directly into prompts when scholarship-specific tailoring is needed.
 - Users benefit more from grounded and modest feedback than from broader but less reliable AI behavior.
 
@@ -212,3 +212,4 @@ ScholarAI MVP will provide explanation-oriented recommendations, grounded docume
 - If citations are weak, users may over-trust generated feedback.
 - Explanation text can drift from actual model behavior if pipelines change without updating the formatter.
 - Interview scoring may appear more objective than it truly is unless bounded clearly in the UI.
+
