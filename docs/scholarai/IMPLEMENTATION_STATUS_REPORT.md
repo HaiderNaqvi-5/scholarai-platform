@@ -1,7 +1,7 @@
-# ScholarAI Implementation Status Report
+﻿# ScholarAI Implementation Status Report
 
 ## Current Implementation Snapshot
-ScholarAI now has a real internal MVP path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. Phase 2 now adds scholarship-grounded bounded guidance for Documents and Interviews with explicit separation of facts, retrieved guidance, generated guidance, and limitations while keeping Canada-first scope fixed. The largest remaining implementation gaps are broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
+ScholarAI now has a real internal v0.1 path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. Phase 2 now adds scholarship-grounded bounded guidance for Documents and Interviews with explicit separation of facts, retrieved guidance, generated guidance, and limitations while keeping Canada-first scope fixed. The largest remaining implementation gaps are broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
 
 ## Active Documentation-First Implementation Track
 The current implementation pass has started locally with a docs-first RBAC expansion covering:
@@ -98,7 +98,7 @@ Current local rollout status:
 | Infra notes | `infra/README.md`, `infra/docker/README.md` | Guidance exists, but this is not a real infra management layer |
 
 ## Not Implemented Yet
-### Remaining MVP work
+### Remaining v0.1 work
 | Feature | Gap |
 |---|---|
 | Recommendation quality evaluation instrumentation | No continuous offline/online scoring harness for ranking quality drift yet |
@@ -116,7 +116,7 @@ Current local rollout status:
 | Larger judged-set evaluation and explainability study tooling | Not implemented |
 | DAAD and broader provider expansion | Deferred |
 
-### Post-MVP Startup Features
+### Deferred By Stage Startup Features
 | Feature | Status |
 |---|---|
 | Broad geography coverage | Deferred |
@@ -125,7 +125,7 @@ Current local rollout status:
 | Institution-facing analytics | Deferred |
 | Tenant-aware admin or commercial partitioning | Deferred |
 
-## MVP Blockers
+## v0.1 Blockers
 1. The ingestion path now exists, but it is still too heuristic and narrow to count as a mature trusted-data pipeline.
 2. Recommendation depth now covers the Phase 1 runtime pipeline, but evaluation and calibration depth are still below the full target in `08_recommendation_and_ml.md`.
 3. Document and interview tools now provide scholarship-grounded bounded guidance, but broader grounding depth and advanced coaching coverage are still below the full target workflow.
@@ -144,14 +144,14 @@ Current local rollout status:
 ### Where implementation still diverges from docs
 - `docs/scholarai/10_backend_api_and_repo.md` still uses the conceptual module label `profiles` while implementation routes are mounted from `students.py` under `/profile` (with `/profiles` alias).
 - The docs describe a fuller recommendation pipeline than the current rules-first runtime implementation exposes.
-- The docs describe a richer ingestion stack and queue model than the current heuristic MVP ingestion run path.
+- The docs describe a richer ingestion stack and queue model than the current heuristic v0.1 ingestion run path.
 
 ## Legacy Docs Or Files That Should Be Archived Or Rewritten Later
 | File | Recommendation | Reason |
 |---|---|---|
 | `docs/PRD.md` | Archive after final extraction | Canonical PRD already exists in `docs/scholarai/02_prd_and_scope.md` |
 | `docs/architecture.md` | Archive after final extraction | Canonical architecture already exists; legacy wording risks drift |
-| `docs/architecture_diagrams.md` | Rewrite or archive | Likely stale against the current MVP implementation |
+| `docs/architecture_diagrams.md` | Rewrite or archive | Likely stale against the current v0.1 implementation |
 | `docs/database_schema.md` | Archive after final extraction | Canonical data model now lives in `docs/scholarai/06_data_models.md` plus Alembic migrations |
 | `docs/api_design.md` | Rewrite or archive | Conflicts with actual route shape and current module naming |
 | `docs/research.md` | Rewrite or archive | Canonical evaluation and roadmap docs exist now |
@@ -163,8 +163,8 @@ Current local rollout status:
 2. Add recommendation evaluation tooling and calibrate rerank weights with judged samples.
 3. Strengthen ingestion coverage with richer parsers, retry handling, and curator-facing run diagnostics.
 
-## MVP decision
-ScholarAI now has a coherent internal MVP path with real browse, profile, recommendation, preparation, curation, ingestion, migration, and CI smoke flows, but it still needs deeper recommendation and preparation fidelity before it should be treated as a fully mature MVP.
+## v0.1 decision
+ScholarAI now has a coherent internal v0.1 path with real browse, profile, recommendation, preparation, curation, ingestion, migration, and CI smoke flows, but it still needs deeper recommendation and preparation fidelity before it should be treated as a fully mature v0.1.
 
 ## Deferred items
 - Broader ML, RAG, graph experimentation, and startup-scale platform features.
@@ -173,10 +173,11 @@ ScholarAI now has a coherent internal MVP path with real browse, profile, recomm
 
 ## Assumptions
 - The current mounted route set and running local demo path represent the intended active implementation surface.
-- `backend/legacy/` is preserved for traceability, not as active MVP behavior.
+- `backend/legacy/` is preserved for traceability, not as active v0.1 behavior.
 - The new ingestion run path is the correct narrow bridge between seeded/manual state and broader automated source coverage.
 
 ## Risks
 - Heuristic ingestion can still create noisy raw records if source pages drift heavily.
 - The recommendation pipeline may appear more complete than it is if the current rules-first fallback is mistaken for the full intended ranking stack.
 - Documentation can drift again unless the canonical docs are updated alongside future runtime changes.
+

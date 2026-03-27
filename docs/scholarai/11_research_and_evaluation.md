@@ -1,4 +1,4 @@
-# ScholarAI Research And Evaluation
+﻿# ScholarAI Research And Evaluation
 
 ## Purpose
 This document frames ScholarAI as an FYP-level research system and defines an evaluation plan that is academically defensible under current data constraints.
@@ -118,7 +118,7 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 | Threat | Impact |
 |---|---|
 | Synthetic-label bias | Model quality may reflect the label heuristic more than reality |
-| Small or narrow corpus | Results may not generalize beyond the MVP scope |
+| Small or narrow corpus | Results may not generalize beyond the v0.1 scope |
 | Annotation subjectivity | Judged-set relevance may vary by reviewer |
 | User-study recruitment bias | Student sample may not represent broader applicant populations |
 | UI confounds | Trust outcomes may reflect interface quality as much as explanation content |
@@ -130,7 +130,7 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 4. Avoid encouraging users to ignore official scholarship requirements.
 5. Use human review where scholarship facts affect publication.
 
-## MVP
+## v0.1
 - Offline evaluation of recommendation baselines.
 - Explanation user study on a feasible pilot cohort.
 - Document-feedback grounding checks.
@@ -141,17 +141,17 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 - Comparative graph-database evaluation.
 - Stronger causal or predictive claims only if true outcome labels are available.
 
-## Post-MVP Startup Features
+## Deferred By Stage Startup Features
 - Product analytics that connect recommendation behavior to downstream application actions.
 - Provider-facing reporting products based on validated aggregate behavior.
 
-## MVP decision
-ScholarAI research will focus on explainable, eligibility-aware ranking and grounded preparation workflows, with evaluation methods chosen to match the limited but realistic data available in MVP.
+## v0.1 decision
+ScholarAI research will focus on explainable, eligibility-aware ranking and grounded preparation workflows, with evaluation methods chosen to match the limited but realistic data available in v0.1.
 
 ## Deferred items
 - Real-world acceptance prediction studies.
 - Large-scale longitudinal outcome modeling.
-- Broad generalization claims outside the MVP corpus.
+- Broad generalization claims outside the v0.1 corpus.
 
 ## Assumptions
 - A judged-set evaluation is feasible within the project timeline.
@@ -162,3 +162,4 @@ ScholarAI research will focus on explainable, eligibility-aware ranking and grou
 - Overclaiming novelty or predictive power would weaken thesis defensibility.
 - Small sample sizes may limit statistical power.
 - Evaluation quality will suffer if annotation guidelines are weak or inconsistent.
+

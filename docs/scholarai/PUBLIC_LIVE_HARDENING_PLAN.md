@@ -1,13 +1,13 @@
-# ScholarAI Public-Live Readiness Gap Analysis And Hardening Plan
+﻿# ScholarAI Public-Live Readiness Gap Analysis And Hardening Plan
 
 ## Purpose
-This document defines the gap between ScholarAI's current internal MVP state and a minimally safe public-facing live deployment. It is evidence-based and intentionally conservative.
+This document defines the gap between ScholarAI's current internal v0.1 state and a minimally safe public-facing live deployment. It is evidence-based and intentionally conservative.
 
-## Current Internal MVP Readiness Summary
-ScholarAI is in a credible internal MVP state, not a public-live state.
+## Current Internal v0.1 Readiness Summary
+ScholarAI is in a credible internal v0.1 state, not a public-live state.
 
 Current strengths:
-1. Core MVP slices are implemented and locally demoable.
+1. Core v0.1 slices are implemented and locally demoable.
 2. Alembic bootstrap plus seeded demo data provides a reproducible internal setup path.
 3. Curation state discipline exists in code: `raw`, `validated`, `published`, `archived`.
 4. Public scholarship reads are restricted to `published` records.
@@ -46,9 +46,9 @@ Current posture:
 ## Public-Live Readiness Gaps
 ### 1. Security
 Current evidence:
-- [backend/app/core/config.py](c:/Users/HP/scholarai-platform/backend/app/core/config.py) includes a default `SECRET_KEY` and development defaults.
-- [.env.example](c:/Users/HP/scholarai-platform/.env.example) is intentionally demo-safe, not production-safe.
-- [backend/app/main.py](c:/Users/HP/scholarai-platform/backend/app/main.py) adds CORS and request IDs, but there are no security headers, CSP, HTTPS assumptions, or hardened proxy/deployment settings.
+- [backend/app/core/config.py](../../backend/app/core/config.py) includes a default `SECRET_KEY` and development defaults.
+- [.env.example](../../.env.example) is intentionally demo-safe, not production-safe.
+- [backend/app/main.py](../../backend/app/main.py) adds CORS and request IDs, but there are no security headers, CSP, HTTPS assumptions, or hardened proxy/deployment settings.
 
 Gap:
 - Current security posture is internal-demo-safe, not public-live-safe.
@@ -62,9 +62,9 @@ What is missing:
 
 ### 2. Auth And Session Robustness
 Current evidence:
-- [frontend/src/components/auth/auth-provider.tsx](c:/Users/HP/scholarai-platform/frontend/src/components/auth/auth-provider.tsx) stores access and refresh tokens in `localStorage`.
-- [backend/app/services/auth/service.py](c:/Users/HP/scholarai-platform/backend/app/services/auth/service.py) issues stateless refresh tokens and immediately reissues new ones.
-- [backend/app/api/v1/routes/auth.py](c:/Users/HP/scholarai-platform/backend/app/api/v1/routes/auth.py) exposes register, login, refresh, and `/me`, but no account verification, password reset, or device/session invalidation.
+- [frontend/src/components/auth/auth-provider.tsx](../../frontend/src/components/auth/auth-provider.tsx) stores access and refresh tokens in `localStorage`.
+- [backend/app/services/auth/service.py](../../backend/app/services/auth/service.py) issues stateless refresh tokens and immediately reissues new ones.
+- [backend/app/api/v1/routes/auth.py](../../backend/app/api/v1/routes/auth.py) exposes register, login, refresh, and `/me`, but no account verification, password reset, or device/session invalidation.
 
 Gap:
 - Auth is good enough for internal usage, but too soft for public exposure.
@@ -79,8 +79,8 @@ What is missing:
 
 ### 3. Data Quality And Curation Discipline
 Current evidence:
-- [backend/app/services/curation/service.py](c:/Users/HP/scholarai-platform/backend/app/services/curation/service.py) correctly enforces state transitions.
-- [backend/app/api/v1/routes/scholarships.py](c:/Users/HP/scholarai-platform/backend/app/api/v1/routes/scholarships.py) only exposes `published` records.
+- [backend/app/services/curation/service.py](../../backend/app/services/curation/service.py) correctly enforces state transitions.
+- [backend/app/api/v1/routes/scholarships.py](../../backend/app/api/v1/routes/scholarships.py) only exposes `published` records.
 - Curation still depends on manual raw import and seeded/demo data; the ingestion automation described in docs is not implemented.
 
 Gap:
@@ -95,9 +95,9 @@ What is missing:
 
 ### 4. Error Handling And API Contracts
 Current evidence:
-- [backend/app/main.py](c:/Users/HP/scholarai-platform/backend/app/main.py) now provides a nested error envelope and request IDs.
-- Contract cleanup is partial; not all endpoints are normalized to the same list-envelope style described in [10_backend_api_and_repo.md](c:/Users/HP/scholarai-platform/docs/scholarai/10_backend_api_and_repo.md).
-- [frontend/src/lib/api.ts](c:/Users/HP/scholarai-platform/frontend/src/lib/api.ts) parses the current error envelope but UI-level fallback patterns remain uneven.
+- [backend/app/main.py](../../backend/app/main.py) now provides a nested error envelope and request IDs.
+- Contract cleanup is partial; not all endpoints are normalized to the same list-envelope style described in [10_backend_api_and_repo.md](../../docs/scholarai/10_backend_api_and_repo.md).
+- [frontend/src/lib/api.ts](../../frontend/src/lib/api.ts) parses the current error envelope but UI-level fallback patterns remain uneven.
 
 Gap:
 - Better than before, but still not public-facing API quality.
@@ -110,8 +110,8 @@ What is missing:
 
 ### 5. Environment And Config Handling
 Current evidence:
-- [README.md](c:/Users/HP/scholarai-platform/README.md), [backend/.env.example](c:/Users/HP/scholarai-platform/backend/.env.example), and [frontend/.env.local.example](c:/Users/HP/scholarai-platform/frontend/.env.local.example) are good for internal handoff.
-- [docker-compose.yml](c:/Users/HP/scholarai-platform/docker-compose.yml) is development-oriented and runs `uvicorn --reload`.
+- [README.md](../../README.md), [backend/.env.example](../../backend/.env.example), and [frontend/.env.local.example](../../frontend/README.md) are good for internal handoff.
+- [docker-compose.yml](../../docker-compose.yml) is development-oriented and runs `uvicorn --reload`.
 
 Gap:
 - Config is serviceable for internal use, not public release.
@@ -124,7 +124,7 @@ What is missing:
 
 ### 6. Logging And Monitoring
 Current evidence:
-- [backend/app/main.py](c:/Users/HP/scholarai-platform/backend/app/main.py) sets request IDs.
+- [backend/app/main.py](../../backend/app/main.py) sets request IDs.
 - There is a `/health` endpoint.
 - There is no actual structured application logging configuration, no metrics, no alerting, and no queue or worker health visibility.
 
@@ -140,12 +140,12 @@ What is missing:
 
 ### 7. Test Coverage
 Current evidence:
-- [.github/workflows/ci.yml](c:/Users/HP/scholarai-platform/.github/workflows/ci.yml) runs backend unit/integration and frontend lint/typecheck/build.
+- [.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs backend unit/integration and frontend lint/typecheck/build.
 - Playwright smoke scripts exist under `tests/e2e/playwright/`, but browser coverage is not in CI.
 - Security, abuse, and public-live regression scenarios are not meaningfully covered.
 
 Gap:
-- Coverage is acceptable for internal MVP momentum, not for public launch confidence.
+- Coverage is acceptable for internal v0.1 momentum, not for public launch confidence.
 
 What is missing:
 1. CI-executed browser smoke on core public and auth flows.
@@ -156,7 +156,7 @@ What is missing:
 ### 8. Deployment Safety
 Current evidence:
 - Docker Compose is the only active deployment baseline.
-- [docker-compose.yml](c:/Users/HP/scholarai-platform/docker-compose.yml) is local-first and mounts source code volumes.
+- [docker-compose.yml](../../docker-compose.yml) is local-first and mounts source code volumes.
 - Demo bootstrap still relies on seeded data and manual rehearsal.
 
 Gap:
@@ -170,7 +170,7 @@ What is missing:
 
 ### 9. Content And UX Readiness
 Current evidence:
-- The UX is good for internal demo and bounded MVP explanation.
+- The UX is good for internal demo and bounded v0.1 explanation.
 - There is no public privacy policy, terms, support contact, or public trust/disclaimer layer.
 - Search/filter is intentionally narrow and some flows still need stronger empty/error/support content.
 
@@ -248,41 +248,41 @@ For a small team, that order is correct because the highest public risk is trust
 
 ## Files That Should Be Updated Next
 ### Code and config
-- [backend/app/core/config.py](c:/Users/HP/scholarai-platform/backend/app/core/config.py)
-- [backend/app/core/security.py](c:/Users/HP/scholarai-platform/backend/app/core/security.py)
-- [backend/app/services/auth/service.py](c:/Users/HP/scholarai-platform/backend/app/services/auth/service.py)
-- [backend/app/main.py](c:/Users/HP/scholarai-platform/backend/app/main.py)
-- [docker-compose.yml](c:/Users/HP/scholarai-platform/docker-compose.yml)
-- [.env.example](c:/Users/HP/scholarai-platform/.env.example)
-- [backend/.env.example](c:/Users/HP/scholarai-platform/backend/.env.example)
-- [.github/workflows/ci.yml](c:/Users/HP/scholarai-platform/.github/workflows/ci.yml)
+- [backend/app/core/config.py](../../backend/app/core/config.py)
+- [backend/app/core/security.py](../../backend/app/core/security.py)
+- [backend/app/services/auth/service.py](../../backend/app/services/auth/service.py)
+- [backend/app/main.py](../../backend/app/main.py)
+- [docker-compose.yml](../../docker-compose.yml)
+- [.env.example](../../.env.example)
+- [backend/.env.example](../../backend/.env.example)
+- [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
 
 ### Data and curation
-- [backend/app/api/v1/routes/curation.py](c:/Users/HP/scholarai-platform/backend/app/api/v1/routes/curation.py)
-- [backend/app/services/curation/service.py](c:/Users/HP/scholarai-platform/backend/app/services/curation/service.py)
+- [backend/app/api/v1/routes/curation.py](../../backend/app/api/v1/routes/curation.py)
+- [backend/app/services/curation/service.py](../../backend/app/services/curation/service.py)
 - future ingestion implementation area under `backend/app/` or `workers/`
 
 ### Public-facing UX and docs
-- [frontend/src/app/page.tsx](c:/Users/HP/scholarai-platform/frontend/src/app/page.tsx)
-- [frontend/src/components/layout/marketing-shell.tsx](c:/Users/HP/scholarai-platform/frontend/src/components/layout/marketing-shell.tsx)
-- [README.md](c:/Users/HP/scholarai-platform/README.md)
-- [docs/scholarai/DEMO_READINESS_AUDIT.md](c:/Users/HP/scholarai-platform/docs/scholarai/DEMO_READINESS_AUDIT.md)
-- [docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md](c:/Users/HP/scholarai-platform/docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md)
+- [frontend/src/app/page.tsx](../../frontend/src/app/page.tsx)
+- [frontend/src/components/layout/marketing-shell.tsx](../../frontend/src/components/layout/marketing-shell.tsx)
+- [README.md](../../README.md)
+- [docs/scholarai/DEMO_READINESS_AUDIT.md](../../docs/scholarai/DEMO_READINESS_AUDIT.md)
+- [docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md](../../docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md)
 
 ## Critical Docs That Must Be Revised Before Public Use
-1. Root [README.md](c:/Users/HP/scholarai-platform/README.md)
-   - It should explicitly separate internal MVP readiness from any public-live posture.
-2. [docs/scholarai/DEMO_READINESS_AUDIT.md](c:/Users/HP/scholarai-platform/docs/scholarai/DEMO_READINESS_AUDIT.md)
+1. Root [README.md](../../README.md)
+   - It should explicitly separate internal v0.1 readiness from any public-live posture.
+2. [docs/scholarai/DEMO_READINESS_AUDIT.md](../../docs/scholarai/DEMO_READINESS_AUDIT.md)
    - It should remain explicitly internal and non-public.
-3. [docs/scholarai/13_qa_devops_and_risks.md](c:/Users/HP/scholarai-platform/docs/scholarai/13_qa_devops_and_risks.md)
+3. [docs/scholarai/13_qa_devops_and_risks.md](../../docs/scholarai/13_qa_devops_and_risks.md)
    - It should be updated once the hardening phases begin so the public-live gates are documented.
 4. New public-facing policy/support docs
    - privacy
    - terms
    - support/contact
 
-## MVP decision
-ScholarAI is not public-live ready. It is in an internal MVP state that can support controlled demos and internal handoff.
+## v0.1 decision
+ScholarAI is not public-live ready. It is in an internal v0.1 state that can support controlled demos and internal handoff.
 
 ## Deferred items
 - Broad feature expansion before core hardening.
@@ -292,9 +292,12 @@ ScholarAI is not public-live ready. It is in an internal MVP state that can supp
 ## Assumptions
 - The team remains small and cannot support a heavy operations program.
 - Public-live means minimally safe and supportable, not enterprise-grade.
-- Hardening must be incremental and protect momentum around the existing MVP.
+- Hardening must be incremental and protect momentum around the existing v0.1.
 
 ## Risks
 - If the team treats internal demo readiness as public-live readiness, the first failures will likely be auth abuse, data trust problems, or weak operational visibility.
 - If hardening is deferred too long, feature work will entrench unsafe assumptions.
 - If public trust content is added last, the product may appear more mature than its operational posture actually is.
+
+
+

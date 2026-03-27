@@ -1,7 +1,7 @@
-# ScholarAI Recommendation And ML
+﻿# ScholarAI Recommendation And ML
 
 ## Purpose
-This document defines the ScholarAI recommendation pipeline, the role of machine learning in MVP, the evaluation plan for ranking quality, and the limitations introduced by constrained data. The design is implementation-ready but remains conservative about claims: ScholarAI estimates fit and competitiveness, it does not claim to predict real scholarship acceptance without true outcome labels.
+This document defines the ScholarAI recommendation pipeline, the role of machine learning in v0.1, the evaluation plan for ranking quality, and the limitations introduced by constrained data. The design is implementation-ready but remains conservative about claims: ScholarAI estimates fit and competitiveness, it does not claim to predict real scholarship acceptance without true outcome labels.
 
 ## Recommendation Principles
 1. Apply validated hard constraints before any similarity or scoring step.
@@ -11,13 +11,13 @@ This document defines the ScholarAI recommendation pipeline, the role of machine
 5. Keep explanation generation aligned with the actual ranking features shown to users.
 
 ## Recommendation Pipeline Overview
-| Stage | Purpose | Input authority | MVP status |
+| Stage | Purpose | Input authority | v0.1 status |
 |---|---|---|---|
-| Stage 0 | Search and scope filtering | Validated scholarship records | MVP |
-| Stage 1 | Knowledge-graph eligibility filtering | Structured validated rules | MVP |
-| Stage 2 | Vector similarity ranking | Structured records plus embeddings | MVP |
-| Stage 3 | ML scoring and reranking | Estimated features derived from stage 1 and 2 outputs | MVP, with fallback |
-| Stage 4 | Explanation generation | Ranking features and validated rule context | MVP |
+| Stage 0 | Search and scope filtering | Validated scholarship records | v0.1 |
+| Stage 1 | Knowledge-graph eligibility filtering | Structured validated rules | v0.1 |
+| Stage 2 | Vector similarity ranking | Structured records plus embeddings | v0.1 |
+| Stage 3 | ML scoring and reranking | Estimated features derived from stage 1 and 2 outputs | v0.1, with fallback |
+| Stage 4 | Explanation generation | Ranking features and validated rule context | v0.1 |
 
 ## Mermaid Recommendation Pipeline
 ```mermaid
@@ -33,7 +33,7 @@ graph LR
 ## Stage Details
 ### Stage 0: validated rule-based filtering
 This stage limits the candidate pool to scholarships that are:
-- in the MVP geographic scope
+- in the v0.1 geographic scope
 - compatible with `MS` degree level
 - aligned to the target fields of Data Science, Artificial Intelligence, or Analytics
 - in `published` state
@@ -76,9 +76,9 @@ This stage turns the most important ranking features and matched constraints int
 | Baseline B | Stage 0 + Stage 1 | Rules-only eligibility baseline |
 | Baseline C | Stage 0 + Stage 1 + Stage 2 | Retrieval-first baseline |
 | Baseline D | Stage 0 + Stage 1 + Stage 2 + heuristic rerank | Low-risk product fallback |
-| Model E | Stage 0 + Stage 1 + Stage 2 + ML rerank | Full MVP target pipeline |
+| Model E | Stage 0 + Stage 1 + Stage 2 + ML rerank | Full v0.1 target pipeline |
 
-The product can ship with Baseline D if Model E is not stable enough within the 16-week timeline. This keeps the MVP useful without overcommitting to immature ML behavior.
+The product can ship with Baseline D if Model E is not stable enough within the 16-week timeline. This keeps the v0.1 useful without overcommitting to immature ML behavior.
 
 ## Feature Definitions
 | Feature | Type | Source | Notes |
@@ -132,7 +132,7 @@ Synthetic data exists to bootstrap the reranker, support pipeline tests, and ena
 | Semantic similarity | Derived from actual embedding comparisons, not synthetic constants |
 
 ## Label Strategy
-### MVP label framing
+### v0.1 label framing
 - Use ordinal or banded fit labels such as `high`, `medium`, `low`.
 - Convert those labels to a normalized ranking score for model training.
 - Do not train or display a "probability of winning scholarship" label unless real outcome labels exist.
@@ -149,7 +149,7 @@ Synthetic data exists to bootstrap the reranker, support pipeline tests, and ena
 | Logistic regression / linear baseline | Provides a simple interpretable reranker |
 | Gradient-boosted trees | Strong candidate for tabular feature interactions |
 
-Deep learning is not a default MVP priority because the expected labeled data volume is low and explanation discipline matters more than model complexity.
+Deep learning is not a default v0.1 priority because the expected labeled data volume is low and explanation discipline matters more than model complexity.
 
 ## Calibration Discussion
 If the reranker produces a score that looks probability-like, apply calibration only to stabilize the internal score distribution for ranking consistency. Do not present calibrated outputs as real-world acceptance probabilities. Preferred user-facing behavior:
@@ -188,13 +188,13 @@ To stay aligned with the product and design docs, the recommendation UI should s
 The UI should not show hidden model jargon or unsupported certainty.
 
 ## Limitations
-1. Real scholarship outcome labels are absent in MVP, so any ML training signal is provisional.
+1. Real scholarship outcome labels are absent in v0.1, so any ML training signal is provisional.
 2. A narrow Canada-first corpus improves reliability but reduces breadth.
 3. Requirement ambiguity can distort labels and evaluation judgments.
 4. User profile quality affects ranking usefulness more than model complexity alone.
 5. Synthetic labels are useful for bootstrapping but can also encode the system designer's assumptions.
 
-## MVP
+## v0.1
 - Stage 0 to Stage 4 pipeline with rules, graph-aware filtering, vector retrieval, estimated fit scoring, and explanation output.
 - Ship a heuristic fallback if the ML reranker is not stable enough.
 
@@ -203,13 +203,13 @@ The UI should not show hidden model jargon or unsupported certainty.
 - Collect richer judged sets and voluntary outcomes for stronger evaluation.
 - Explore separate competitiveness modeling once true labels exist.
 
-## Post-MVP Startup Features
+## Deferred By Stage Startup Features
 - Personalization from longitudinal user behavior.
 - Provider-specific ranking objectives.
 - Recommendation optimization for conversion and application tracking workflows.
 
-## MVP decision
-ScholarAI MVP will use a hybrid recommendation pipeline that prioritizes validated eligibility rules first, semantic retrieval second, and estimated fit scoring third, with all outputs framed as non-causal estimates rather than scholarship acceptance predictions.
+## v0.1 decision
+ScholarAI v0.1 will use a hybrid recommendation pipeline that prioritizes validated eligibility rules first, semantic retrieval second, and estimated fit scoring third, with all outputs framed as non-causal estimates rather than scholarship acceptance predictions.
 
 ## Deferred items
 - Outcome-based acceptance prediction.
@@ -219,9 +219,10 @@ ScholarAI MVP will use a hybrid recommendation pipeline that prioritizes validat
 ## Assumptions
 - A judged relevance set can be assembled from curator review and representative student profiles.
 - The heuristic fallback pipeline remains product-valuable if ML quality is not yet sufficient.
-- A 384-dimension embedding model is adequate for MVP semantic retrieval.
+- A 384-dimension embedding model is adequate for v0.1 semantic retrieval.
 
 ## Risks
 - Synthetic labels can overfit to the heuristics used to generate them.
 - Sparse or inconsistent requirement data can hurt both filtering and ranking.
 - Users may interpret a high score as an admission guarantee unless the UX remains disciplined.
+

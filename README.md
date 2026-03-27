@@ -1,8 +1,8 @@
-# ScholarAI Platform
+﻿# ScholarAI Platform
 
 ScholarAI is an AI-powered scholarship platform focused on helping students discover scholarships, evaluate eligibility, plan application strategy, improve application documents, and practice scholarship interviews.
 
-## Current MVP Scope
+## Current v0.1 Scope
 - Delivery model: 3 developers, 16 weeks, limited budget.
 - Architecture style: modular monolith.
 - Primary corpus: Canada-focused scholarship and program scope.
@@ -16,7 +16,7 @@ ScholarAI is an AI-powered scholarship platform focused on helping students disc
 - Backend: FastAPI.
 - Async processing: Celery + Redis.
 - Data layer: PostgreSQL + pgvector.
-- Knowledge Graph Layer: mandatory logical layer, implemented in MVP as either narrowly scoped Neo4j or a relationally derived graph abstraction.
+- Knowledge Graph Layer: mandatory logical layer, implemented in v0.1 as either narrowly scoped Neo4j or a relationally derived graph abstraction.
 - Ingestion: Playwright + Pandas + Pydantic.
 - Deployment baseline: Docker Compose.
 - Database migrations: Alembic.
@@ -26,7 +26,7 @@ ScholarAI is an AI-powered scholarship platform focused on helping students disc
 - Canonical docs index: `docs/scholarai/README.md`
 - Migration and authoring plan: `docs/scholarai/WORKPLAN.md`
 - Current implementation audit: `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`
-- Internal MVP handoff: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
+- Internal v0.1 handoff: `docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md`
 - Public-live hardening plan: `docs/scholarai/PUBLIC_LIVE_HARDENING_PLAN.md`
 - Governing migration specification: `docs/scholarai/CODEX_MASTER_PROMPT_V1.md`
 - Current migration task: `docs/scholarai/CODEX_TASK_01_DOC_MIGRATION.md`
@@ -51,7 +51,7 @@ scholarai-platform/
 ```
 
 ## Implementation Status
-- Repository status: active internal MVP implementation with documentation-led scope control.
+- Repository status: active internal v0.1 implementation with documentation-led scope control.
 - Canonical docs `01` through `14` define the product, scope, design system, data model, architecture, evaluation, execution plan, QA strategy, and roadmap baseline.
 - Active implementation track: docs-first RBAC expansion with capability-based access, institution-scoped university permissions, and compatibility-window migration.
 - The current implementation includes:
@@ -75,7 +75,7 @@ scholarai-platform/
 - `GET /api/v1/interviews/{id}` returns session history summary and rubric trend summary used by adaptive follow-up.
 - Invalid grounding identifiers fail cleanly with structured error responses.
 
-## Local MVP Run
+## Local v0.1 Run
 ### Env files
 - Docker Compose path: copy `.env.example` to `.env` only if you need to override defaults.
 - Direct backend path: copy `backend/.env.example` to `backend/.env`.
@@ -118,12 +118,12 @@ scholarai-platform/
 - Rehearsal script: `tests/e2e/playwright/rehearse_seeded_demo.py`
 - Smoke suite runner: `tests/e2e/playwright/run_smoke_suite.py`
 
-## MVP decision
+## v0.1 decision
 ScholarAI implementation will follow a documentation-first path, with `docs/scholarai/` as the active source of truth.
 
 ## Deferred items
 - Legacy docs archival/removal actions after migration content is finalized.
-- Feature work outside MVP constraints.
+- Feature work outside v0.1 constraints.
 
 ## Assumptions
 - Team will use `docs/scholarai/WORKPLAN.md` as the sequencing reference for future documentation passes.
@@ -132,5 +132,6 @@ ScholarAI implementation will follow a documentation-first path, with `docs/scho
 
 ## Risks
 - Parallel editing in legacy and canonical docs may create inconsistencies.
-- Scope creep into deferred startup features can break MVP feasibility.
+- Scope creep into deferred startup features can break v0.1 feasibility.
 - Early code work before canonical docs are complete can lock in conflicting assumptions.
+

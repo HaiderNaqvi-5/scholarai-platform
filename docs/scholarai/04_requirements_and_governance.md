@@ -1,4 +1,4 @@
-# ScholarAI Requirements And Governance
+﻿# ScholarAI Requirements And Governance
 
 ## Purpose
 This document defines the baseline requirements, governance rules, and decision boundaries that keep ScholarAI implementable, defensible, and internally consistent.
@@ -23,24 +23,24 @@ This document defines the baseline requirements, governance rules, and decision 
 ## Functional Requirements
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-01 | The platform must store scholarships, requirements, deadlines, funding information, and provenance states in structured records. | MVP |
-| FR-02 | The platform must support search and filtering across the defined MVP corpus. | MVP |
-| FR-03 | The platform must enforce hard eligibility logic before ranking results. | MVP |
-| FR-04 | The platform must provide recommendation outputs with explanation-oriented rationale. | MVP |
-| FR-05 | The platform must support document-feedback workflows for SOPs, essays, and related application materials. | MVP |
-| FR-06 | The platform must support interview-practice workflows with structured feedback. | MVP |
-| FR-07 | The platform must support admin curation and publication workflows for scholarship data. | MVP |
-| FR-08 | The platform must track provenance through `raw`, `validated`, and `published` states. | MVP |
+| FR-01 | The platform must store scholarships, requirements, deadlines, funding information, and provenance states in structured records. | v0.1 |
+| FR-02 | The platform must support search and filtering across the defined v0.1 corpus. | v0.1 |
+| FR-03 | The platform must enforce hard eligibility logic before ranking results. | v0.1 |
+| FR-04 | The platform must provide recommendation outputs with explanation-oriented rationale. | v0.1 |
+| FR-05 | The platform must support document-feedback workflows for SOPs, essays, and related application materials. | v0.1 |
+| FR-06 | The platform must support interview-practice workflows with structured feedback. | v0.1 |
+| FR-07 | The platform must support admin curation and publication workflows for scholarship data. | v0.1 |
+| FR-08 | The platform must track provenance through `raw`, `validated`, and `published` states. | v0.1 |
 
 ## Non-Functional Requirements
 | ID | Requirement | Priority |
 |---|---|---|
-| NFR-01 | The system must remain understandable and maintainable by a 3-person team. | MVP |
-| NFR-02 | The active architecture must avoid distributed microservice complexity. | MVP |
-| NFR-03 | Policy-critical information must come from structured validated data, not generated text. | MVP |
-| NFR-04 | AI outputs must be framed as guidance or estimation, not authoritative decisions. | MVP |
-| NFR-05 | The system must keep clear boundaries between user data, validated facts, and generated outputs. | MVP |
-| NFR-06 | Documentation must remain the source of truth while product scope is still evolving. | MVP |
+| NFR-01 | The system must remain understandable and maintainable by a 3-person team. | v0.1 |
+| NFR-02 | The active architecture must avoid distributed microservice complexity. | v0.1 |
+| NFR-03 | Policy-critical information must come from structured validated data, not generated text. | v0.1 |
+| NFR-04 | AI outputs must be framed as guidance or estimation, not authoritative decisions. | v0.1 |
+| NFR-05 | The system must keep clear boundaries between user data, validated facts, and generated outputs. | v0.1 |
+| NFR-06 | Documentation must remain the source of truth while product scope is still evolving. | v0.1 |
 
 ## Data Governance
 ### Source-of-truth rule
@@ -76,7 +76,7 @@ No generated response may override validated scholarship facts. If generated gui
 If real scholarship outcome labels are absent, all ranking and scoring outputs must be described as estimates based on available features and assumptions.
 
 ## Scope Governance
-### MVP
+### v0.1
 - Canada-first scholarship corpus.
 - MS Data Science, MS Artificial Intelligence, MS Analytics.
 - USA only for Fulbright-related information and narrow cross-border logic.
@@ -86,7 +86,7 @@ If real scholarship outcome labels are absent, all ranking and scoring outputs m
 - Stronger comparative graph-layer experiments.
 - Broader outcome-data collection and evaluation design.
 
-### Post-MVP Startup Features
+### Deferred By Stage Startup Features
 - Broader geography and academic coverage.
 - Marketplace and institutional monetization features.
 - Operational analytics products and ecosystem integrations.
@@ -101,21 +101,21 @@ If real scholarship outcome labels are absent, all ranking and scoring outputs m
 ## Architecture Governance
 | Topic | Rule |
 |---|---|
-| Knowledge Graph Layer | Mandatory logically; MVP default is a relationally derived graph abstraction unless Neo4j becomes clearly justified |
-| Search architecture | PostgreSQL + pgvector is the MVP baseline; additional search systems require explicit justification |
+| Knowledge Graph Layer | Mandatory logically; v0.1 default is a relationally derived graph abstraction unless Neo4j becomes clearly justified |
+| Search architecture | PostgreSQL + pgvector is the v0.1 baseline; additional search systems require explicit justification |
 | Background jobs | Celery + Redis only where async work is necessary |
 | Experiment tracking | Prefer lightweight tracking; MLflow must be justified by actual workflow needs |
 
 ## Documentation Governance
 1. Canonical active documentation lives under `docs/scholarai/`.
 2. Legacy docs outside `docs/scholarai/` are migration inputs, not long-term authorities.
-3. Every documentation file must end with `MVP decision`, `Deferred items`, `Assumptions`, and `Risks`.
+3. Every documentation file must end with `v0.1 decision`, `Deferred items`, `Assumptions`, and `Risks`.
 4. No section should remain as placeholder text.
 
 ## Review Gates
 | Gate | Check |
 |---|---|
-| Scope gate | No deferred startup features have leaked into MVP |
+| Scope gate | No deferred startup features have leaked into v0.1 |
 | Data gate | Source-of-truth fields are grounded in validated records |
 | AI gate | Generated outputs are clearly advisory |
 | Architecture gate | The design remains feasible for 3 developers in 16 weeks |
@@ -163,20 +163,24 @@ Migration from legacy role-only claims to capability claims must use a compatibi
 | Audit gate | Privileged operations are fully traceable |
 | Deprecation gate | Legacy role-only path has a dated removal milestone |
 
-## MVP decision
+## v0.1 decision
 ScholarAI governance prioritizes constrained scope, structured data authority, advisory-only AI framing, and modular-monolith feasibility over breadth or architectural ambition.
 
 ## Deferred items
 - Governance for commercial partnerships and paid workflows.
-- Broader legal and institutional policy handling beyond MVP geography.
+- Broader legal and institutional policy handling beyond v0.1 geography.
 - Advanced experimentation governance tied to real outcome labels.
 
 ## Assumptions
 - The team will treat documentation changes as architecture and product changes, not only editorial changes.
 - Admin curation is available to maintain provenance discipline.
-- MVP can rely on internal governance discipline before heavier compliance processes are needed.
+- v0.1 can rely on internal governance discipline before heavier compliance processes are needed.
 
 ## Risks
 - Governance rules are easy to write and easy to ignore unless used in review.
 - AI-related scope creep can happen quickly if advisory boundaries are not enforced.
 - Weak provenance handling would undermine both product trust and research defensibility.
+
+
+## SLC decision (v0.1)
+TBD (baseline governance alignment).

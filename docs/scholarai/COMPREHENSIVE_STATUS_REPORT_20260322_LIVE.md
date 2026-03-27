@@ -1,9 +1,9 @@
-# ScholarAI Comprehensive Status Report (Live)
+﻿# ScholarAI Comprehensive Status Report (Live)
 
 Date: 2026-03-22
 Scope: Consolidated status from canonical docs + in-repo implementation state
 
-## 1) MVP Status: done vs partial vs not done
+## 1) v0.1 Status: done vs partial vs not done
 
 ### Done (implemented in current backend/code path)
 
@@ -32,9 +32,9 @@ Scope: Consolidated status from canonical docs + in-repo implementation state
 - Full production hardening checklist in docs is not fully closed.
 - Several roadmap and research-track items remain design/spec level or deferred.
 
-## 2) Deferred research (explicitly treated as non-MVP)
+## 2) Deferred research (explicitly treated as non-v0.1)
 
-Based on research/roadmap docs, these remain deferred or exploratory tracks rather than MVP blockers:
+Based on research/roadmap docs, these remain deferred or exploratory tracks rather than v0.1 blockers:
 
 - Advanced recommendation experimentation beyond baseline production policy logic.
 - Higher-order explainability/reranking research variants and ablation-heavy evaluation tracks.
@@ -42,22 +42,22 @@ Based on research/roadmap docs, these remain deferred or exploratory tracks rath
 - Extended evaluation programs intended for publication-level rigor, not launch gating.
 - Advanced model strategy work (future model variants, richer adaptation loops, and deeper experimentation pipelines).
 
-## 3) Post-MVP / startup-scale features (explicit inventory)
+## 3) Deferred By Stage / startup-scale features (explicit inventory)
 
-The following are documented as post-MVP/startup-scale direction and are not fully implemented yet:
+The following are documented as Deferred By Stage/startup-scale direction and are not fully implemented yet:
 
 - Enterprise tenancy maturity (org-level governance depth, enterprise-grade controls expansion).
 - Enterprise identity/connectivity expansions (beyond current baseline auth/RBAC migration path).
 - Broader integration surface with external platforms and partner ecosystem workflows.
 - Productization upgrades for scale operations (advanced ops dashboards, stronger incident automation, broader runbooks).
-- Growth and monetization readiness tracks (commercial/scale operations beyond MVP baseline).
+- Growth and monetization readiness tracks (commercial/scale operations beyond v0.1 baseline).
 - Full public-live hardening completion across reliability, operations, and release processes.
 
 ## 4) Docs vs code reality: alignment and divergence
 
 ### Alignment
 
-- Status docs that mark MVP as "not fully complete" align with current repo reality.
+- Status docs that mark v0.1 as "not fully complete" align with current repo reality.
 - RBAC capability-first migration direction in docs aligns with implementation now present in code.
 - KPI maturity direction (instrumentation and health gating) aligns with current implementation trajectory.
 - `v2` API direction and staged migration strategy align with active code changes.
@@ -70,7 +70,7 @@ The following are documented as post-MVP/startup-scale direction and are not ful
 
 ## 5) Practical "where we are now"
 
-- ScholarAI is in a late-MVP hardening and migration stage, not a fully finished startup-scale state.
+- ScholarAI is in a late-v0.1 hardening and migration stage, not a fully finished startup-scale state.
 - Core backend foundations are strong and moving in the right direction.
 - KPI and governance maturity are materially improved and actively tested.
 - The biggest remaining gap is not "core missing backend" but "closure": parity completion, ops hardening, and doc synchronization.
@@ -81,3 +81,4 @@ The following are documented as post-MVP/startup-scale direction and are not ful
 2. Complete external alert routing + operational escalation runbooks.
 3. Synchronize all status/audit docs to a single branch truth source.
 4. Close remaining public-live hardening checklist items and rerun readiness audit.
+
