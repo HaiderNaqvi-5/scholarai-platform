@@ -99,6 +99,7 @@ jobs:
 
       - name: Run docs governance checks
         run: |
+          set -o pipefail
           python scripts/docs_governance_check.py | tee /tmp/docs-governance.out
 
       - name: Publish docs governance summary
