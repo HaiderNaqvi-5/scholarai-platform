@@ -178,6 +178,30 @@ async def test_grounded_feedback_uses_validated_scholarship_facts_and_sections()
     assert isinstance(feedback.quality_gate.all_passed, bool)
 
 
+async def test_document_quality_gate_counts_apply_guidance_as_actionable():
+    service = DocumentService(FakeSession())
+    payload = {
+        "citations": ["[fact-1]"],
+        "caution_notes": [],
+    }
+    sections = {
+        "validated_facts": [{"id": "fact-1"}],
+        "retrieved_writing_guidance": [{"source": "guide"}],
+        "generated_guidance": [
+            {"type": "generated", "guidance": "Apply this evidence to your opening paragraph."},
+            {"type": "generated", "guidance": "Use one quantified result to support your fit."},
+        ],
+        "limitations": ["Practice-only guidance."],
+    }
+
+    metrics = service._build_quality_metrics(payload, sections)
+    gate = service._build_quality_gate(payload, sections)
+
+    assert metrics.actionable_guidance_count == 2
+    assert gate.actionable_guidance_pass is True
+    assert gate.all_passed is True
+
+
 async def test_invalid_scholarship_grounding_id_fails_cleanly():
     session = FakeSession()
     service = DocumentService(session)

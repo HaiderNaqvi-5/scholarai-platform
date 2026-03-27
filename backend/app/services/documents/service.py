@@ -678,6 +678,7 @@ class DocumentService:
         if not guidance:
             return False
         action_verbs = (
+            "apply",
             "add",
             "answer",
             "connect",

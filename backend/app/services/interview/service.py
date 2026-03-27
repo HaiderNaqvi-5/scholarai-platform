@@ -421,6 +421,7 @@ class InterviewSessionService:
             "connect",
             "describe",
             "explain",
+            "rebuild",
             "replace",
             "use",
         )
