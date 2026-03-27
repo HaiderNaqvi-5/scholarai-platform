@@ -3,7 +3,6 @@
 ScholarAI is an AI-powered scholarship platform focused on helping students discover scholarships, evaluate eligibility, plan application strategy, improve application documents, and practice scholarship interviews.
 
 ## Current v0.1 Scope
-- Temporary validation marker: this MVP term is intentionally added to verify docs-governance enforcement.
 - Delivery model: 3 developers, 16 weeks, limited budget.
 - Architecture style: modular monolith.
 - Primary corpus: Canada-focused scholarship and program scope.
