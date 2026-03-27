@@ -66,6 +66,8 @@ class InterviewAnswerFeedback(BaseModel):
     summary_feedback: str
     strengths: list[str]
     improvement_prompts: list[str]
+    targeted_follow_up_actions: list[str] = Field(default_factory=list)
+    rubric_focus_dimension: str | None = None
     dimensions: list[InterviewRubricDimension]
     limitation_notice: str
     created_at: datetime | None = None
@@ -102,6 +104,8 @@ class InterviewProgressionMetrics(BaseModel):
     score_delta: float | None = None
     improvement_ratio: float = Field(ge=0.0, le=1.0)
     needs_focus_ratio: float = Field(ge=0.0, le=1.0)
+    follow_up_actionability_ratio: float = Field(ge=0.0, le=1.0)
+    adaptive_guidance_coverage: float = Field(ge=0.0, le=1.0)
 
 
 class InterviewProgressionThresholds(BaseModel):
@@ -109,6 +113,8 @@ class InterviewProgressionThresholds(BaseModel):
     min_average_score: float
     min_score_delta: float
     max_needs_focus_ratio: float = Field(ge=0.0, le=1.0)
+    min_follow_up_actionability_ratio: float = Field(ge=0.0, le=1.0)
+    min_adaptive_guidance_coverage: float = Field(ge=0.0, le=1.0)
 
 
 class InterviewProgressionGate(BaseModel):
@@ -118,6 +124,8 @@ class InterviewProgressionGate(BaseModel):
     average_score_pass: bool
     score_delta_pass: bool
     needs_focus_ratio_pass: bool
+    follow_up_actionability_pass: bool
+    adaptive_guidance_pass: bool
     all_passed: bool
 
 

@@ -536,6 +536,12 @@ class DocumentService:
         generated_guidance_pass = (
             metrics.generated_guidance_count >= thresholds.min_generated_guidance_count
         )
+        grounded_partition_pass = (
+            metrics.grounded_partition_count >= thresholds.min_grounded_partition_count
+        )
+        actionable_guidance_pass = (
+            metrics.actionable_guidance_count >= thresholds.min_actionable_guidance_count
+        )
 
         return DocumentQualityGate(
             thresholds=thresholds,
@@ -544,11 +550,15 @@ class DocumentService:
             caution_note_count_pass=caution_note_count_pass,
             retrieved_guidance_pass=retrieved_guidance_pass,
             generated_guidance_pass=generated_guidance_pass,
+            grounded_partition_pass=grounded_partition_pass,
+            actionable_guidance_pass=actionable_guidance_pass,
             all_passed=(
                 citation_coverage_pass
                 and caution_note_count_pass
                 and retrieved_guidance_pass
                 and generated_guidance_pass
+                and grounded_partition_pass
+                and actionable_guidance_pass
             ),
         )
 
@@ -564,13 +574,39 @@ class DocumentService:
         caution_notes = list(payload.get("caution_notes", []))
 
         citation_coverage_ratio = 1.0 if not validated_facts else min(len(citations) / len(validated_facts), 1.0)
-        review_flag = citation_coverage_ratio < 0.8 or len(caution_notes) >= 2
+        grounded_partition_count = sum(
+            1
+            for value in (
+                validated_facts,
+                retrieved,
+                generated,
+                sections.get("limitations", []),
+            )
+            if value
+        )
+        actionable_guidance_count = sum(
+            1 for item in generated if self._is_actionable_generated_guidance(item)
+        )
+        fact_to_guidance_link_ratio = (
+            1.0
+            if not validated_facts
+            else min(len(generated) / len(validated_facts), 1.0)
+        )
+        review_flag = (
+            citation_coverage_ratio < 0.8
+            or len(caution_notes) >= 2
+            or grounded_partition_count < 3
+            or actionable_guidance_count < 2
+        )
 
         return DocumentQualityMetrics(
             citation_coverage_ratio=round(citation_coverage_ratio, 4),
             validated_fact_count=len(validated_facts),
             retrieved_guidance_count=len(retrieved),
             generated_guidance_count=len(generated),
+            grounded_partition_count=grounded_partition_count,
+            actionable_guidance_count=actionable_guidance_count,
+            fact_to_guidance_link_ratio=round(fact_to_guidance_link_ratio, 4),
             caution_note_count=len(caution_notes),
             review_flag=review_flag,
         )
@@ -634,3 +670,21 @@ class DocumentService:
             "This feedback uses bounded writing guidance and generated coaching only. "
             "Official scholarship rules still come from validated scholarship records."
         )
+
+    def _is_actionable_generated_guidance(self, item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        guidance = str(item.get("guidance", "")).lower()
+        if not guidance:
+            return False
+        action_verbs = (
+            "add",
+            "answer",
+            "connect",
+            "explain",
+            "highlight",
+            "name",
+            "state",
+            "use",
+        )
+        return any(guidance.startswith(verb) or f" {verb} " in guidance for verb in action_verbs)

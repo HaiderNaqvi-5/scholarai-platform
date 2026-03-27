@@ -269,6 +269,14 @@ class InterviewSessionService:
         average_score_pass = (metrics.average_score or 0.0) >= thresholds.min_average_score
         score_delta_pass = (metrics.score_delta or 0.0) >= thresholds.min_score_delta
         needs_focus_ratio_pass = metrics.needs_focus_ratio <= thresholds.max_needs_focus_ratio
+        follow_up_actionability_pass = (
+            metrics.follow_up_actionability_ratio
+            >= thresholds.min_follow_up_actionability_ratio
+        )
+        adaptive_guidance_pass = (
+            metrics.adaptive_guidance_coverage
+            >= thresholds.min_adaptive_guidance_coverage
+        )
 
         return InterviewProgressionGate(
             thresholds=thresholds,
@@ -277,11 +285,15 @@ class InterviewSessionService:
             average_score_pass=average_score_pass,
             score_delta_pass=score_delta_pass,
             needs_focus_ratio_pass=needs_focus_ratio_pass,
+            follow_up_actionability_pass=follow_up_actionability_pass,
+            adaptive_guidance_pass=adaptive_guidance_pass,
             all_passed=(
                 answered_count_pass
                 and average_score_pass
                 and score_delta_pass
                 and needs_focus_ratio_pass
+                and follow_up_actionability_pass
+                and adaptive_guidance_pass
             ),
         )
 
@@ -298,6 +310,8 @@ class InterviewSessionService:
                 score_delta=None,
                 improvement_ratio=0.0,
                 needs_focus_ratio=0.0,
+                follow_up_actionability_ratio=0.0,
+                adaptive_guidance_coverage=0.0,
             )
 
         scores = [response.overall_score for response in responses]
@@ -313,6 +327,14 @@ class InterviewSessionService:
 
         needs_focus_count = sum(1 for score in scores if score < 3.0)
         needs_focus_ratio = round(needs_focus_count / len(scores), 4)
+        actionable_follow_up_count = sum(
+            1 for response in responses if self._is_actionable_follow_up(response)
+        )
+        adaptive_guidance_count = sum(
+            1
+            for response in responses
+            if select_weakest_dimension(response) is not None
+        )
 
         return InterviewProgressionMetrics(
             answered_count=len(scores),
@@ -322,6 +344,8 @@ class InterviewSessionService:
             score_delta=score_delta,
             improvement_ratio=improvement_ratio,
             needs_focus_ratio=needs_focus_ratio,
+            follow_up_actionability_ratio=round(actionable_follow_up_count / len(scores), 4),
+            adaptive_guidance_coverage=round(adaptive_guidance_count / len(scores), 4),
         )
 
     def _build_current_question(
@@ -345,6 +369,17 @@ class InterviewSessionService:
 
     def _build_feedback(self, response: InterviewResponse) -> InterviewAnswerFeedback:
         payload = response.score_payload or {}
+        dimensions = list(payload.get("dimensions", []))
+        rubric_focus_dimension = payload.get("rubric_focus_dimension")
+        if rubric_focus_dimension is None:
+            rubric_focus_dimension = select_weakest_dimension(
+                {"dimensions": dimensions}
+            )
+        targeted_actions = list(payload.get("targeted_follow_up_actions", []))
+        if not targeted_actions:
+            targeted_actions = self._derive_targeted_actions_from_prompts(
+                list(payload.get("improvement_prompts", []))
+            )
         return InterviewAnswerFeedback(
             question_index=payload.get("question_index", response.question_index),
             question_text=payload.get("question_text", response.question_text),
@@ -355,7 +390,9 @@ class InterviewSessionService:
             summary_feedback=payload.get("summary_feedback", response.summary_feedback),
             strengths=list(payload.get("strengths", [])),
             improvement_prompts=list(payload.get("improvement_prompts", [])),
-            dimensions=list(payload.get("dimensions", [])),
+            targeted_follow_up_actions=targeted_actions,
+            rubric_focus_dimension=rubric_focus_dimension,
+            dimensions=dimensions,
             limitation_notice=payload.get(
                 "limitation_notice",
                 "This is practice guidance only.",
@@ -373,3 +410,28 @@ class InterviewSessionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Interview practice mode must be '{allowed_text}'",
             ) from exc
+
+    def _is_actionable_follow_up(self, feedback: InterviewAnswerFeedback) -> bool:
+        actions = feedback.targeted_follow_up_actions or feedback.improvement_prompts
+        if not actions:
+            return False
+        action_verbs = (
+            "add",
+            "answer",
+            "connect",
+            "describe",
+            "explain",
+            "replace",
+            "use",
+        )
+        for action in actions:
+            normalized = action.strip().lower()
+            if any(
+                normalized.startswith(verb) or f" {verb} " in normalized
+                for verb in action_verbs
+            ):
+                return True
+        return False
+
+    def _derive_targeted_actions_from_prompts(self, prompts: list[str]) -> list[str]:
+        return prompts[:2]

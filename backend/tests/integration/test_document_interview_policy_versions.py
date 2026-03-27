@@ -59,6 +59,8 @@ def test_document_feedback_response_includes_policy_version(app, client):
             max_caution_note_count=1,
             min_retrieved_guidance_count=1,
             min_generated_guidance_count=1,
+            min_grounded_partition_count=3,
+            min_actionable_guidance_count=2,
         )
         quality_gate = DocumentQualityGate(
             thresholds=thresholds,
@@ -67,6 +69,8 @@ def test_document_feedback_response_includes_policy_version(app, client):
             caution_note_count_pass=True,
             retrieved_guidance_pass=True,
             generated_guidance_pass=True,
+            grounded_partition_pass=True,
+            actionable_guidance_pass=True,
             all_passed=True,
         )
         quality_metrics = DocumentQualityMetrics(
@@ -74,6 +78,9 @@ def test_document_feedback_response_includes_policy_version(app, client):
             validated_fact_count=1,
             retrieved_guidance_count=1,
             generated_guidance_count=1,
+            grounded_partition_count=4,
+            actionable_guidance_count=2,
+            fact_to_guidance_link_ratio=1.0,
             caution_note_count=0,
             review_flag=False,
         )
@@ -195,6 +202,8 @@ def test_interview_summary_response_includes_policy_version(app, client):
                 score_delta=None,
                 improvement_ratio=0.0,
                 needs_focus_ratio=0.0,
+                follow_up_actionability_ratio=0.0,
+                adaptive_guidance_coverage=0.0,
             ),
             progression_gate=InterviewProgressionGate(
                 thresholds=InterviewProgressionThresholds(
@@ -202,12 +211,16 @@ def test_interview_summary_response_includes_policy_version(app, client):
                     min_average_score=3.0,
                     min_score_delta=0.0,
                     max_needs_focus_ratio=0.5,
+                    min_follow_up_actionability_ratio=0.7,
+                    min_adaptive_guidance_coverage=0.7,
                 ),
                 policy_version="interview.progression.v1",
                 answered_count_pass=False,
                 average_score_pass=False,
                 score_delta_pass=False,
                 needs_focus_ratio_pass=True,
+                follow_up_actionability_pass=False,
+                adaptive_guidance_pass=False,
                 all_passed=False,
             ),
             started_at=now,

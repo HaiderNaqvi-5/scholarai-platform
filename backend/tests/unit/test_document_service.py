@@ -165,11 +165,16 @@ async def test_grounded_feedback_uses_validated_scholarship_facts_and_sections()
     assert feedback.grounded_context_sections.generated_guidance
     assert feedback.quality_metrics.validated_fact_count == len(feedback.validated_facts)
     assert feedback.quality_metrics.citation_coverage_ratio > 0
+    assert feedback.quality_metrics.grounded_partition_count >= 3
+    assert feedback.quality_metrics.actionable_guidance_count >= 2
+    assert feedback.quality_metrics.fact_to_guidance_link_ratio > 0
     assert isinstance(feedback.quality_metrics.review_flag, bool)
     assert feedback.quality_gate.policy_version == "document.quality.v1"
     assert feedback.quality_gate.thresholds.min_citation_coverage_ratio == 0.8
     assert feedback.quality_gate.retrieved_guidance_pass is True
     assert feedback.quality_gate.generated_guidance_pass is True
+    assert feedback.quality_gate.grounded_partition_pass is True
+    assert feedback.quality_gate.actionable_guidance_pass is True
     assert isinstance(feedback.quality_gate.all_passed, bool)
 
 
