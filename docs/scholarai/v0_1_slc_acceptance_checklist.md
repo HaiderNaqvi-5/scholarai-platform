@@ -50,13 +50,13 @@ Use this checklist as the release acceptance source of truth for ScholarAI `v0.1
 
 | ID | Status | Evidence Link(s) |
 | --- | --- | --- |
-| SLC-TRUST-001 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-TRUST-002 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-TRUST-003 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-UI-001 | Pending screenshots | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-UI-002 | Pending screenshots | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-UI-003 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
-| SLC-CORE-004 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-TRUST-001 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-TRUST-002 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-TRUST-003 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-UI-001 | Pending screenshots | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-UI-002 | Pending screenshots | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-UI-003 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
+| SLC-CORE-004 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
 
 ## Completion Rule
 
