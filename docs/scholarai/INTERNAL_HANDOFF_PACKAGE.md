@@ -1,10 +1,10 @@
-﻿# ScholarAI Internal Handoff Package
+# ScholarAI Internal Handoff Package
 
 ## Purpose
-This note is for internal reviewers, supervisors, and developers who need a clear v0.1 handoff path without reading the full documentation pack first.
+This note is for internal reviewers, supervisors, and developers who need a clear v0.1 SLC handoff path without reading the full documentation pack first.
 
 ## What ScholarAI currently does
-ScholarAI currently supports a narrow internal v0.1 flow built around published scholarship records and bounded preparation workflows.
+ScholarAI currently supports a narrow internal v0.1 SLC flow built around published scholarship records and bounded preparation workflows.
 
 Implemented product slices:
 1. Public scholarship browse and scholarship detail pages over published records only.
@@ -70,7 +70,7 @@ Start here if you need the full context:
 5. Only the first Alembic revision exists so far.
 
 ## What is not implemented yet
-Still outside the current internal v0.1 readiness level:
+Still outside the current internal v0.1 SLC readiness level:
 1. Broad ingestion automation feeding raw scholarship records.
 2. Advanced ML reranking or graph-aware recommendation infrastructure.
 3. Full RAG-backed document assistance.
@@ -79,14 +79,14 @@ Still outside the current internal v0.1 readiness level:
 
 ## What to say during the demo when a slice is partial
 Use direct, accurate phrasing:
-- Scholarship discovery: "This is the v0.1-safe browse surface over published records. Search depth and broader filtering are deferred."
+- Scholarship discovery: "This is the v0.1 SLC-safe browse surface over published records. Search depth and broader filtering are deferred."
 - Recommendations: "These results are deterministic and rules-first. They explain fit using explicit constraints rather than a black-box model."
 - Document feedback: "This is bounded writing guidance, not policy authority and not a full RAG system yet."
 - Interview practice: "This is rubric-based practice scoring, not a conversational AI interviewer."
 - Curation: "This shows the source-of-truth workflow. Automation into raw records is the next step, but the lifecycle enforcement is already in place."
 
 ## Internal deploy-readiness conclusion
-ScholarAI is ready for an internal v0.1 handoff and a controlled internal demo if the team uses the documented bootstrap path, restarts stale local processes when needed, and stays within the bounded demo script above.
+ScholarAI is ready for an internal v0.1 SLC handoff and a controlled internal demo if the team uses the documented bootstrap path, restarts stale local processes when needed, and stays within the bounded demo script above.
 
 Verified in this pass:
 1. `docker compose up --build -d frontend` successfully rebuilt the frontend service.
@@ -94,7 +94,7 @@ Verified in this pass:
 3. `http://localhost:3000/scholarships` responded successfully after rebuild.
 4. `tests/e2e/playwright/public_scholarship_browse_smoke.py` passed after rebuild.
 
-## v0.1 decision
+## SLC decision (v0.1)
 This handoff package is for internal deploy and presentation readiness only.
 
 ## Deferred items

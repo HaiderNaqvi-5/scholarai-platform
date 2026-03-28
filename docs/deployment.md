@@ -1,4 +1,4 @@
-﻿# ScholarAI — Deployment & Development Guide
+# ScholarAI — Deployment & Development Guide
 
 > Status: Legacy draft (not canonical).
 > Canonical deployment and runtime guidance is maintained in docs/scholarai/13_qa_devops_and_risks.md and the root docker-compose.yml.
@@ -122,7 +122,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Milestone 1: Foundation & Data (Weeks 1-4)
 - **Week 1 (Setup)**: Initialize Mono-repo, Docker compose configs (PostgreSQL, Neo4j, Redis, OpenSearch).
 - **Week 2 (Schemas)**: Implement SQLAlchemy ORM models and Cypher constraints. Setup Next.js boilerplate.
-- **Week 3 (Scraper v0.1)**: Playwright scrapers targeting Canada MS DS/AI programs + DAAD.
+- **Week 3 (Scraper v0.1 SLC)**: Playwright scrapers targeting Canada MS DS/AI programs + DAAD.
 - **Week 4 (Ingestion)**: Pipeline pulling scraped JSON, generating Pydantic validations, and writing to Neo4j/Postgres. 
 
 ### Milestone 2: AI & Retrieval Systems (Weeks 5-8)
@@ -142,4 +142,3 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - **Week 14 (Optimization)**: Fix OpenSearch indexing bugs. Latency tuning for LangChain calls (Redis caching).
 - **Week 15 (Code Freeze)**: Repository lockdown. Final deployment rehearsal on local Docker swarms.
 - **Week 16 (Documentation)**: Final technical design document polishing and academic defense prep.
-

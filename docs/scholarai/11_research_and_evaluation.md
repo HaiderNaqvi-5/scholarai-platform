@@ -1,4 +1,4 @@
-﻿# ScholarAI Research And Evaluation
+# ScholarAI Research And Evaluation
 
 ## Purpose
 This document frames ScholarAI as an FYP-level research system and defines an evaluation plan that is academically defensible under current data constraints.
@@ -118,7 +118,7 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 | Threat | Impact |
 |---|---|
 | Synthetic-label bias | Model quality may reflect the label heuristic more than reality |
-| Small or narrow corpus | Results may not generalize beyond the v0.1 scope |
+| Small or narrow corpus | Results may not generalize beyond the v0.1 SLC scope |
 | Annotation subjectivity | Judged-set relevance may vary by reviewer |
 | User-study recruitment bias | Student sample may not represent broader applicant populations |
 | UI confounds | Trust outcomes may reflect interface quality as much as explanation content |
@@ -129,8 +129,7 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 3. Preserve transparency around model limitations and missing data.
 4. Avoid encouraging users to ignore official scholarship requirements.
 5. Use human review where scholarship facts affect publication.
-
-## v0.1
+## SLC decision (v0.1)
 - Offline evaluation of recommendation baselines.
 - Explanation user study on a feasible pilot cohort.
 - Document-feedback grounding checks.
@@ -141,17 +140,17 @@ There is no true large-scale public scholarship outcome dataset for this domain.
 - Comparative graph-database evaluation.
 - Stronger causal or predictive claims only if true outcome labels are available.
 
-## Deferred By Stage Startup Features
+## Deferred By Stage
 - Product analytics that connect recommendation behavior to downstream application actions.
 - Provider-facing reporting products based on validated aggregate behavior.
 
-## v0.1 decision
-ScholarAI research will focus on explainable, eligibility-aware ranking and grounded preparation workflows, with evaluation methods chosen to match the limited but realistic data available in v0.1.
+## SLC decision (v0.1)
+ScholarAI research will focus on explainable, eligibility-aware ranking and grounded preparation workflows, with evaluation methods chosen to match the limited but realistic data available in v0.1 SLC.
 
 ## Deferred items
 - Real-world acceptance prediction studies.
 - Large-scale longitudinal outcome modeling.
-- Broad generalization claims outside the v0.1 corpus.
+- Broad generalization claims outside the v0.1 SLC corpus.
 
 ## Assumptions
 - A judged-set evaluation is feasible within the project timeline.

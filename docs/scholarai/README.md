@@ -1,10 +1,10 @@
 # ScholarAI Documentation Pack
 
 ## Purpose
-This folder is the canonical documentation source of truth for ScholarAI product scope, architecture, research framing, and execution planning. It is written for a 3-developer, 16-week, stage-first delivery model.
+This folder is the canonical documentation source of truth for ScholarAI product scope, architecture, research framing, and execution planning. It is written for a 3-developer, 16-week, SLC-first delivery model.
 
 ## Implementation Note
-The first coding phase normalizes the repository in place around the existing `frontend/` and `backend/` roots. A future `apps/*` migration remains optional and deferred until the v0.1 foundation is stable.
+The first coding phase normalizes the repository in place around the existing `frontend/` and `backend/` roots. A future `apps/*` migration remains optional and deferred until the v0.1 SLC foundation is stable.
 
 ## File Tree
 ```text
@@ -41,7 +41,7 @@ docs/scholarai/
 | Topic | Canonical file |
 |---|---|
 | Product intent and summary | `01_executive_summary.md` |
-| PRD, v0.1 boundaries, scope control | `02_prd_and_scope.md` |
+| PRD, v0.1 SLC boundaries, scope control | `02_prd_and_scope.md` |
 | Visual system and UX standards | `03_brand_and_design_system.md` |
 | Requirements and governance rules | `04_requirements_and_governance.md` |
 | Architecture and runtime boundaries | `05_system_architecture.md` |
@@ -70,17 +70,17 @@ docs/scholarai/
   - canonical-tail section consistency in canonical docs
 
 ## Key Architecture Decisions Summary
-1. v0.1 architecture is a modular monolith.
+1. v0.1 SLC architecture is a modular monolith.
 2. Frontend is Next.js + React + TypeScript + TailwindCSS.
 3. Backend is FastAPI.
 4. Async tasks run through Celery + Redis.
 5. PostgreSQL is primary data store and pgvector is used for vector search.
-6. Knowledge Graph Layer is mandatory logically; v0.1 implementation can be Neo4j or a relationally derived abstraction.
+6. Knowledge Graph Layer is mandatory logically; v0.1 SLC implementation can be Neo4j or a relationally derived abstraction.
 7. Ingestion stack is Playwright + Pandas + Pydantic.
 8. Deployment baseline is Docker Compose and migrations use Alembic.
-9. v0.1 corpus is Canada-first for MS Data Science, MS Artificial Intelligence, and MS Analytics.
+9. v0.1 SLC corpus is Canada-first for MS Data Science, MS Artificial Intelligence, and MS Analytics.
 10. USA usage is restricted to Fulbright-related scope and narrowly scoped cross-border logic.
-11. DAAD is not part of v0.1 and is deferred to Future Research Extensions.
+11. DAAD is not part of v0.1 SLC and is deferred to Future Research Extensions.
 12. Structured validated data is authoritative for eligibility, deadlines, funding rules, and official scholarship requirements.
 
 ## Current Implementation Status
@@ -103,7 +103,7 @@ docs/scholarai/
   - auth, protected routes, and session persistence are implemented
   - profile save/load and a functional onboarding route are implemented
   - public scholarship browse, search/filter, and scholarship detail pages are implemented
-  - dashboard, saved opportunities, document assistance, interview practice, and curation are implemented as narrow v0.1 slices
+  - dashboard, saved opportunities, document assistance, interview practice, and curation are implemented as narrow v0.1 SLC slices
   - curation now includes manual raw import plus source-registry ingestion runs
   - migration-driven bootstrap and browser smoke checks in CI are implemented
   - Phase 1 recommendation depth is now active (relational eligibility graph abstraction, pgvector retrieval, heuristic rerank, and rules-only fallback)
@@ -139,7 +139,7 @@ docs/scholarai/
 2. Modular monolith container diagram.
 3. Scholarship recommendation pipeline (eligibility filter -> vector retrieval -> reranking).
 4. Data ingestion and provenance lifecycle (`raw` -> `validated` -> `published`).
-5. Knowledge Graph Layer logical model and v0.1 implementation choice.
+5. Knowledge Graph Layer logical model and v0.1 SLC implementation choice.
 6. Primary relational schema ERD.
 7. API boundary and backend module map.
 8. 16-week delivery roadmap diagram.
@@ -148,7 +148,7 @@ docs/scholarai/
 ## Glossary Of Core Terms
 | Term | Definition |
 |---|---|
-| v0.1 | Minimum viable product delivered by 3 developers in 16 weeks under constrained budget. |
+| v0.1 SLC | Minimum viable product delivered by 3 developers in 16 weeks under constrained budget. |
 | Modular monolith | Single deployable backend with clear internal service boundaries. |
 | Knowledge Graph Layer | Logical graph reasoning layer used for eligibility and relationship-aware filtering. |
 | Structured validated data | Parsed and schema-validated records that serve as source of truth for policy-critical fields. |
@@ -156,8 +156,8 @@ docs/scholarai/
 | Estimated Scholarship Fit Score | Non-causal model output indicating estimated fit based on available features and assumptions. |
 | Application Competitiveness Score | Non-causal estimate of application strength relative to scholarship requirements. |
 | RAG | Retrieval-Augmented Generation limited to writing guidance and feedback, not policy truth. |
-| Future Research Extensions | Deferred research-focused capabilities outside v0.1 scope. |
-| Deferred By Stage | Commercial expansion features after v0.1 stabilization and validation. |
+| Future Research Extensions | Deferred research-focused capabilities outside v0.1 SLC scope. |
+| Deferred By Stage | Commercial expansion features after v0.1 SLC stabilization and validation. |
 
 ## SLC decision (v0.1)
 `docs/scholarai/` is the canonical home for active ScholarAI documentation, and migration proceeds through this pack.

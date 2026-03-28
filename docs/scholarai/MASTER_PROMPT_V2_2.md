@@ -1,4 +1,4 @@
-﻿MASTER PROMPT V2.2
+MASTER PROMPT V2.2
 
 ROLE
 
@@ -101,11 +101,11 @@ System must be realistically implementable by:
 
 Strictly separate all outputs into:
 
-• v0.1
+• v0.1 SLC
 • Future Research Extensions
-• Deferred By Stage Startup Features
+• Deferred By Stage
 
-Any feature not essential for v0.1 must be explicitly marked as deferred.
+Any feature not essential for v0.1 SLC must be explicitly marked as deferred.
 
 When trade-offs are required prioritize:
 
@@ -118,11 +118,11 @@ maintainability
 security
 cost control.
 
-No feature may be included in v0.1 unless it is realistically buildable within the stated constraints.
+No feature may be included in v0.1 SLC unless it is realistically buildable within the stated constraints.
 
-2. v0.1 IMPLEMENTATION STYLE
+2. v0.1 SLC IMPLEMENTATION STYLE
 
-For v0.1, ScholarAI must be designed as a MODULAR MONOLITH, not a distributed microservice system.
+For v0.1 SLC, ScholarAI must be designed as a MODULAR MONOLITH, not a distributed microservice system.
 
 Use:
 
@@ -133,7 +133,7 @@ Use:
 • PostgreSQL as the primary transactional database
 • Redis for queueing and caching only where justified
 
-Separate deployable services are Deferred By Stage unless absolutely necessary and strongly justified.
+Separate deployable services are post-v0.1 SLC unless absolutely necessary and strongly justified.
 
 3. DOCUMENTATION-FIRST RULE
 
@@ -160,7 +160,7 @@ When working inside a repository, perform a documentation migration process with
 • archive or remove conflicting obsolete docs with explicit justification
 • produce a migration summary of files updated, created, rewritten, archived, or removed
 
-STRICT v0.1 DATA CONSTRAINT
+STRICT v0.1 SLC DATA CONSTRAINT
 
 Programs:
 • MS Data Science
@@ -168,9 +168,9 @@ Programs:
 • MS Analytics
 
 Geographic scope:
-• Canada is the PRIMARY university and program corpus for v0.1
+• Canada is the PRIMARY university and program corpus for v0.1 SLC
 • USA is permitted only for Fulbright-related scholarship provider information, directly relevant funding rules, or explicitly scoped cross-border scholarship logic
-• broad USA discovery is not v0.1 unless explicitly justified
+• broad USA discovery is not v0.1 SLC unless explicitly justified
 • DAAD is DEFERRED to Future Research Extensions
 
 REQUIRED DOCUMENT SET
@@ -200,7 +200,7 @@ REQUIRED DOCUMENT FOOTER
 
 Every documentation file must end with:
 
-• v0.1 decision
+• SLC decision (v0.1)
 • Deferred items
 • Assumptions
 • Risks

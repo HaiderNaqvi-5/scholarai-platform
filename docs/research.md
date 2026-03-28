@@ -1,4 +1,4 @@
-﻿# ScholarAI — Academic Research Contribution
+# ScholarAI — Academic Research Contribution
 
 > Status: Legacy draft (not canonical).
 > Canonical research and evaluation scope is maintained in docs/scholarai/11_research_and_evaluation.md and docs/scholarai/13_qa_devops_and_risks.md.
@@ -64,4 +64,3 @@ All research publications stemming from the initial system must explicitly discl
 
 - **Algorithmic Bias:** Machine learning models trained on historical or synthetic data may inadvertently favor certain demographics or Western-centric educational markers. The research will include an equity audit across demographic cohorts.
 - **Data Privacy:** Storing sensitive academic records requires GDPR compliance. The system mitigates data exposure by storing only anonymized profile data and never exposing personal identifiable information (PII) in model training.
-

@@ -1,4 +1,4 @@
-﻿# ScholarAI — AI Models Design
+# ScholarAI — AI Models Design
 
 > Covers feature engineering, training pipeline, model evaluation, explainability, and the interview simulation system.
 
@@ -6,7 +6,7 @@
 
 ## 1. Feature Engineering
 
-### Input Feature Vector (Strict v0.1 Constraints)
+### Input Feature Vector (Strict v0.1 SLC Constraints)
 
 | Feature | Type | Source | Definition |
 |---|---|---|---|
@@ -232,4 +232,3 @@ HTML page → Pydantic validation → PostgreSQL (pgvector) + Neo4j + OpenSearch
 - **Cache** LangChain LLM responses in Redis
 - **Batch** scraper pipeline processing using Celery
 - **Budget alerts** via API billing dashboards
-
