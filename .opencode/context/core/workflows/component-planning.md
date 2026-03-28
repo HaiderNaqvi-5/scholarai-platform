@@ -1,4 +1,4 @@
-<!-- Context: workflows/component-planning | Priority: high | Version: 1.0 -->
+<!-- Context: workflows/component-planning | Priority: high | Version: 1.0 | Updated: 2026-03-28 -->
 
 # Component-Based Planning Workflow
 
@@ -77,7 +77,7 @@ Don't try to write a detailed plan for the entire system upfront. Create a high-
 
 ## Example Component Plan (`component-inventory.md`)
 
-```markdown
+````markdown
 # Component: Inventory Service
 
 ## Interface
@@ -93,4 +93,4 @@ interface InventoryManager {
 - [ ] Create mock implementation for tests
 - [ ] Implement `checkStock` logic with DB query
 - [ ] Add unit tests for race conditions
-```
+````

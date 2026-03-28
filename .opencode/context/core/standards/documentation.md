@@ -27,7 +27,7 @@
 
 ## README Structure
 
-```markdown
+````markdown
 # Project Name
 Brief description (1-2 sentences)
 
@@ -56,7 +56,7 @@ const result = doSomething();
 
 ## License
 [License type]
-```
+````
 
 ## Function Documentation
 
@@ -118,7 +118,7 @@ const user = getUser();
 
 ## API Documentation
 
-```markdown
+````markdown
 ### POST /api/users
 Create a new user
 
@@ -135,7 +135,7 @@ Create a new user
 **Errors:**
 - 400 - Invalid input
 - 409 - Email exists
-```
+````
 
 ## Best Practices
 
