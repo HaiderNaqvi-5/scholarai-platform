@@ -27,14 +27,10 @@ def test_document_and_interview_thresholds_are_config_backed():
     document_thresholds = get_document_quality_thresholds()
     assert document_thresholds.min_citation_coverage_ratio == 0.8
     assert document_thresholds.max_caution_note_count == 1
-    assert document_thresholds.min_grounded_partition_count == 3
-    assert document_thresholds.min_actionable_guidance_count == 2
 
     interview_thresholds = get_interview_progression_thresholds()
     assert interview_thresholds.min_answered_count == 2
     assert interview_thresholds.min_average_score == 3.0
-    assert interview_thresholds.min_follow_up_actionability_ratio == 0.7
-    assert interview_thresholds.min_adaptive_guidance_coverage == 0.7
 
 
 def test_recommendation_default_thresholds_follow_settings(monkeypatch):

@@ -59,8 +59,6 @@ def test_document_feedback_response_includes_policy_version(app, client):
             max_caution_note_count=1,
             min_retrieved_guidance_count=1,
             min_generated_guidance_count=1,
-            min_grounded_partition_count=3,
-            min_actionable_guidance_count=2,
         )
         quality_gate = DocumentQualityGate(
             thresholds=thresholds,
@@ -69,8 +67,6 @@ def test_document_feedback_response_includes_policy_version(app, client):
             caution_note_count_pass=True,
             retrieved_guidance_pass=True,
             generated_guidance_pass=True,
-            grounded_partition_pass=True,
-            actionable_guidance_pass=True,
             all_passed=True,
         )
         quality_metrics = DocumentQualityMetrics(
@@ -78,9 +74,6 @@ def test_document_feedback_response_includes_policy_version(app, client):
             validated_fact_count=1,
             retrieved_guidance_count=1,
             generated_guidance_count=1,
-            grounded_partition_count=4,
-            actionable_guidance_count=2,
-            fact_to_guidance_link_ratio=1.0,
             caution_note_count=0,
             review_flag=False,
         )
@@ -91,7 +84,23 @@ def test_document_feedback_response_includes_policy_version(app, client):
             strengths=["s"],
             revision_priorities=["r"],
             caution_notes=[],
-            citations=["c"],
+            citations=[
+                {
+                    "source_id": "scholarship:1",
+                    "title": "Scholarship record",
+                    "url_or_ref": "https://example.test/scholarship",
+                    "snippet": "Validated scholarship snippet",
+                    "relevance_score": 0.9,
+                }
+            ],
+            grounding_score=0.91,
+            coverage_flags={
+                "motivation": True,
+                "preparation": True,
+                "future_impact": True,
+                "scholarship_fit": True,
+            },
+            ungrounded_warnings=[],
             grounded_context=[],
             validated_facts=[],
             retrieved_writing_guidance=[],
@@ -130,23 +139,33 @@ def test_document_feedback_response_includes_policy_version(app, client):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_db] = override_db
 
-    try:
-        response = client.post(
-            "/api/v1/documents",
-            data={
-                "document_type": "sop",
-                "title": "Doc",
-                "content_text": "This is a sufficiently long document text for testing policy version output.",
-            },
-            headers={"Authorization": "Bearer fake"},
-        )
-    finally:
-        app.dependency_overrides.clear()
-        DocumentService.submit_document = original_submit
+    response = client.post(
+        "/api/v1/documents",
+        data={
+            "document_type": "sop",
+            "title": "Doc",
+            "content_text": "This is a sufficiently long document text for testing policy version output.",
+        },
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    app.dependency_overrides.clear()
+    DocumentService.submit_document = original_submit
 
     assert response.status_code == 201
     payload = response.json()
     assert payload["document"]["latest_feedback"]["quality_gate"]["policy_version"] == "document.quality.v1"
+    citations = payload["document"]["latest_feedback"]["citations"]
+    assert isinstance(citations, list)
+    assert citations
+    citation = citations[0]
+    assert set(citation.keys()) == {
+        "source_id",
+        "title",
+        "url_or_ref",
+        "snippet",
+        "relevance_score",
+    }
 
 
 def test_interview_summary_response_includes_policy_version(app, client):
@@ -202,8 +221,6 @@ def test_interview_summary_response_includes_policy_version(app, client):
                 score_delta=None,
                 improvement_ratio=0.0,
                 needs_focus_ratio=0.0,
-                follow_up_actionability_ratio=0.0,
-                adaptive_guidance_coverage=0.0,
             ),
             progression_gate=InterviewProgressionGate(
                 thresholds=InterviewProgressionThresholds(
@@ -211,16 +228,12 @@ def test_interview_summary_response_includes_policy_version(app, client):
                     min_average_score=3.0,
                     min_score_delta=0.0,
                     max_needs_focus_ratio=0.5,
-                    min_follow_up_actionability_ratio=0.7,
-                    min_adaptive_guidance_coverage=0.7,
                 ),
                 policy_version="interview.progression.v1",
                 answered_count_pass=False,
                 average_score_pass=False,
                 score_delta_pass=False,
                 needs_focus_ratio_pass=True,
-                follow_up_actionability_pass=False,
-                adaptive_guidance_pass=False,
                 all_passed=False,
             ),
             started_at=now,
@@ -235,15 +248,14 @@ def test_interview_summary_response_includes_policy_version(app, client):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_db] = override_db
 
-    try:
-        response = client.post(
-            "/api/v1/interviews",
-            json={"practice_mode": "general"},
-            headers={"Authorization": "Bearer fake"},
-        )
-    finally:
-        app.dependency_overrides.clear()
-        InterviewSessionService.start_session = original_start
+    response = client.post(
+        "/api/v1/interviews",
+        json={"practice_mode": "general"},
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    app.dependency_overrides.clear()
+    InterviewSessionService.start_session = original_start
 
     assert response.status_code == 201
     payload = response.json()
