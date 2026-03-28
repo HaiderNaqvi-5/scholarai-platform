@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { ScholarshipDetailShell } from "@/components/scholarships/scholarship-detail-shell";
 
 export default async function ScholarshipDetailPage({
@@ -7,5 +9,9 @@ export default async function ScholarshipDetailPage({
 }) {
   const { scholarshipId } = await params;
 
-  return <ScholarshipDetailShell scholarshipId={scholarshipId} />;
+  return (
+    <Suspense fallback={null}>
+      <ScholarshipDetailShell scholarshipId={scholarshipId} />
+    </Suspense>
+  );
 }

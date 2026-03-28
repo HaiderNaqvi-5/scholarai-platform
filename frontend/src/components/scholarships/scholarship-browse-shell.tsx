@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -81,9 +82,24 @@ type BrowseState = {
 };
 
 const DEFAULT_PAGE_SIZE = 12;
+const MAX_COMPARE_ITEMS = 4;
+
+function parseCompareIds(raw: string | null): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+}
 
 export function ScholarshipBrowseShell() {
   const { accessToken, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [countryFilter, setCountryFilter] = useState<CountryFilter>("all");
   const [fieldFilter, setFieldFilter] = useState<FieldFilter>("all");
@@ -238,6 +254,38 @@ export function ScholarshipBrowseShell() {
         : null,
     ].filter(Boolean) as string[];
   }, [state.appliedFilters]);
+
+  const compareIds = useMemo(
+    () => parseCompareIds(searchParams.get("ids")),
+    [searchParams],
+  );
+
+  const compareHref = useMemo(() => {
+    const ids = compareIds.join(",");
+    return ids ? `/scholarships/compare?ids=${encodeURIComponent(ids)}` : "/scholarships/compare";
+  }, [compareIds]);
+
+  const updateCompareIds = (nextIds: string[]) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextIds.length > 0) {
+      params.set("ids", nextIds.join(","));
+    } else {
+      params.delete("ids");
+    }
+
+    const query = params.toString();
+    router.replace(query ? `/scholarships?${query}` : "/scholarships", { scroll: false });
+  };
+
+  const toggleCompare = (scholarshipId: string) => {
+    if (compareIds.includes(scholarshipId)) {
+      updateCompareIds(compareIds.filter((id) => id !== scholarshipId));
+      return;
+    }
+
+    if (compareIds.length >= MAX_COMPARE_ITEMS) return;
+    updateCompareIds([...compareIds, scholarshipId]);
+  };
 
   const handleSaveToggle = async (scholarshipId: string, isSaved: boolean) => {
     if (!accessToken) return;
@@ -491,6 +539,21 @@ export function ScholarshipBrowseShell() {
               title="Published scholarships"
               description="Each record has been verified and published with source provenance."
             />
+            <div className="dashboard-actions">
+              <Link className="auth-link auth-link--secondary" href={compareHref}>
+                Compare selected ({compareIds.length})
+              </Link>
+              {compareIds.length > 0 ? (
+                <button
+                  className="auth-link auth-link--secondary"
+                  onClick={() => updateCompareIds([])}
+                  type="button"
+                >
+                  Clear compare
+                </button>
+              ) : null}
+              <p className="field-note">Select up to {MAX_COMPARE_ITEMS} scholarships.</p>
+            </div>
             {state.isLoading ? (
               <div className="recommendation-list">
                 <SkeletonCard />
@@ -503,6 +566,9 @@ export function ScholarshipBrowseShell() {
                 <div className="recommendation-list">
                   {state.items.map((item) => {
                     const isSaved = state.savedIds.has(item.scholarship_id);
+                    const isCompared = compareIds.includes(item.scholarship_id);
+                    const canAddToCompare =
+                      isCompared || compareIds.length < MAX_COMPARE_ITEMS;
                     return (
                       <article className="recommendation-card" key={item.scholarship_id}>
                         <div className="recommendation-card__header">
@@ -528,6 +594,19 @@ export function ScholarshipBrowseShell() {
                           <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
                             View details
                           </Link>
+                          <button
+                            className={
+                              isCompared
+                                ? "auth-link auth-link--secondary"
+                                : "auth-link auth-link--primary"
+                            }
+                            disabled={!canAddToCompare}
+                            onClick={() => toggleCompare(item.scholarship_id)}
+                            type="button"
+                            aria-pressed={isCompared}
+                          >
+                            {isCompared ? "Added to compare" : "Add to compare"}
+                          </button>
                           {isAuthenticated ? (
                             <button
                               className={

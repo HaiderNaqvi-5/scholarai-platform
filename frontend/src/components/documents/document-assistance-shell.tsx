@@ -118,6 +118,12 @@ export function DocumentAssistanceShell() {
     () => state.items.find((item) => item.id === state.selectedId) ?? null,
     [state.items, state.selectedId],
   );
+  const [showWhyAdvice, setShowWhyAdvice] = useState(false);
+
+  useEffect(() => {
+    setShowWhyAdvice(false);
+  }, [state.selectedId]);
+
   const groundingSelection = useMemo(
     () => parseScholarshipGrounding(scholarshipGrounding),
     [scholarshipGrounding],
@@ -227,14 +233,18 @@ export function DocumentAssistanceShell() {
 
   const feedback = selectedDocument?.latest_feedback ?? null;
   const generatedGuidance = getGeneratedGuidance(feedback);
-  const qualityMetrics = feedback?.quality_metrics ?? null;
-  const qualityGate = feedback?.quality_gate ?? null;
   const validatedFacts = normalizeGroundingEntries(feedback?.validated_facts);
   const retrievedWritingGuidance = normalizeGroundingEntries(
     feedback?.retrieved_writing_guidance ?? feedback?.grounded_context,
   );
   const limitations = getLimitations(feedback);
   const citations = feedback?.citations ?? [];
+  const groundingScore = feedback?.grounding_score ?? 0;
+  const coverageFlags = feedback?.coverage_flags ?? {};
+  const ungroundedWarnings = feedback?.ungrounded_warnings ?? [];
+  const hasCoverageGap =
+    Object.values(coverageFlags).some((covered) => !covered) ||
+    ungroundedWarnings.length > 0;
   const selectedGroundingCount =
     selectedDocument?.scholarship_ids?.length ??
     (selectedDocument?.scholarship_id ? 1 : 0);
@@ -494,61 +504,83 @@ export function DocumentAssistanceShell() {
                       variant="validated"
                     />
                   ) : null}
+                  <StatusBadge
+                    label={`Grounding score: ${Math.round(groundingScore * 100)}%`}
+                    variant={groundingScore >= 0.7 ? "validated" : "warning"}
+                  />
                 </div>
+                {hasCoverageGap ? (
+                  <div className="guidance-callout" role="status" aria-live="polite">
+                    <p className="list-heading">Partial grounding coverage detected</p>
+                    <ul className="detail-list">
+                      {ungroundedWarnings.length > 0 ? (
+                        ungroundedWarnings.map((warning) => <li key={warning}>{warning}</li>)
+                      ) : (
+                        <li>
+                          Some evidence sections are missing. Add clearer preparation and
+                          scholarship-fit details for stronger guidance.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
                 <p className="list-heading">Generated guidance</p>
                 <p className="body-copy">{generatedGuidance.summary}</p>
               </article>
               <article>
                 <p className="list-heading">Strengths</p>
                 <ul className="detail-list">
-                  {generatedGuidance.strengths.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.strengths.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
               <article>
                 <p className="list-heading">Revision priorities</p>
                 <ul className="detail-list">
-                  {generatedGuidance.revision_priorities.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.revision_priorities.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
               <article>
                 <p className="list-heading">Cautions</p>
                 <ul className="detail-list">
-                  {generatedGuidance.caution_notes.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.caution_notes.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
-              {qualityMetrics ? (
+              {citations.length > 0 ? (
                 <article>
-                  <p className="list-heading">Quality gate snapshot</p>
                   <div className="meta-row">
-                    <StatusBadge
-                      label={qualityGate?.all_passed ? "KPI pass" : "Needs refinement"}
-                      variant={qualityGate?.all_passed ? "validated" : "warning"}
-                    />
-                    {qualityGate?.policy_version ? (
-                      <span className="route-card__label">
-                        Policy {qualityGate.policy_version}
-                      </span>
-                    ) : null}
+                    <p className="list-heading">Why this advice</p>
+                    <button
+                      className="nav-link text-xs"
+                      type="button"
+                      onClick={() => setShowWhyAdvice((current) => !current)}
+                    >
+                      {showWhyAdvice ? "Hide details" : "Show details"}
+                    </button>
                   </div>
-                  <ul className="detail-list">
-                    <li>
-                      Grounded partitions: {qualityMetrics.grounded_partition_count}
-                    </li>
-                    <li>
-                      Actionable guidance items:{" "}
-                      {qualityMetrics.actionable_guidance_count}
-                    </li>
-                    <li>
-                      Fact-to-guidance link ratio:{" "}
-                      {Math.round(qualityMetrics.fact_to_guidance_link_ratio * 100)}%
-                    </li>
-                  </ul>
+                  {showWhyAdvice ? (
+                    <ul className="detail-list">
+                      {citations.map((citation, index) => (
+                        <li key={`${citation.source_id}-${index}`}>
+                          <strong>[{index + 1}] {citation.title}</strong>: {citation.snippet}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </article>
               ) : null}
               <div className="document-actions">
@@ -628,7 +660,9 @@ export function DocumentAssistanceShell() {
                   <p className="list-heading">Citations</p>
                   <ul className="detail-list">
                     {citations.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={`${item.source_id}-${item.url_or_ref}`}>
+                        <strong>{item.title}</strong> - {item.url_or_ref}
+                      </li>
                     ))}
                   </ul>
                 </article>
@@ -645,6 +679,14 @@ export function DocumentAssistanceShell() {
       </section>
     </AppShell>
   );
+}
+
+function renderCitationMarker(index: number, citationCount: number) {
+  if (citationCount === 0) {
+    return null;
+  }
+  const marker = (index % citationCount) + 1;
+  return <sup aria-label={`Citation ${marker}`}> [{marker}]</sup>;
 }
 
 function validateClientSubmission(
@@ -714,29 +756,15 @@ function getGeneratedGuidance(feedback: DocumentDetail["latest_feedback"]) {
       caution_notes: [] as string[],
     };
   }
-  const generatedGuidanceItems = Array.isArray(feedback.generated_guidance)
-    ? feedback.generated_guidance
-    : [];
-  const generatedGuidanceObject =
-    feedback.generated_guidance && !Array.isArray(feedback.generated_guidance)
-      ? feedback.generated_guidance
-      : null;
-  const generatedGuidanceBulletPoints = generatedGuidanceItems
-    .map((item) => item.guidance?.trim())
-    .filter((item): item is string => Boolean(item));
 
   return {
-    summary: generatedGuidanceObject?.summary ?? feedback.summary,
-    strengths:
-      generatedGuidanceObject?.strengths ??
-      feedback.strengths ??
-      generatedGuidanceBulletPoints.slice(0, 3),
+    summary: feedback.generated_guidance?.summary ?? feedback.summary,
+    strengths: feedback.generated_guidance?.strengths ?? feedback.strengths,
     revision_priorities:
-      generatedGuidanceObject?.revision_priorities ??
-      feedback.revision_priorities ??
-      generatedGuidanceBulletPoints.slice(0, 4),
+      feedback.generated_guidance?.revision_priorities ??
+      feedback.revision_priorities,
     caution_notes:
-      generatedGuidanceObject?.caution_notes ?? feedback.caution_notes,
+      feedback.generated_guidance?.caution_notes ?? feedback.caution_notes,
   };
 }
 

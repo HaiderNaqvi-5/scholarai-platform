@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -26,8 +27,24 @@ type DetailState = {
   notice: string | null;
 };
 
+const MAX_COMPARE_ITEMS = 4;
+
+function parseCompareIds(raw: string | null): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+}
+
 export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: string }) {
   const { accessToken, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [state, setState] = useState<DetailState>({
     isLoading: true,
     error: null,
@@ -162,6 +179,37 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
       },
     ];
   }, [state.item]);
+
+  const compareIds = useMemo(
+    () => parseCompareIds(searchParams.get("ids")),
+    [searchParams],
+  );
+  const isCompared = compareIds.includes(scholarshipId);
+  const canAddToCompare = isCompared || compareIds.length < MAX_COMPARE_ITEMS;
+
+  const compareHref = useMemo(() => {
+    const ids = compareIds.join(",");
+    return ids ? `/scholarships/compare?ids=${encodeURIComponent(ids)}` : "/scholarships/compare";
+  }, [compareIds]);
+
+  const handleCompareToggle = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    const nextIds = isCompared
+      ? compareIds.filter((id) => id !== scholarshipId)
+      : [...compareIds, scholarshipId];
+    if (!isCompared && compareIds.length >= MAX_COMPARE_ITEMS) return;
+
+    if (nextIds.length > 0) {
+      params.set("ids", nextIds.join(","));
+    } else {
+      params.delete("ids");
+    }
+
+    const query = params.toString();
+    router.replace(query ? `/scholarships/${scholarshipId}?${query}` : `/scholarships/${scholarshipId}`, {
+      scroll: false,
+    });
+  };
 
   return (
     <AppShell
@@ -300,6 +348,22 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
                   </div>
                 ) : null}
                 <div className="dashboard-actions">
+                  <button
+                    className={
+                      isCompared
+                        ? "auth-link auth-link--secondary"
+                        : "auth-link auth-link--primary"
+                    }
+                    disabled={!canAddToCompare}
+                    onClick={handleCompareToggle}
+                    type="button"
+                    aria-pressed={isCompared}
+                  >
+                    {isCompared ? "Added to compare" : "Add to compare"}
+                  </button>
+                  <Link className="nav-link" href={compareHref}>
+                    Open compare ({compareIds.length})
+                  </Link>
                   <a
                     className="nav-link"
                     href={state.item.source_url}
