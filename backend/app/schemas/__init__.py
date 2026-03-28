@@ -1,4 +1,5 @@
 from app.schemas.auth import (
+    LogoutResponse,
     RefreshTokenRequest,
     TokenResponse,
     UserCreate,
@@ -95,6 +96,7 @@ __all__ = [
     "StudentProfileResponse",
     "StudentProfileUpsertRequest",
     "RefreshTokenRequest",
+    "LogoutResponse",
     "TokenResponse",
     "UserCreate",
     "UserLogin",

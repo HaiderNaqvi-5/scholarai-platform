@@ -72,6 +72,13 @@ async def get_current_user(
             message="Account is disabled",
             status_code=status.HTTP_403_FORBIDDEN
         )
+    token_version = payload.get("token_version")
+    if token_version is None or token_version != user.auth_token_version:
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_EXPIRED,
+            message="Session token is no longer valid",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
 
     token_capabilities_raw = payload.get("capabilities")
     token_capabilities: set[str] = set()

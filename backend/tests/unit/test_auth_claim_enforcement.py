@@ -41,6 +41,7 @@ def _user(role: UserRole, institution_id=None):
         role=role,
         institution_id=institution_id,
         is_active=True,
+        auth_token_version=0,
     )
 
 
@@ -49,7 +50,11 @@ async def test_get_current_user_rejects_non_list_capabilities(monkeypatch):
     monkeypatch.setattr(
         dependencies,
         "decode_token",
-        lambda _token, expected_type="access": {"sub": str(user.id), "capabilities": "admin.audit.read"},
+        lambda _token, expected_type="access": {
+            "sub": str(user.id),
+            "capabilities": "admin.audit.read",
+            "token_version": user.auth_token_version,
+        },
     )
     monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
@@ -65,7 +70,11 @@ async def test_get_current_user_rejects_non_string_capabilities(monkeypatch):
     monkeypatch.setattr(
         dependencies,
         "decode_token",
-        lambda _token, expected_type="access": {"sub": str(user.id), "capabilities": ["admin.audit.read", 7]},
+        lambda _token, expected_type="access": {
+            "sub": str(user.id),
+            "capabilities": ["admin.audit.read", 7],
+            "token_version": user.auth_token_version,
+        },
     )
     monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
@@ -85,6 +94,7 @@ async def test_get_current_user_rejects_university_missing_scope_claim(monkeypat
         lambda _token, expected_type="access": {
             "sub": str(user.id),
             "capabilities": ["university.students.read"],
+            "token_version": user.auth_token_version,
         },
     )
     monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
@@ -106,6 +116,7 @@ async def test_get_current_user_rejects_mismatched_scope_claim(monkeypatch):
             "sub": str(user.id),
             "capabilities": ["university.students.read"],
             "institution_scope": str(uuid4()),
+            "token_version": user.auth_token_version,
         },
     )
     monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
