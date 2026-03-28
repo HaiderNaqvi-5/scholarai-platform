@@ -1,4 +1,4 @@
-﻿# GitHub Push, CI, and Sanity Test Investigation Report
+# GitHub Push, CI, and Sanity Test Investigation Report
 
 Date: 2026-03-21  
 Repository: `HaiderNaqvi-5/scholarai-platform`  
@@ -89,4 +89,3 @@ Branch checked: `copilot/check-github-push-errors`
 - [ ] Add Suspense boundary for `/admin` route.
 - [ ] Re-run CI until all jobs pass (`backend-sanity`, `frontend-sanity`, `browser-smoke`).
 - [ ] (Optional) Improve local/offline build reliability by moving to local fonts.
-

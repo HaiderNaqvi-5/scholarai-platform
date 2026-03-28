@@ -1,13 +1,13 @@
-﻿# ScholarAI Public-Live Readiness Gap Analysis And Hardening Plan
+# ScholarAI Public-Live Readiness Gap Analysis And Hardening Plan
 
 ## Purpose
-This document defines the gap between ScholarAI's current internal v0.1 state and a minimally safe public-facing live deployment. It is evidence-based and intentionally conservative.
+This document defines the gap between ScholarAI's current internal v0.1 SLC state and a minimally safe public-facing live deployment. It is evidence-based and intentionally conservative.
 
-## Current Internal v0.1 Readiness Summary
-ScholarAI is in a credible internal v0.1 state, not a public-live state.
+## Current Internal v0.1 SLC Readiness Summary
+ScholarAI is in a credible internal v0.1 SLC state, not a public-live state.
 
 Current strengths:
-1. Core v0.1 slices are implemented and locally demoable.
+1. Core v0.1 SLC slices are implemented and locally demoable.
 2. Alembic bootstrap plus seeded demo data provides a reproducible internal setup path.
 3. Curation state discipline exists in code: `raw`, `validated`, `published`, `archived`.
 4. Public scholarship reads are restricted to `published` records.
@@ -145,7 +145,7 @@ Current evidence:
 - Security, abuse, and public-live regression scenarios are not meaningfully covered.
 
 Gap:
-- Coverage is acceptable for internal v0.1 momentum, not for public launch confidence.
+- Coverage is acceptable for internal v0.1 SLC momentum, not for public launch confidence.
 
 What is missing:
 1. CI-executed browser smoke on core public and auth flows.
@@ -170,7 +170,7 @@ What is missing:
 
 ### 9. Content And UX Readiness
 Current evidence:
-- The UX is good for internal demo and bounded v0.1 explanation.
+- The UX is good for internal demo and bounded v0.1 SLC explanation.
 - There is no public privacy policy, terms, support contact, or public trust/disclaimer layer.
 - Search/filter is intentionally narrow and some flows still need stronger empty/error/support content.
 
@@ -271,7 +271,7 @@ For a small team, that order is correct because the highest public risk is trust
 
 ## Critical Docs That Must Be Revised Before Public Use
 1. Root [README.md](../../README.md)
-   - It should explicitly separate internal v0.1 readiness from any public-live posture.
+   - It should explicitly separate internal v0.1 SLC readiness from any public-live posture.
 2. [docs/scholarai/DEMO_READINESS_AUDIT.md](../../docs/scholarai/DEMO_READINESS_AUDIT.md)
    - It should remain explicitly internal and non-public.
 3. [docs/scholarai/13_qa_devops_and_risks.md](../../docs/scholarai/13_qa_devops_and_risks.md)
@@ -281,8 +281,8 @@ For a small team, that order is correct because the highest public risk is trust
    - terms
    - support/contact
 
-## v0.1 decision
-ScholarAI is not public-live ready. It is in an internal v0.1 state that can support controlled demos and internal handoff.
+## SLC decision (v0.1)
+ScholarAI is not public-live ready. It is in an internal v0.1 SLC state that can support controlled demos and internal handoff.
 
 ## Deferred items
 - Broad feature expansion before core hardening.
@@ -292,12 +292,10 @@ ScholarAI is not public-live ready. It is in an internal v0.1 state that can sup
 ## Assumptions
 - The team remains small and cannot support a heavy operations program.
 - Public-live means minimally safe and supportable, not enterprise-grade.
-- Hardening must be incremental and protect momentum around the existing v0.1.
+- Hardening must be incremental and protect momentum around the existing v0.1 SLC foundation.
 
 ## Risks
 - If the team treats internal demo readiness as public-live readiness, the first failures will likely be auth abuse, data trust problems, or weak operational visibility.
 - If hardening is deferred too long, feature work will entrench unsafe assumptions.
 - If public trust content is added last, the product may appear more mature than its operational posture actually is.
-
-
 

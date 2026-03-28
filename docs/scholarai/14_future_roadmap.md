@@ -1,9 +1,9 @@
-﻿# ScholarAI Future Roadmap
+# ScholarAI Future Roadmap
 
 ## Purpose
-This document separates near-term Deferred By Stage improvements from longer-horizon research and startup opportunities so that the v0.1 remains disciplined while still preserving a growth path.
+This document separates near-term post-v0.1 SLC improvements from longer-horizon research and startup opportunities so that the v0.1 SLC remains disciplined while still preserving a growth path.
 
-## Short-Term Deferred By Stage Improvements
+## Short-Term Deferred Improvements (v0.2)
 | Area | Improvement |
 |---|---|
 | Corpus quality | Expand validated Canadian scholarship coverage within the same MS scope |
@@ -28,16 +28,16 @@ This document separates near-term Deferred By Stage improvements from longer-hor
 | Geography expansion | Broaden beyond Canada once curation operations are stable |
 | Additional degree levels | Expand to other postgraduate programs before undergraduate breadth |
 | Provider tooling | Provider-submitted scholarship data with review workflows |
-| Institution tooling | Advanced multi-tenant dashboards and reporting beyond v0.1 scoped university panel |
+| Institution tooling | Advanced multi-tenant dashboards and reporting beyond v0.1 SLC scoped university panel |
 | Student workflow | Reminder systems, planning timelines, and collaboration features |
 
 ## Authorization Growth Path
-### v0.1 scope
+### v0.1 SLC scope
 - Capability-based authorization matrix with six role bundles.
 - Institution-scoped university access for relevant endpoints.
 - Compatibility-window migration from legacy role claims.
 
-### Deferred By Stage scope
+### Deferred scope by stage
 - policy automation and periodic access recertification workflows
 - advanced tenant administration and delegated institution controls
 - higher-granularity owner analytics for operational governance
@@ -60,10 +60,10 @@ This document separates near-term Deferred By Stage improvements from longer-hor
 |---|---|---|
 | Universities | Structured scholarship updates and program-specific funding data | Must remain curator-reviewed |
 | Scholarship providers | Direct record submission and correction workflows | Needs moderation and audit trail |
-| Advisors or mentors | Feedback or review workflows | Not part of v0.1 |
+| Advisors or mentors | Feedback or review workflows | Not part of v0.1 SLC |
 
 ## Monetization-Supporting Capabilities
-### Deferred By Stage possibilities
+### Deferred possibilities by stage
 - premium application-planning workflows
 - institution or provider analytics dashboards
 - sponsored but clearly labeled scholarship visibility
@@ -72,7 +72,7 @@ This document separates near-term Deferred By Stage improvements from longer-hor
 Monetization should not distort source-of-truth governance or ranking transparency.
 
 ## Roadmap Separation
-### v0.1
+### v0.1 SLC
 - Canada-first validated scholarship discovery
 - eligibility-aware ranking
 - grounded preparation support
@@ -82,7 +82,7 @@ Monetization should not distort source-of-truth governance or ranking transparen
 - graph-comparison studies
 - richer evaluation and label collection
 
-### Deferred By Stage Startup Features
+### Deferred By Stage
 - market expansion
 - partner integrations
 - monetization-supporting tooling
@@ -93,8 +93,8 @@ Monetization should not distort source-of-truth governance or ranking transparen
 3. Do not add startup-scale infrastructure before product reliability is proven.
 4. Keep the Knowledge Graph Layer and explanation discipline intact as the product grows.
 
-## v0.1 decision
-ScholarAI will treat the current v0.1 as a trust-and-data foundation, while using the roadmap to sequence research expansion and startup opportunities without leaking them into the core deliverable.
+## SLC decision (v0.1)
+ScholarAI will treat the current v0.1 SLC as a trust-and-data foundation, while using the roadmap to sequence research expansion and startup opportunities without leaking them into the core deliverable.
 
 ## Deferred items
 - DAAD and broad international expansion.
@@ -107,7 +107,7 @@ ScholarAI will treat the current v0.1 as a trust-and-data foundation, while usin
 - Provider partnerships are only useful if moderation and provenance remain strong.
 
 ## Risks
-- Premature expansion can destroy the data-quality advantage of the v0.1.
+- Premature expansion can destroy the data-quality advantage of the v0.1 SLC foundation.
 - Monetization features can bias ranking or trust if governance is weak.
 - Partner-submitted data can become noisy unless curator review remains mandatory.
 

@@ -1,4 +1,4 @@
-﻿# ScholarAI Phase Status Report
+# ScholarAI Phase Status Report
 
 > Status: Historical snapshot (superseded).
 > Current implementation truth is tracked in docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md.
@@ -146,4 +146,3 @@ Recommended order:
 
 This report is based on static inspection of the repository structure, current source files, and Git branch state.
 It does **not** confirm runtime correctness through full application startup or end-to-end tests.
-

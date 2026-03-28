@@ -1,7 +1,7 @@
-﻿# ScholarAI Requirements And Governance
+# ScholarAI Requirements And Governance
 
 ## Purpose
-This document defines the baseline requirements, governance rules, and decision boundaries that keep ScholarAI implementable, defensible, and internally consistent.
+Define baseline requirements, governance rules, and operational boundaries that keep ScholarAI implementable, trustworthy, and aligned with the **v0.1 SLC** direction.
 
 ## Governing Constraints
 | Area | Constraint |
@@ -23,107 +23,103 @@ This document defines the baseline requirements, governance rules, and decision 
 ## Functional Requirements
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-01 | The platform must store scholarships, requirements, deadlines, funding information, and provenance states in structured records. | v0.1 |
-| FR-02 | The platform must support search and filtering across the defined v0.1 corpus. | v0.1 |
-| FR-03 | The platform must enforce hard eligibility logic before ranking results. | v0.1 |
-| FR-04 | The platform must provide recommendation outputs with explanation-oriented rationale. | v0.1 |
-| FR-05 | The platform must support document-feedback workflows for SOPs, essays, and related application materials. | v0.1 |
-| FR-06 | The platform must support interview-practice workflows with structured feedback. | v0.1 |
-| FR-07 | The platform must support admin curation and publication workflows for scholarship data. | v0.1 |
-| FR-08 | The platform must track provenance through `raw`, `validated`, and `published` states. | v0.1 |
+| FR-01 | Store scholarships, requirements, deadlines, funding information, and provenance states in structured records. | v0.1 SLC |
+| FR-02 | Support search and filtering across the defined v0.1 corpus. | v0.1 SLC |
+| FR-03 | Enforce hard eligibility logic before ranking outputs. | v0.1 SLC |
+| FR-04 | Provide recommendation outputs with explanation-oriented rationale. | v0.1 SLC |
+| FR-05 | Support document-feedback workflows for SOPs, essays, and related materials. | v0.1 SLC |
+| FR-06 | Support interview-practice workflows with structured feedback. | v0.1 SLC |
+| FR-07 | Support admin curation and publication workflows for scholarship data. | v0.1 SLC |
+| FR-08 | Track provenance through `raw`, `validated`, and `published` states. | v0.1 SLC |
+| FR-09 | Support save/tracker visibility for readiness gaps, deadlines, and next actions. | v0.1 SLC |
 
 ## Non-Functional Requirements
 | ID | Requirement | Priority |
 |---|---|---|
-| NFR-01 | The system must remain understandable and maintainable by a 3-person team. | v0.1 |
-| NFR-02 | The active architecture must avoid distributed microservice complexity. | v0.1 |
-| NFR-03 | Policy-critical information must come from structured validated data, not generated text. | v0.1 |
-| NFR-04 | AI outputs must be framed as guidance or estimation, not authoritative decisions. | v0.1 |
-| NFR-05 | The system must keep clear boundaries between user data, validated facts, and generated outputs. | v0.1 |
-| NFR-06 | Documentation must remain the source of truth while product scope is still evolving. | v0.1 |
+| NFR-01 | Keep the system understandable and maintainable by a 3-person team. | v0.1 SLC |
+| NFR-02 | Avoid distributed microservice complexity in active architecture. | v0.1 SLC |
+| NFR-03 | Keep policy-critical information sourced from structured validated data. | v0.1 SLC |
+| NFR-04 | Frame AI outputs as advisory guidance, not authoritative decisions. | v0.1 SLC |
+| NFR-05 | Maintain boundaries between user data, validated facts, and generated outputs. | v0.1 SLC |
+| NFR-06 | Keep documentation as source of truth while scope evolves by stage. | v0.1 SLC |
+| NFR-07 | Require visual evidence for completion of UI-affecting changes. | v0.1 SLC |
 
 ## Data Governance
 ### Source-of-truth rule
-Structured validated data is authoritative for:
-- eligibility
-- deadlines
-- funding rules
-- official scholarship requirements
+Structured validated data is authoritative for eligibility, deadlines, funding rules, and official scholarship requirements.
 
 ### Provenance rule
-Every scholarship record should move through:
+Every scholarship record moves through:
 1. `raw`
 2. `validated`
 3. `published`
 
 ### Validation rule
-No generated response may override validated scholarship facts. If generated guidance conflicts with validated data, validated data wins and the generated output should be corrected or suppressed.
+Generated responses may not override validated scholarship facts.
 
 ## AI Governance
 ### Allowed AI assistance
-- Estimated Scholarship Fit Score generation.
-- Application Competitiveness Score framing.
-- SOP and essay feedback.
-- Interview-answer feedback.
-- Document quality suggestions.
+- Explainable fit guidance.
+- Bounded document and interview feedback.
+- Preparation strategy and next-step suggestions.
 
 ### Disallowed claims
-- Scholarship acceptance prediction framed as fact.
+- Deterministic scholarship acceptance claims.
 - Policy truth derived from generated text.
-- Unsupported accuracy claims, fake metrics, or invented dataset coverage.
+- Unsupported accuracy claims or invented coverage.
 
 ### Model framing rule
-If real scholarship outcome labels are absent, all ranking and scoring outputs must be described as estimates based on available features and assumptions.
+Without real outcome labels, all recommendation and scoring outputs are estimates and guidance signals only.
 
 ## Scope Governance
-### v0.1
+### v0.1 SLC
 - Canada-first scholarship corpus.
 - MS Data Science, MS Artificial Intelligence, MS Analytics.
-- USA only for Fulbright-related information and narrow cross-border logic.
+- USA only for narrowly scoped Fulbright-related context.
 
 ### Future Research Extensions
-- DAAD.
-- Stronger comparative graph-layer experiments.
-- Broader outcome-data collection and evaluation design.
+- Graph-layer comparative experiments.
+- Stronger outcome-label and evaluation frameworks.
 
-### Deferred By Stage Startup Features
-- Broader geography and academic coverage.
-- Marketplace and institutional monetization features.
-- Operational analytics products and ecosystem integrations.
+### Deferred By Stage
+- v0.2 depth expansions.
+- v0.3 platform and mentor workflow expansion.
+- v1.x ecosystem and institution-facing scale.
 
 ## Change-Control Rules
-1. Any feature that adds operational complexity must justify why the modular monolith is no longer sufficient.
-2. Any new data source must state validation strategy and provenance handling.
-3. Any new AI workflow must state whether it affects validated facts or only advisory guidance.
-4. Any expansion beyond Canada-first scope must be marked as deferred unless explicitly approved.
-5. Any change to core terminology must be reflected across `README.md`, `docs/scholarai/README.md`, and relevant canonical docs.
+1. Features that increase operational complexity must justify modular-monolith boundaries.
+2. New data sources must define validation and provenance handling.
+3. New AI workflows must specify whether they affect validated facts or advisory guidance only.
+4. Expansion beyond v0.1 scope must be explicitly staged.
+5. Terminology updates must remain consistent across canonical docs and readmes.
 
 ## Architecture Governance
 | Topic | Rule |
 |---|---|
-| Knowledge Graph Layer | Mandatory logically; v0.1 default is a relationally derived graph abstraction unless Neo4j becomes clearly justified |
-| Search architecture | PostgreSQL + pgvector is the v0.1 baseline; additional search systems require explicit justification |
-| Background jobs | Celery + Redis only where async work is necessary |
-| Experiment tracking | Prefer lightweight tracking; MLflow must be justified by actual workflow needs |
+| Knowledge Graph Layer | Mandatory logical concept; v0.1 default remains relationally derived graph abstraction |
+| Search architecture | PostgreSQL + pgvector baseline; extra systems need explicit justification |
+| Background jobs | Celery + Redis where async processing is necessary |
+| Experiment tracking | Lightweight tracking preferred; heavier tooling must be justified |
 
 ## Documentation Governance
-1. Canonical active documentation lives under `docs/scholarai/`.
-2. Legacy docs outside `docs/scholarai/` are migration inputs, not long-term authorities.
-3. Every documentation file must end with `v0.1 decision`, `Deferred items`, `Assumptions`, and `Risks`.
-4. No section should remain as placeholder text.
+1. Canonical active docs live under `docs/scholarai/`.
+2. Legacy docs outside canonical set are reference inputs, not authority.
+3. Canonical docs end with `SLC decision (v0.1)`, `Deferred By Stage`, `Assumptions`, and `Risks`.
+4. Placeholder sections are not permitted.
 
 ## Review Gates
 | Gate | Check |
 |---|---|
-| Scope gate | No deferred startup features have leaked into v0.1 |
-| Data gate | Source-of-truth fields are grounded in validated records |
+| Scope gate | No staged-deferred features leaked into v0.1 |
+| Data gate | Source-of-truth fields remain validated-data grounded |
 | AI gate | Generated outputs are clearly advisory |
-| Architecture gate | The design remains feasible for 3 developers in 16 weeks |
+| Architecture gate | Design remains feasible for a 3-person team |
 | Documentation gate | Terminology and section naming remain consistent |
+| UI quality gate | Browser or screenshot evidence exists for UI completion |
 
 ## Authorization Governance (RBAC Expansion)
 ### Authorization model rule
-ScholarAI uses a capability-based authorization matrix. Roles are assignment bundles, but access decisions are evaluated through explicit capabilities.
+ScholarAI uses a capability-based authorization matrix. Roles are assignment bundles; access decisions evaluate explicit capabilities.
 
 ### Canonical role set
 1. `ENDUSER_STUDENT`
@@ -132,55 +128,51 @@ ScholarAI uses a capability-based authorization matrix. Roles are assignment bun
 4. `ADMIN`
 5. `UNIVERSITY`
 6. `OWNER`
+7. `MENTOR` (staged and policy-gated)
+8. `TEST_USER` (internal QA simulation role)
 
 ### Capability governance rules
-1. Deny by default for any endpoint or action without an explicit capability mapping.
-2. No implicit cross-role inheritance is assumed in runtime checks.
-3. High-risk capabilities require at least one secondary reviewer for assignment changes.
-4. Privileged operations must emit audit events with `actor_user_id`, `action_type`, and `request_id`.
+1. Deny by default for endpoints/actions without explicit capability mapping.
+2. No implicit cross-role inheritance in runtime checks.
+3. High-risk capability assignments require secondary reviewer approval.
+4. Privileged operations must emit audit events with actor and request tracing metadata.
 
 ### Institution scope rule for university access
-`UNIVERSITY` access must be bound to explicit institution scope from first release of the contract.
+`UNIVERSITY` access must enforce explicit `institution_id` scope at service and query layers.
 
-Required controls:
-- every university-bound query must enforce `institution_id` filtering
-- cross-institution reads and writes must fail with authorization errors
-- scope overrides are prohibited outside emergency break-glass flow
+### Owner and support visibility rule
+Owner/admin visibility is operational and security-oriented. It must not become unrestricted personal-data surveillance.
 
 ### Migration governance rule
-Migration from legacy role-only claims to capability claims must use a compatibility window:
+Role-only claims transition through compatibility window:
 1. accept legacy role claims
 2. issue capability claims in parallel
 3. compare runtime decisions for mismatch telemetry
-4. remove legacy fallback only after sustained stability
+4. remove legacy fallback after sustained stability
 
 ### RBAC-specific review gates
 | Gate | Check |
 |---|---|
-| Capability gate | Every protected endpoint references explicit capabilities |
+| Capability gate | Protected endpoints reference explicit capabilities |
 | Scope isolation gate | Institution-scoped access is enforced for university actors |
-| Compatibility gate | Legacy/new auth decision mismatches are measured and bounded |
+| Compatibility gate | Legacy/new auth mismatches are measured and bounded |
 | Audit gate | Privileged operations are fully traceable |
-| Deprecation gate | Legacy role-only path has a dated removal milestone |
-
-## v0.1 decision
-ScholarAI governance prioritizes constrained scope, structured data authority, advisory-only AI framing, and modular-monolith feasibility over breadth or architectural ambition.
-
-## Deferred items
-- Governance for commercial partnerships and paid workflows.
-- Broader legal and institutional policy handling beyond v0.1 geography.
-- Advanced experimentation governance tied to real outcome labels.
-
-## Assumptions
-- The team will treat documentation changes as architecture and product changes, not only editorial changes.
-- Admin curation is available to maintain provenance discipline.
-- v0.1 can rely on internal governance discipline before heavier compliance processes are needed.
-
-## Risks
-- Governance rules are easy to write and easy to ignore unless used in review.
-- AI-related scope creep can happen quickly if advisory boundaries are not enforced.
-- Weak provenance handling would undermine both product trust and research defensibility.
-
+| Deprecation gate | Legacy role-only path has dated removal milestone |
 
 ## SLC decision (v0.1)
-TBD (baseline governance alignment).
+ScholarAI governance prioritizes constrained scope, structured data authority, advisory AI framing, and evidence-backed quality over feature sprawl.
+
+## Deferred By Stage
+- Governance for institution-commercial workflows at scale.
+- Expanded cross-jurisdiction legal and policy handling.
+- Advanced experimentation governance dependent on outcome-label maturity.
+
+## Assumptions
+- Documentation updates are treated as product and architecture updates.
+- Admin curation remains available to enforce provenance discipline.
+- Evidence requirements are enforced in review, not only documented.
+
+## Risks
+- Governance can drift if review gates are not actively applied.
+- Scope creep can reintroduce pre-SLC instability.
+- Weak provenance discipline can undermine trust and explainability claims.

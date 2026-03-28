@@ -1,4 +1,4 @@
-﻿# ScholarAI — Skills Matrix & Knowledge Requirements
+# ScholarAI — Skills Matrix & Knowledge Requirements
 
 ---
 
@@ -62,4 +62,3 @@
 | LangChain | [LangChain Docs](https://docs.langchain.com/) |
 | FastAPI | [FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/) |
 | Neo4j | [Neo4j Getting Started](https://neo4j.com/docs/getting-started/) |
-
