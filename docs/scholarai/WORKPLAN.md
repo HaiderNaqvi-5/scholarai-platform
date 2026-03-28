@@ -34,13 +34,13 @@ The first coding phase normalizes the repository in place around `frontend/` and
 | `docs/scholarai/11_research_and_evaluation.md` | Create | Canonical and active | Use as thesis and experiment reference |
 | `docs/scholarai/12_execution_plan.md` | Create | Canonical and active | Use as delivery baseline |
 | `docs/scholarai/13_qa_devops_and_risks.md` | Create | Canonical and active | Use as quality and fallback reference |
-| `docs/scholarai/14_future_roadmap.md` | Create | Canonical and active | Keep deferred scope separate from MVP |
+| `docs/scholarai/14_future_roadmap.md` | Create | Canonical and active | Keep deferred scope separate from v0.1 SLC |
 
 ## Section-To-File Mapping
 | Section | Target file |
 |---|---|
 | Product intent, constraints, value proposition | `01_executive_summary.md` |
-| Users, scope, non-goals, MVP boundaries | `02_prd_and_scope.md` |
+| Users, scope, non-goals, v0.1 SLC boundaries | `02_prd_and_scope.md` |
 | UX direction, brand rules, design system | `03_brand_and_design_system.md` |
 | Functional requirements, governance, decision rules | `04_requirements_and_governance.md` |
 | Modular monolith architecture and service boundaries | `05_system_architecture.md` |
@@ -52,20 +52,20 @@ The first coding phase normalizes the repository in place around `frontend/` and
 | Research questions, experiments, reproducibility | `11_research_and_evaluation.md` |
 | 16-week execution sequencing and ownership | `12_execution_plan.md` |
 | QA strategy, CI/CD baseline, risk controls | `13_qa_devops_and_risks.md` |
-| Future Research Extensions and Post-MVP Startup Features | `14_future_roadmap.md` |
+| Future Research Extensions and Deferred By Stage | `14_future_roadmap.md` |
 
 ## Key Architecture Decisions That Must Stay Consistent
-1. MVP architecture is a modular monolith.
+1. v0.1 SLC architecture is a modular monolith.
 2. Frontend is Next.js + React + TypeScript + TailwindCSS.
 3. Backend is FastAPI.
 4. Async jobs use Celery + Redis.
 5. PostgreSQL is primary database and pgvector is the vector layer.
-6. Knowledge Graph Layer is mandatory logically; MVP implementation may be Neo4j or a relationally derived abstraction.
+6. Knowledge Graph Layer is mandatory logically; v0.1 SLC implementation may be Neo4j or a relationally derived abstraction.
 7. Data ingestion uses Playwright + Pandas + Pydantic.
 8. Deployment baseline is Docker Compose.
 9. Migrations use Alembic.
 10. CI/CD baseline is GitHub Actions.
-11. MVP data scope is Canada-first for MS Data Science, MS Artificial Intelligence, and MS Analytics.
+11. v0.1 SLC data scope is Canada-first for MS Data Science, MS Artificial Intelligence, and MS Analytics.
 12. USA scope is limited to Fulbright-related information and narrowly scoped cross-border logic.
 13. DAAD is deferred to Future Research Extensions.
 14. Structured validated data is the source of truth for eligibility, deadlines, funding rules, and official requirements.
@@ -73,28 +73,28 @@ The first coding phase normalizes the repository in place around `frontend/` and
 ## Documentation Audit Classification
 | File | Classification | Proposed action | Rationale |
 |---|---|---|---|
-| `README.md` | Partially reusable | Rewritten in pass 1 | Good project framing but outdated stack/scope details (for example OpenSearch, mentorship in MVP) |
-| `docs/PRD.md` | Conflicting | Rewrite into `docs/scholarai/02_prd_and_scope.md`; then archive legacy | Includes DAAD in MVP and broad provider framing that conflicts with current constraints |
+| `README.md` | Partially reusable | Rewritten in pass 1 | Good project framing but outdated stack/scope details (for example OpenSearch, mentorship in v0.1 SLC) |
+| `docs/PRD.md` | Conflicting | Rewrite into `docs/scholarai/02_prd_and_scope.md`; then archive legacy | Includes DAAD in v0.1 SLC and broad provider framing that conflicts with current constraints |
 | `docs/architecture.md` | Partially reusable | Rewrite into `docs/scholarai/05_system_architecture.md`; then archive legacy | Useful problem framing, but data/store choices and novelty claims need tighter constraints |
-| `docs/architecture_diagrams.md` | Conflicting | Rewrite diagrams in new pack; then archive legacy | Diagrams include OpenSearch and multi-model orchestration outside current MVP baseline |
+| `docs/architecture_diagrams.md` | Conflicting | Rewrite diagrams in new pack; then archive legacy | Diagrams include OpenSearch and multi-model orchestration outside current v0.1 SLC baseline |
 | `docs/database_schema.md` | Partially reusable | Rewrite into `docs/scholarai/06_data_models.md`; then archive legacy | Contains useful entities but includes deferred mentorship and mixed scope language |
 | `docs/deployment.md` | Partially reusable | Rewrite into `docs/scholarai/13_qa_devops_and_risks.md`; then archive legacy | Useful delivery constraints, but includes services and milestones not yet governance-locked |
-| `docs/api_design.md` | Conflicting | Rewrite into `docs/scholarai/10_backend_api_and_repo.md`; then archive legacy | Includes non-MVP geography and deferred feature endpoints |
+| `docs/api_design.md` | Conflicting | Rewrite into `docs/scholarai/10_backend_api_and_repo.md`; then archive legacy | Includes non-v0.1 SLC geography and deferred feature endpoints |
 | `docs/ai_models.md` | Conflicting | Rewrite into `docs/scholarai/08_recommendation_and_ml.md`; then archive legacy | Contains unsupported metric targets and speculative implementation assumptions |
 | `docs/knowledge_graph.md` | Partially reusable | Rewrite into `docs/scholarai/06_data_models.md` and `05_system_architecture.md`; then archive legacy | Core graph idea is useful but implementation claims are over-asserted |
-| `docs/research.md` | Partially reusable | Rewrite into `docs/scholarai/11_research_and_evaluation.md`; then archive legacy | Useful RQ framing, but claims require tighter validity and MVP boundary control |
+| `docs/research.md` | Partially reusable | Rewrite into `docs/scholarai/11_research_and_evaluation.md`; then archive legacy | Useful RQ framing, but claims require tighter validity and v0.1 SLC boundary control |
 | `docs/skills.md` | Obsolete | Archive | Internal team skills matrix is not source-of-truth architecture/product documentation |
 | `docs/phase_status_report.md` | Obsolete | Archive | Snapshot report tied to specific commit/branch; not stable product documentation |
-| `docs/implementation_plan.md.resolved` | Conflicting | Archive after extracting reusable constraints into new pack | Contains stale absolute paths, mixed decisions, and unresolved MVP conflicts |
+| `docs/implementation_plan.md.resolved` | Conflicting | Archive after extracting reusable constraints into new pack | Contains stale absolute paths, mixed decisions, and unresolved v0.1 SLC conflicts |
 | `docs/scholarai/CODEX_MASTER_PROMPT_V1.md` | Aligned | Keep active | Governing migration constraints align with repo rules |
 | `docs/scholarai/CODEX_TASK_01_DOC_MIGRATION.md` | Aligned | Keep active | Current execution task file |
 | `docs/scholarai/MASTER_PROMPT_V2_2.md` | Partially reusable | Archive after migration | Contains overlapping guidance; keep one governing prompt to avoid drift |
 | `docs/scholarai/MASTER_PROMPT_V2_1.md` | Obsolete | Remove in later cleanup pass | Placeholder-only file with no operational content |
 
 ## Unresolved Assumptions
-1. OpenSearch is treated as non-MVP until a concrete unmet retrieval need is documented.
-2. Mentorship workflows remain deferred from MVP and move to Post-MVP Startup Features.
-3. Interview practice remains in MVP, but voice-first flow may be phased if complexity exceeds timeline.
+1. OpenSearch is treated as non-v0.1 SLC until a concrete unmet retrieval need is documented.
+2. Mentorship workflows remain deferred from v0.1 SLC and move to Deferred By Stage.
+3. Interview practice remains in v0.1 SLC, but voice-first flow may be phased if complexity exceeds timeline.
 4. Any quantitative model target metrics are provisional until dataset quality and label strategy are validated.
 
 ## Document Authoring Order
@@ -157,7 +157,7 @@ Start local implementation through a docs-first authorization rewrite that intro
 4. Legacy docs that conflict with canonical contracts contain a clear transition note.
 5. Documentation updates are approved before broad implementation commits.
 
-## MVP decision
+## SLC decision (v0.1)
 The full canonical documentation pack now exists and defines product, scope, design, data, architecture, evaluation, execution, QA, and roadmap before application code changes.
 
 ## Deferred items
@@ -173,3 +173,4 @@ The full canonical documentation pack now exists and defines product, scope, des
 - Keeping legacy docs active for too long can cause scope drift and conflicting implementation decisions.
 - If old and new docs are both treated as authoritative, team coordination errors are likely.
 - Delayed normalization of API/schema docs can propagate inconsistent naming into implementation.
+

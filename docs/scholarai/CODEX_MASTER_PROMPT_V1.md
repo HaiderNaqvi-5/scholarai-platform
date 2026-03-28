@@ -1,4 +1,4 @@
-﻿SCHOLARAI CODEX MASTER PROMPT V1
+SCHOLARAI CODEX MASTER PROMPT V1
 
 ### ROLE
 
@@ -26,7 +26,7 @@ ScholarAI is an AI-powered platform that helps students:
 
 This project is both:
 - a 16-week computer science FYP
-- a startup-ready MVP foundation
+- a startup-ready v0.1 SLC foundation
 
 The team size is fixed:
 - 3 developers
@@ -53,13 +53,13 @@ When needed, rewrite, archive, or remove conflicting old docs with explicit just
 
 ### NON-NEGOTIABLE CONSTRAINTS
 
-1. MVP must be realistically buildable by:
+1. v0.1 SLC must be realistically buildable by:
    - 3 developers
    - 16 weeks
    - limited budget
 
 2. Architecture must remain:
-   - modular monolith for MVP
+   - modular monolith for v0.1 SLC
    - one Next.js frontend
    - one FastAPI backend
    - Celery workers only for async jobs
@@ -67,14 +67,14 @@ When needed, rewrite, archive, or remove conflicting old docs with explicit just
    - Redis only where justified
    - pgvector for vector search
 
-3. Knowledge Graph Layer is mandatory logically, but MVP implementation may be either:
+3. Knowledge Graph Layer is mandatory logically, but v0.1 SLC implementation may be either:
    - narrowly scoped Neo4j
    - or a relationally derived graph abstraction if simpler and more feasible
 
 4. Data scope:
-   - Canada is the primary MVP university/program corpus
+   - Canada is the primary v0.1 SLC university/program corpus
    - USA is allowed only for Fulbright-related scholarship provider information, directly relevant funding rules, or narrowly scoped cross-border scholarship logic
-   - broad USA university discovery is not MVP by default
+   - broad USA university discovery is not v0.1 SLC by default
    - DAAD is deferred to Future Research Extensions
 
 5. Structured validated data is the source of truth for:
@@ -102,9 +102,9 @@ When needed, rewrite, archive, or remove conflicting old docs with explicit just
    - not template-like
 
 9. Always separate recommendations into:
-   - MVP
+   - v0.1 SLC
    - Future Research Extensions
-   - Post-MVP Startup Features
+   - Deferred By Stage
 
 ### REPOSITORY BEHAVIOR
 
@@ -116,7 +116,7 @@ When operating in this repository:
 4. Archive or remove obsolete/conflicting docs only with explicit justification.
 5. Prefer archiving over deletion if there is uncertainty.
 6. Do not silently delete files.
-7. Keep all active docs aligned with the current MVP scope.
+7. Keep all active docs aligned with the current v0.1 SLC scope.
 
 ### OUTPUT STYLE
 
@@ -129,7 +129,7 @@ Use:
 - Mermaid diagrams where useful
 - explicit assumptions
 - explicit risks
-- explicit MVP vs deferred decisions
+- explicit v0.1 SLC vs deferred decisions
 
 Avoid:
 - vague filler
@@ -141,7 +141,7 @@ Avoid:
 ### REQUIRED DOCUMENT FOOTER
 
 Every documentation file must end with exactly these sections:
-- MVP decision
+- SLC decision (v0.1)
 - Deferred items
 - Assumptions
 - Risks
@@ -182,3 +182,4 @@ If no narrower task is given, start with repository documentation migration in t
 5. Archive or remove conflicting legacy docs with justification
 6. Produce a migration summary
 7. Produce a final consistency summary
+

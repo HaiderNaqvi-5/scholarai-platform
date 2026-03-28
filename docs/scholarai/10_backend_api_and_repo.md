@@ -16,7 +16,7 @@ This document defines the FastAPI modular monolith structure, API boundary, asyn
   - `admin` is described here as a conceptual module, but the current mounted internal workflow is concentrated in `curation`
 
 ## Backend Architecture Stance
-ScholarAI MVP uses one FastAPI backend with clearly separated internal modules. Business domains stay in-process and share one primary PostgreSQL data layer rather than being split into separate deployable services.
+ScholarAI v0.1 SLC uses one FastAPI backend with clearly separated internal modules. Business domains stay in-process and share one primary PostgreSQL data layer rather than being split into separate deployable services.
 
 ## Internal Module Boundaries
 | Module | Responsibility | Must not own |
@@ -268,7 +268,7 @@ Target rule:
 3. Downstream SQLAlchemy models, Pydantic schemas, and frontend/generated clients should import from that shared contract layer rather than duplicating lists by hand.
 
 ## API Versioning Strategy
-### MVP
+### v0.1 SLC
 - Use a single explicit version prefix: `/api/v1`.
 - Keep breaking changes behind future version bumps rather than silent schema drift.
 - Treat schema changes as documentation and migration events, not casual refactors.
@@ -323,8 +323,7 @@ scholarai-platform/
 | Schema changes | Require documentation update plus migration plan |
 | AI code generation | Treat output as draft, never as final authority |
 | Tests | New modules should ship with unit or integration coverage plan |
-
-## MVP
+## SLC decision (v0.1)
 - One FastAPI backend with clearly separated internal modules.
 - `/api/v1` versioned routes for core user and admin workflows.
 - Celery used only for meaningful async tasks.
@@ -333,13 +332,13 @@ scholarai-platform/
 - Comparative API instrumentation for evaluation experiments.
 - More advanced internal service boundaries if complexity justifies them.
 
-## Post-MVP Startup Features
+## Deferred By Stage
 - Public partner APIs.
 - Webhooks and provider submission endpoints.
 - Tenant-aware admin boundaries if commercialization requires them.
 
-## MVP decision
-ScholarAI MVP will use a versioned FastAPI modular monolith with explicit internal boundaries, a stable error contract, and strict guardrails for any later AI-generated implementation code.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC will use a versioned FastAPI modular monolith with explicit internal boundaries, a stable error contract, and strict guardrails for any later AI-generated implementation code.
 
 ## Deferred items
 - Public integration APIs.
@@ -347,7 +346,7 @@ ScholarAI MVP will use a versioned FastAPI modular monolith with explicit intern
 - Tenant-aware platform partitioning.
 
 ## Assumptions
-- One backend process plus Celery workers is sufficient for MVP complexity.
+- One backend process plus Celery workers is sufficient for v0.1 SLC complexity.
 - Recommendation and document feedback paths can remain inside the same backend without unacceptable coupling.
 - Documentation will stay ahead of major API changes.
 
@@ -355,3 +354,4 @@ ScholarAI MVP will use a versioned FastAPI modular monolith with explicit intern
 - Module boundaries can erode quickly if route handlers start owning business logic directly.
 - Async task sprawl can recreate microservice complexity unless kept disciplined.
 - AI-generated code can introduce undocumented contracts unless review standards stay strict.
+

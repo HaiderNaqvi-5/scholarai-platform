@@ -2,9 +2,9 @@
 
 > Status: Legacy draft (not canonical).
 > Canonical diagrams and architecture constraints are maintained in docs/scholarai/05_system_architecture.md.
-> This file may reference deferred components not in current MVP implementation.
+> This file may reference deferred components not in current v0.1 SLC implementation.
 
-> All diagrams are provided in **Mermaid** syntax for rendering, strictly aligned to the MVP Master Blueprint.
+> All diagrams are provided in **Mermaid** syntax for rendering, strictly aligned to the v0.1 SLC Master Blueprint.
 
 ---
 

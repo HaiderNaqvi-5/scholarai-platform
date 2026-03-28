@@ -51,7 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : null,
   );
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+    const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    return Boolean(storedToken || storedRefreshToken);
+  });
 
   const clearSession = useCallback(() => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -108,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
     if (!storedToken && !storedRefreshToken) {
-      setIsLoading(false);
       return;
     }
 

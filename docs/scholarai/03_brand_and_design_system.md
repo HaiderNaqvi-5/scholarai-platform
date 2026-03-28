@@ -107,8 +107,8 @@ ScholarAI must visually separate:
 
 This separation is a product trust requirement, not only a design preference.
 
-## MVP Vs Deferred Design Scope
-### MVP
+## v0.1 SLC Vs Deferred Design Scope
+### v0.1 SLC
 - Light theme first.
 - Core component library for discovery, detail, explanation, document feedback, interview feedback, and admin validation.
 - Strong typography, measured motion, and a restrained palette.
@@ -117,12 +117,12 @@ This separation is a product trust requirement, not only a design preference.
 - More advanced explanation visualizations and trust-study variants.
 - Comparative interface experiments for explanation helpfulness.
 
-### Post-MVP Startup Features
+### Deferred By Stage
 - Brand sub-systems for provider and institution products.
 - White-label or partner-specific experience layers.
 
-## MVP decision
-ScholarAI MVP will use a restrained, premium light-theme design system centered on strong typography, calm surfaces, and clear separation between validated data and generated guidance.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC will use a restrained, premium light-theme design system centered on strong typography, calm surfaces, and clear separation between validated data and generated guidance.
 
 ## Deferred items
 - Dark mode.
@@ -131,7 +131,7 @@ ScholarAI MVP will use a restrained, premium light-theme design system centered 
 - Highly customized visualization libraries beyond core explanation needs.
 
 ## Assumptions
-- A typography-led light theme is the fastest path to a premium but feasible MVP.
+- A typography-led light theme is the fastest path to a premium but feasible v0.1 SLC release.
 - Most early usage will be document-heavy and desktop-first, even though mobile support remains required.
 - Clear visual separation of fact and guidance materially improves trust.
 
@@ -139,3 +139,4 @@ ScholarAI MVP will use a restrained, premium light-theme design system centered 
 - A dense information architecture can become visually flat if hierarchy is weak.
 - Over-polishing decorative surfaces can waste scarce frontend capacity.
 - If generated guidance is not visually differentiated, users may confuse it with validated scholarship facts.
+

@@ -1,4 +1,4 @@
-﻿Use the repo rules in .codex/AGENTS.md.
+Use the repo rules in .codex/AGENTS.md.
 
 Also use docs/scholarai/CODEX_MASTER_PROMPT_V1.md as the governing task specification for ScholarAI repository documentation work.
 
@@ -59,7 +59,7 @@ docs/scholarai/README.md MUST INCLUDE:
 
 ROOT README.md MUST INCLUDE:
 - what ScholarAI is
-- current MVP scope
+- current v0.1 SLC scope
 - high-level architecture summary
 - documentation entry points
 - repo navigation guidance
@@ -69,7 +69,7 @@ CONSTRAINTS:
 - 3 developers
 - 16 weeks
 - limited budget
-- MVP-first scope
+- SLC-first scope
 - modular monolith
 - Canada-first scope
 - USA only for Fulbright-related scope
@@ -88,5 +88,6 @@ RULES:
 BEFORE FINISHING:
 - verify terminology consistency across touched files
 - verify README.md aligns with docs/scholarai/
-- verify startup features do not leak into MVP scope
+- verify startup features do not leak into v0.1 SLC scope
 - verify all new docs include clear assumptions and risks
+

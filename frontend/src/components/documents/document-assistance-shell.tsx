@@ -118,6 +118,12 @@ export function DocumentAssistanceShell() {
     () => state.items.find((item) => item.id === state.selectedId) ?? null,
     [state.items, state.selectedId],
   );
+  const [showWhyAdvice, setShowWhyAdvice] = useState(false);
+
+  useEffect(() => {
+    setShowWhyAdvice(false);
+  }, [state.selectedId]);
+
   const groundingSelection = useMemo(
     () => parseScholarshipGrounding(scholarshipGrounding),
     [scholarshipGrounding],
@@ -233,6 +239,12 @@ export function DocumentAssistanceShell() {
   );
   const limitations = getLimitations(feedback);
   const citations = feedback?.citations ?? [];
+  const groundingScore = feedback?.grounding_score ?? 0;
+  const coverageFlags = feedback?.coverage_flags ?? {};
+  const ungroundedWarnings = feedback?.ungrounded_warnings ?? [];
+  const hasCoverageGap =
+    Object.values(coverageFlags).some((covered) => !covered) ||
+    ungroundedWarnings.length > 0;
   const selectedGroundingCount =
     selectedDocument?.scholarship_ids?.length ??
     (selectedDocument?.scholarship_id ? 1 : 0);
@@ -492,34 +504,85 @@ export function DocumentAssistanceShell() {
                       variant="validated"
                     />
                   ) : null}
+                  <StatusBadge
+                    label={`Grounding score: ${Math.round(groundingScore * 100)}%`}
+                    variant={groundingScore >= 0.7 ? "validated" : "warning"}
+                  />
                 </div>
+                {hasCoverageGap ? (
+                  <div className="guidance-callout" role="status" aria-live="polite">
+                    <p className="list-heading">Partial grounding coverage detected</p>
+                    <ul className="detail-list">
+                      {ungroundedWarnings.length > 0 ? (
+                        ungroundedWarnings.map((warning) => <li key={warning}>{warning}</li>)
+                      ) : (
+                        <li>
+                          Some evidence sections are missing. Add clearer preparation and
+                          scholarship-fit details for stronger guidance.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
                 <p className="list-heading">Generated guidance</p>
                 <p className="body-copy">{generatedGuidance.summary}</p>
               </article>
               <article>
                 <p className="list-heading">Strengths</p>
                 <ul className="detail-list">
-                  {generatedGuidance.strengths.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.strengths.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
               <article>
                 <p className="list-heading">Revision priorities</p>
                 <ul className="detail-list">
-                  {generatedGuidance.revision_priorities.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.revision_priorities.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
               <article>
                 <p className="list-heading">Cautions</p>
                 <ul className="detail-list">
-                  {generatedGuidance.caution_notes.map((item) => (
-                    <li key={item}>{item}</li>
+                  {generatedGuidance.caution_notes.map((item, index) => (
+                    <li key={item}>
+                      {item}
+                      {renderCitationMarker(index, citations.length)}
+                    </li>
                   ))}
                 </ul>
               </article>
+              {citations.length > 0 ? (
+                <article>
+                  <div className="meta-row">
+                    <p className="list-heading">Why this advice</p>
+                    <button
+                      className="nav-link text-xs"
+                      type="button"
+                      onClick={() => setShowWhyAdvice((current) => !current)}
+                    >
+                      {showWhyAdvice ? "Hide details" : "Show details"}
+                    </button>
+                  </div>
+                  {showWhyAdvice ? (
+                    <ul className="detail-list">
+                      {citations.map((citation, index) => (
+                        <li key={`${citation.source_id}-${index}`}>
+                          <strong>[{index + 1}] {citation.title}</strong>: {citation.snippet}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </article>
+              ) : null}
               <div className="document-actions">
                 <button
                   className="auth-link auth-link--secondary"
@@ -597,7 +660,9 @@ export function DocumentAssistanceShell() {
                   <p className="list-heading">Citations</p>
                   <ul className="detail-list">
                     {citations.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={`${item.source_id}-${item.url_or_ref}`}>
+                        <strong>{item.title}</strong> - {item.url_or_ref}
+                      </li>
                     ))}
                   </ul>
                 </article>
@@ -614,6 +679,14 @@ export function DocumentAssistanceShell() {
       </section>
     </AppShell>
   );
+}
+
+function renderCitationMarker(index: number, citationCount: number) {
+  if (citationCount === 0) {
+    return null;
+  }
+  const marker = (index % citationCount) + 1;
+  return <sup aria-label={`Citation ${marker}`}> [{marker}]</sup>;
 }
 
 function validateClientSubmission(

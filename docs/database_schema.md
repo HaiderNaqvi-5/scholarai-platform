@@ -32,8 +32,8 @@ erDiagram
         uuid user_id FK
         string citizenship
         float gpa
-        string target_field_of_study "MVP: DS, AI, Analytics"
-        string target_country "MVP: Canada"
+        string target_field_of_study "v0.1 SLC: DS, AI, Analytics"
+        string target_country "v0.1 SLC: Canada"
         vector profile_embedding "pgvector (768-dim)"
     }
 
@@ -41,9 +41,9 @@ erDiagram
         uuid id PK
         string name
         string provider "e.g., DAAD, Fulbright"
-        string degree_level "MVP: MS"
-        string field_of_study "MVP: AI, Analytics"
-        string country "MVP: Canada"
+        string degree_level "v0.1 SLC: MS"
+        string field_of_study "v0.1 SLC: AI, Analytics"
+        string country "v0.1 SLC: Canada"
         float min_gpa
         text full_description
         vector scholarship_embedding "pgvector (768-dim)"

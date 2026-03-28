@@ -86,6 +86,30 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+  docs-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run docs governance checks
+        run: |
+          python scripts/docs_governance_check.py | tee /tmp/docs-governance.out
+
+      - name: Publish docs governance summary
+        if: always()
+        run: |
+          {
+            echo "## Docs Governance"
+            echo ""
+            sed -n '/^Docs governance summary:/,$p' /tmp/docs-governance.out
+          } >> "$GITHUB_STEP_SUMMARY"
+
   browser-smoke:
     runs-on: ubuntu-latest
     services:

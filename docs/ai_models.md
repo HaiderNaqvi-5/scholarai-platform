@@ -6,7 +6,7 @@
 
 ## 1. Feature Engineering
 
-### Input Feature Vector (Strict MVP Constraints)
+### Input Feature Vector (Strict v0.1 SLC Constraints)
 
 | Feature | Type | Source | Definition |
 |---|---|---|---|

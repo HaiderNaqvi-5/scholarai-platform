@@ -45,7 +45,7 @@ Provide a commit-ready snapshot of documentation changes required to align canon
    - Ensure endpoint names and dependency guards in docs match mounted routes in `backend/app/api/v1/routes/` and `backend/app/core/dependencies.py`.
 2. Data-model consistency:
    - Ensure schema language matches model/migration reality in `backend/app/models/models.py` and latest Alembic revisions.
-3. MVP scope consistency:
+3. v0.1 SLC scope consistency:
    - Confirm Canada-first and bounded-assistance language is consistent across `02`, `05`, `08`, `10`, `12`, `14` docs.
 4. Legacy-doc de-duplication:
    - Ensure root docs do not conflict with canonical docs. Prefer explicit superseded banners when needed.

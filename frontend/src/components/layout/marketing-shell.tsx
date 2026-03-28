@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { AuthActions } from "@/components/auth/auth-actions";
 import { Footer } from "@/components/layout/footer";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { marketingNavLinks } from "@/lib/routes";
 
 type MarketingShellProps = {
@@ -49,7 +50,10 @@ export function MarketingShell({
               </Link>
             ))}
           </div>
-          <AuthActions />
+          <div className="shell-nav__actions">
+            <ThemeToggle />
+            <AuthActions />
+          </div>
         </nav>
         <header className="hero-block hero-block--marketing fade-in">
           <div className="hero-block__copy">

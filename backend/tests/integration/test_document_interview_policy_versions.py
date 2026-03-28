@@ -84,7 +84,23 @@ def test_document_feedback_response_includes_policy_version(app, client):
             strengths=["s"],
             revision_priorities=["r"],
             caution_notes=[],
-            citations=["c"],
+            citations=[
+                {
+                    "source_id": "scholarship:1",
+                    "title": "Scholarship record",
+                    "url_or_ref": "https://example.test/scholarship",
+                    "snippet": "Validated scholarship snippet",
+                    "relevance_score": 0.9,
+                }
+            ],
+            grounding_score=0.91,
+            coverage_flags={
+                "motivation": True,
+                "preparation": True,
+                "future_impact": True,
+                "scholarship_fit": True,
+            },
+            ungrounded_warnings=[],
             grounded_context=[],
             validated_facts=[],
             retrieved_writing_guidance=[],
@@ -139,6 +155,17 @@ def test_document_feedback_response_includes_policy_version(app, client):
     assert response.status_code == 201
     payload = response.json()
     assert payload["document"]["latest_feedback"]["quality_gate"]["policy_version"] == "document.quality.v1"
+    citations = payload["document"]["latest_feedback"]["citations"]
+    assert isinstance(citations, list)
+    assert citations
+    citation = citations[0]
+    assert set(citation.keys()) == {
+        "source_id",
+        "title",
+        "url_or_ref",
+        "snippet",
+        "relevance_score",
+    }
 
 
 def test_interview_summary_response_includes_policy_version(app, client):

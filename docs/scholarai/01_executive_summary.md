@@ -1,44 +1,41 @@
 # ScholarAI Executive Summary
 
 ## Purpose
-ScholarAI is an AI-powered scholarship platform designed to help students discover relevant scholarships, check core eligibility, plan stronger applications, improve application documents, and practice scholarship interviews. This documentation pack defines an implementation-ready MVP that a 3-person team can realistically deliver in 16 weeks.
+ScholarAI is an AI-powered scholarship platform that helps students discover verified opportunities, understand fit, prepare stronger applications, and track progress in one system. This documentation pack defines an implementation-ready **v0.1 SLC** release for a 3-person team.
 
 ## Problem Summary
-Students face a fragmented scholarship ecosystem. Official requirements are scattered across university pages, provider pages, and policy documents. Eligibility logic is often unclear, application planning is manual, and document support is generic rather than scholarship-specific. Existing tools usually stop at directory listings or generic writing help.
+Students face fragmented scholarship information, unclear eligibility interpretation, manual planning burden, and generic preparation tools. Many products either stop at directories or provide opaque AI outputs that are hard to trust.
 
 ## Product Thesis
-ScholarAI should reduce information friction without pretending to automate final admission decisions. The platform combines structured scholarship data, eligibility-aware filtering, explainable ranking, application guidance, and interview practice in one workflow. The system is designed so that structured validated data remains authoritative for all policy-critical fields.
+ScholarAI reduces information friction without pretending to automate final scholarship outcomes. The product combines validated data, eligibility-aware filtering, explainable fit guidance, preparation workflows, and tracker visibility in a single coherent journey.
 
 ## What ScholarAI Delivers
-| Area | User outcome | Implementation stance |
+| Area | User outcome | v0.1 SLC stance |
 |---|---|---|
-| Discovery | Students can search a curated scholarship corpus | Canada-first MVP with targeted ingestion |
-| Eligibility | Students can see whether basic hard constraints are met | Structured validated rules are authoritative |
-| Recommendation | Students receive ranked opportunities with transparent reasoning | Use Estimated Scholarship Fit Score, not causal success claims |
-| Application support | Students get feedback on SOPs, essays, and related documents | RAG is limited to feedback and improvement guidance |
-| Interview practice | Students rehearse scholarship-style questions and receive structured feedback | Feedback is advisory, not authoritative |
+| Discovery | Students can search a curated scholarship corpus | Canada-first with strict provenance quality |
+| Eligibility | Students can see hard constraints clearly | Structured validated rules are authoritative |
+| Recommendation | Students receive ranked opportunities with transparent rationale | Guidance bands, not deterministic claims |
+| Application support | Students get bounded SOP/CV/essay improvement support | Advisory only; facts stay data-grounded |
+| Interview practice | Students rehearse scholarship-style questions with feedback | Actionable, rubric-style coaching |
 
-## MVP Scope Summary
-### MVP
+## v0.1 SLC Scope Summary
+### v0.1 SLC
 - Canada-first scholarship and program corpus.
 - Program focus: MS Data Science, MS Artificial Intelligence, MS Analytics.
-- USA scope limited to Fulbright-related provider information and narrowly scoped cross-border logic.
+- USA scope only for narrowly scoped Fulbright-related cross-border context.
 - Modular monolith architecture with one Next.js frontend and one FastAPI backend.
-- PostgreSQL + pgvector as the primary data and retrieval foundation.
-- Knowledge Graph Layer implemented logically, with a relationally derived graph abstraction as the default MVP approach.
-- Core workflows: discovery, eligibility-aware ranking, application guidance, interview practice, and admin curation.
+- PostgreSQL + pgvector baseline with relationally derived graph abstraction.
+- Core loops: discovery, fit understanding, save/track, document prep, interview prep, curation operations.
 
 ### Future Research Extensions
-- DAAD-focused ingestion and evaluation.
-- Comparative evaluation of relational graph abstraction versus narrowly scoped Neo4j deployment.
-- Stronger experiment design for explanation helpfulness, trust, and ranking utility.
-- Better outcome-label collection and reproducibility workflows for model evaluation.
+- Comparative evaluation of graph-layer implementations.
+- Better experimental design for explanation helpfulness and trust outcomes.
+- Expanded outcome-label collection for model evaluation rigor.
 
-### Post-MVP Startup Features
-- Broader geography and program expansion.
-- Mentor marketplace or paid advisory workflows.
-- Institution dashboards and provider analytics.
-- Workflow automation for reminders, collaboration, and operational reporting.
+### Deferred By Stage
+- v0.2: richer recommendation depth and preparation workflows.
+- v0.3: mentor and stronger operations expansions.
+- v1.x: partner/institution ecosystem capabilities and commercial scale surfaces.
 
 ## Delivery Model
 | Constraint | Decision |
@@ -46,45 +43,37 @@ ScholarAI should reduce information friction without pretending to automate fina
 | Team | 3 developers |
 | Timeline | 16 weeks |
 | Budget | Limited |
-| Development style | Documentation-first, MVP-first |
+| Development style | Documentation-first, SLC-first |
 | Deployment baseline | Docker Compose |
 | CI/CD baseline | GitHub Actions |
 
 ## Research Position
-ScholarAI is both an FYP and a startup-ready MVP foundation. The strongest research angle is not "AI predicts who wins scholarships." The defensible research angle is that ScholarAI can study explainable ranking, policy-grounded eligibility workflows, and structured AI feedback in a constrained scholarship domain. Any ML output must be framed as an estimate rather than a causal prediction unless real outcome labels exist.
+The defensible research framing is not acceptance prediction. It is explainable ranking, policy-grounded eligibility workflows, and structured advisory feedback in a constrained scholarship domain.
 
 ## Source-Of-Truth Principle
-ScholarAI treats structured validated data as the authority for:
-- eligibility
-- deadlines
-- funding rules
-- official scholarship requirements
-
-Generated outputs can support writing, reflection, and practice, but they do not override validated scholarship data.
+Structured validated data is authoritative for eligibility, deadlines, funding rules, and official scholarship requirements. Generated outputs support preparation but do not override validated facts.
 
 ## Implementation Posture
-ScholarAI should be built as the simplest defensible system that can demonstrate:
+ScholarAI should be built as the simplest defensible product that demonstrates:
 1. Curated ingestion and validation.
-2. Eligibility-aware ranking.
-3. Explainable outputs.
-4. Useful student-facing preparation workflows.
-5. A premium but feasible frontend experience.
+2. Eligibility-aware ranking with explainability.
+3. Useful, bounded preparation workflows.
+4. Premium, role-aware, evidence-verified UI quality.
 
-## MVP decision
-ScholarAI MVP is a Canada-first, modular-monolith scholarship platform that delivers discovery, eligibility-aware ranking, document guidance, and interview practice without claiming authoritative prediction of scholarship outcomes.
+## SLC decision (v0.1)
+ScholarAI v0.1 is a Canada-first, premium-feeling, modular-monolith product that delivers discovery, explainable fit guidance, and preparation support without overstating AI certainty.
 
-## Deferred items
-- DAAD-specific MVP ingestion.
-- Broad USA university discovery.
-- Mentor marketplace features.
-- Claims that require real scholarship outcome labels.
+## Deferred By Stage
+- Broader geography and provider expansion.
+- Mentor marketplace or heavy collaboration workflows.
+- Claims requiring real scholarship outcome labels.
 
 ## Assumptions
-- A constrained Canada-first corpus is sufficient for MVP validation and FYP scope control.
-- A relationally derived graph abstraction is the simplest defensible default for the Knowledge Graph Layer in MVP.
-- Users benefit from transparent reasoning even when recommendations are only estimated fit signals.
+- A constrained, high-quality corpus creates stronger trust than broad noisy coverage.
+- Transparent fit guidance is more useful than opaque scoring.
+- Evidence-driven QA prevents false confidence from green CI alone.
 
 ## Risks
-- If scholarship rules are not validated carefully, user trust will collapse quickly.
-- A narrow corpus may limit perceived coverage even if it improves data quality.
-- Interview and document feedback can be useful but still subjective, which must be communicated clearly.
+- Legacy pre-SLC language may cause mixed product expectations.
+- Narrow scope may be perceived as limited without clear messaging.
+- Advisory outputs can be over-trusted if boundaries are not explicit in UI.

@@ -16,9 +16,9 @@ This allows instantaneous, 100% accurate filtering. A student will never see a C
 |---|---|---|
 | `Student` | The applicant. | `id`, `name`, `gpa` |
 | `Scholarship` | The funding opportunity. | `id`, `name`, `deadline`, `min_gpa_req` |
-| `Degree` | MS, BS, PhD. MVP is restricted to **MS**. | `name` |
-| `FieldOfStudy` | Academic disciplines. MVP is restricted to **Data Science, AI, Analytics**. | `name` |
-| `Country` | Geographic locations. MVP is restricted to **Canada**. | `name`, `iso_code` |
+| `Degree` | MS, BS, PhD. v0.1 SLC is restricted to **MS**. | `name` |
+| `FieldOfStudy` | Academic disciplines. v0.1 SLC is restricted to **Data Science, AI, Analytics**. | `name` |
+| `Country` | Geographic locations. v0.1 SLC is restricted to **Canada**. | `name`, `iso_code` |
 | `Skill` | Required hard/soft skills parsed from descriptions. | `name` |
 
 ## 3. Relationship Types (Edges)
@@ -37,7 +37,7 @@ This allows instantaneous, 100% accurate filtering. A student will never see a C
 
 ### Node Creation
 ```cypher
-// Create constrained fields for MVP
+// Create constrained fields for v0.1 SLC
 CREATE (ds:FieldOfStudy {name: "Data Science"})
 CREATE (ai:FieldOfStudy {name: "Artificial Intelligence"})
 CREATE (an:FieldOfStudy {name: "Analytics"})
@@ -64,7 +64,7 @@ MATCH (student)-[:INTERESTED_IN]->(field:FieldOfStudy)<-[:FUNDS_FIELD]-(scholar)
 // Verify GPA boundary
 WHERE student.gpa >= scholar.min_gpa_req
 
-// Ensure the scholarship is in the target country (MVP: Canada)
+// Ensure the scholarship is in the target country (v0.1 SLC: Canada)
 MATCH (scholar)-[:HOSTED_IN]->(country:Country {name: "Canada"})
 
 RETURN scholar.id, scholar.name

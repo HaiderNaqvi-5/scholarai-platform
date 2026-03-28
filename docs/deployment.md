@@ -122,7 +122,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Milestone 1: Foundation & Data (Weeks 1-4)
 - **Week 1 (Setup)**: Initialize Mono-repo, Docker compose configs (PostgreSQL, Neo4j, Redis, OpenSearch).
 - **Week 2 (Schemas)**: Implement SQLAlchemy ORM models and Cypher constraints. Setup Next.js boilerplate.
-- **Week 3 (Scraper MVP)**: Playwright scrapers targeting Canada MS DS/AI programs + DAAD.
+- **Week 3 (Scraper v0.1 SLC)**: Playwright scrapers targeting Canada MS DS/AI programs + DAAD.
 - **Week 4 (Ingestion)**: Pipeline pulling scraped JSON, generating Pydantic validations, and writing to Neo4j/Postgres. 
 
 ### Milestone 2: AI & Retrieval Systems (Weeks 5-8)

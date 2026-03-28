@@ -2,7 +2,7 @@
 
 > Status: Legacy draft (not canonical).
 > Canonical architecture is maintained in docs/scholarai/05_system_architecture.md.
-> This file remains for historical traceability and contains pre-MVP-scope assumptions.
+> This file remains for historical traceability and contains pre-v0.1 SLC-scope assumptions.
 
 > **Document Version:** 1.0 — **Date:** 2026-03-08  
 > **Classification:** FYP Technical Design Document  

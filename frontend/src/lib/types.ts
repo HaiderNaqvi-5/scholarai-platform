@@ -202,6 +202,14 @@ export type DocumentGeneratedGuidance = {
   caution_notes: string[];
 };
 
+export type DocumentCitation = {
+  source_id: string;
+  title: string;
+  url_or_ref: string;
+  snippet: string;
+  relevance_score: number;
+};
+
 export type DocumentFeedback = {
   id: string;
   status: DocumentProcessingStatus;
@@ -209,7 +217,10 @@ export type DocumentFeedback = {
   strengths: string[];
   revision_priorities: string[];
   caution_notes: string[];
-  citations: string[];
+  citations: DocumentCitation[];
+  grounding_score: number;
+  coverage_flags: Record<string, boolean>;
+  ungrounded_warnings: string[];
   grounded_context: DocumentGroundingEntry[];
   limitation_notice: string;
   validated_facts?: DocumentGroundingEntry[] | null;

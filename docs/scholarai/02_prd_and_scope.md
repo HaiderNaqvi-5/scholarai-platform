@@ -1,130 +1,129 @@
 # ScholarAI PRD And Scope
 
 ## Product Goal
-Build a focused scholarship platform that helps students move from "I do not know where to start" to "I know which scholarships fit, why they fit, and how to prepare stronger applications" within a tightly constrained MVP.
+Build a focused scholarship operating system that helps students move from "I do not know where to start" to "I know what fits, why it fits, what is missing, and what to do next" within a constrained **v0.1 SLC** scope.
 
 ## Primary Users
 | User | Need | Why ScholarAI matters |
 |---|---|---|
-| Student applicant | Find relevant scholarships and understand fit | Replaces fragmented manual research with a guided workflow |
-| Admin curator | Validate and publish structured scholarship data | Maintains source-of-truth quality for policy-critical fields |
-| Research team | Evaluate explainable ranking and guided preparation workflows | Supports defensible FYP research framing |
+| Student applicant | Find relevant scholarships and act confidently | Replaces fragmented manual research with guided execution |
+| Admin curator | Validate and publish scholarship data | Preserves trust in policy-critical fields |
+| Test-user (internal QA) | Validate flows in production-like scenarios | Protects release confidence without using real user identities |
+| Product and research team | Evaluate explainability and workflow quality | Supports defensible product and research progress |
 
 ## User Jobs To Be Done
-1. Discover scholarships relevant to a defined academic target.
-2. Understand basic eligibility constraints before investing time.
-3. Prioritize scholarships using transparent reasoning.
-4. Improve documents with grounded feedback.
-5. Practice interview responses using scholarship-oriented prompts.
+1. Discover relevant scholarships quickly.
+2. Understand hard eligibility constraints early.
+3. Prioritize opportunities with transparent reasoning.
+4. Improve documents with bounded, context-aware feedback.
+5. Practice interview responses with actionable coaching.
 
 ## Product Principles
-1. Scope discipline beats feature breadth.
+1. SLC discipline beats feature breadth.
 2. Structured validated data beats generic AI confidence.
-3. Explainable ranking beats opaque scoring.
-4. Advisory assistance beats overstated automation.
-5. One coherent workflow beats disconnected tools.
+3. Explainable guidance beats opaque scoring.
+4. Advisory AI beats overstated automation.
+5. One coherent journey beats disconnected tools.
 
-## MVP Scope
+## v0.1 SLC Scope
 ### In scope
 | Capability | Description |
 |---|---|
-| Curated scholarship discovery | Search and browse a Canada-first scholarship corpus tied to the defined MVP program scope |
-| Eligibility-aware filtering | Enforce hard constraints using structured validated rules and Knowledge Graph Layer logic |
-| Ranked recommendations | Present Estimated Scholarship Fit Score with explanation-oriented rationale |
-| Scholarship detail pages | Show requirements, deadlines, funding information, provenance, and source links |
-| Application strategy guidance | Provide workflow guidance on next steps, priorities, and preparation focus areas |
-| Document feedback | Provide SOP, essay, and document-quality feedback through bounded RAG workflows |
-| Interview practice | Simulate scholarship-style interview prompts and structured feedback |
-| Admin curation workflow | Review, validate, and publish scholarship records through provenance states |
+| Curated scholarship discovery | Search and browse Canada-first scholarship corpus within defined academic scope |
+| Eligibility-aware filtering | Enforce hard constraints from structured validated rules and graph-derived logic |
+| Explainable fit guidance | Present transparent fit rationale with next-step guidance |
+| Scholarship detail pages | Show requirements, deadlines, funding, provenance, and source links |
+| Save and tracker workflows | Preserve opportunities and track readiness and deadlines |
+| Document preparation support | Bounded SOP/CV/essay feedback workflows |
+| Interview practice | Scholarship-style prompts with structured feedback |
+| Admin curation workflow | Validate and publish scholarship records through provenance states |
 
-### Out of scope for MVP
-| Item | Reason |
-|---|---|
-| Broad USA university discovery | Conflicts with Canada-first scope control |
-| DAAD ingestion | Explicitly deferred by repository rules |
-| Mentor marketplace | Adds workflow and privacy complexity without being core to MVP validation |
-| Automated application submission | High risk, low priority, and operationally complex |
-| Claims of scholarship acceptance prediction | Unsupported without real outcome labels |
-| Policy truth from generated outputs | Violates source-of-truth governance |
+### Deferred By Stage
+| Item | Target stage | Reason |
+|---|---|---|
+| Compare mode and richer timeline planning | v0.2 | Secondary to core loop completeness |
+| Voice-first interview practice | v0.2-v0.3 | Increases implementation and QA complexity |
+| Mentor collaboration workflows | v0.3 | Adds privacy and workflow complexity |
+| Institution-facing verification and dashboards | v0.3-v1.x | Requires partner operating model and governance |
+| Broad geography and degree expansion | v1.x | Must not dilute data quality in v0.1 |
+| Deterministic acceptance-style claims | never in v0.1 | Unsupported without real outcome labels |
 
 ## Scope Boundaries
 ### Geography
-- Canada is the primary MVP university and scholarship corpus.
-- USA is allowed only for Fulbright-related information and narrow cross-border logic.
-- Broad USA scraping is excluded from MVP.
+- Canada is the primary v0.1 scope.
+- USA is limited to narrowly scoped Fulbright-related cases.
+- Broad USA scraping remains deferred.
 
 ### Academic scope
 - Degree level: MS.
 - Program targets: Data Science, Artificial Intelligence, Analytics.
-- General undergraduate and PhD discovery are excluded from MVP.
+- General undergraduate and PhD discovery are deferred.
 
 ### Data scope
-- Official scholarship requirements, deadlines, and funding rules must come from structured validated records.
-- Free-form model output is advisory only.
+- Official requirements, deadlines, and funding rules come from structured validated records.
+- Generated output is advisory and must not override validated facts.
 
 ## Core User Flows
-1. Student creates or updates a profile.
-2. Student explores scholarships through search and filters.
-3. System applies hard eligibility logic before ranking.
-4. Student reviews scholarship details and explanations.
-5. Student uses strategy, document, and interview tools to prepare.
+1. Student signs in and completes profile/onboarding.
+2. Student explores scholarships and applies filters.
+3. System enforces hard eligibility before fit guidance.
+4. Student reviews details and saves priority opportunities.
+5. Student uses preparation tools and tracker next actions.
 
 ## Functional Requirements
 | ID | Requirement |
 |---|---|
-| PRD-01 | The system must store scholarship records with provenance state and source reference. |
-| PRD-02 | The system must support search and filtering over the MVP scholarship corpus. |
-| PRD-03 | The system must evaluate hard eligibility constraints before recommendation ranking. |
-| PRD-04 | The system must provide explanation-oriented ranking output for recommendations. |
-| PRD-05 | The system must support document-feedback workflows bounded to guidance use cases. |
-| PRD-06 | The system must support interview-practice workflows with structured feedback. |
-| PRD-07 | The system must provide admin workflows for validation and publication of scholarship data. |
+| PRD-01 | Store scholarship records with provenance state and source references. |
+| PRD-02 | Support search and filtering over the v0.1 SLC corpus. |
+| PRD-03 | Evaluate hard eligibility constraints before fit guidance ranking. |
+| PRD-04 | Provide explanation-oriented fit output with actionable next steps. |
+| PRD-05 | Support bounded document-feedback workflows. |
+| PRD-06 | Support interview-practice workflows with structured feedback. |
+| PRD-07 | Provide admin workflows for validation and publication of scholarship data. |
+| PRD-08 | Support saved scholarships and readiness-oriented tracking workflow. |
 
 ## Non-Functional Scope Constraints
 | Area | Constraint |
 |---|---|
-| Team feasibility | Must remain deliverable by 3 developers in 16 weeks |
-| Architecture | Must remain a modular monolith |
-| Operations | Must avoid heavy infrastructure and multi-service sprawl |
-| Transparency | Must avoid black-box scholarship acceptance claims |
-| Reliability | Must prefer narrower validated coverage over broad noisy coverage |
+| Team feasibility | Deliverable by 3 developers in 16 weeks |
+| Architecture | Modular monolith |
+| Operations | Avoid heavy distributed-service sprawl |
+| Transparency | Avoid deterministic acceptance claims |
+| Trust | Prefer narrower validated coverage over broad noisy coverage |
+| Quality evidence | UI completion requires visual verification artifacts |
 
 ## Release Framing
-### MVP
-- Constrained corpus, clear eligibility rules, explainable ranking, advisory preparation tools.
+### v0.1 SLC
+Constrained corpus, clear eligibility rules, explainable guidance, save/tracker workflows, and bounded preparation tools with premium UX expectations.
 
 ### Future Research Extensions
-- DAAD and additional provider logic.
-- Deeper evaluation of Knowledge Graph Layer alternatives.
-- Expanded dataset collection and stronger experimental design.
+Graph-layer comparisons, trust/evaluation studies, and improved outcome-label research methods.
 
-### Post-MVP Startup Features
-- Wider geography and degree coverage.
-- Collaboration workflows and commercial service layers.
-- Institution-facing analytics and ecosystem tooling.
+### Deferred By Stage
+v0.2 depth improvements, v0.3 platform expansion, and v1.x ecosystem/commercial scale.
 
-## Acceptance Conditions For MVP
-1. Users can browse and inspect a curated scholarship corpus within the defined scope.
+## Acceptance Conditions For v0.1 SLC
+1. Users can browse, inspect, save, and track scholarships without confusion.
 2. Eligibility-relevant rules are represented in structured validated data.
-3. Recommendations are explainable and framed as estimates, not deterministic outcomes.
-4. Writing and interview tools are clearly bounded as advisory aids.
+3. Fit guidance is explainable and framed as advisory estimates.
+4. Document and interview tools are bounded and transparent.
 5. Admin curation supports `raw`, `validated`, and `published` provenance states.
+6. Primary screens demonstrate consistent quality across desktop and mobile.
 
-## MVP decision
-ScholarAI MVP will focus on a narrow, high-quality scholarship workflow for Canada-first MS programs, with explainable ranking and bounded AI preparation tools as the core product surface.
+## SLC decision (v0.1)
+ScholarAI v0.1 will focus on a narrow, high-quality scholarship workflow for Canada-first MS programs with explainable fit guidance, save/tracker execution, and bounded preparation support.
 
-## Deferred items
-- DAAD and other non-MVP provider expansion.
-- Mentor workflows and paid services.
-- Broad geography, degree, and institutional expansion.
-- Any feature that depends on real scholarship outcome labels before those labels exist.
+## Deferred By Stage
+- v0.2 depth features (compare mode, richer planning, deeper preparation).
+- v0.3 mentor and operations expansion.
+- v1.x broader geography, institutional surfaces, and ecosystem integrations.
 
 ## Assumptions
-- A constrained corpus is more valuable for MVP than a large but weakly validated directory.
-- Students prefer transparent prioritization support over fully manual scholarship research.
-- Admin curation capacity is sufficient to maintain a smaller validated dataset.
+- A constrained corpus is more valuable in v0.1 than large low-confidence coverage.
+- Students benefit from clear rationale and next actions over opaque scores.
+- Evidence-driven QA can hold premium UX quality in a small-team delivery model.
 
 ## Risks
-- Users may expect broader coverage than the MVP intentionally supports.
-- Document and interview guidance may be over-trusted if disclaimers are weak.
-- Recommendation usefulness depends on disciplined data validation and profile quality.
+- Users may still expect broader coverage unless scope is communicated clearly.
+- Advisory outputs may be over-trusted if boundaries are weak in UI copy.
+- Scope creep can degrade product coherence before v0.1 maturity.

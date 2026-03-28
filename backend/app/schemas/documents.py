@@ -23,6 +23,14 @@ class DocumentGeneratedGuidanceItem(BaseModel):
     guidance: str
 
 
+class DocumentCitation(BaseModel):
+    source_id: str
+    title: str
+    url_or_ref: str
+    snippet: str
+    relevance_score: float = Field(ge=0.0, le=1.0)
+
+
 class DocumentQualityMetrics(BaseModel):
     citation_coverage_ratio: float = Field(ge=0.0, le=1.0)
     validated_fact_count: int = Field(ge=0)
@@ -65,7 +73,10 @@ class DocumentFeedbackResponse(BaseModel):
     strengths: list[str]
     revision_priorities: list[str]
     caution_notes: list[str]
-    citations: list[str]
+    citations: list[DocumentCitation]
+    grounding_score: float = Field(ge=0.0, le=1.0)
+    coverage_flags: dict[str, bool]
+    ungrounded_warnings: list[str]
     grounded_context: list[str]
     validated_facts: list[DocumentValidatedFact]
     retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]

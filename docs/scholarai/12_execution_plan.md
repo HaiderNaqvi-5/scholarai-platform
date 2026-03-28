@@ -34,7 +34,7 @@ This document defines the 16-week delivery plan for ScholarAI. It translates the
 | 10 | Integrate recommendation, explanation, and preparation UI contracts | B + C |
 | 11 | Build offline evaluation sets, ranking comparisons, and explanation study materials | B |
 | 12 | Run pilot QA and UX polish on search, recommendation, and feedback surfaces | C |
-| 13 | Freeze MVP-scope features and complete research evaluation pass | All |
+| 13 | Freeze v0.1 SLC-scope features and complete research evaluation pass | All |
 | 14 | Run full regression, deployment rehearsal, and documentation cleanup | A |
 | 15 | Prepare thesis evidence, demo scripts, and fallback-safe release candidate | All |
 | 16 | Final hardening, packaging, and roadmap handoff | All |
@@ -138,7 +138,7 @@ This workstream starts immediately and must pass documentation gates before broa
 | Recommendation logic changes | ML owner plus one additional reviewer |
 | User-facing explanation changes | Frontend owner plus one additional reviewer |
 | Curation workflow changes | Backend owner and curator workflow reviewer |
-| Security-sensitive changes | Backend owner plus whole-team signoff for MVP-critical paths |
+| Security-sensitive changes | Backend owner plus whole-team signoff for v0.1 SLC-critical paths |
 
 ## Schedule Risk Management
 ### Cut last if schedule slips
@@ -152,17 +152,16 @@ This workstream starts immediately and must pass documentation gates before broa
 - advanced model comparison breadth
 - non-critical admin analytics
 - experimental UX variants
-
-## MVP
+## SLC decision (v0.1)
 - Phase-complete delivery focused on reliable data, usable ranking, and polished core workflows.
 
 ## Future Research Extensions
-- Larger evaluation studies and graph-layer experiments after MVP stabilization.
+- Larger evaluation studies and graph-layer experiments after v0.1 SLC stabilization.
 
-## Post-MVP Startup Features
+## Deferred By Stage
 - Commercial roadmap exploration only after core product reliability and thesis packaging are complete.
 
-## MVP decision
+## SLC decision (v0.1)
 ScholarAI will be delivered through five explicit phases over 16 weeks, with data reliability and curation foundations completed before recommendation sophistication or startup-style expansion.
 
 ## Deferred items
@@ -179,3 +178,4 @@ ScholarAI will be delivered through five explicit phases over 16 weeks, with dat
 - Frontloading too little documentation will cause downstream rework.
 - Recommendation and evaluation work can overrun if data foundations are late.
 - Scope creep in AI features can threaten the final hardening phase.
+
