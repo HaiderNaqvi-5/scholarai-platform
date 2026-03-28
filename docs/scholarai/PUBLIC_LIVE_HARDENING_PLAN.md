@@ -110,7 +110,7 @@ What is missing:
 
 ### 5. Environment And Config Handling
 Current evidence:
-- [README.md](../../README.md), [backend/.env.example](../../backend/.env.example), and [frontend/.env.local.example](../../frontend/.env.local.example) are good for internal handoff.
+- [README.md](../../README.md), [backend/.env.example](../../backend/.env.example), and [frontend/.env.local.example](../../frontend/README.md) are good for internal handoff.
 - [docker-compose.yml](../../docker-compose.yml) is development-oriented and runs `uvicorn --reload`.
 
 Gap:
