@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -218,8 +218,15 @@ class KPISnapshotService:
         }
 
     async def _delete_older_than(self, *, model: type, cutoff: datetime) -> int:
-        result = await self.db.execute(
-            delete(model).where(model.created_at < cutoff)
-        )
+        ids_result = await self.db.execute(select(model.id).where(model.created_at < cutoff))
+        ids = list(ids_result.scalars().all())
+        if not ids:
+            return 0
+
+        for snapshot_id in ids:
+            snapshot = await self.db.get(model, snapshot_id)
+            if snapshot is not None:
+                await self.db.delete(snapshot)
+
         await self.db.flush()
-        return result.rowcount
+        return len(ids)

@@ -23,14 +23,19 @@ class DocumentGeneratedGuidanceItem(BaseModel):
     guidance: str
 
 
+class DocumentCitation(BaseModel):
+    source_id: str
+    title: str
+    url_or_ref: str
+    snippet: str
+    relevance_score: float = Field(ge=0.0, le=1.0)
+
+
 class DocumentQualityMetrics(BaseModel):
     citation_coverage_ratio: float = Field(ge=0.0, le=1.0)
     validated_fact_count: int = Field(ge=0)
     retrieved_guidance_count: int = Field(ge=0)
     generated_guidance_count: int = Field(ge=0)
-    grounded_partition_count: int = Field(ge=0)
-    actionable_guidance_count: int = Field(ge=0)
-    fact_to_guidance_link_ratio: float = Field(ge=0.0, le=1.0)
     caution_note_count: int = Field(ge=0)
     review_flag: bool
 
@@ -40,8 +45,6 @@ class DocumentQualityThresholds(BaseModel):
     max_caution_note_count: int = Field(ge=0)
     min_retrieved_guidance_count: int = Field(ge=0)
     min_generated_guidance_count: int = Field(ge=0)
-    min_grounded_partition_count: int = Field(ge=0)
-    min_actionable_guidance_count: int = Field(ge=0)
 
 
 class DocumentQualityGate(BaseModel):
@@ -51,8 +54,6 @@ class DocumentQualityGate(BaseModel):
     caution_note_count_pass: bool
     retrieved_guidance_pass: bool
     generated_guidance_pass: bool
-    grounded_partition_pass: bool
-    actionable_guidance_pass: bool
     all_passed: bool
 
 
@@ -72,7 +73,10 @@ class DocumentFeedbackResponse(BaseModel):
     strengths: list[str]
     revision_priorities: list[str]
     caution_notes: list[str]
-    citations: list[str]
+    citations: list[DocumentCitation]
+    grounding_score: float = Field(ge=0.0, le=1.0)
+    coverage_flags: dict[str, bool]
+    ungrounded_warnings: list[str]
     grounded_context: list[str]
     validated_facts: list[DocumentValidatedFact]
     retrieved_writing_guidance: list[DocumentRetrievedGuidanceSnippet]

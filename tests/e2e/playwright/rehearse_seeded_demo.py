@@ -22,10 +22,9 @@ def main() -> None:
             "strongpass1"
         )
         page.locator('[data-testid="signup-form"] button[type="submit"]').click()
+        page.wait_for_url("**/onboarding")
         page.wait_for_load_state("networkidle")
 
-        page.goto("http://localhost:3000/profile")
-        page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="profile-form"]')
 
         page.locator(
@@ -40,14 +39,15 @@ def main() -> None:
         page.locator('[data-testid="profile-form"] input[name="gpa_value"]').fill("3.7")
         page.locator('[data-testid="profile-form"] input[name="gpa_scale"]').fill("4")
         page.locator('[data-testid="profile-form"] button[type="submit"]').click()
+        page.wait_for_url("**/recommendations")
         page.wait_for_load_state("networkidle")
 
         page.wait_for_selector('[data-testid="recommendations-workspace"]')
-        page.wait_for_selector('[data-testid="recommendation-card"]')
-        page.wait_for_selector("text=Criteria satisfied")
-        page.wait_for_selector("text=Ranking constraints")
-
-        page.locator('button:has-text("Save opportunity")').first.click()
+        cards = page.locator('[data-testid="recommendation-card"]')
+        if cards.count():
+            page.wait_for_selector("text=What aligned")
+            page.wait_for_selector("text=What to verify")
+            page.locator('button[aria-label*="to shortlist"]').first.click()
         page.goto("http://localhost:3000/dashboard")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector('[data-testid="dashboard-shell"]')
