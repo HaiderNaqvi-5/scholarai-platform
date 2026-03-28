@@ -54,7 +54,7 @@ async def test_auth_service_register_creates_user():
     user = await service.register(
         UserCreate(
             email="Student@example.com",
-            password="strongpass1",
+            password="Strongpass1!",
             full_name="Student Name",
         )
     )
@@ -72,6 +72,7 @@ async def test_auth_service_login_rejects_invalid_password():
         role=UserRole.STUDENT,
         is_active=True,
         institution_id=None,
+        auth_token_version=0,
     )
     session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
@@ -93,6 +94,7 @@ async def test_auth_service_login_returns_tokens_for_valid_credentials():
         role=UserRole.STUDENT,
         is_active=True,
         institution_id=None,
+        auth_token_version=0,
     )
     session = FakeSession(
         [
@@ -122,6 +124,7 @@ async def test_auth_service_refresh_session_returns_new_tokens():
         role=UserRole.STUDENT,
         is_active=True,
         institution_id=None,
+        auth_token_version=0,
     )
     session = FakeSession(
         [
@@ -151,7 +154,7 @@ async def test_auth_service_refresh_session_returns_new_tokens():
 async def test_auth_service_refresh_session_rejects_missing_subject_claim():
     session = FakeSession([])
     service = AuthService(session)
-    refresh_token = create_refresh_token({"role": UserRole.STUDENT.value})
+    refresh_token = create_refresh_token({"role": UserRole.STUDENT.value, "token_version": 0})
 
     with pytest.raises(ScholarAIException) as caught:
         await service.refresh_session(refresh_token)
@@ -165,7 +168,7 @@ async def test_auth_service_refresh_session_rejects_unknown_user():
     session = FakeSession([ScalarResult(one=None)])
     service = AuthService(session)
     refresh_token = create_refresh_token(
-        {"sub": "missing-user", "role": UserRole.STUDENT.value}
+        {"sub": "missing-user", "role": UserRole.STUDENT.value, "token_version": 0}
     )
 
     with pytest.raises(ScholarAIException) as caught:
@@ -184,11 +187,12 @@ async def test_auth_service_refresh_session_rejects_inactive_user():
         role=UserRole.STUDENT,
         is_active=False,
         institution_id=None,
+        auth_token_version=0,
     )
     session = FakeSession([ScalarResult(one=user)])
     service = AuthService(session)
     refresh_token = create_refresh_token(
-        {"sub": str(user.id), "role": user.role.value}
+        {"sub": str(user.id), "role": user.role.value, "token_version": 0}
     )
 
     with pytest.raises(ScholarAIException) as caught:
@@ -197,3 +201,45 @@ async def test_auth_service_refresh_session_rejects_inactive_user():
     assert caught.value.code == ErrorCode.AUTH_INACTIVE_ACCOUNT
     assert caught.value.status_code == 403
     assert session.execute_count == 1
+
+
+async def test_auth_service_refresh_session_rejects_token_version_mismatch():
+    user = SimpleNamespace(
+        id="user-3",
+        email="student@example.com",
+        password_hash=hash_password("correct-password"),
+        role=UserRole.STUDENT,
+        is_active=True,
+        institution_id=None,
+        auth_token_version=2,
+    )
+    session = FakeSession([ScalarResult(one=user)])
+    service = AuthService(session)
+    refresh_token = create_refresh_token(
+        {"sub": str(user.id), "role": user.role.value, "token_version": 1}
+    )
+
+    with pytest.raises(ScholarAIException) as caught:
+        await service.refresh_session(refresh_token)
+
+    assert caught.value.code == ErrorCode.AUTH_TOKEN_EXPIRED
+    assert caught.value.status_code == 401
+    assert session.execute_count == 1
+
+
+async def test_auth_service_logout_increments_token_version():
+    user = SimpleNamespace(
+        id="user-4",
+        email="student@example.com",
+        password_hash=hash_password("correct-password"),
+        role=UserRole.STUDENT,
+        is_active=True,
+        institution_id=None,
+        auth_token_version=0,
+    )
+    session = FakeSession([])
+    service = AuthService(session)
+
+    await service.logout(user=user)
+
+    assert user.auth_token_version == 1

@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    AUTH_RATE_LIMIT_REGISTER_REQUESTS: int = 5
+    AUTH_RATE_LIMIT_LOGIN_REQUESTS: int = 5
+    AUTH_RATE_LIMIT_REFRESH_REQUESTS: int = 10
+    AUTH_RATE_LIMIT_LOGOUT_REQUESTS: int = 10
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -75,13 +80,26 @@ class Settings(BaseSettings):
     DEMO_ADMIN_FULL_NAME: str = "ScholarAI Demo Admin"
 
     def validate_production_settings(self):
-        if self.ENVIRONMENT == "production":
-            if self.SECRET_KEY == "change-me-in-production-min-32-chars!!":
-                raise RuntimeError("PROD_ERROR: SECRET_KEY must be overridden in production!")
-            if self.NEO4J_PASSWORD == "password":
-                raise RuntimeError("PROD_ERROR: NEO4J_PASSWORD must be overridden in production!")
-            if "password" in self.DATABASE_URL and "@localhost" not in self.DATABASE_URL:
-                raise RuntimeError("PROD_ERROR: DATABASE_URL appears to use default password in production!")
+        env_name = self.ENVIRONMENT.strip().lower()
+        if env_name not in {"production", "staging"}:
+            return
+
+        if self.SECRET_KEY == "change-me-in-production-min-32-chars!!" or len(self.SECRET_KEY) < 32:
+            raise RuntimeError("PROD_ERROR: SECRET_KEY must be overridden with a 32+ char value.")
+        if self.NEO4J_PASSWORD == "password":
+            raise RuntimeError("PROD_ERROR: NEO4J_PASSWORD must be overridden in production/staging.")
+        if "password" in self.DATABASE_URL and "@localhost" not in self.DATABASE_URL:
+            raise RuntimeError(
+                "PROD_ERROR: DATABASE_URL appears to use default password in production/staging."
+            )
+        if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
+            raise RuntimeError("PROD_ERROR: REDIS_URL must not point to localhost in production/staging.")
+        if "localhost" in self.CELERY_BROKER_URL or "127.0.0.1" in self.CELERY_BROKER_URL:
+            raise RuntimeError(
+                "PROD_ERROR: CELERY_BROKER_URL must not point to localhost in production/staging."
+            )
+        if self.AUTO_SEED_DEMO_DATA:
+            raise RuntimeError("PROD_ERROR: AUTO_SEED_DEMO_DATA must be False in production/staging.")
 
 
 settings = Settings()

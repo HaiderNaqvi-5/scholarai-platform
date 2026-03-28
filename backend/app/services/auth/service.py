@@ -61,6 +61,7 @@ class AuthService:
             "capabilities": capabilities,
             "policy_version": "rbac.v1",
             "institution_scope": str(user.institution_id) if user.institution_id else None,
+            "token_version": user.auth_token_version,
         }
         return TokenResponse(
             access_token=create_access_token(token_data),
@@ -93,6 +94,13 @@ class AuthService:
                 message="Account is disabled",
                 status_code=403
             )
+        token_version = payload.get("token_version")
+        if token_version is None or token_version != user.auth_token_version:
+            raise ScholarAIException(
+                code=ErrorCode.AUTH_TOKEN_EXPIRED,
+                message="Refresh token is no longer valid",
+                status_code=401,
+            )
 
         capabilities = await self._resolve_capabilities(user)
         token_data = {
@@ -101,12 +109,17 @@ class AuthService:
             "capabilities": capabilities,
             "policy_version": "rbac.v1",
             "institution_scope": str(user.institution_id) if user.institution_id else None,
+            "token_version": user.auth_token_version,
         }
         return TokenResponse(
             access_token=create_access_token(token_data),
             refresh_token=create_refresh_token(token_data),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+
+    async def logout(self, *, user: User) -> None:
+        user.auth_token_version += 1
+        await self.db.flush()
 
     async def _resolve_capabilities(self, user: User) -> list[str]:
         role_result = await self.db.execute(
