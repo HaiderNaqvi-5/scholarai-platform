@@ -96,6 +96,14 @@ class InterviewScoringService:
         overall_band = self._band(overall_score)
         strengths = self._strengths(dimensions)
         improvement_prompts = self._improvements(dimensions, question_text)
+        targeted_follow_up_actions = self._targeted_follow_up_actions(
+            dimensions,
+            question_text,
+        )
+        weakest_dimension = min(
+            dimensions,
+            key=lambda item: item.score,
+        ).dimension
 
         summary_feedback = (
             "This answer has a usable structure and should next become more specific and scholarship-oriented."
@@ -113,6 +121,8 @@ class InterviewScoringService:
             summary_feedback=summary_feedback,
             strengths=strengths,
             improvement_prompts=improvement_prompts,
+            targeted_follow_up_actions=targeted_follow_up_actions,
+            rubric_focus_dimension=weakest_dimension,
             dimensions=dimensions,
             limitation_notice=(
                 "This is a rules-based practice score for coaching only. It is not a prediction of real interview outcomes."
@@ -194,6 +204,25 @@ class InterviewScoringService:
                 elif item.dimension == "specificity":
                     improvements.append("Add one concrete example with an action and outcome.")
         return improvements[:3] or ["Tighten the answer so the strongest example appears earlier."]
+
+    def _targeted_follow_up_actions(
+        self,
+        dimensions: list[InterviewRubricDimension],
+        question_text: str,
+    ) -> list[str]:
+        weakest_dimensions = sorted(dimensions, key=lambda item: item.score)[:2]
+        actions: list[str] = []
+        for item in weakest_dimensions:
+            if item.dimension == "clarity":
+                actions.append("Answer using a three-part structure: context, action, result.")
+            elif item.dimension == "relevance":
+                actions.append(f"Answer the exact ask from the prompt: {question_text}")
+            elif item.dimension == "confidence":
+                actions.append("Replace hedging with direct ownership statements starting with 'I'.")
+            elif item.dimension == "specificity":
+                actions.append("Describe one concrete example with a measurable outcome.")
+
+        return actions[:2]
 
     def _question_keywords(self, question_text: str) -> set[str]:
         return {

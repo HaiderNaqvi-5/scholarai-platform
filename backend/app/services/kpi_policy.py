@@ -34,6 +34,8 @@ def get_document_quality_thresholds() -> DocumentQualityThresholds:
         max_caution_note_count=settings.DOCUMENT_QUALITY_MAX_CAUTION_NOTE_COUNT,
         min_retrieved_guidance_count=settings.DOCUMENT_QUALITY_MIN_RETRIEVED_GUIDANCE_COUNT,
         min_generated_guidance_count=settings.DOCUMENT_QUALITY_MIN_GENERATED_GUIDANCE_COUNT,
+        min_grounded_partition_count=settings.DOCUMENT_QUALITY_MIN_GROUNDED_PARTITION_COUNT,
+        min_actionable_guidance_count=settings.DOCUMENT_QUALITY_MIN_ACTIONABLE_GUIDANCE_COUNT,
     )
 
 
@@ -47,6 +49,8 @@ def get_interview_progression_thresholds() -> InterviewProgressionThresholds:
         min_average_score=settings.INTERVIEW_PROGRESSION_MIN_AVERAGE_SCORE,
         min_score_delta=settings.INTERVIEW_PROGRESSION_MIN_SCORE_DELTA,
         max_needs_focus_ratio=settings.INTERVIEW_PROGRESSION_MAX_NEEDS_FOCUS_RATIO,
+        min_follow_up_actionability_ratio=settings.INTERVIEW_PROGRESSION_MIN_FOLLOW_UP_ACTIONABILITY_RATIO,
+        min_adaptive_guidance_coverage=settings.INTERVIEW_PROGRESSION_MIN_ADAPTIVE_GUIDANCE_COVERAGE,
     )
 
 

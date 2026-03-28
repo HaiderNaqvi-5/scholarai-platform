@@ -202,6 +202,44 @@ export type DocumentGeneratedGuidance = {
   caution_notes: string[];
 };
 
+export type DocumentGeneratedGuidanceItem = {
+  type: string;
+  guidance: string;
+};
+
+export type DocumentQualityMetrics = {
+  citation_coverage_ratio: number;
+  validated_fact_count: number;
+  retrieved_guidance_count: number;
+  generated_guidance_count: number;
+  grounded_partition_count: number;
+  actionable_guidance_count: number;
+  fact_to_guidance_link_ratio: number;
+  caution_note_count: number;
+  review_flag: boolean;
+};
+
+export type DocumentQualityThresholds = {
+  min_citation_coverage_ratio: number;
+  max_caution_note_count: number;
+  min_retrieved_guidance_count: number;
+  min_generated_guidance_count: number;
+  min_grounded_partition_count: number;
+  min_actionable_guidance_count: number;
+};
+
+export type DocumentQualityGate = {
+  thresholds: DocumentQualityThresholds;
+  policy_version: string;
+  citation_coverage_pass: boolean;
+  caution_note_count_pass: boolean;
+  retrieved_guidance_pass: boolean;
+  generated_guidance_pass: boolean;
+  grounded_partition_pass: boolean;
+  actionable_guidance_pass: boolean;
+  all_passed: boolean;
+};
+
 export type DocumentFeedback = {
   id: string;
   status: DocumentProcessingStatus;
@@ -214,8 +252,13 @@ export type DocumentFeedback = {
   limitation_notice: string;
   validated_facts?: DocumentGroundingEntry[] | null;
   retrieved_writing_guidance?: DocumentGroundingEntry[] | null;
-  generated_guidance?: DocumentGeneratedGuidance | null;
+  generated_guidance?:
+    | DocumentGeneratedGuidance
+    | DocumentGeneratedGuidanceItem[]
+    | null;
   limitations?: string[] | null;
+  quality_metrics?: DocumentQualityMetrics | null;
+  quality_gate?: DocumentQualityGate | null;
   grounded_context_sections?: {
     validated_facts: DocumentGroundingEntry[];
     retrieved_writing_guidance: DocumentGroundingEntry[];
@@ -277,9 +320,44 @@ export type InterviewAnswerFeedback = {
   summary_feedback: string;
   strengths: string[];
   improvement_prompts: string[];
+  targeted_follow_up_actions: string[];
+  rubric_focus_dimension: string | null;
   dimensions: InterviewRubricDimension[];
   limitation_notice: string;
   created_at: string | null;
+};
+
+export type InterviewProgressionMetrics = {
+  answered_count: number;
+  average_score: number | null;
+  first_score: number | null;
+  latest_score: number | null;
+  score_delta: number | null;
+  improvement_ratio: number;
+  needs_focus_ratio: number;
+  follow_up_actionability_ratio: number;
+  adaptive_guidance_coverage: number;
+};
+
+export type InterviewProgressionThresholds = {
+  min_answered_count: number;
+  min_average_score: number;
+  min_score_delta: number;
+  max_needs_focus_ratio: number;
+  min_follow_up_actionability_ratio: number;
+  min_adaptive_guidance_coverage: number;
+};
+
+export type InterviewProgressionGate = {
+  thresholds: InterviewProgressionThresholds;
+  policy_version: string;
+  answered_count_pass: boolean;
+  average_score_pass: boolean;
+  score_delta_pass: boolean;
+  needs_focus_ratio_pass: boolean;
+  follow_up_actionability_pass: boolean;
+  adaptive_guidance_pass: boolean;
+  all_passed: boolean;
 };
 
 export type InterviewCurrentQuestion = {
@@ -320,6 +398,8 @@ export type InterviewSessionSummary = {
     latest_weakest_dimension: string | null;
     dimension_averages: Record<string, number>;
   };
+  progression_metrics: InterviewProgressionMetrics;
+  progression_gate: InterviewProgressionGate;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;

@@ -420,6 +420,30 @@ export function InterviewPracticeShell() {
                   ))}
                 </ul>
               </article>
+              {state.session.latest_feedback.targeted_follow_up_actions.length > 0 ? (
+                <article>
+                  <p className="list-heading">Targeted follow-up actions</p>
+                  <ul className="detail-list">
+                    {state.session.latest_feedback.targeted_follow_up_actions.map(
+                      (item) => (
+                        <li key={item}>{item}</li>
+                      ),
+                    )}
+                  </ul>
+                </article>
+              ) : null}
+              {state.session.latest_feedback.rubric_focus_dimension ? (
+                <article>
+                  <p className="list-heading">Rubric focus</p>
+                  <p className="body-copy">
+                    Prioritize improvement in{" "}
+                    <strong>
+                      {state.session.latest_feedback.rubric_focus_dimension}
+                    </strong>{" "}
+                    on the next answer.
+                  </p>
+                </article>
+              ) : null}
               <article className="guidance-callout">
                 <p className="list-heading">Limitation</p>
                 <p className="body-copy">
@@ -439,6 +463,44 @@ export function InterviewPracticeShell() {
                     {state.session.trend_summary.latest_weakest_dimension}
                   </p>
                 ) : null}
+              </article>
+              <article>
+                <p className="list-heading">Progression gate</p>
+                <div className="meta-row">
+                  <StatusBadge
+                    label={
+                      state.session.progression_gate.all_passed
+                        ? "KPI pass"
+                        : "Needs more depth"
+                    }
+                    variant={
+                      state.session.progression_gate.all_passed
+                        ? "validated"
+                        : "warning"
+                    }
+                  />
+                  <span className="route-card__label">
+                    Policy {state.session.progression_gate.policy_version}
+                  </span>
+                </div>
+                <ul className="detail-list">
+                  <li>
+                    Follow-up actionability:{" "}
+                    {Math.round(
+                      state.session.progression_metrics.follow_up_actionability_ratio *
+                        100,
+                    )}
+                    %
+                  </li>
+                  <li>
+                    Adaptive guidance coverage:{" "}
+                    {Math.round(
+                      state.session.progression_metrics.adaptive_guidance_coverage *
+                        100,
+                    )}
+                    %
+                  </li>
+                </ul>
               </article>
             </div>
           ) : (

@@ -227,6 +227,8 @@ export function DocumentAssistanceShell() {
 
   const feedback = selectedDocument?.latest_feedback ?? null;
   const generatedGuidance = getGeneratedGuidance(feedback);
+  const qualityMetrics = feedback?.quality_metrics ?? null;
+  const qualityGate = feedback?.quality_gate ?? null;
   const validatedFacts = normalizeGroundingEntries(feedback?.validated_facts);
   const retrievedWritingGuidance = normalizeGroundingEntries(
     feedback?.retrieved_writing_guidance ?? feedback?.grounded_context,
@@ -520,6 +522,35 @@ export function DocumentAssistanceShell() {
                   ))}
                 </ul>
               </article>
+              {qualityMetrics ? (
+                <article>
+                  <p className="list-heading">Quality gate snapshot</p>
+                  <div className="meta-row">
+                    <StatusBadge
+                      label={qualityGate?.all_passed ? "KPI pass" : "Needs refinement"}
+                      variant={qualityGate?.all_passed ? "validated" : "warning"}
+                    />
+                    {qualityGate?.policy_version ? (
+                      <span className="route-card__label">
+                        Policy {qualityGate.policy_version}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="detail-list">
+                    <li>
+                      Grounded partitions: {qualityMetrics.grounded_partition_count}
+                    </li>
+                    <li>
+                      Actionable guidance items:{" "}
+                      {qualityMetrics.actionable_guidance_count}
+                    </li>
+                    <li>
+                      Fact-to-guidance link ratio:{" "}
+                      {Math.round(qualityMetrics.fact_to_guidance_link_ratio * 100)}%
+                    </li>
+                  </ul>
+                </article>
+              ) : null}
               <div className="document-actions">
                 <button
                   className="auth-link auth-link--secondary"
@@ -683,15 +714,29 @@ function getGeneratedGuidance(feedback: DocumentDetail["latest_feedback"]) {
       caution_notes: [] as string[],
     };
   }
+  const generatedGuidanceItems = Array.isArray(feedback.generated_guidance)
+    ? feedback.generated_guidance
+    : [];
+  const generatedGuidanceObject =
+    feedback.generated_guidance && !Array.isArray(feedback.generated_guidance)
+      ? feedback.generated_guidance
+      : null;
+  const generatedGuidanceBulletPoints = generatedGuidanceItems
+    .map((item) => item.guidance?.trim())
+    .filter((item): item is string => Boolean(item));
 
   return {
-    summary: feedback.generated_guidance?.summary ?? feedback.summary,
-    strengths: feedback.generated_guidance?.strengths ?? feedback.strengths,
+    summary: generatedGuidanceObject?.summary ?? feedback.summary,
+    strengths:
+      generatedGuidanceObject?.strengths ??
+      feedback.strengths ??
+      generatedGuidanceBulletPoints.slice(0, 3),
     revision_priorities:
-      feedback.generated_guidance?.revision_priorities ??
-      feedback.revision_priorities,
+      generatedGuidanceObject?.revision_priorities ??
+      feedback.revision_priorities ??
+      generatedGuidanceBulletPoints.slice(0, 4),
     caution_notes:
-      feedback.generated_guidance?.caution_notes ?? feedback.caution_notes,
+      generatedGuidanceObject?.caution_notes ?? feedback.caution_notes,
   };
 }
 

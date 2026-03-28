@@ -28,6 +28,9 @@ class DocumentQualityMetrics(BaseModel):
     validated_fact_count: int = Field(ge=0)
     retrieved_guidance_count: int = Field(ge=0)
     generated_guidance_count: int = Field(ge=0)
+    grounded_partition_count: int = Field(ge=0)
+    actionable_guidance_count: int = Field(ge=0)
+    fact_to_guidance_link_ratio: float = Field(ge=0.0, le=1.0)
     caution_note_count: int = Field(ge=0)
     review_flag: bool
 
@@ -37,6 +40,8 @@ class DocumentQualityThresholds(BaseModel):
     max_caution_note_count: int = Field(ge=0)
     min_retrieved_guidance_count: int = Field(ge=0)
     min_generated_guidance_count: int = Field(ge=0)
+    min_grounded_partition_count: int = Field(ge=0)
+    min_actionable_guidance_count: int = Field(ge=0)
 
 
 class DocumentQualityGate(BaseModel):
@@ -46,6 +51,8 @@ class DocumentQualityGate(BaseModel):
     caution_note_count_pass: bool
     retrieved_guidance_pass: bool
     generated_guidance_pass: bool
+    grounded_partition_pass: bool
+    actionable_guidance_pass: bool
     all_passed: bool
 
 
