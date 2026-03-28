@@ -20,76 +20,21 @@
 ## 8-Stage Workflow
 
 ### Stage 1: Identify Changes (APPROVAL REQUIRED)
-**Action**: User describes what changed
-
-**Format**:
-```
-What changed in {topic}?
-  [A] API changes
-  [B] Deprecations
-  [C] New features
-  [D] Breaking changes
-  [E] Other (describe)
-
-Select all that apply (A B C D or describe):
-```
-
-**Follow-up**: Get specific details for each selected type
+**Action**: User describes what changed (API changes, deprecations, new features, breaking changes)
 
 **Validation**: MUST get user input before proceeding
 
 ---
 
 ### Stage 2: Find Affected Files
-**Action**: Search for files referencing the topic
+**Action**: Grep for topic references across all context; show file list with reference counts
 
-**Process**:
-1. Grep for topic references across all context
-2. Count references per file
-3. Show impact analysis
-
-**Format**:
-```
-Found 5 files referencing {topic}:
-  📄 concepts/routing.md (3 references, 145 lines)
-  📄 examples/app-router-example.md (7 references, 78 lines)
-  📄 guides/setting-up-nextjs.md (2 references, 132 lines)
-  📄 errors/nextjs-errors.md (1 reference, 98 lines)
-  📄 lookup/nextjs-commands.md (4 references, 54 lines)
-
-Total impact: 17 references across 5 files
-```
+**Validation**: Present impact summary before continuing
 
 ---
 
 ### Stage 3: Preview Changes (APPROVAL REQUIRED)
-**Action**: Show line-by-line diff for each file
-
-**Format**:
-```
-Proposed updates:
-
-━━━ concepts/routing.md ━━━
-
-Line 15:
-  - App router is optional (use pages/ or app/)
-  + App router is now default in Next.js 15 (pages/ still supported)
-
-Line 42:
-  + ## Metadata API (New in v15)
-  + Next.js 15 introduces new metadata API...
-
-━━━ examples/app-router-example.md ━━━
-
-Line 8:
-  - // Optional: use app router
-  + // Default in Next.js 15+
-
-Preview next file? (yes/no/show-all)
-Approve changes? (yes/no/edit):
-```
-
-**Edit mode**: Line-by-line approval for each change
+**Action**: Show line-by-line diff for each affected file; allow per-line approval
 
 **Validation**: MUST get approval before proceeding
 
@@ -151,48 +96,16 @@ Approve changes? (yes/no/edit):
 ---
 
 ### Stage 8: Report
-**Action**: Show comprehensive results
-
-**Format**:
-```
-✅ Updated X files
-📝 Modified Y references
-🔄 Added migration notes to errors/
-💾 Backup: .tmp/backup/update-{topic}-{timestamp}/
-
-Summary of changes:
-  - concepts/routing.md: 2 updates (145 → 162 lines)
-  - examples/app-router-example.md: 4 updates (78 → 89 lines)
-  - guides/setting-up-nextjs.md: 1 update (132 → 133 lines)
-
-All files still under 200 line limit ✓
-
-Rollback available if needed.
-```
+**Action**: Confirm updated files, reference counts, line totals, backup location, and rollback availability
 
 ---
 
 ## Change Types
 
-### API Changes
-- Method signatures changed
-- Parameters added/removed
-- Return types changed
-
-### Deprecations
-- Features marked deprecated
-- Replacement APIs available
-- Timeline for removal
-
-### New Features
-- New capabilities added
-- New APIs introduced
-- New patterns available
-
-### Breaking Changes
-- Incompatible changes
-- Migration required
-- Old code won't work
+- **API Changes**: Method signatures, parameters, return types
+- **Deprecations**: Marked features, replacements, removal timeline
+- **New Features**: New capabilities, APIs, patterns
+- **Breaking Changes**: Incompatible changes requiring migration
 
 ---
 
