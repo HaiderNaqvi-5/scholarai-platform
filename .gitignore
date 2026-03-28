@@ -10,6 +10,7 @@ build/
 *.egg
 venv/
 .venv/
+.venv*/
 env/
 
 # ML / Data
@@ -60,3 +61,4 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 backend/runtime/
+.tmp/
