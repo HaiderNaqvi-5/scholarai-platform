@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AuthActions } from "@/components/auth/auth-actions";
 import { Footer } from "@/components/layout/footer";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { appNavRoutes } from "@/lib/routes";
 
 type AppShellProps = {
@@ -56,7 +57,10 @@ export function AppShell({
               );
             })}
           </div>
-          <AuthActions />
+          <div className="shell-nav__actions">
+            <ThemeToggle />
+            <AuthActions />
+          </div>
         </nav>
         <header className="hero-block hero-block--app fade-in">
           <div className="hero-block__copy">

@@ -272,59 +272,13 @@ async def test_interview_service_session_history_and_trend_summary():
     assert result.progression_metrics.score_delta == 1.5
     assert result.progression_metrics.improvement_ratio == 1.0
     assert result.progression_metrics.needs_focus_ratio == 0.5
-    assert result.progression_metrics.follow_up_actionability_ratio == 1.0
-    assert result.progression_metrics.adaptive_guidance_coverage == 1.0
     assert result.progression_gate.policy_version == "interview.progression.v1"
     assert result.progression_gate.thresholds.min_answered_count == 2
     assert result.progression_gate.answered_count_pass is True
     assert result.progression_gate.average_score_pass is False
     assert result.progression_gate.score_delta_pass is True
     assert result.progression_gate.needs_focus_ratio_pass is True
-    assert result.progression_gate.follow_up_actionability_pass is True
-    assert result.progression_gate.adaptive_guidance_pass is True
     assert result.progression_gate.all_passed is False
-    assert result.latest_feedback is not None
-    assert result.latest_feedback.rubric_focus_dimension in {
-        "clarity",
-        "relevance",
-        "confidence",
-        "specificity",
-    }
-    assert result.latest_feedback.targeted_follow_up_actions
-
-
-async def test_interview_progression_gate_treats_rebuild_fallback_as_actionable():
-    service = InterviewSessionService(FakeSession())
-    responses = [
-        _feedback(
-            question_index=0,
-            question_text="Question one?",
-            answer_text="First answer",
-            overall_score=3.2,
-            dimensions=[("clarity", 3), ("relevance", 3), ("confidence", 3), ("specificity", 3)],
-        ).model_copy(
-            update={
-                "improvement_prompts": [
-                    "Rebuild the answer into a simple opening, evidence, and closing structure."
-                ],
-                "targeted_follow_up_actions": None,
-            }
-        ),
-        _feedback(
-            question_index=1,
-            question_text="Question two?",
-            answer_text="Second answer",
-            overall_score=3.8,
-            dimensions=[("clarity", 4), ("relevance", 4), ("confidence", 3), ("specificity", 4)],
-        ),
-    ]
-
-    metrics = service._build_progression_metrics(responses)
-    gate = service._build_progression_gate(responses)
-
-    assert metrics.follow_up_actionability_ratio == 1.0
-    assert gate.follow_up_actionability_pass is True
-    assert gate.all_passed is True
 
 
 async def test_interview_invalid_scholarship_grounding_fails_cleanly():

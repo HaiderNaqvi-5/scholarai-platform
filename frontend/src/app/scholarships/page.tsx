@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import type { Metadata } from "next";
 
 import { ScholarshipBrowseShell } from "@/components/scholarships/scholarship-browse-shell";
@@ -9,5 +11,9 @@ export const metadata: Metadata = {
 };
 
 export default function ScholarshipsPage() {
-  return <ScholarshipBrowseShell />;
+  return (
+    <Suspense fallback={null}>
+      <ScholarshipBrowseShell />
+    </Suspense>
+  );
 }

@@ -17,6 +17,22 @@ class _Result:
         return self._rows
 
 
+class _ScalarRows:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _ScalarResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalars(self):
+        return _ScalarRows(self._rows)
+
+
 class _FakeSession:
     def __init__(self, rows_by_call):
         self.rows_by_call = rows_by_call
@@ -35,24 +51,26 @@ class _FakeSession:
         return _Result(rows)
 
 
-class _BulkDeleteResult:
-    def __init__(self, rowcount: int):
-        self.rowcount = rowcount
-
-
 class _FakeCleanupSession:
     def __init__(self):
         self.execute_calls = 0
+        self.deleted = []
 
     async def execute(self, _query):
         self.execute_calls += 1
         if self.execute_calls == 1:
-            return _BulkDeleteResult(2)
+            return _ScalarResult([uuid.uuid4(), uuid.uuid4()])
         if self.execute_calls == 2:
-            return _BulkDeleteResult(1)
+            return _ScalarResult([uuid.uuid4()])
         if self.execute_calls == 3:
-            return _BulkDeleteResult(0)
-        return _BulkDeleteResult(0)
+            return _ScalarResult([])
+        return _ScalarResult([])
+
+    async def get(self, model, snapshot_id):
+        return {"model": model.__name__, "id": snapshot_id}
+
+    async def delete(self, snapshot):
+        self.deleted.append(snapshot)
 
     async def flush(self):
         return None
@@ -113,4 +131,4 @@ async def test_kpi_snapshot_service_purges_old_snapshots():
     assert deleted["document_deleted"] == 1
     assert deleted["interview_deleted"] == 0
     assert deleted["total_deleted"] == 3
-    assert fake_db.execute_calls == 3
+    assert len(fake_db.deleted) == 3
