@@ -1,17 +1,17 @@
-﻿# ScholarAI System Architecture
+# ScholarAI System Architecture
 
 ## Architecture Objective
-Define a system architecture that delivers the core ScholarAI workflows within v0.1 constraints while preserving a path to later research extensions and startup growth.
+Define a system architecture that delivers the core ScholarAI workflows within v0.1 SLC constraints while preserving a path to later research extensions and startup growth.
 
 ## Architecture Principles
-1. Keep the v0.1 architecture as a modular monolith.
+1. Keep the v0.1 SLC architecture as a modular monolith.
 2. Prefer one strong relational foundation over multiple specialized stores unless clearly justified.
 3. Preserve strict boundaries between validated facts and generated guidance.
 4. Keep every major subsystem understandable by a 3-person team.
 5. Optimize for data reliability and maintainability before optimization for breadth.
 
-## v0.1 Architecture Summary
-| Layer | v0.1 decision |
+## v0.1 SLC Architecture Summary
+| Layer | SLC decision (v0.1) |
 |---|---|
 | Frontend | One Next.js application for student and admin experiences |
 | Backend | One FastAPI application with internal service modules |
@@ -43,7 +43,7 @@ graph TB
 
     subgraph DATA["Data Layer"]
         PG["PostgreSQL + pgvector"]
-        KG["Knowledge Graph Layer\n(Relational Abstraction In v0.1)"]
+        KG["Knowledge Graph Layer\n(Relational Abstraction In v0.1 SLC)"]
     end
 
     subgraph ING["Ingestion"]
@@ -78,7 +78,7 @@ graph TB
 | Ingestion | Source extraction, parsing, schema validation, deduplication, and publication into the main data layer |
 
 ## Knowledge Graph Layer
-The Knowledge Graph Layer is mandatory as a logical concept because ScholarAI needs relationship-aware filtering over eligibility conditions and scholarship context. For v0.1, the default implementation is a relationally derived graph abstraction backed by PostgreSQL tables and joins. This keeps infrastructure lighter while preserving the graph reasoning model.
+The Knowledge Graph Layer is mandatory as a logical concept because ScholarAI needs relationship-aware filtering over eligibility conditions and scholarship context. For v0.1 SLC, the default implementation is a relationally derived graph abstraction backed by PostgreSQL tables and joins. This keeps infrastructure lighter while preserving the graph reasoning model.
 
 ### Why this default
 - It is simpler to operate than adding Neo4j at the start.
@@ -138,7 +138,7 @@ graph LR
 | Embeddings | Stored in PostgreSQL through pgvector |
 | Background tasks | Isolated into Celery workers, not separate business services |
 | Admin workflows | Remain inside the same FastAPI backend, protected by capability checks |
-| Search system sprawl | Avoided in v0.1; no separate OpenSearch layer by default |
+| Search system sprawl | Avoided in v0.1 SLC; no separate OpenSearch layer by default |
 
 ## Authorization Architecture Constraints
 1. Authorization uses a capability matrix evaluated in backend dependencies.
@@ -148,7 +148,7 @@ graph LR
 5. High-risk capability decisions must be auditable.
 
 ## Deployment Topology
-### v0.1
+### v0.1 SLC
 - One frontend container.
 - One backend container.
 - PostgreSQL container.
@@ -164,17 +164,17 @@ graph LR
 |---|---|---|
 | Modular monolith | Lower coordination overhead and simpler deployment | Requires clear internal module discipline |
 | PostgreSQL + pgvector baseline | Fewer moving parts and strong data centralization | Less specialized than a multi-store architecture |
-| Relational graph abstraction first | Simpler v0.1 operations | May be less expressive than Neo4j for future graph research |
+| Relational graph abstraction first | Simpler v0.1 SLC operations | May be less expressive than Neo4j for future graph research |
 | Advisory AI boundaries | Stronger trust and defensibility | Less flashy product claims |
 
-## Non-v0.1 Architecture Explicitly Excluded
+## Non-v0.1 SLC Architecture Explicitly Excluded
 - Broad microservice decomposition.
 - Separate search engine without a documented gap.
 - Heavy orchestration layers for multiple LLM providers as a default requirement.
 - Infrastructure choices justified only by future scale assumptions.
 
-## v0.1 decision
-ScholarAI v0.1 architecture is a modular monolith centered on Next.js, FastAPI, PostgreSQL, pgvector, Celery, and Redis, with the Knowledge Graph Layer implemented first as a relationally derived graph abstraction.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC architecture is a modular monolith centered on Next.js, FastAPI, PostgreSQL, pgvector, Celery, and Redis, with the Knowledge Graph Layer implemented first as a relationally derived graph abstraction.
 
 ## Deferred items
 - Dedicated Neo4j deployment unless a clear graph-specific need emerges.
@@ -182,12 +182,12 @@ ScholarAI v0.1 architecture is a modular monolith centered on Next.js, FastAPI, 
 - Independent AI microservices or multi-service orchestration platforms.
 
 ## Assumptions
-- PostgreSQL can support the v0.1 mix of transactional data, embeddings, and graph-derived reasoning.
+- PostgreSQL can support the v0.1 SLC mix of transactional data, embeddings, and graph-derived reasoning.
 - The recommendation pipeline can remain interpretable and useful without real outcome-label prediction claims.
 - The team benefits more from fewer deployable units than from specialized infrastructure early on.
 
 ## Risks
-- If relational graph logic becomes too complex, the v0.1 architecture may need adjustment sooner than expected.
+- If relational graph logic becomes too complex, the v0.1 SLC architecture may need adjustment sooner than expected.
 - A single backend can become messy if module boundaries are not enforced.
 - Preparation workflows can blur into policy advice unless product boundaries remain explicit.
 

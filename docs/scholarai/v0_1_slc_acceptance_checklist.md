@@ -46,6 +46,18 @@ Use this checklist as the release acceptance source of truth for ScholarAI `v0.1
 | SLC-UI-002 | Every UI-affecting PR includes mobile screenshots for changed surfaces. | PR UI evidence links |
 | SLC-UI-003 | UI evidence is tied to checklist IDs in Acceptance Criteria Mapping. | PR checklist mapping section |
 
+## Execution Evidence Log (2026-03-28)
+
+| ID | Status | Evidence Link(s) |
+| --- | --- | --- |
+| SLC-TRUST-001 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-TRUST-002 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-TRUST-003 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-UI-001 | Pending screenshots | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-UI-002 | Pending screenshots | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-UI-003 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+| SLC-CORE-004 | In Progress | [Grounding/Citation evidence artifact](../../tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) |
+
 ## Completion Rule
 
 `v0.1 SLC` is release-ready only when all applicable IDs above are marked complete with evidence links and no open high-risk exceptions.

@@ -1,7 +1,7 @@
-﻿# ScholarAI Comprehensive Implementation Report (2026-03-22)
+# ScholarAI Comprehensive Implementation Report (2026-03-22)
 
 ## Purpose
-This report consolidates current implementation status across backend, frontend, auth/RBAC, data, AI features, testing, docs, and roadmap scope. It is intended as a single source for "what is done", "what is partial", "what is deferred", and "what belongs to Deferred By Stage startup scale".
+This report consolidates current implementation status across backend, frontend, auth/RBAC, data, AI features, testing, docs, and roadmap scope. It is intended as a single source for "what is done", "what is partial", "what is deferred", and "what belongs to post-v0.1 SLC startup scale".
 
 ## Snapshot
 | Item | Current state |
@@ -41,7 +41,7 @@ This report consolidates current implementation status across backend, frontend,
 | Curator actions (edit/approve/reject/publish/unpublish) | Implemented | Curation API routes and service methods |
 | Manual raw import path | Implemented | Curation import route and service |
 
-### 4. Ingestion Pipeline (Current v0.1 Layer)
+### 4. Ingestion Pipeline (Current v0.1 SLC Layer)
 | Area | Status | Evidence |
 |---|---|---|
 | Source-registry run creation and execution | Implemented | `backend/app/services/ingestion/service.py` |
@@ -83,7 +83,7 @@ python -m pytest tests/unit/test_ingestion_service.py tests/unit/test_curation_s
 
 ## Deferred Features (Explicitly Not in Current Delivery)
 
-### v0.1-Defer-First (from execution risk policy)
+### v0.1 SLC-Defer-First (from execution risk policy)
 | Feature | Deferred reason |
 |---|---|
 | Audio interview support | Lower priority than core text-first reliability |
@@ -95,7 +95,7 @@ python -m pytest tests/unit/test_ingestion_service.py tests/unit/test_curation_s
 | Feature | Deferred reason |
 |---|---|
 | DAAD and broader corpus expansion | Deferred By Stage data quality and ops maturity required |
-| Graph-layer comparative experiments | Research-track activity after v0.1 hardening |
+| Graph-layer comparative experiments | Research-track activity after v0.1 SLC hardening |
 | Larger explainability studies | Requires stable judged datasets and study ops |
 | Rich ML reranking/ablation depth | Requires mature evaluation pipeline and telemetry |
 
@@ -119,7 +119,7 @@ python -m pytest tests/unit/test_ingestion_service.py tests/unit/test_curation_s
 4. Docs-first RBAC workstream exists and is reflected in planning docs.
 
 ### Areas with controlled drift
-1. Some infrastructure/search choices expanded beyond strict minimal-v0.1 posture in places.
+1. Some infrastructure/search choices expanded beyond strict minimal-v0.1 SLC posture in places.
 2. Parts of ingestion/recommendation maturity lag behind architecture ambition in canonical docs.
 3. Legacy root docs and canonical docs both exist, creating temporary documentation duality risk.
 

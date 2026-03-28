@@ -1,4 +1,4 @@
-﻿# ScholarAI Minimal Push Plan (2026-03-22)
+# ScholarAI Minimal Push Plan (2026-03-22)
 
 ## Goal
 Align documentation and implementation status on GitHub with minimal risk and clean review boundaries.
@@ -64,4 +64,3 @@ Use three small commits in order.
 - If one docs commit is wrong, revert only that commit:
   - `git revert <commit_sha>`
 - Keep docs commits independent from code commits.
-

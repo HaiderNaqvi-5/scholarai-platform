@@ -1,10 +1,10 @@
-﻿# ScholarAI — Architecture Diagrams
+# ScholarAI — Architecture Diagrams
 
 > Status: Legacy draft (not canonical).
 > Canonical diagrams and architecture constraints are maintained in docs/scholarai/05_system_architecture.md.
-> This file may reference deferred components not in current v0.1 implementation.
+> This file may reference deferred components not in current v0.1 SLC implementation.
 
-> All diagrams are provided in **Mermaid** syntax for rendering, strictly aligned to the v0.1 Master Blueprint.
+> All diagrams are provided in **Mermaid** syntax for rendering, strictly aligned to the v0.1 SLC Master Blueprint.
 
 ---
 
@@ -123,4 +123,3 @@ graph TD
     ROUTER -->|Ingestion Parsing| GEMINI
     CLAUDE & GPT4 & GEMINI --> RESP["Synthesized Output"]
 ```
-

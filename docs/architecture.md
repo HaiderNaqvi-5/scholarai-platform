@@ -1,8 +1,8 @@
-﻿# ScholarAI — System Architecture
+# ScholarAI — System Architecture
 
 > Status: Legacy draft (not canonical).
 > Canonical architecture is maintained in docs/scholarai/05_system_architecture.md.
-> This file remains for historical traceability and contains pre-v0.1-scope assumptions.
+> This file remains for historical traceability and contains pre-v0.1 SLC-scope assumptions.
 
 > **Document Version:** 1.0 — **Date:** 2026-03-08  
 > **Classification:** FYP Technical Design Document  
@@ -88,4 +88,3 @@ International scholarship applications are one of the most **informationally asy
 | **AI/ML** | scikit-learn, XGBoost, SHAP, LIME, Whisper, LangChain | Best-in-class ML libraries; LangChain for RAG and multi-agent workflows |
 | **Data** | PostgreSQL, Neo4j, OpenSearch, Redis | Relational + Vector + Graph + Text Search + Cache |
 | **DevOps** | Docker, GitHub Actions, MLflow | Containerization, CI/CD, experiment tracking |
-

@@ -1,7 +1,7 @@
-﻿# ScholarAI QA, DevOps, And Risks
+# ScholarAI QA, DevOps, And Risks
 
 ## Purpose
-This document defines the v0.1 quality strategy, local and CI workflows, deployment baseline, operational safeguards, and the risk register used to keep delivery realistic.
+This document defines the v0.1 SLC quality strategy, local and CI workflows, deployment baseline, operational safeguards, and the risk register used to keep delivery realistic.
 
 ## QA And Test Strategy
 ### Test layers
@@ -64,7 +64,7 @@ This document defines the v0.1 quality strategy, local and CI workflows, deploym
 	- route-level 401 and 403 deny-path assertions for protected endpoints
 
 ## End-To-End Testing
-### v0.1 user-critical paths
+### v0.1 SLC user-critical paths
 1. Search and filter scholarships.
 2. Open scholarship detail and inspect validated facts.
 3. Request recommendations and inspect explanation panels.
@@ -78,7 +78,7 @@ This document defines the v0.1 quality strategy, local and CI workflows, deploym
 | Parser field presence tests | Ensure required fields survive extraction |
 | Normalization tests | Keep country, degree, and field mappings consistent |
 | Deduplication tests | Prevent duplicate publication |
-| Scope tests | Block non-v0.1 geography leakage |
+| Scope tests | Block non-v0.1 SLC geography leakage |
 | Provenance tests | Ensure source and run references are preserved |
 
 ## Model Evaluation Tests
@@ -98,7 +98,7 @@ Use a fixed checklist before demos and milestone signoff:
 - admin actions create visible audit trail
 
 ## Local Setup
-### v0.1 baseline
+### v0.1 SLC baseline
 - Docker Compose for local multi-service startup
 - `.env.example` for documented environment variables
 - local PostgreSQL, Redis, backend, frontend, and worker services
@@ -115,7 +115,7 @@ Use a fixed checklist before demos and milestone signoff:
 | Demo / staging | integration rehearsal and evaluation runs |
 | Production-like thesis demo | final packaged environment for presentation |
 
-Limited budget means v0.1 should avoid a large environment matrix.
+Limited budget means v0.1 SLC should avoid a large environment matrix.
 
 ## CI/CD
 ### CI baseline
@@ -126,7 +126,7 @@ Limited budget means v0.1 should avoid a large environment matrix.
 
 ### CD baseline
 - manual promotion to demo environment
-- no automatic production rollout required for v0.1
+- no automatic production rollout required for v0.1 SLC
 
 ## Rollback Strategy
 | Layer | Rollback approach |
@@ -155,7 +155,7 @@ Limited budget means v0.1 should avoid a large environment matrix.
 - cross-institution deny events grouped by actor and institution
 - privileged action audit completeness checks
 
-This is enough for v0.1 without building a heavy observability stack.
+This is enough for v0.1 SLC without building a heavy observability stack.
 
 ## Secrets Handling
 1. Keep secrets out of the repo.
@@ -193,7 +193,7 @@ This is enough for v0.1 without building a heavy observability stack.
 4. explicit source-of-truth separation between validated facts and generated guidance
 
 ## DevOps Delivery Posture
-### v0.1
+### v0.1 SLC
 - simple local-first Docker Compose setup
 - minimal CI gates
 - manual demo promotion
@@ -202,18 +202,18 @@ This is enough for v0.1 without building a heavy observability stack.
 - stronger experiment-tracking infrastructure if justified
 - richer monitoring for large evaluation runs
 
-### Deferred By Stage Startup Features
+### Deferred By Stage
 - automated deployment pipelines
 - more advanced observability and alerting
 - stronger secrets and environment isolation
 
-## v0.1 decision
-ScholarAI v0.1 will use a lean QA and DevOps approach centered on local reproducibility, essential CI checks, manual promotion, and explicit fallback rules that preserve the data and recommendation core.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC will use a lean QA and DevOps approach centered on local reproducibility, essential CI checks, manual promotion, and explicit fallback rules that preserve the data and recommendation core.
 
 ## Deferred items
 - Full production-grade observability stack.
 - Fully automated deployment promotion.
-- Broad performance testing beyond v0.1-critical paths.
+- Broad performance testing beyond v0.1 SLC-critical paths.
 
 ## Assumptions
 - Docker Compose is sufficient for development and demo deployment.

@@ -1,4 +1,4 @@
-﻿# ScholarAI Brand And Design System
+# ScholarAI Brand And Design System
 
 ## Design Intent
 ScholarAI should feel premium, restrained, and deliberate. The product should communicate trust through clarity rather than decoration. The interface must be feasible for one strong frontend developer to implement without falling back to generic dashboard patterns.
@@ -107,8 +107,8 @@ ScholarAI must visually separate:
 
 This separation is a product trust requirement, not only a design preference.
 
-## v0.1 Vs Deferred Design Scope
-### v0.1
+## v0.1 SLC Vs Deferred Design Scope
+### v0.1 SLC
 - Light theme first.
 - Core component library for discovery, detail, explanation, document feedback, interview feedback, and admin validation.
 - Strong typography, measured motion, and a restrained palette.
@@ -117,12 +117,12 @@ This separation is a product trust requirement, not only a design preference.
 - More advanced explanation visualizations and trust-study variants.
 - Comparative interface experiments for explanation helpfulness.
 
-### Deferred By Stage Startup Features
+### Deferred By Stage
 - Brand sub-systems for provider and institution products.
 - White-label or partner-specific experience layers.
 
-## v0.1 decision
-ScholarAI v0.1 will use a restrained, premium light-theme design system centered on strong typography, calm surfaces, and clear separation between validated data and generated guidance.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC will use a restrained, premium light-theme design system centered on strong typography, calm surfaces, and clear separation between validated data and generated guidance.
 
 ## Deferred items
 - Dark mode.
@@ -131,7 +131,7 @@ ScholarAI v0.1 will use a restrained, premium light-theme design system centered
 - Highly customized visualization libraries beyond core explanation needs.
 
 ## Assumptions
-- A typography-led light theme is the fastest path to a premium but feasible v0.1.
+- A typography-led light theme is the fastest path to a premium but feasible v0.1 SLC release.
 - Most early usage will be document-heavy and desktop-first, even though mobile support remains required.
 - Clear visual separation of fact and guidance materially improves trust.
 

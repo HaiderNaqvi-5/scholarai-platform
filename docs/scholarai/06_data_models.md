@@ -1,14 +1,14 @@
-﻿# ScholarAI Data Models
+# ScholarAI Data Models
 
 ## Purpose
-This document defines the canonical v0.1 data model for ScholarAI. It covers the PostgreSQL schema, source-of-truth rules, curation-state handling, document storage references, and the Knowledge Graph Layer design that supports eligibility-aware recommendation logic.
+This document defines the canonical v0.1 SLC data model for ScholarAI. It covers the PostgreSQL schema, source-of-truth rules, curation-state handling, document storage references, and the Knowledge Graph Layer design that supports eligibility-aware recommendation logic.
 
 ## Data Modeling Principles
 1. Store policy-critical scholarship facts in structured PostgreSQL tables.
 2. Keep `raw`, `validated`, and `published` states explicit.
 3. Preserve a clear line between source ingestion data and user-facing curated data.
 4. Keep auditability and curator traceability built into the core schema.
-5. Implement the Knowledge Graph Layer logically in v0.1 using relationally derived structures first.
+5. Implement the Knowledge Graph Layer logically in v0.1 SLC using relationally derived structures first.
 
 ## Source-Of-Truth Rules
 | Domain | Operational source of truth | Notes |
@@ -117,9 +117,9 @@ Runtime authorization must prefer capability evaluation and only use role fallba
 | `gpa_scale` | DECIMAL(3,2) | Needed for normalization |
 | `english_test_type` | VARCHAR(32) NULL | IELTS, TOEFL, none |
 | `english_test_score` | DECIMAL(4,2) NULL | Optional language score |
-| `target_degree_level` | VARCHAR(32) | v0.1 default `MS` |
-| `target_field` | VARCHAR(64) | One of the v0.1 program families |
-| `target_country_code` | VARCHAR(3) | v0.1 default `CAN` |
+| `target_degree_level` | VARCHAR(32) | v0.1 SLC default `MS` |
+| `target_field` | VARCHAR(64) | One of the v0.1 SLC program families |
+| `target_country_code` | VARCHAR(3) | v0.1 SLC default `CAN` |
 | `research_experience_level` | SMALLINT NULL | Structured ordinal feature |
 | `leadership_experience_level` | SMALLINT NULL | Structured ordinal feature |
 | `volunteer_experience_level` | SMALLINT NULL | Structured ordinal feature |
@@ -181,8 +181,8 @@ Runtime authorization must prefer capability evaluation and only use role fallba
 | `scholarship_title` | VARCHAR(255) | Display title |
 | `summary_text` | TEXT | Curated summary |
 | `source_url` | TEXT | Canonical citation link |
-| `country_code` | VARCHAR(3) | v0.1 default `CAN`; scoped exceptions allowed |
-| `degree_level` | VARCHAR(32) | v0.1 default `MS` |
+| `country_code` | VARCHAR(3) | v0.1 SLC default `CAN`; scoped exceptions allowed |
+| `degree_level` | VARCHAR(32) | v0.1 SLC default `MS` |
 | `field_scope` | VARCHAR(128) | Program family alignment |
 | `deadline_at` | TIMESTAMP NULL | Canonical deadline |
 | `is_deadline_rolling` | BOOLEAN | Rolling-application flag |
@@ -228,7 +228,7 @@ Runtime authorization must prefer capability evaluation and only use role fallba
 |---|---|---|
 | `id` | UUID PK | University identifier |
 | `canonical_name` | VARCHAR(255) UNIQUE | Normalized name |
-| `country_code` | VARCHAR(3) | v0.1 expects `CAN` |
+| `country_code` | VARCHAR(3) | v0.1 SLC expects `CAN` |
 | `province_or_state` | VARCHAR(64) NULL | Location context |
 | `created_at` | TIMESTAMP | Audit field |
 | `updated_at` | TIMESTAMP | Audit field |
@@ -240,7 +240,7 @@ Runtime authorization must prefer capability evaluation and only use role fallba
 | `university_id` | UUID FK -> `universities.id` | Owning university |
 | `program_name` | VARCHAR(255) | Canonical program title |
 | `field_of_study` | VARCHAR(64) | DS, AI, Analytics alignment |
-| `degree_level` | VARCHAR(32) | v0.1 `MS` |
+| `degree_level` | VARCHAR(32) | v0.1 SLC `MS` |
 | `created_at` | TIMESTAMP | Audit field |
 | `updated_at` | TIMESTAMP | Audit field |
 
@@ -334,7 +334,7 @@ Runtime authorization must prefer capability evaluation and only use role fallba
 | Index | Target | Purpose |
 |---|---|---|
 | `idx_scholarships_state_deadline` | `scholarships(record_state, deadline_at)` | Fast curated listing |
-| `idx_scholarships_country_field_degree` | `scholarships(country_code, field_scope, degree_level)` | v0.1 search/filtering |
+| `idx_scholarships_country_field_degree` | `scholarships(country_code, field_scope, degree_level)` | v0.1 SLC search/filtering |
 | `idx_requirements_scholarship_type` | `scholarship_requirements(scholarship_id, requirement_type)` | Eligibility evaluation |
 | `idx_raw_records_hash` | `raw_scholarship_records(source_record_hash)` | Deduplication |
 | `idx_ingestion_runs_source_status` | `ingestion_runs(source_id, status)` | Operational monitoring |
@@ -521,8 +521,8 @@ erDiagram
 | `Requirement` | `SCOPES_TO` | `Country` / `DegreeLevel` / `FieldOfStudy` | Typed rule attachment |
 | `Scholarship` | `PROVIDED_BY` | `Provider` | Provider grouping |
 
-## v0.1 Graph Implementation Choice
-### v0.1
+## v0.1 SLC Graph Implementation Choice
+### v0.1 SLC
 - Implement the Knowledge Graph Layer as relationally derived graph views and query services backed by PostgreSQL.
 - Materialize normalized entities and relationship tables needed for eligibility filtering.
 - Keep the logical graph model stable even if Neo4j is not deployed.
@@ -531,11 +531,11 @@ erDiagram
 - Mirror the same graph model into a narrowly scoped Neo4j deployment for comparative experiments.
 - Benchmark relational graph abstraction versus graph-database traversal.
 
-### Deferred By Stage Startup Features
+### Deferred By Stage
 - Expand the graph to include alumni outcomes, provider relationships, and collaborative pathways if validated data grows enough to justify it.
 
 ## Sync Strategy Between PostgreSQL And Graph Layer
-### v0.1 sync approach
+### v0.1 SLC sync approach
 1. Ingestion and curation update canonical PostgreSQL tables.
 2. A derived graph builder maps validated and published records into relationship-oriented tables or materialized views.
 3. Recommendation stage 1 queries these derived relations for eligibility filtering.
@@ -546,18 +546,18 @@ erDiagram
 - Use idempotent upserts keyed by PostgreSQL UUIDs.
 - Keep PostgreSQL authoritative; Neo4j remains a read-optimized projection.
 
-## v0.1 decision
-ScholarAI v0.1 will use PostgreSQL as the authoritative data layer, with explicit curation states and a relationally derived Knowledge Graph Layer that supports eligibility-aware filtering without requiring Neo4j from day one.
+## SLC decision (v0.1)
+ScholarAI v0.1 SLC will use PostgreSQL as the authoritative data layer, with explicit curation states and a relationally derived Knowledge Graph Layer that supports eligibility-aware filtering without requiring Neo4j from day one.
 
 ## Deferred items
 - Dedicated Neo4j deployment.
 - Mentor and marketplace-related entities.
-- Broader geographic and academic taxonomies beyond the v0.1 corpus.
+- Broader geographic and academic taxonomies beyond the v0.1 SLC corpus.
 
 ## Assumptions
 - A 384-dimension embedding size is used consistently with `all-MiniLM-L6-v2`.
 - Canonical scholarship publication can be modeled through explicit state transitions on curated records.
-- Local-path or object-storage references are sufficient for v0.1 document handling.
+- Local-path or object-storage references are sufficient for v0.1 SLC document handling.
 
 ## Risks
 - If requirement normalization is too loose, eligibility filtering quality will degrade.
