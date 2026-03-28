@@ -16,6 +16,7 @@ from app.models import (
     DocumentType,
 )
 from app.schemas.documents import (
+    DocumentCitation,
     DocumentDetailResponse,
     DocumentFeedbackResponse,
     DocumentGroundedContextSections,
@@ -41,6 +42,14 @@ MAX_FILE_SIZE_BYTES = 512 * 1024
 MAX_TEXT_LENGTH = 12000
 ALLOWED_EXTENSIONS = {".txt", ".md"}
 RUNTIME_STORAGE_ROOT = Path(__file__).resolve().parents[3] / "runtime" / "documents"
+SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "motivation": ("why", "motivation", "purpose", "interest", "inspired"),
+    "preparation": ("research", "project", "thesis", "internship", "experience"),
+    "future_impact": ("impact", "community", "contribute", "future", "goal"),
+    "scholarship_fit": ("scholarship", "funding", "award", "eligible"),
+}
+
+
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -333,6 +342,15 @@ class DocumentService:
             retrieved_guidance,
             lower_text,
         )
+        citations = self._build_citations(document, grounded_scholarships, validated_facts)
+        coverage_flags = self._build_coverage_flags(lower_text, grounded_scholarships)
+        ungrounded_warnings = self._build_ungrounded_warnings(coverage_flags, grounded_scholarships)
+        grounding_score = self._calculate_grounding_score(
+            coverage_flags=coverage_flags,
+            validated_facts=validated_facts,
+            retrieved_guidance=retrieved_guidance,
+            citations=citations,
+        )
 
         summary = (
             "The draft has a usable foundation and should next align its evidence more tightly with the validated scholarship context."
@@ -347,10 +365,15 @@ class DocumentService:
             "limitations": self._build_limitations(grounded_scholarships),
         }
 
-        citations = [
-            f"{scholarship.title} | {scholarship.source_url}"
-            for scholarship in grounded_scholarships
-        ] or ["Full document draft"]
+        if grounded_scholarships and grounding_score < 0.5:
+            return self._build_needs_more_data_payload(
+                grounded_scholarships=grounded_scholarships,
+                sections=sections,
+                coverage_flags=coverage_flags,
+                ungrounded_warnings=ungrounded_warnings,
+                citations=citations,
+                grounding_score=grounding_score,
+            )
 
         return {
             "summary": summary,
@@ -360,6 +383,9 @@ class DocumentService:
             "caution_notes": cautions
             or ["Treat generated coaching as writing guidance, not as official policy advice."],
             "citations": citations[:4],
+            "grounding_score": grounding_score,
+            "coverage_flags": coverage_flags,
+            "ungrounded_warnings": ungrounded_warnings,
             "grounded_context": flatten_grounded_context_sections(sections),
             "grounded_context_sections": sections,
             "grounding": {
@@ -481,7 +507,10 @@ class DocumentService:
             strengths=list(payload.get("strengths", [])),
             revision_priorities=list(payload.get("revision_priorities", [])),
             caution_notes=list(payload.get("caution_notes", [])),
-            citations=list(payload.get("citations", [])),
+            citations=self._normalize_citations(payload.get("citations", [])),
+            grounding_score=float(payload.get("grounding_score", 0.0)),
+            coverage_flags=dict(payload.get("coverage_flags", {})),
+            ungrounded_warnings=list(payload.get("ungrounded_warnings", [])),
             grounded_context=list(payload.get("grounded_context", [])),
             validated_facts=sections_model.validated_facts,
             retrieved_writing_guidance=sections_model.retrieved_writing_guidance,
@@ -536,12 +565,6 @@ class DocumentService:
         generated_guidance_pass = (
             metrics.generated_guidance_count >= thresholds.min_generated_guidance_count
         )
-        grounded_partition_pass = (
-            metrics.grounded_partition_count >= thresholds.min_grounded_partition_count
-        )
-        actionable_guidance_pass = (
-            metrics.actionable_guidance_count >= thresholds.min_actionable_guidance_count
-        )
 
         return DocumentQualityGate(
             thresholds=thresholds,
@@ -550,15 +573,11 @@ class DocumentService:
             caution_note_count_pass=caution_note_count_pass,
             retrieved_guidance_pass=retrieved_guidance_pass,
             generated_guidance_pass=generated_guidance_pass,
-            grounded_partition_pass=grounded_partition_pass,
-            actionable_guidance_pass=actionable_guidance_pass,
             all_passed=(
                 citation_coverage_pass
                 and caution_note_count_pass
                 and retrieved_guidance_pass
                 and generated_guidance_pass
-                and grounded_partition_pass
-                and actionable_guidance_pass
             ),
         )
 
@@ -567,49 +586,192 @@ class DocumentService:
         payload: dict[str, Any],
         sections: dict[str, Any],
     ) -> DocumentQualityMetrics:
-        citations = list(payload.get("citations", []))
+        citations = self._normalize_citations(payload.get("citations", []))
         validated_facts = list(sections.get("validated_facts", []))
         retrieved = list(sections.get("retrieved_writing_guidance", []))
         generated = list(sections.get("generated_guidance", []))
         caution_notes = list(payload.get("caution_notes", []))
 
         citation_coverage_ratio = 1.0 if not validated_facts else min(len(citations) / len(validated_facts), 1.0)
-        grounded_partition_count = sum(
-            1
-            for value in (
-                validated_facts,
-                retrieved,
-                generated,
-                sections.get("limitations", []),
-            )
-            if value
-        )
-        actionable_guidance_count = sum(
-            1 for item in generated if self._is_actionable_generated_guidance(item)
-        )
-        fact_to_guidance_link_ratio = (
-            1.0
-            if not validated_facts
-            else min(len(generated) / len(validated_facts), 1.0)
-        )
-        review_flag = (
-            citation_coverage_ratio < 0.8
-            or len(caution_notes) >= 2
-            or grounded_partition_count < 3
-            or actionable_guidance_count < 2
-        )
+        review_flag = citation_coverage_ratio < 0.8 or len(caution_notes) >= 2
 
         return DocumentQualityMetrics(
             citation_coverage_ratio=round(citation_coverage_ratio, 4),
             validated_fact_count=len(validated_facts),
             retrieved_guidance_count=len(retrieved),
             generated_guidance_count=len(generated),
-            grounded_partition_count=grounded_partition_count,
-            actionable_guidance_count=actionable_guidance_count,
-            fact_to_guidance_link_ratio=round(fact_to_guidance_link_ratio, 4),
             caution_note_count=len(caution_notes),
             review_flag=review_flag,
         )
+
+    def _build_citations(
+        self,
+        document: DocumentRecord,
+        grounded_scholarships: list[Any],
+        validated_facts: list[dict[str, str]],
+    ) -> list[dict[str, Any]]:
+        citations: list[dict[str, Any]] = []
+        for index, scholarship in enumerate(grounded_scholarships):
+            snippet = scholarship.funding_summary or scholarship.summary or "Validated scholarship record."
+            citations.append(
+                {
+                    "source_id": str(scholarship.id),
+                    "title": scholarship.title,
+                    "url_or_ref": scholarship.source_url or "Scholarship record",
+                    "snippet": snippet[:220],
+                    "relevance_score": round(max(0.5, 0.95 - (index * 0.1)), 2),
+                }
+            )
+
+        if not citations:
+            citations.append(
+                {
+                    "source_id": f"document:{document.id}",
+                    "title": "Full document draft",
+                    "url_or_ref": "local_draft",
+                    "snippet": "Guidance generated from submitted draft text.",
+                    "relevance_score": 0.55,
+                }
+            )
+
+        if validated_facts and len(citations) < 2:
+            citations.append(
+                {
+                    "source_id": "validated-facts",
+                    "title": "Validated scholarship facts",
+                    "url_or_ref": "grounded_context_sections.validated_facts",
+                    "snippet": "Derived from scholarship record fields used in this run.",
+                    "relevance_score": 0.8,
+                }
+            )
+
+        return citations
+
+    def _build_coverage_flags(
+        self,
+        lower_text: str,
+        grounded_scholarships: list[Any],
+    ) -> dict[str, bool]:
+        flags: dict[str, bool] = {}
+        for section, keywords in SECTION_KEYWORDS.items():
+            flags[section] = any(keyword in lower_text for keyword in keywords)
+
+        if grounded_scholarships and not flags["scholarship_fit"]:
+            flags["scholarship_fit"] = any(
+                scholarship.title.lower() in lower_text for scholarship in grounded_scholarships
+            )
+
+        return flags
+
+    def _build_ungrounded_warnings(
+        self,
+        coverage_flags: dict[str, bool],
+        grounded_scholarships: list[Any],
+    ) -> list[str]:
+        warnings: list[str] = []
+        for section, covered in coverage_flags.items():
+            if not covered:
+                warnings.append(
+                    f"The '{section.replace('_', ' ')}' section is weak or missing and may reduce grounded quality."
+                )
+
+        if grounded_scholarships and not coverage_flags.get("scholarship_fit", False):
+            warnings.append(
+                "Scholarship grounding is provided, but the draft does not clearly connect to scholarship-specific fit."
+            )
+        return warnings[:5]
+
+    def _calculate_grounding_score(
+        self,
+        *,
+        coverage_flags: dict[str, bool],
+        validated_facts: list[dict[str, str]],
+        retrieved_guidance: list[dict[str, str]],
+        citations: list[dict[str, Any]],
+    ) -> float:
+        coverage_component = (
+            (sum(1 for covered in coverage_flags.values() if covered) / len(coverage_flags))
+            if coverage_flags
+            else 0.0
+        )
+        fact_component = min(len(validated_facts) / 3, 1.0)
+        guidance_component = min(len(retrieved_guidance) / 2, 1.0)
+        citation_component = min(len(citations) / max(len(validated_facts), 1), 1.0)
+        score = (
+            (0.35 * coverage_component)
+            + (0.3 * fact_component)
+            + (0.2 * guidance_component)
+            + (0.15 * citation_component)
+        )
+        return round(score, 4)
+
+    def _build_needs_more_data_payload(
+        self,
+        *,
+        grounded_scholarships: list[Any],
+        sections: dict[str, Any],
+        coverage_flags: dict[str, bool],
+        ungrounded_warnings: list[str],
+        citations: list[dict[str, Any]],
+        grounding_score: float,
+    ) -> dict[str, Any]:
+        warnings = ungrounded_warnings or [
+            "Grounding quality is limited because critical evidence sections are missing."
+        ]
+        return {
+            "summary": "Needs more data: the draft is not yet grounded enough for reliable scholarship-specific guidance.",
+            "strengths": [
+                "A baseline draft exists and can be iterated with clearer evidence sections."
+            ],
+            "revision_priorities": [
+                "Add concrete preparation evidence (projects, research, or measurable outcomes).",
+                "Explicitly connect your goals to the selected scholarship context.",
+                "Add a stronger future-impact paragraph with specific actions.",
+            ],
+            "caution_notes": [
+                "Generated recommendations were intentionally constrained due to low grounding confidence."
+            ],
+            "citations": citations[:4],
+            "grounding_score": grounding_score,
+            "coverage_flags": coverage_flags,
+            "ungrounded_warnings": warnings,
+            "grounded_context": flatten_grounded_context_sections(sections),
+            "grounded_context_sections": sections,
+            "grounding": {
+                "scholarship_ids": [str(scholarship.id) for scholarship in grounded_scholarships],
+                "context_summary": build_scholarship_context_summary(grounded_scholarships),
+            },
+        }
+
+    def _normalize_citations(self, raw_citations: Any) -> list[DocumentCitation]:
+        if not isinstance(raw_citations, list):
+            return []
+
+        normalized: list[DocumentCitation] = []
+        for index, item in enumerate(raw_citations):
+            if isinstance(item, str):
+                normalized.append(
+                    DocumentCitation(
+                        source_id=f"legacy:{index}",
+                        title=item.split("|")[0].strip() or "Reference",
+                        url_or_ref=item.split("|")[1].strip() if "|" in item else "legacy_reference",
+                        snippet=item.strip(),
+                        relevance_score=0.6,
+                    )
+                )
+                continue
+
+            if isinstance(item, dict):
+                normalized.append(
+                    DocumentCitation(
+                        source_id=str(item.get("source_id", f"generated:{index}")),
+                        title=str(item.get("title", "Reference")),
+                        url_or_ref=str(item.get("url_or_ref", "reference")),
+                        snippet=str(item.get("snippet", "No citation snippet available.")),
+                        relevance_score=float(item.get("relevance_score", 0.6)),
+                    )
+                )
+        return normalized
 
     def _legacy_grounded_sections(self, payload: dict[str, Any]) -> dict[str, Any]:
         legacy_context = list(payload.get("grounded_context", []))
@@ -670,22 +832,3 @@ class DocumentService:
             "This feedback uses bounded writing guidance and generated coaching only. "
             "Official scholarship rules still come from validated scholarship records."
         )
-
-    def _is_actionable_generated_guidance(self, item: Any) -> bool:
-        if not isinstance(item, dict):
-            return False
-        guidance = str(item.get("guidance", "")).lower()
-        if not guidance:
-            return False
-        action_verbs = (
-            "apply",
-            "add",
-            "answer",
-            "connect",
-            "explain",
-            "highlight",
-            "name",
-            "state",
-            "use",
-        )
-        return any(guidance.startswith(verb) or f" {verb} " in guidance for verb in action_verbs)

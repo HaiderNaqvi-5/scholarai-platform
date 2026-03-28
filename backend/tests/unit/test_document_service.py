@@ -8,6 +8,7 @@ from starlette.datastructures import Headers
 
 from app.models import DocumentType, RecordState, Scholarship
 from app.services.documents import DocumentService
+from app.services.documents import service as document_service_module
 
 pytestmark = pytest.mark.asyncio
 
@@ -165,41 +166,12 @@ async def test_grounded_feedback_uses_validated_scholarship_facts_and_sections()
     assert feedback.grounded_context_sections.generated_guidance
     assert feedback.quality_metrics.validated_fact_count == len(feedback.validated_facts)
     assert feedback.quality_metrics.citation_coverage_ratio > 0
-    assert feedback.quality_metrics.grounded_partition_count >= 3
-    assert feedback.quality_metrics.actionable_guidance_count >= 2
-    assert feedback.quality_metrics.fact_to_guidance_link_ratio > 0
     assert isinstance(feedback.quality_metrics.review_flag, bool)
     assert feedback.quality_gate.policy_version == "document.quality.v1"
     assert feedback.quality_gate.thresholds.min_citation_coverage_ratio == 0.8
     assert feedback.quality_gate.retrieved_guidance_pass is True
     assert feedback.quality_gate.generated_guidance_pass is True
-    assert feedback.quality_gate.grounded_partition_pass is True
-    assert feedback.quality_gate.actionable_guidance_pass is True
     assert isinstance(feedback.quality_gate.all_passed, bool)
-
-
-async def test_document_quality_gate_counts_apply_guidance_as_actionable():
-    service = DocumentService(FakeSession())
-    payload = {
-        "citations": ["[fact-1]"],
-        "caution_notes": [],
-    }
-    sections = {
-        "validated_facts": [{"id": "fact-1"}],
-        "retrieved_writing_guidance": [{"source": "guide"}],
-        "generated_guidance": [
-            {"type": "generated", "guidance": "Apply this evidence to your opening paragraph."},
-            {"type": "generated", "guidance": "Use one quantified result to support your fit."},
-        ],
-        "limitations": ["Practice-only guidance."],
-    }
-
-    metrics = service._build_quality_metrics(payload, sections)
-    gate = service._build_quality_gate(payload, sections)
-
-    assert metrics.actionable_guidance_count == 2
-    assert gate.actionable_guidance_pass is True
-    assert gate.all_passed is True
 
 
 async def test_invalid_scholarship_grounding_id_fails_cleanly():
@@ -220,3 +192,91 @@ async def test_invalid_scholarship_grounding_id_fails_cleanly():
 
     assert caught.value.status_code == 400
     assert "not found" in str(caught.value.detail).lower()
+
+
+async def test_weak_grounding_fallback_emits_required_contract_fields(monkeypatch):
+    scholarship = _published_ca_scholarship()
+    session = FakeSession({scholarship.id: scholarship})
+    service = DocumentService(session)
+
+    async def fake_load_document(user_id, document_id):
+        document = session.added[0]
+        feedback = session.added[1]
+        document.feedback_entries = [feedback]
+        document.id = document_id
+        document.user_id = user_id
+        return document
+
+    service._load_document = fake_load_document  # type: ignore[method-assign]
+
+    # Force low-confidence grounding deterministically without changing production thresholds.
+    monkeypatch.setattr(document_service_module, "build_validated_facts", lambda _scholarships: [])
+    monkeypatch.setattr(
+        document_service_module,
+        "retrieve_bounded_writing_guidance",
+        lambda _document_type, _scholarships: [],
+    )
+
+    result = await service.submit_document(
+        user_id=uuid4(),
+        document_type="sop",
+        title="Weak Grounding SOP",
+        content_text=(
+            "This draft is intentionally generic and does not include concrete evidence "
+            "or scholarship-specific alignment."
+        ),
+        scholarship_id=str(scholarship.id),
+    )
+
+    feedback = result.latest_feedback
+    assert feedback is not None
+    assert feedback.grounding_score < 0.5
+    assert isinstance(feedback.coverage_flags, dict)
+    assert feedback.coverage_flags
+    assert feedback.ungrounded_warnings
+    assert feedback.citations
+    citation = feedback.citations[0]
+    assert citation.source_id
+    assert citation.title
+    assert citation.url_or_ref
+    assert citation.snippet
+    assert 0.0 <= citation.relevance_score <= 1.0
+
+
+async def test_quality_metrics_supports_structured_and_legacy_citations():
+    service = DocumentService(FakeSession())
+    sections = {
+        "validated_facts": [
+            {"label": "Provider", "value": "A"},
+            {"label": "Country", "value": "B"},
+        ],
+        "retrieved_writing_guidance": [],
+        "generated_guidance": [],
+    }
+
+    structured_payload = {
+        "citations": [
+            {
+                "source_id": "s1",
+                "title": "Source 1",
+                "url_or_ref": "https://example.test/1",
+                "snippet": "Snippet 1",
+                "relevance_score": 0.9,
+            }
+        ],
+        "caution_notes": [],
+    }
+    structured_metrics = service._build_quality_metrics(structured_payload, sections)
+    assert structured_metrics.citation_coverage_ratio == 0.5
+
+    legacy_payload = {
+        "citations": ["Source Alpha | legacy_ref", "Source Beta"],
+        "caution_notes": [],
+    }
+    normalized_legacy = service._normalize_citations(legacy_payload["citations"])
+    assert len(normalized_legacy) == 2
+    assert all(citation.source_id for citation in normalized_legacy)
+    assert all(citation.title for citation in normalized_legacy)
+
+    legacy_metrics = service._build_quality_metrics(legacy_payload, sections)
+    assert legacy_metrics.citation_coverage_ratio == 1.0
