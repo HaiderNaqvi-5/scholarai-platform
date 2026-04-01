@@ -56,7 +56,7 @@ class IngestionRunRetryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_records: int | None = Field(default=None, ge=1, le=20)
-    execution_mode: Literal["inline", "worker", "auto"] | None = None
+    execution_mode: Literal["inline"] | None = None
 
 
 class IngestionRunQueueAssignmentRequest(BaseModel):
@@ -79,7 +79,7 @@ class IngestionRunBulkRetryRequest(BaseModel):
 
     run_ids: list[str] = Field(min_length=1, max_length=50)
     max_records: int | None = Field(default=None, ge=1, le=20)
-    execution_mode: Literal["inline", "worker", "auto"] | None = None
+    execution_mode: Literal["inline"] | None = None
 
     @field_validator("run_ids")
     @classmethod
