@@ -4,9 +4,16 @@ from uuid import uuid4
 
 import pytest
 import httpx
+from fastapi import HTTPException
 
 from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, UserRole
-from app.schemas.curation import IngestionRunStartRequest
+from app.schemas.curation import (
+    IngestionRunDetail,
+    IngestionRunBulkRetryRequest,
+    IngestionRunQueueAssignmentRequest,
+    IngestionRunRetryRequest,
+    IngestionRunStartRequest,
+)
 from app.services.ingestion.service import (
     CaptureResult,
     IngestionService,
@@ -359,6 +366,310 @@ async def test_capture_source_retries_retryable_error_and_includes_retry_policy(
     assert capture.metadata["retry_policy"]["base_delay_seconds"] == 0.75
     assert capture.metadata["attempt_errors"][0]["classification"] == "timeout"
     assert capture.metadata["attempt_errors"][0]["retryable"] is True
+
+
+async def test_retry_run_updates_retry_metadata_and_executes_inline(monkeypatch):
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    run_id = uuid4()
+    run = IngestionRun(
+        id=run_id,
+        source_registry=session.source,
+        source_registry_id=session.source.id,
+        triggered_by_user_id=actor.id,
+        institution_id=None,
+        status=IngestionRunStatus.FAILED,
+        fetch_url=str(session.source.base_url),
+    )
+    run.run_metadata = {
+        "request": {"max_records": 5, "execution_mode_requested": "worker"},
+        "execution": {"attempt_count": 1, "run_retry_count": 0, "selected_mode": "worker"},
+    }
+    run.created_at = datetime.now(timezone.utc)
+    run.updated_at = datetime.now(timezone.utc)
+    session.run = run
+    session.source = session.source
+
+    async def execute_for_run(_query):
+        return FakeResult(run)
+
+    session.execute = execute_for_run
+
+    captured_execute = {}
+
+    async def fake_execute_run(
+        _run_id,
+        *,
+        actor_user_id,
+        max_records,
+        execution_context,
+        persist_running_state=False,
+    ):
+        captured_execute["run_id"] = _run_id
+        captured_execute["actor_user_id"] = actor_user_id
+        captured_execute["max_records"] = max_records
+        captured_execute["execution_context"] = execution_context
+        captured_execute["persist_running_state"] = persist_running_state
+        return service._build_detail(run)
+
+    monkeypatch.setattr(service, "execute_run", fake_execute_run)
+
+    detail = await service.retry_run(
+        run_id,
+        payload=IngestionRunRetryRequest(max_records=3, execution_mode="inline"),
+        actor_user=actor,
+    )
+
+    assert captured_execute["run_id"] == run_id
+    assert captured_execute["actor_user_id"] == actor.id
+    assert captured_execute["max_records"] == 3
+    assert captured_execute["execution_context"]["dispatch_status"] == "retry_inline"
+    assert detail.run_metadata["execution"]["run_retry_count"] == 1
+    assert detail.run_metadata["request"]["execution_mode_requested"] == "inline"
+    assert detail.run_metadata["execution"]["last_retry_requested_at"] is not None
+
+
+async def test_retry_run_rejects_running_status():
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    run_id = uuid4()
+    run = IngestionRun(
+        id=run_id,
+        source_registry=session.source,
+        source_registry_id=session.source.id,
+        triggered_by_user_id=actor.id,
+        institution_id=None,
+        status=IngestionRunStatus.RUNNING,
+        fetch_url=str(session.source.base_url),
+    )
+    run.run_metadata = {"request": {"max_records": 5}}
+    run.created_at = datetime.now(timezone.utc)
+    run.updated_at = datetime.now(timezone.utc)
+    session.run = run
+    session.source = session.source
+
+    async def execute_for_run(_query):
+        return FakeResult(run)
+
+    session.execute = execute_for_run
+
+    with pytest.raises(HTTPException) as caught:
+        await service.retry_run(
+            run_id,
+            payload=IngestionRunRetryRequest(),
+            actor_user=actor,
+        )
+
+    assert caught.value.status_code == 409
+    assert "cannot be retried" in str(caught.value.detail)
+
+
+async def test_retry_run_rejects_cross_institution_scope():
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    run_id = uuid4()
+    run = IngestionRun(
+        id=run_id,
+        source_registry=session.source,
+        source_registry_id=session.source.id,
+        triggered_by_user_id=uuid4(),
+        institution_id=uuid4(),
+        status=IngestionRunStatus.FAILED,
+        fetch_url=str(session.source.base_url),
+    )
+    run.run_metadata = {"request": {"max_records": 5}}
+    run.created_at = datetime.now(timezone.utc)
+    run.updated_at = datetime.now(timezone.utc)
+    session.run = run
+    session.source = session.source
+
+    async def execute_for_run(_query):
+        return FakeResult(run)
+
+    session.execute = execute_for_run
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.UNIVERSITY, institution_id=uuid4())
+
+    with pytest.raises(HTTPException) as caught:
+        await service.retry_run(
+            run_id,
+            payload=IngestionRunRetryRequest(),
+            actor_user=actor,
+        )
+
+    assert caught.value.status_code == 403
+    assert "outside institution scope" in str(caught.value.detail)
+
+
+async def test_list_runs_filters_by_status_source_and_dispatch():
+    session = FakeSession()
+    service = IngestionService(session)
+    source_one = make_source()
+    source_two = make_source()
+    source_two.source_key = "fulbright-foreign-student"
+
+    run_a = IngestionRun(
+        id=uuid4(),
+        source_registry=source_one,
+        source_registry_id=source_one.id,
+        triggered_by_user_id=uuid4(),
+        institution_id=None,
+        status=IngestionRunStatus.PARTIAL,
+        fetch_url=str(source_one.base_url),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        run_metadata={"execution": {"dispatch_status": "queued"}},
+    )
+    run_b = IngestionRun(
+        id=uuid4(),
+        source_registry=source_two,
+        source_registry_id=source_two.id,
+        triggered_by_user_id=uuid4(),
+        institution_id=None,
+        status=IngestionRunStatus.FAILED,
+        fetch_url=str(source_two.base_url),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        run_metadata={"execution": {"dispatch_status": "retry_inline"}},
+    )
+
+    class ListResult:
+        def __init__(self, runs):
+            self._runs = runs
+
+        def scalars(self):
+            return SimpleNamespace(all=lambda: self._runs)
+
+    async def fake_execute(_query):
+        return ListResult([run_a, run_b])
+
+    session.execute = fake_execute
+
+    filtered = await service.list_runs(
+        actor_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None),
+        status_filter="failed",
+        source_key="fulbright-foreign-student",
+        dispatch_status="retry_inline",
+    )
+
+    assert filtered.total == 1
+    assert filtered.items[0].status == "failed"
+    assert filtered.items[0].source_key == "fulbright-foreign-student"
+    assert filtered.items[0].dispatch_status == "retry_inline"
+
+
+async def test_list_runs_rejects_invalid_status_filter():
+    session = FakeSession()
+    service = IngestionService(session)
+
+    with pytest.raises(HTTPException) as caught:
+        await service.list_runs(
+            actor_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None),
+            status_filter="not_a_status",
+        )
+
+    assert caught.value.status_code == 400
+
+
+async def test_assign_review_queue_sets_execution_metadata():
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    run = IngestionRun(
+        id=uuid4(),
+        source_registry=session.source,
+        source_registry_id=session.source.id,
+        triggered_by_user_id=actor.id,
+        institution_id=None,
+        status=IngestionRunStatus.PARTIAL,
+        fetch_url=str(session.source.base_url),
+    )
+    run.run_metadata = {"execution": {}}
+    run.created_at = datetime.now(timezone.utc)
+    run.updated_at = datetime.now(timezone.utc)
+    session.run = run
+
+    async def execute_for_run(_query):
+        return FakeResult(run)
+
+    session.execute = execute_for_run
+
+    detail = await service.assign_review_queue(
+        run.id,
+        payload=IngestionRunQueueAssignmentRequest(queue_key="manual-review", note="needs escalation"),
+        actor_user=actor,
+    )
+
+    execution = detail.run_metadata["execution"]
+    assert execution["review_queue"] == "manual-review"
+    assert execution["queue_assignment_note"] == "needs escalation"
+    assert execution["queue_assigned_by_user_id"] == str(actor.id)
+    assert execution["queue_assigned_at"] is not None
+
+
+async def test_bulk_retry_runs_returns_mixed_results(monkeypatch):
+    session = FakeSession()
+    service = IngestionService(session)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    run_ok = str(uuid4())
+    run_skip = str(uuid4())
+
+    async def fake_retry(run_id, *, payload, actor_user):
+        if str(run_id) == run_ok:
+            return IngestionRunDetail(
+                run_id=run_ok,
+                source_key="waterloo-awards",
+                source_display_name="Waterloo",
+                fetch_url="https://example.test",
+                status="partial",
+                capture_mode=None,
+                parser_name=None,
+                records_found=1,
+                records_created=1,
+                records_skipped=0,
+                failure_reason=None,
+                started_at=None,
+                completed_at=None,
+                created_at=datetime.now(timezone.utc),
+                execution_mode_requested="inline",
+                execution_mode_selected="inline",
+                dispatch_status="retry_inline",
+                celery_task_id=None,
+                attempt_count=1,
+                run_retry_count=1,
+                last_started_at=None,
+                last_retry_requested_at=None,
+                failure_phase=None,
+                review_queue=None,
+                queue_assigned_by_user_id=None,
+                queue_assigned_at=None,
+                queue_assignment_note=None,
+                run_metadata={},
+            )
+        if str(run_id) == run_skip:
+            raise HTTPException(status_code=409, detail="already running")
+        raise HTTPException(status_code=404, detail="not found")
+
+    monkeypatch.setattr(service, "retry_run", fake_retry)
+
+    response = await service.bulk_retry_runs(
+        payload=IngestionRunBulkRetryRequest(
+            run_ids=[run_ok, run_skip, "bad-uuid"],
+            max_records=3,
+            execution_mode="inline",
+        ),
+        actor_user=actor,
+    )
+
+    assert response.total == 3
+    assert response.retried == 1
+    assert response.skipped == 1
+    assert response.failed == 1
 
 
 class ExceptionWrapper:
