@@ -41,13 +41,6 @@ from app.schemas.interviews import (
     InterviewSessionSummaryResponse,
 )
 from app.schemas.recommendations import (
-    RecommendationBenchmarkAggregate,
-    RecommendationBenchmarkCaseResult,
-    RecommendationBenchmarkDataset,
-    RecommendationBenchmarkEvaluationResponse,
-    RecommendationBenchmarkGatePassRateItem,
-    RecommendationBenchmarkListResponse,
-    RecommendationBenchmarkSummary,
     RecommendationEvaluationRequest,
     RecommendationEvaluationResponse,
     RecommendationItem,
@@ -58,7 +51,6 @@ from app.schemas.recommendations import (
 from app.schemas.saved_opportunities import (
     SavedOpportunityItem,
     SavedOpportunityListResponse,
-    SavedOpportunityStatusUpdateRequest,
 )
 from app.schemas.scholarships import (
     ScholarshipAppliedFilters,
@@ -69,14 +61,6 @@ from app.schemas.scholarships import (
 from app.schemas.students import StudentProfileResponse, StudentProfileUpsertRequest
 from app.schemas.mentor import MentorFeedbackRequest, MentorFeedbackResponse
 from app.schemas.analytics import PlatformAnalyticsResponse
-from app.schemas.access_control import (
-    AccessControlManagedUser,
-    AccessControlManagedUserListResponse,
-    AccessControlRoleChangeItem,
-    AccessControlRoleChangeListResponse,
-    AccessControlRoleChangeRequest,
-    AccessControlRoleChangeRevertRequest,
-)
 
 __all__ = [
     "DocumentDetailResponse",
@@ -111,20 +95,12 @@ __all__ = [
     "InterviewSessionSummaryResponse",
     "RecommendationItem",
     "RecommendationListResponse",
-    "RecommendationBenchmarkAggregate",
-    "RecommendationBenchmarkCaseResult",
-    "RecommendationBenchmarkDataset",
-    "RecommendationBenchmarkEvaluationResponse",
-    "RecommendationBenchmarkGatePassRateItem",
-    "RecommendationBenchmarkListResponse",
-    "RecommendationBenchmarkSummary",
     "RecommendationEvaluationRequest",
     "RecommendationEvaluationResponse",
     "RecommendationMetricItem",
     "RecommendationRequest",
     "SavedOpportunityItem",
     "SavedOpportunityListResponse",
-    "SavedOpportunityStatusUpdateRequest",
     "ScholarshipAppliedFilters",
     "ScholarshipDetailResponse",
     "ScholarshipListItem",
@@ -140,10 +116,4 @@ __all__ = [
     "MentorFeedbackRequest",
     "MentorFeedbackResponse",
     "PlatformAnalyticsResponse",
-    "AccessControlManagedUser",
-    "AccessControlManagedUserListResponse",
-    "AccessControlRoleChangeItem",
-    "AccessControlRoleChangeListResponse",
-    "AccessControlRoleChangeRequest",
-    "AccessControlRoleChangeRevertRequest",
 ]
