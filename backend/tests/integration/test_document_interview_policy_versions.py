@@ -260,3 +260,66 @@ def test_interview_summary_response_includes_policy_version(app, client):
     assert response.status_code == 201
     payload = response.json()
     assert payload["progression_gate"]["policy_version"] == "interview.progression.v1"
+
+
+def test_interview_coaching_analytics_response_contract(app, client):
+    async def override_current_user():
+        return _DummyCurrentUser()
+
+    async def override_db():
+        yield _NoOpDB()
+
+    async def fake_get_coaching_analytics(self, user_id):
+        from app.schemas.interviews import (
+            InterviewCoachingAnalyticsResponse,
+            InterviewCoachingRecentSession,
+        )
+
+        now = datetime.now(timezone.utc)
+        return InterviewCoachingAnalyticsResponse(
+            session_count=2,
+            answered_count_total=5,
+            average_score_overall=3.1,
+            score_delta_from_first_session=0.6,
+            weakest_dimension_overall="specificity",
+            recommended_focuses=[
+                "Add one concrete example with measurable impact in each answer.",
+            ],
+            recent_sessions=[
+                InterviewCoachingRecentSession(
+                    session_id=str(uuid4()),
+                    practice_mode="general",
+                    answered_count=3,
+                    average_score=3.2,
+                    score_delta=0.4,
+                    score_direction="improving",
+                    weakest_dimension_overall="specificity",
+                    completed_at=now,
+                    updated_at=now,
+                )
+            ],
+        )
+
+    original_method = InterviewSessionService.get_coaching_analytics
+    InterviewSessionService.get_coaching_analytics = fake_get_coaching_analytics  # type: ignore[assignment]
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+
+    response = client.get(
+        "/api/v1/interviews/coaching-analytics",
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    app.dependency_overrides.clear()
+    InterviewSessionService.get_coaching_analytics = original_method
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session_count"] == 2
+    assert payload["answered_count_total"] == 5
+    assert payload["average_score_overall"] == 3.1
+    assert payload["score_delta_from_first_session"] == 0.6
+    assert payload["weakest_dimension_overall"] == "specificity"
+    assert isinstance(payload["recommended_focuses"], list)
+    assert payload["recent_sessions"]

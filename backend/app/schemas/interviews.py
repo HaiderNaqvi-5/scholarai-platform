@@ -94,6 +94,28 @@ class InterviewTrendSummary(BaseModel):
     dimension_averages: dict[str, float]
 
 
+class InterviewCoachingRecentSession(BaseModel):
+    session_id: str
+    practice_mode: str
+    answered_count: int = Field(ge=0)
+    average_score: float | None
+    score_delta: float | None
+    score_direction: str
+    weakest_dimension_overall: str | None
+    completed_at: datetime | None
+    updated_at: datetime
+
+
+class InterviewCoachingAnalyticsResponse(BaseModel):
+    session_count: int = Field(ge=0)
+    answered_count_total: int = Field(ge=0)
+    average_score_overall: float | None
+    score_delta_from_first_session: float | None
+    weakest_dimension_overall: str | None
+    recommended_focuses: list[str]
+    recent_sessions: list[InterviewCoachingRecentSession]
+
+
 class InterviewProgressionMetrics(BaseModel):
     answered_count: int = Field(ge=0)
     average_score: float | None = None

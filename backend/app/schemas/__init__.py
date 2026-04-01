@@ -35,6 +35,8 @@ from app.schemas.health import ErrorDetail, ErrorEnvelope, HealthResponse
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
+    InterviewCoachingAnalyticsResponse,
+    InterviewCoachingRecentSession,
     InterviewCurrentQuestionResponse,
     InterviewRubricDimension,
     InterviewSessionStartRequest,
@@ -105,6 +107,8 @@ __all__ = [
     "HealthResponse",
     "InterviewAnswerFeedback",
     "InterviewAnswerRequest",
+    "InterviewCoachingAnalyticsResponse",
+    "InterviewCoachingRecentSession",
     "InterviewCurrentQuestionResponse",
     "InterviewRubricDimension",
     "InterviewSessionStartRequest",

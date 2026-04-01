@@ -338,6 +338,28 @@ export type InterviewSessionSummary = {
   updated_at: string;
 };
 
+export type InterviewCoachingRecentSession = {
+  session_id: string;
+  practice_mode: InterviewPracticeMode;
+  answered_count: number;
+  average_score: number | null;
+  score_delta: number | null;
+  score_direction: string;
+  weakest_dimension_overall: string | null;
+  completed_at: string | null;
+  updated_at: string;
+};
+
+export type InterviewCoachingAnalyticsResponse = {
+  session_count: number;
+  answered_count_total: number;
+  average_score_overall: number | null;
+  score_delta_from_first_session: number | null;
+  weakest_dimension_overall: string | null;
+  recommended_focuses: string[];
+  recent_sessions: InterviewCoachingRecentSession[];
+};
+
 export type CurationRecordState = "raw" | "validated" | "published" | "archived";
 
 export type CurationRecordSummary = {

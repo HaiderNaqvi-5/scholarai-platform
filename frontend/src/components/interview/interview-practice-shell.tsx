@@ -13,6 +13,7 @@ import { AudioRecorder } from "@/components/interview/audio-recorder";
 import { apiRequest } from "@/lib/api";
 import type {
   ApiError,
+  InterviewCoachingAnalyticsResponse,
   InterviewCurrentQuestion,
   InterviewSessionSummary,
 } from "@/lib/types";
@@ -23,8 +24,10 @@ type InterviewState = {
   isLoading: boolean;
   isStarting: boolean;
   isSubmitting: boolean;
+  isLoadingCoaching: boolean;
   error: string | null;
   session: InterviewSessionSummary | null;
+  coachingAnalytics: InterviewCoachingAnalyticsResponse | null;
   notice: string | null;
 };
 
@@ -38,8 +41,10 @@ export function InterviewPracticeShell() {
     isLoading: true,
     isStarting: false,
     isSubmitting: false,
+    isLoadingCoaching: true,
     error: null,
     session: null,
+    coachingAnalytics: null,
     notice: null,
   });
 
@@ -58,15 +63,19 @@ export function InterviewPracticeShell() {
       try {
         const session = await apiRequest<InterviewSessionSummary>(
           `/interviews/${sessionId}`,
-          { token: accessToken },
+          {
+            token: accessToken,
+          },
         );
         if (!isActive) return;
         setState({
           isLoading: false,
           isStarting: false,
           isSubmitting: false,
+          isLoadingCoaching: true,
           error: null,
           session,
+          coachingAnalytics: null,
           notice: null,
         });
       } catch (error) {
@@ -75,8 +84,10 @@ export function InterviewPracticeShell() {
         setState((current) => ({
           ...current,
           isLoading: false,
+          isLoadingCoaching: false,
           error: resolveErrorMessage(error),
           session: null,
+          coachingAnalytics: null,
           notice: null,
         }));
       }
@@ -88,6 +99,42 @@ export function InterviewPracticeShell() {
       isActive = false;
     };
   }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+    let isActive = true;
+    const loadCoaching = async () => {
+      setState((current) => ({ ...current, isLoadingCoaching: true }));
+      try {
+        const coachingAnalytics = await apiRequest<InterviewCoachingAnalyticsResponse>(
+          "/interviews/coaching-analytics",
+          { token: accessToken },
+        );
+        if (!isActive) {
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          coachingAnalytics,
+          isLoadingCoaching: false,
+        }));
+      } catch {
+        if (!isActive) {
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          isLoadingCoaching: false,
+        }));
+      }
+    };
+    void loadCoaching();
+    return () => {
+      isActive = false;
+    };
+  }, [accessToken, state.session?.session_id]);
 
   const currentQuestion = useMemo<InterviewCurrentQuestion | null>(
     () => state.session?.current_question ?? null,
@@ -116,14 +163,15 @@ export function InterviewPracticeShell() {
       localStorage.setItem(LATEST_SESSION_KEY, session.session_id);
       setAnswerText("");
       setAudioB64(null);
-      setState({
+      setState((current) => ({
+        ...current,
         isLoading: false,
         isStarting: false,
         isSubmitting: false,
         error: null,
         session,
         notice: "Session started.",
-      });
+      }));
     } catch (error) {
       setState((current) => ({
         ...current,
@@ -167,6 +215,7 @@ export function InterviewPracticeShell() {
         ...current,
         isSubmitting: false,
         session,
+        coachingAnalytics: current.coachingAnalytics,
         notice: "Answer submitted and scored.",
       }));
     } catch (error) {
@@ -489,6 +538,94 @@ export function InterviewPracticeShell() {
             </div>
           )}
         </article>
+      </section>
+
+      <section className="surface-card" data-testid="interview-coaching-analytics">
+        <PageHeader
+          eyebrow="Coaching"
+          title="Long-horizon coaching analytics"
+          description="Cross-session trajectory and priority focus areas."
+        />
+        {state.isLoadingCoaching ? (
+          <SkeletonLine count={3} />
+        ) : state.coachingAnalytics ? (
+          <div className="surface-list">
+            <article className="metrics-grid">
+              <div className="data-point">
+                <p className="data-point__label">Sessions</p>
+                <strong>{state.coachingAnalytics.session_count}</strong>
+              </div>
+              <div className="data-point">
+                <p className="data-point__label">Answered</p>
+                <strong>{state.coachingAnalytics.answered_count_total}</strong>
+              </div>
+              <div className="data-point">
+                <p className="data-point__label">Avg score</p>
+                <strong>
+                  {state.coachingAnalytics.average_score_overall ?? "—"}
+                </strong>
+              </div>
+              <div className="data-point">
+                <p className="data-point__label">Delta</p>
+                <strong>
+                  {state.coachingAnalytics.score_delta_from_first_session ?? "—"}
+                </strong>
+              </div>
+            </article>
+
+            <article>
+              <p className="list-heading">Recommended focus</p>
+              {state.coachingAnalytics.recommended_focuses.length ? (
+                <ul className="detail-list">
+                  {state.coachingAnalytics.recommended_focuses.map((focus) => (
+                    <li key={focus}>{focus}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="body-copy">
+                  Complete additional responses to unlock coaching recommendations.
+                </p>
+              )}
+            </article>
+
+            <article>
+              <p className="list-heading">Recent session trends</p>
+              {state.coachingAnalytics.recent_sessions.length ? (
+                <div className="surface-list">
+                  {state.coachingAnalytics.recent_sessions.map((item) => (
+                    <article key={item.session_id}>
+                      <div className="meta-row">
+                        <StatusBadge
+                          label={item.practice_mode === "scholarship" ? "Scholarship mode" : "General mode"}
+                          variant="planned"
+                        />
+                        <span className="route-card__label">
+                          {item.answered_count} answered · {item.score_direction}
+                        </span>
+                      </div>
+                      <p className="body-copy">
+                        Avg {item.average_score ?? "—"} · Delta {item.score_delta ?? "—"}
+                      </p>
+                      {item.weakest_dimension_overall ? (
+                        <p className="code-note">
+                          Weakest dimension: {item.weakest_dimension_overall}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="body-copy">
+                  No completed history yet. Start with one full session to populate this panel.
+                </p>
+              )}
+            </article>
+          </div>
+        ) : (
+          <p className="body-copy">
+            Coaching analytics are temporarily unavailable.
+          </p>
+        )}
       </section>
     </AppShell>
   );
