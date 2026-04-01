@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -299,3 +299,119 @@ async def test_interview_invalid_scholarship_grounding_fails_cleanly():
 async def test_interview_answer_request_rejects_too_short_input():
     with pytest.raises(ValidationError):
         InterviewAnswerRequest(answer_text="Too short for useful interview coaching.")
+
+
+async def test_interview_service_coaching_analytics_across_sessions():
+    session = FakeSession()
+    service = InterviewSessionService(session)
+    user_id = uuid4()
+    session_a = InterviewSession(
+        user_id=user_id,
+        practice_mode=InterviewPracticeMode.GENERAL,
+        status=InterviewSessionStatus.COMPLETED,
+        current_question_index=3,
+        total_questions=3,
+        question_set=["Q1", "Q2", "Q3"],
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+    )
+    session_a.id = uuid4()
+    session_a.created_at = datetime.now(timezone.utc)
+    anchor = datetime.now(timezone.utc)
+    session_a.updated_at = anchor - timedelta(days=1)
+    session_a.responses = [
+        InterviewResponse(
+            session_id=session_a.id,
+            question_index=0,
+            question_text="Q1",
+            answer_text="A1",
+            score_payload=_feedback(
+                question_index=0,
+                question_text="Q1",
+                answer_text="A1",
+                overall_score=2.0,
+                dimensions=[("clarity", 2), ("relevance", 2), ("confidence", 2), ("specificity", 1)],
+            ).model_dump(),
+            summary_feedback="S1",
+        ),
+        InterviewResponse(
+            session_id=session_a.id,
+            question_index=1,
+            question_text="Q2",
+            answer_text="A2",
+            score_payload=_feedback(
+                question_index=1,
+                question_text="Q2",
+                answer_text="A2",
+                overall_score=2.5,
+                dimensions=[("clarity", 2), ("relevance", 2), ("confidence", 3), ("specificity", 2)],
+            ).model_dump(),
+            summary_feedback="S2",
+        ),
+    ]
+    for response in session_a.responses:
+        response.created_at = datetime.now(timezone.utc)
+
+    session_b = InterviewSession(
+        user_id=user_id,
+        practice_mode=InterviewPracticeMode.SCHOLARSHIP,
+        status=InterviewSessionStatus.COMPLETED,
+        current_question_index=3,
+        total_questions=3,
+        question_set=["Q1", "Q2", "Q3"],
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+    )
+    session_b.id = uuid4()
+    session_b.created_at = datetime.now(timezone.utc)
+    session_b.updated_at = anchor
+    session_b.responses = [
+        InterviewResponse(
+            session_id=session_b.id,
+            question_index=0,
+            question_text="Q1",
+            answer_text="B1",
+            score_payload=_feedback(
+                question_index=0,
+                question_text="Q1",
+                answer_text="B1",
+                overall_score=3.0,
+                dimensions=[("clarity", 3), ("relevance", 3), ("confidence", 3), ("specificity", 2)],
+            ).model_dump(),
+            summary_feedback="SB1",
+        ),
+        InterviewResponse(
+            session_id=session_b.id,
+            question_index=1,
+            question_text="Q2",
+            answer_text="B2",
+            score_payload=_feedback(
+                question_index=1,
+                question_text="Q2",
+                answer_text="B2",
+                overall_score=3.5,
+                dimensions=[("clarity", 4), ("relevance", 3), ("confidence", 3), ("specificity", 2)],
+            ).model_dump(),
+            summary_feedback="SB2",
+        ),
+    ]
+    for response in session_b.responses:
+        response.created_at = datetime.now(timezone.utc)
+
+    async def fake_execute(query):
+        query_text = str(query)
+        if "FROM interview_sessions" in query_text:
+            return FakeResult([session_b, session_a])
+        raise AssertionError("unexpected query in coaching analytics unit path")
+
+    session.execute = fake_execute  # type: ignore[method-assign]
+
+    result = await service.get_coaching_analytics(user_id)
+
+    assert result.session_count == 2
+    assert result.answered_count_total == 4
+    assert result.average_score_overall == 2.75
+    assert result.score_delta_from_first_session == 1.0
+    assert result.weakest_dimension_overall == "specificity"
+    assert result.recommended_focuses
+    assert len(result.recent_sessions) == 2

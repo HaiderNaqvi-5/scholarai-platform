@@ -8,6 +8,55 @@ def test_saved_opportunities_requires_authentication(client):
     assert "request_id" in body["error"]
 
 
+def test_interview_coaching_analytics_requires_authentication(client):
+    response = client.get("/api/v1/interviews/coaching-analytics")
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["status"] == 401
+    assert "request_id" in body["error"]
+
+
+def test_curation_ingestion_retry_requires_authentication(client):
+    response = client.post(
+        "/api/v1/curation/ingestion-runs/00000000-0000-0000-0000-000000000000/retry",
+        json={},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["status"] == 401
+    assert "request_id" in body["error"]
+
+
+def test_curation_ingestion_assign_queue_requires_authentication(client):
+    response = client.post(
+        "/api/v1/curation/ingestion-runs/00000000-0000-0000-0000-000000000000/assign-queue",
+        json={"queue_key": "manual-review"},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["status"] == 401
+    assert "request_id" in body["error"]
+
+
+def test_curation_ingestion_bulk_retry_requires_authentication(client):
+    response = client.post(
+        "/api/v1/curation/ingestion-runs/bulk-retry",
+        json={"run_ids": ["00000000-0000-0000-0000-000000000000"]},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["status"] == 401
+    assert "request_id" in body["error"]
+
+
 def test_v1_deprecation_headers_and_v2_route_available(client):
     v1_response = client.post(
         "/api/v1/recommendations/evaluate",
@@ -57,9 +106,9 @@ def test_api_v2_route_inventory_snapshot_from_openapi(client):
     known_non_parity_surfaces = [
         "/api/v2/auth",
         "/api/v2/curation",
-        "/api/v2/saved-opportunities",
         "/api/v2/mentor",
         "/api/v2/health",
+        "/api/v2/saved-opportunities",
     ]
     for prefix in known_non_parity_surfaces:
         assert not any(path == prefix or path.startswith(f"{prefix}/") for path in paths)

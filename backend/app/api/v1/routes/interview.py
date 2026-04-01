@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.dependencies import InterviewCreateUser, InterviewReadUser, InterviewRespondUser
 from app.schemas import (
     InterviewAnswerRequest,
+    InterviewCoachingAnalyticsResponse,
     InterviewCurrentQuestionResponse,
     InterviewSessionStartRequest,
     InterviewSessionSummaryResponse,
@@ -29,6 +30,15 @@ async def create_interview_session(
         practice_mode=payload.practice_mode,
         scholarship_id=payload.scholarship_id,
     )
+
+
+@router.get("/coaching-analytics", response_model=InterviewCoachingAnalyticsResponse)
+async def get_interview_coaching_analytics(
+    current_user: InterviewReadUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewCoachingAnalyticsResponse:
+    service = InterviewSessionService(db)
+    return await service.get_coaching_analytics(current_user.id)
 
 
 @router.get("/{session_id}", response_model=InterviewSessionSummaryResponse)

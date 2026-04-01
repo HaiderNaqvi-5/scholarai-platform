@@ -60,3 +60,23 @@ def test_curation_records_returns_403_for_missing_curation_capability(app, clien
     assert response.status_code == 403
     body = response.json()
     assert body["error"]["code"] == "auth_insufficient_permissions"
+
+
+def test_interview_coaching_analytics_returns_403_without_interview_read_capability(app, client):
+    async def override_current_user():
+        return _fake_user(capabilities={"interview.self.create"})
+
+    async def override_db():
+        yield object()
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+
+    response = client.get(
+        "/api/v1/interviews/coaching-analytics",
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    assert response.status_code == 403
+    body = response.json()
+    assert body["error"]["code"] == "auth_insufficient_permissions"

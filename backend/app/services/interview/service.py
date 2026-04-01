@@ -17,6 +17,8 @@ from app.models import (
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
+    InterviewCoachingAnalyticsResponse,
+    InterviewCoachingRecentSession,
     InterviewCurrentQuestionResponse,
     InterviewHistorySummary,
     InterviewProgressionGate,
@@ -95,6 +97,123 @@ class InterviewSessionService:
     ) -> InterviewCurrentQuestionResponse:
         session = await self._load_session(user_id, session_id)
         return self._build_current_question(session)
+
+    async def get_coaching_analytics(
+        self,
+        user_id: uuid.UUID,
+    ) -> InterviewCoachingAnalyticsResponse:
+        result = await self.db.execute(
+            select(InterviewSession)
+            .where(
+                InterviewSession.user_id == user_id,
+                InterviewSession.status == InterviewSessionStatus.COMPLETED,
+            )
+            .options(selectinload(InterviewSession.responses))
+            .order_by(InterviewSession.updated_at.desc())
+        )
+        all_sessions = result.scalars().all()
+        # Only include sessions that have at least one response so analytics
+        # reflect completed interview history with actual answers.
+        sessions = [s for s in all_sessions if s.responses]
+        if not sessions:
+            return InterviewCoachingAnalyticsResponse(
+                session_count=0,
+                answered_count_total=0,
+                average_score_overall=None,
+                score_delta_from_first_session=None,
+                weakest_dimension_overall=None,
+                recommended_focuses=[],
+                recent_sessions=[],
+            )
+
+        session_coaching_items: list[InterviewCoachingRecentSession] = []
+        first_session_avg: float | None = None
+        latest_session_avg: float | None = None
+        average_values: list[float] = []
+        answered_count_total = 0
+        dimension_totals: dict[str, int] = {}
+        dimension_counts: dict[str, int] = {}
+
+        chronological_sessions = sorted(
+            sessions, key=lambda item: item.started_at or item.created_at
+        )
+        for session in chronological_sessions:
+            sorted_responses = sorted(session.responses, key=lambda item: item.question_index)
+            response_items = [self._build_feedback(response) for response in sorted_responses]
+            trend_summary = InterviewTrendSummary(**build_trend_summary(response_items))
+            answered_count = len(response_items)
+            answered_count_total += answered_count
+            session_average = trend_summary.average_score
+
+            if session_average is not None:
+                average_values.append(session_average)
+                if first_session_avg is None:
+                    first_session_avg = session_average
+                latest_session_avg = session_average
+
+            for response in response_items:
+                for dimension in response.dimensions:
+                    current_total = dimension_totals.get(dimension.dimension, 0)
+                    current_count = dimension_counts.get(dimension.dimension, 0)
+                    dimension_totals[dimension.dimension] = current_total + int(dimension.score)
+                    dimension_counts[dimension.dimension] = current_count + 1
+
+            session_coaching_items.append(
+                InterviewCoachingRecentSession(
+                    session_id=str(session.id),
+                    practice_mode=session.practice_mode.value,
+                    answered_count=answered_count,
+                    average_score=session_average,
+                    score_delta=trend_summary.score_delta,
+                    score_direction=trend_summary.score_direction,
+                    weakest_dimension_overall=trend_summary.weakest_dimension_overall,
+                    completed_at=session.completed_at,
+                    updated_at=session.updated_at,
+                )
+            )
+
+        dimension_averages: dict[str, float] = {}
+        for dimension, total in dimension_totals.items():
+            count = dimension_counts.get(dimension, 0)
+            if count <= 0:
+                continue
+            dimension_averages[dimension] = round(total / count, 2)
+
+        weakest_dimension_overall = (
+            min(
+                dimension_averages.items(),
+                key=lambda item: (item[1], item[0]),
+            )[0]
+            if dimension_averages
+            else None
+        )
+        recommended_focuses = self._build_recommended_focuses(dimension_averages)
+
+        score_delta_from_first_session = None
+        if first_session_avg is not None and latest_session_avg is not None:
+            score_delta_from_first_session = round(latest_session_avg - first_session_avg, 2)
+
+        recent_sessions = sorted(
+            session_coaching_items,
+            key=lambda item: item.updated_at,
+            reverse=True,
+        )[:5]
+
+        average_score_overall = (
+            round(sum(average_values) / len(average_values), 2)
+            if average_values
+            else None
+        )
+
+        return InterviewCoachingAnalyticsResponse(
+            session_count=len(sessions),
+            answered_count_total=answered_count_total,
+            average_score_overall=average_score_overall,
+            score_delta_from_first_session=score_delta_from_first_session,
+            weakest_dimension_overall=weakest_dimension_overall,
+            recommended_focuses=recommended_focuses,
+            recent_sessions=recent_sessions,
+        )
 
     async def submit_answer(
         self,
@@ -373,3 +492,28 @@ class InterviewSessionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Interview practice mode must be '{allowed_text}'",
             ) from exc
+
+    def _build_recommended_focuses(self, dimension_averages: dict[str, float]) -> list[str]:
+        if not dimension_averages:
+            return []
+
+        focus_templates = {
+            "clarity": "Lead with a three-part structure: context, evidence, and result.",
+            "relevance": "Tie each answer directly to the prompt before adding supporting details.",
+            "confidence": "Use direct ownership language about decisions, actions, and outcomes.",
+            "specificity": "Add one concrete example with measurable impact in each answer.",
+        }
+
+        prioritized = sorted(
+            dimension_averages.items(),
+            key=lambda item: (item[1], item[0]),
+        )
+        focuses: list[str] = []
+        for dimension, _score in prioritized[:2]:
+            focuses.append(
+                focus_templates.get(
+                    dimension,
+                    f"Strengthen {dimension} with specific evidence and concise structure.",
+                )
+            )
+        return focuses
