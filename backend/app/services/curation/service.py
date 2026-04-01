@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -97,8 +97,6 @@ class CurationService:
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[CurationRecordSummary], int]:
-        from sqlalchemy import func as sa_func
-
         self._assert_user_scope(actor_user)
         base_query = select(Scholarship).options(selectinload(Scholarship.source_registry))
 
@@ -110,7 +108,7 @@ class CurationService:
             base_query = base_query.where(Scholarship.record_state == parsed_state)
 
         count_result = await self.db.execute(
-            select(sa_func.count()).select_from(base_query.subquery())
+            select(func.count()).select_from(base_query.subquery())
         )
         total = count_result.scalar_one()
 

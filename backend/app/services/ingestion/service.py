@@ -15,7 +15,7 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -274,8 +274,6 @@ class IngestionService:
         source_key: str | None = None,
         dispatch_status: str | None = None,
     ) -> IngestionRunListResponse:
-        from sqlalchemy import func as sa_func
-
         if actor_user is not None:
             self._assert_actor_scope(actor_user)
         normalized_status = self._normalize_status_filter(status_filter)
@@ -299,7 +297,7 @@ class IngestionService:
         if normalized_status is not None:
             query = query.where(IngestionRun.status == normalized_status)
         if normalized_source_key is not None:
-            query = query.where(sa_func.lower(SourceRegistry.source_key) == normalized_source_key)
+            query = query.where(func.lower(SourceRegistry.source_key) == normalized_source_key)
 
         if normalized_dispatch is not None:
             # dispatch_status lives inside a JSON field; filter in Python after DB fetch
@@ -310,7 +308,7 @@ class IngestionService:
             page_runs = runs[offset : offset + page_size]
         else:
             count_result = await self.db.execute(
-                select(sa_func.count()).select_from(query.subquery())
+                select(func.count()).select_from(query.subquery())
             )
             total = count_result.scalar_one()
             page_result = await self.db.execute(query.offset(offset).limit(page_size))
