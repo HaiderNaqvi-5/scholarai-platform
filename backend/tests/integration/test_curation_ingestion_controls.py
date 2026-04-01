@@ -126,13 +126,14 @@ def test_curation_ingestion_list_supports_filters(app, client):
 
     curation_routes.IngestionService = FakeIngestionService  # type: ignore[assignment]
 
-    response = client.get(
-        "/api/v1/curation/ingestion-runs?page=1&page_size=8&status=failed&source_key=fulbright-foreign-student&dispatch_status=retry_inline",
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    curation_routes.IngestionService = original_service  # type: ignore[assignment]
-    app.dependency_overrides.clear()
+    try:
+        response = client.get(
+            "/api/v1/curation/ingestion-runs?page=1&page_size=8&status=failed&source_key=fulbright-foreign-student&dispatch_status=retry_inline",
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        curation_routes.IngestionService = original_service  # type: ignore[assignment]
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
@@ -175,14 +176,15 @@ def test_curation_ingestion_retry_endpoint_returns_detail(app, client):
     import app.api.v1.routes.curation as curation_routes
 
     curation_routes.IngestionService = FakeIngestionService  # type: ignore[assignment]
-    response = client.post(
-        f"/api/v1/curation/ingestion-runs/{run_id}/retry",
-        json={"max_records": 4, "execution_mode": "inline"},
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    curation_routes.IngestionService = original_service  # type: ignore[assignment]
-    app.dependency_overrides.clear()
+    try:
+        response = client.post(
+            f"/api/v1/curation/ingestion-runs/{run_id}/retry",
+            json={"max_records": 4, "execution_mode": "inline"},
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        curation_routes.IngestionService = original_service  # type: ignore[assignment]
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
@@ -230,14 +232,15 @@ def test_curation_ingestion_assign_queue_endpoint_returns_detail(app, client):
     import app.api.v1.routes.curation as curation_routes
 
     curation_routes.IngestionService = FakeIngestionService  # type: ignore[assignment]
-    response = client.post(
-        f"/api/v1/curation/ingestion-runs/{run_id}/assign-queue",
-        json={"queue_key": "manual-review", "note": "priority"},
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    curation_routes.IngestionService = original_service  # type: ignore[assignment]
-    app.dependency_overrides.clear()
+    try:
+        response = client.post(
+            f"/api/v1/curation/ingestion-runs/{run_id}/assign-queue",
+            json={"queue_key": "manual-review", "note": "priority"},
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        curation_routes.IngestionService = original_service  # type: ignore[assignment]
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
@@ -304,14 +307,15 @@ def test_curation_ingestion_bulk_retry_endpoint_returns_counts(app, client):
     import app.api.v1.routes.curation as curation_routes
 
     curation_routes.IngestionService = FakeIngestionService  # type: ignore[assignment]
-    response = client.post(
-        "/api/v1/curation/ingestion-runs/bulk-retry",
-        json={"run_ids": [run_ok, run_skip], "max_records": 4, "execution_mode": "inline"},
-        headers={"Authorization": "Bearer fake"},
-    )
-
-    curation_routes.IngestionService = original_service  # type: ignore[assignment]
-    app.dependency_overrides.clear()
+    try:
+        response = client.post(
+            "/api/v1/curation/ingestion-runs/bulk-retry",
+            json={"run_ids": [run_ok, run_skip], "max_records": 4, "execution_mode": "inline"},
+            headers={"Authorization": "Bearer fake"},
+        )
+    finally:
+        curation_routes.IngestionService = original_service  # type: ignore[assignment]
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
