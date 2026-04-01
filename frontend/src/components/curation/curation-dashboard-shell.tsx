@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -17,9 +17,13 @@ import type {
   CurationRecordListResponse,
   CurationRawImportRequest,
   CurationRecordState,
+  IngestionRunBulkRetryRequest,
+  IngestionRunBulkRetryResponse,
   IngestionExecutionMode,
   IngestionRunDetail,
   IngestionRunListResponse,
+  IngestionRunQueueAssignmentRequest,
+  IngestionRunRetryRequest,
   IngestionRunStartRequest,
   IngestionRunSummary,
 } from "@/lib/types";
@@ -113,6 +117,18 @@ type IngestionState = {
   execution_mode: IngestionExecutionMode;
 };
 
+type RunFilterState = {
+  status: "all" | "queued" | "running" | "completed" | "partial" | "failed";
+  source_key: string;
+  dispatch_status: string;
+};
+
+type IngestionBulkState = {
+  selectedRunIds: string[];
+  queueKey: string;
+  queueNote: string;
+};
+
 const EMPTY_EDIT_STATE: EditState = {
   title: "",
   provider_name: "",
@@ -147,6 +163,18 @@ const EMPTY_INGESTION_STATE: IngestionState = {
   source_type: CURATION_SOURCE_OPTIONS[0].source_type,
   max_records: "5",
   execution_mode: "auto",
+};
+
+const EMPTY_RUN_FILTER_STATE: RunFilterState = {
+  status: "all",
+  source_key: "",
+  dispatch_status: "",
+};
+
+const EMPTY_INGESTION_BULK_STATE: IngestionBulkState = {
+  selectedRunIds: [],
+  queueKey: "manual-review",
+  queueNote: "",
 };
 
 export function CurationDashboardShell() {
@@ -190,6 +218,65 @@ export function CurationDashboardShell() {
   const [importState, setImportState] = useState<ImportState>(EMPTY_IMPORT_STATE);
   const [ingestionState, setIngestionState] =
     useState<IngestionState>(EMPTY_INGESTION_STATE);
+  const [runFilterState, setRunFilterState] = useState<RunFilterState>(
+    EMPTY_RUN_FILTER_STATE,
+  );
+  const [ingestionBulkState, setIngestionBulkState] = useState<IngestionBulkState>(
+    EMPTY_INGESTION_BULK_STATE,
+  );
+
+  const loadRuns = useCallback(async () => {
+    if (!accessToken) {
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      isRunsLoading: true,
+      error: null,
+      errorContext: null,
+    }));
+    try {
+      const search = new URLSearchParams();
+      search.set("page", "1");
+      search.set("page_size", "8");
+      if (runFilterState.status !== "all") {
+        search.set("status", runFilterState.status);
+      }
+      if (runFilterState.source_key.trim()) {
+        search.set("source_key", runFilterState.source_key.trim());
+      }
+      if (runFilterState.dispatch_status.trim()) {
+        search.set("dispatch_status", runFilterState.dispatch_status.trim());
+      }
+      const response = await apiRequest<IngestionRunListResponse>(
+        `/curation/ingestion-runs?${search.toString()}`,
+        { token: accessToken },
+      );
+
+      setState((current) => ({
+        ...current,
+        isRunsLoading: false,
+        runs: response.items,
+      }));
+
+      if (response.items[0]) {
+        const detail = await apiRequest<IngestionRunDetail>(
+          `/curation/ingestion-runs/${response.items[0].run_id}`,
+          { token: accessToken },
+        );
+        setState((current) => ({ ...current, selectedRun: detail }));
+      } else {
+        setState((current) => ({ ...current, selectedRun: null }));
+      }
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isRunsLoading: false,
+        error: resolveErrorMessage(error),
+        errorContext: "runs",
+      }));
+    }
+  }, [accessToken, runFilterState]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -239,53 +326,6 @@ export function CurationDashboardShell() {
       }
     };
 
-    const loadRuns = async () => {
-      setState((current) => ({
-        ...current,
-        isRunsLoading: true,
-        error: null,
-        errorContext: null,
-      }));
-      try {
-        const response = await apiRequest<IngestionRunListResponse>(
-          "/curation/ingestion-runs?limit=8",
-          { token: accessToken },
-        );
-        if (!isActive) {
-          return;
-        }
-
-        setState((current) => ({
-          ...current,
-          isRunsLoading: false,
-          runs: response.items,
-        }));
-
-        if (response.items[0]) {
-          const detail = await apiRequest<IngestionRunDetail>(
-            `/curation/ingestion-runs/${response.items[0].run_id}`,
-            { token: accessToken },
-          );
-          if (!isActive) {
-            return;
-          }
-          setState((current) => ({ ...current, selectedRun: detail }));
-        } else {
-          setState((current) => ({ ...current, selectedRun: null }));
-        }
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-        setState((current) => ({
-          ...current,
-          isRunsLoading: false,
-          error: resolveErrorMessage(error),
-          errorContext: "runs",
-        }));
-      }
-    };
-
     const loadRecordDetail = async (recordId: string, initial = false) => {
       setState((current) => ({
         ...current,
@@ -321,12 +361,18 @@ export function CurationDashboardShell() {
     };
 
     void loadRecords();
-    void loadRuns();
 
     return () => {
       isActive = false;
     };
   }, [accessToken, state.filter]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+    void loadRuns();
+  }, [accessToken, loadRuns]);
 
   const selectedId = state.selectedRecord?.record_id ?? null;
 
@@ -703,6 +749,213 @@ export function CurationDashboardShell() {
     }
   };
 
+  const retryIngestionRun = async () => {
+    if (!accessToken || !state.selectedRun || state.isSaving) {
+      return;
+    }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to retry ingestion runs.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to retry ingestion runs.",
+        },
+      }));
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
+
+    try {
+      const payload: IngestionRunRetryRequest = {
+        max_records: Number(ingestionState.max_records) || null,
+        execution_mode: "inline",
+      };
+      const detail = await apiRequest<IngestionRunDetail>(
+        `/curation/ingestion-runs/${state.selectedRun.run_id}/retry`,
+        {
+          method: "POST",
+          token: accessToken,
+          body: JSON.stringify(payload),
+        },
+      );
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        selectedRun: detail,
+        runs: [detail, ...current.runs.filter((item) => item.run_id !== detail.run_id)],
+        actionFeedback: {
+          variant: "success",
+          message: "Ingestion run retried successfully.",
+        },
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
+      }));
+    }
+  };
+
+  const toggleRunSelection = (runId: string) => {
+    setIngestionBulkState((current) => ({
+      ...current,
+      selectedRunIds: current.selectedRunIds.includes(runId)
+        ? current.selectedRunIds.filter((id) => id !== runId)
+        : [...current.selectedRunIds, runId],
+    }));
+  };
+
+  const assignSelectedRunsQueue = async () => {
+    if (!accessToken || ingestionBulkState.selectedRunIds.length === 0 || state.isSaving) {
+      return;
+    }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to assign ingestion queues.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to assign ingestion queues.",
+        },
+      }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
+    try {
+      const payload: IngestionRunQueueAssignmentRequest = {
+        queue_key: ingestionBulkState.queueKey.trim() || "manual-review",
+        note: emptyToNull(ingestionBulkState.queueNote),
+      };
+      const updates = await Promise.all(
+        ingestionBulkState.selectedRunIds.map((runId) =>
+          apiRequest<IngestionRunDetail>(`/curation/ingestion-runs/${runId}/assign-queue`, {
+            method: "POST",
+            token: accessToken,
+            body: JSON.stringify(payload),
+          })
+        ),
+      );
+      const detailById = new Map(updates.map((detail) => [detail.run_id, detail]));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        selectedRun: current.selectedRun ? detailById.get(current.selectedRun.run_id) ?? current.selectedRun : null,
+        runs: current.runs.map((run) => detailById.get(run.run_id) ?? run),
+        actionFeedback: {
+          variant: "success",
+          message: `Assigned queue for ${updates.length} run(s).`,
+        },
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
+      }));
+    }
+  };
+
+  const bulkRetrySelectedRuns = async () => {
+    if (!accessToken || ingestionBulkState.selectedRunIds.length === 0 || state.isSaving) {
+      return;
+    }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to bulk retry ingestion runs.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to bulk retry ingestion runs.",
+        },
+      }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
+    try {
+      const payload: IngestionRunBulkRetryRequest = {
+        run_ids: ingestionBulkState.selectedRunIds,
+        max_records: Number(ingestionState.max_records) || null,
+        execution_mode: "inline",
+      };
+      const response = await apiRequest<IngestionRunBulkRetryResponse>(
+        "/curation/ingestion-runs/bulk-retry",
+        {
+          method: "POST",
+          token: accessToken,
+          body: JSON.stringify(payload),
+        },
+      );
+      const updatedDetails = response.items
+        .map((item) => item.detail)
+        .filter((detail): detail is IngestionRunDetail => detail !== null);
+      const detailById = new Map(updatedDetails.map((detail) => [detail.run_id, detail]));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        selectedRun: current.selectedRun ? detailById.get(current.selectedRun.run_id) ?? current.selectedRun : null,
+        runs: current.runs.map((run) => detailById.get(run.run_id) ?? run),
+        actionFeedback: {
+          variant: response.failed > 0 ? "error" : "success",
+          message: `Bulk retry: ${response.retried} retried, ${response.skipped} skipped, ${response.failed} failed.`,
+        },
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
+      }));
+    }
+  };
+
   const runAction = async (
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
@@ -936,6 +1189,118 @@ export function CurationDashboardShell() {
             title="Ingestion history"
             description="Each run tracks source, records found, created, and skipped."
           />
+          <div className="form-grid">
+            <label className="form-field">
+              <span className="form-field__label">Run status</span>
+              <select
+                className="text-input"
+                onChange={(event) =>
+                  setRunFilterState((current) => ({
+                    ...current,
+                    status: event.target.value as RunFilterState["status"],
+                  }))
+                }
+                value={runFilterState.status}
+              >
+                <option value="all">All statuses</option>
+                <option value="queued">Queued</option>
+                <option value="running">Running</option>
+                <option value="completed">Completed</option>
+                <option value="partial">Partial</option>
+                <option value="failed">Failed</option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Source key filter</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setRunFilterState((current) => ({
+                    ...current,
+                    source_key: event.target.value,
+                  }))
+                }
+                placeholder="waterloo-awards"
+                value={runFilterState.source_key}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Dispatch status filter</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setRunFilterState((current) => ({
+                    ...current,
+                    dispatch_status: event.target.value,
+                  }))
+                }
+                placeholder="queued / retry_inline"
+                value={runFilterState.dispatch_status}
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label className="form-field">
+              <span className="form-field__label">Queue key</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionBulkState((current) => ({
+                    ...current,
+                    queueKey: event.target.value,
+                  }))
+                }
+                placeholder="manual-review"
+                value={ingestionBulkState.queueKey}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-field__label">Queue assignment note</span>
+              <input
+                className="text-input"
+                onChange={(event) =>
+                  setIngestionBulkState((current) => ({
+                    ...current,
+                    queueNote: event.target.value,
+                  }))
+                }
+                placeholder="optional note"
+                value={ingestionBulkState.queueNote}
+              />
+            </label>
+          </div>
+          <div className="document-actions">
+            <button
+              className="auth-link auth-link--secondary"
+              data-testid="curation-assign-queue-selected"
+              disabled={
+                state.isSaving ||
+                !canRunIngestion ||
+                ingestionBulkState.selectedRunIds.length === 0
+              }
+              onClick={() => void assignSelectedRunsQueue()}
+              type="button"
+            >
+              {state.activeAction === "ingestion"
+                ? "Assigning queue"
+                : `Assign queue to selected (${ingestionBulkState.selectedRunIds.length})`}
+            </button>
+            <button
+              className="auth-link auth-link--primary"
+              data-testid="curation-bulk-retry-selected"
+              disabled={
+                state.isSaving ||
+                !canRunIngestion ||
+                ingestionBulkState.selectedRunIds.length === 0
+              }
+              onClick={() => void bulkRetrySelectedRuns()}
+              type="button"
+            >
+              {state.activeAction === "ingestion"
+                ? "Retrying selected"
+                : `Retry selected runs (${ingestionBulkState.selectedRunIds.length})`}
+            </button>
+          </div>
           {state.isRunsLoading ? (
             <div className="surface-list">
               <SkeletonCard />
@@ -961,6 +1326,17 @@ export function CurationDashboardShell() {
                   type="button"
                 >
                   <div className="meta-row">
+                    <label
+                      aria-label={`Select ingestion run ${run.run_id}`}
+                      className="route-card__label"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        checked={ingestionBulkState.selectedRunIds.includes(run.run_id)}
+                        onChange={() => toggleRunSelection(run.run_id)}
+                        type="checkbox"
+                      />
+                    </label>
                     <StatusBadge label={run.status} variant={runBadgeVariant(run.status)} />
                     <span className="route-card__label">{run.source_key}</span>
                   </div>
@@ -968,6 +1344,9 @@ export function CurationDashboardShell() {
                   <p className="route-card__description">
                     Created {run.records_created} · Skipped {run.records_skipped} ·{" "}
                     {run.execution_mode_selected ?? "mode-unknown"}
+                  </p>
+                  <p className="route-card__description">
+                    Queue {run.review_queue ?? "unassigned"}
                   </p>
                 </button>
               ))}
@@ -1005,12 +1384,61 @@ export function CurationDashboardShell() {
                   Celery task id: {state.selectedRun.celery_task_id ?? "n/a"}
                 </li>
                 <li>
+                  Attempt count: {state.selectedRun.attempt_count ?? "n/a"}
+                </li>
+                <li>
+                  Retry count: {state.selectedRun.run_retry_count ?? "n/a"}
+                </li>
+                <li>
+                  Last started:{" "}
+                  {state.selectedRun.last_started_at
+                    ? new Date(state.selectedRun.last_started_at).toLocaleString()
+                    : "n/a"}
+                </li>
+                <li>
+                  Last retry requested:{" "}
+                  {state.selectedRun.last_retry_requested_at
+                    ? new Date(state.selectedRun.last_retry_requested_at).toLocaleString()
+                    : "n/a"}
+                </li>
+                <li>
+                  Failure phase: {state.selectedRun.failure_phase ?? "n/a"}
+                </li>
+                <li>Review queue: {state.selectedRun.review_queue ?? "unassigned"}</li>
+                <li>
+                  Queue assigned by: {state.selectedRun.queue_assigned_by_user_id ?? "n/a"}
+                </li>
+                <li>
+                  Queue assigned at:{" "}
+                  {state.selectedRun.queue_assigned_at
+                    ? new Date(state.selectedRun.queue_assigned_at).toLocaleString()
+                    : "n/a"}
+                </li>
+                <li>
+                  Queue note: {state.selectedRun.queue_assignment_note ?? "n/a"}
+                </li>
+                <li>
                   Completed:{" "}
                   {state.selectedRun.completed_at
                     ? new Date(state.selectedRun.completed_at).toLocaleString()
                     : "Still running"}
                 </li>
               </ul>
+              <div className="document-actions">
+                <button
+                  className="auth-link auth-link--secondary"
+                  data-testid="curation-retry-ingestion"
+                  disabled={
+                    state.isSaving ||
+                    !canRunIngestion ||
+                    state.selectedRun.status === "running"
+                  }
+                  onClick={() => void retryIngestionRun()}
+                  type="button"
+                >
+                  {state.activeAction === "ingestion" ? "Retrying run" : "Retry run"}
+                </button>
+              </div>
             </article>
           ) : null}
         </article>
