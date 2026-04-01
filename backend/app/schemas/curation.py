@@ -56,7 +56,7 @@ class IngestionRunRetryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_records: int | None = Field(default=None, ge=1, le=20)
-    execution_mode: Literal["inline", "worker", "auto"] | None = None
+    execution_mode: Literal["inline"] | None = None
 
 
 class IngestionRunQueueAssignmentRequest(BaseModel):
@@ -65,13 +65,21 @@ class IngestionRunQueueAssignmentRequest(BaseModel):
     queue_key: str = Field(min_length=2, max_length=64)
     note: str | None = Field(default=None, max_length=500)
 
+    @field_validator("queue_key")
+    @classmethod
+    def normalize_queue_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("queue_key must not be empty or only whitespace")
+        return normalized
+
 
 class IngestionRunBulkRetryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_ids: list[str] = Field(min_length=1, max_length=50)
     max_records: int | None = Field(default=None, ge=1, le=20)
-    execution_mode: Literal["inline", "worker", "auto"] | None = None
+    execution_mode: Literal["inline"] | None = None
 
     @field_validator("run_ids")
     @classmethod

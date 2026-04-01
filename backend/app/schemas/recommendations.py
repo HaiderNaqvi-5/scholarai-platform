@@ -139,3 +139,51 @@ class RecommendationListResponse(BaseModel):
     items: list[RecommendationItem]
     total: int = Field(ge=0)
     meta: RecommendationResponseMeta | None = None
+
+
+class RecommendationBenchmarkGatePassRateItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
+    recall_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
+    ndcg_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
+
+
+class RecommendationBenchmarkCaseResult(BaseModel):
+    case_id: str
+    predicted_ids: list[str]
+    metrics: list[RecommendationMetricItem]
+    kpi_passed: bool | None = None
+
+
+class RecommendationBenchmarkSummary(BaseModel):
+    benchmark_id: str
+    name: str
+    case_count: int = Field(ge=0)
+    passed_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    gate_pass_rate: float = Field(ge=0.0, le=1.0)
+    created_at: datetime
+
+
+class RecommendationBenchmarkAggregate(BaseModel):
+    benchmark_id: str
+    gate_pass_rates: list[RecommendationBenchmarkGatePassRateItem]
+    overall_pass_rate: float = Field(ge=0.0, le=1.0)
+
+
+class RecommendationBenchmarkDataset(BaseModel):
+    benchmark_id: str
+    name: str
+    description: str | None = None
+    cases: list[RecommendationBenchmarkCaseResult]
+
+
+class RecommendationBenchmarkEvaluationResponse(BaseModel):
+    summary: RecommendationBenchmarkSummary
+    aggregate: RecommendationBenchmarkAggregate
+    cases: list[RecommendationBenchmarkCaseResult]
+
+
+class RecommendationBenchmarkListResponse(BaseModel):
+    items: list[RecommendationBenchmarkSummary]
+    total: int = Field(ge=0)
