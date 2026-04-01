@@ -15,15 +15,20 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import IngestionRun, IngestionRunStatus, Scholarship, SourceRegistry, User, UserRole
 from app.schemas.curation import (
     CurationRawImportRequest,
+    IngestionRunBulkRetryItem,
+    IngestionRunBulkRetryRequest,
+    IngestionRunBulkRetryResponse,
     IngestionRunDetail,
     IngestionRunListResponse,
+    IngestionRunQueueAssignmentRequest,
+    IngestionRunRetryRequest,
     IngestionRunStartRequest,
     IngestionRunSummary,
 )
@@ -259,24 +264,210 @@ class IngestionService:
         await self.db.flush()
         return self._build_detail(run)
 
-    async def list_runs(self, actor_user: User | None = None, limit: int = 20) -> IngestionRunListResponse:
+    async def list_runs(
+        self,
+        actor_user: User | None = None,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status_filter: str | None = None,
+        source_key: str | None = None,
+        dispatch_status: str | None = None,
+    ) -> IngestionRunListResponse:
         if actor_user is not None:
             self._assert_actor_scope(actor_user)
+        normalized_status = self._normalize_status_filter(status_filter)
+        normalized_source_key = source_key.strip().lower() if isinstance(source_key, str) and source_key.strip() else None
+        normalized_dispatch = (
+            dispatch_status.strip().lower()
+            if isinstance(dispatch_status, str) and dispatch_status.strip()
+            else None
+        )
+
+        offset = (page - 1) * page_size
         query = (
             select(IngestionRun)
+            .join(SourceRegistry)
             .options(selectinload(IngestionRun.source_registry))
             .order_by(IngestionRun.created_at.desc())
-            .limit(limit)
         )
-        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
-            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
         result = await self.db.execute(query)
-        items = [self._build_summary(item) for item in self._result_items(result)]
-        return IngestionRunListResponse(items=items, total=len(items))
+        runs = self._result_items(result)
+        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
+            runs = [run for run in runs if run.institution_id == actor_user.institution_id]
+        if normalized_status is not None:
+            runs = [run for run in runs if run.status == normalized_status]
+        if normalized_source_key is not None:
+            runs = [
+                run
+                for run in runs
+                if run.source_registry and run.source_registry.source_key.lower() == normalized_source_key
+            ]
+        if normalized_dispatch is not None:
+            runs = [run for run in runs if self._read_dispatch_status(run.run_metadata) == normalized_dispatch]
 
-    async def get_run(self, run_id: uuid.UUID) -> IngestionRunDetail:
+        total = len(runs)
+        page_runs = runs[offset : offset + page_size]
+        items = [self._build_summary(item) for item in page_runs]
+        return IngestionRunListResponse(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            has_more=offset + len(items) < total,
+        )
+
+    async def get_run(self, run_id: uuid.UUID, actor_user: User | None = None) -> IngestionRunDetail:
+        if actor_user is not None:
+            self._assert_actor_scope(actor_user)
         run = await self._load_run(run_id)
+        if actor_user is not None:
+            self._assert_run_scope(run, actor_user)
         return self._build_detail(run)
+
+    async def retry_run(
+        self,
+        run_id: uuid.UUID,
+        *,
+        payload: IngestionRunRetryRequest,
+        actor_user: User,
+    ) -> IngestionRunDetail:
+        self._assert_actor_scope(actor_user)
+        run = await self._load_run(run_id)
+        self._assert_run_scope(run, actor_user)
+        if run.status == IngestionRunStatus.RUNNING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ingestion run is currently running and cannot be retried",
+            )
+
+        requested_mode = payload.execution_mode or self._read_requested_execution_mode(run.run_metadata)
+        selected_max_records = payload.max_records or self._read_requested_max_records(run.run_metadata)
+        retry_timestamp = self._now().isoformat()
+        existing_execution = dict((run.run_metadata or {}).get("execution") or {})
+        retry_count = int(existing_execution.get("run_retry_count", 0)) + 1
+        run.run_metadata = self._merge_run_metadata(
+            run.run_metadata,
+            {
+                "request": {
+                    "max_records": selected_max_records,
+                    "execution_mode_requested": requested_mode,
+                },
+                "execution": {
+                    "requested_mode": requested_mode,
+                    "last_retry_requested_at": retry_timestamp,
+                    "run_retry_count": retry_count,
+                    "retry_origin_run_id": str(run.id),
+                },
+            },
+        )
+        await self.db.flush()
+        return await self.execute_run(
+            run.id,
+            actor_user_id=actor_user.id,
+            max_records=selected_max_records,
+            execution_context={
+                "requested_mode": requested_mode,
+                "selected_mode": "inline",
+                "dispatch_status": "retry_inline",
+                "retry_triggered": True,
+                "last_retry_requested_at": retry_timestamp,
+            },
+        )
+
+    async def assign_review_queue(
+        self,
+        run_id: uuid.UUID,
+        *,
+        payload: IngestionRunQueueAssignmentRequest,
+        actor_user: User,
+    ) -> IngestionRunDetail:
+        self._assert_actor_scope(actor_user)
+        run = await self._load_run(run_id)
+        self._assert_run_scope(run, actor_user)
+        assigned_at = self._now().isoformat()
+        run.run_metadata = self._merge_run_metadata(
+            run.run_metadata,
+            {
+                "execution": {
+                    "review_queue": payload.queue_key.strip(),
+                    "queue_assigned_by_user_id": str(actor_user.id),
+                    "queue_assigned_at": assigned_at,
+                    "queue_assignment_note": payload.note,
+                }
+            },
+        )
+        await self.db.flush()
+        return self._build_detail(run)
+
+    async def bulk_retry_runs(
+        self,
+        *,
+        payload: IngestionRunBulkRetryRequest,
+        actor_user: User,
+    ) -> IngestionRunBulkRetryResponse:
+        items: list[IngestionRunBulkRetryItem] = []
+        counts = {"retried": 0, "skipped": 0, "failed": 0}
+
+        for run_id_raw in payload.run_ids:
+            try:
+                run_id = uuid.UUID(run_id_raw)
+            except ValueError:
+                counts["failed"] += 1
+                items.append(
+                    IngestionRunBulkRetryItem(
+                        run_id=run_id_raw,
+                        status="failed",
+                        message="Invalid run id format",
+                    )
+                )
+                continue
+
+            try:
+                detail = await self.retry_run(
+                    run_id,
+                    payload=IngestionRunRetryRequest(
+                        max_records=payload.max_records,
+                        execution_mode=payload.execution_mode,
+                    ),
+                    actor_user=actor_user,
+                )
+                counts["retried"] += 1
+                items.append(
+                    IngestionRunBulkRetryItem(
+                        run_id=run_id_raw,
+                        status="retried",
+                        message="Run retried successfully",
+                        detail=detail,
+                    )
+                )
+            except HTTPException as exc:
+                status_label = "skipped" if exc.status_code in {403, 404, 409} else "failed"
+                counts[status_label] += 1
+                items.append(
+                    IngestionRunBulkRetryItem(
+                        run_id=run_id_raw,
+                        status=status_label,
+                        message=str(exc.detail),
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                counts["failed"] += 1
+                items.append(
+                    IngestionRunBulkRetryItem(
+                        run_id=run_id_raw,
+                        status="failed",
+                        message=str(exc),
+                    )
+                )
+
+        return IngestionRunBulkRetryResponse(
+            items=items,
+            total=len(items),
+            retried=counts["retried"],
+            skipped=counts["skipped"],
+            failed=counts["failed"],
+        )
 
     async def _execute_existing_run(
         self,
@@ -466,6 +657,14 @@ class IngestionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="University user requires institution scope",
             )
+
+    def _assert_run_scope(self, run: IngestionRun, actor_user: User) -> None:
+        if actor_user.role == UserRole.UNIVERSITY:
+            if run.institution_id is None or run.institution_id != actor_user.institution_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Ingestion run is outside institution scope",
+                )
 
     def _build_actor_context(self, actor_user_id: uuid.UUID) -> User:
         return User(
@@ -1123,6 +1322,38 @@ class IngestionService:
         except (TypeError, ValueError):
             return DEFAULT_MAX_RECORDS
 
+    def _read_requested_execution_mode(self, run_metadata: dict[str, Any] | None) -> str:
+        request = dict((run_metadata or {}).get("request") or {})
+        execution = dict((run_metadata or {}).get("execution") or {})
+        requested_mode = (
+            request.get("execution_mode_requested")
+            or execution.get("requested_mode")
+            or execution.get("selected_mode")
+            or "inline"
+        )
+        if requested_mode in {"auto", "worker", "inline"}:
+            return requested_mode
+        return "inline"
+
+    def _read_dispatch_status(self, run_metadata: dict[str, Any] | None) -> str:
+        execution = dict((run_metadata or {}).get("execution") or {})
+        dispatch = execution.get("dispatch_status")
+        return dispatch.strip().lower() if isinstance(dispatch, str) and dispatch.strip() else ""
+
+    def _normalize_status_filter(self, status_filter: str | None) -> IngestionRunStatus | None:
+        if not status_filter:
+            return None
+        normalized = status_filter.strip().lower()
+        if not normalized:
+            return None
+        try:
+            return IngestionRunStatus(normalized)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid ingestion run status filter",
+            ) from exc
+
     def _result_items(self, result: Any) -> list[Any]:
         scalars = getattr(result, "scalars", None)
         if callable(scalars):
@@ -1218,6 +1449,7 @@ class IngestionService:
         metadata = run.run_metadata or {}
         execution = metadata.get("execution") or {}
         request = metadata.get("request") or {}
+        failure = metadata.get("failure") or {}
 
         def _as_int(value: Any) -> int:
             try:
@@ -1244,6 +1476,19 @@ class IngestionService:
             execution_mode_selected=execution.get("selected_mode"),
             dispatch_status=execution.get("dispatch_status"),
             celery_task_id=execution.get("celery_task_id"),
+            attempt_count=_as_int(execution.get("attempt_count"))
+            if execution.get("attempt_count") is not None
+            else None,
+            run_retry_count=_as_int(execution.get("run_retry_count"))
+            if execution.get("run_retry_count") is not None
+            else None,
+            last_started_at=execution.get("last_started_at"),
+            last_retry_requested_at=execution.get("last_retry_requested_at"),
+            failure_phase=failure.get("phase"),
+            review_queue=execution.get("review_queue"),
+            queue_assigned_by_user_id=execution.get("queue_assigned_by_user_id"),
+            queue_assigned_at=execution.get("queue_assigned_at"),
+            queue_assignment_note=execution.get("queue_assignment_note"),
         )
 
     def _build_detail(self, run: IngestionRun) -> IngestionRunDetail:

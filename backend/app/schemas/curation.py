@@ -52,6 +52,36 @@ class IngestionRunStartRequest(BaseModel):
     execution_mode: Literal["inline", "worker", "auto"] = "inline"
 
 
+class IngestionRunRetryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_records: int | None = Field(default=None, ge=1, le=20)
+    execution_mode: Literal["inline", "worker", "auto"] | None = None
+
+
+class IngestionRunQueueAssignmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    queue_key: str = Field(min_length=2, max_length=64)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class IngestionRunBulkRetryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_ids: list[str] = Field(min_length=1, max_length=50)
+    max_records: int | None = Field(default=None, ge=1, le=20)
+    execution_mode: Literal["inline", "worker", "auto"] | None = None
+
+    @field_validator("run_ids")
+    @classmethod
+    def normalize_run_ids(cls, value: list[str]) -> list[str]:
+        normalized = [item.strip() for item in value if item and item.strip()]
+        if not normalized:
+            raise ValueError("run_ids must include at least one run id")
+        return normalized
+
+
 class CurationRecordUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -113,6 +143,9 @@ class CurationRecordDetail(CurationRecordSummary):
 class CurationRecordListResponse(BaseModel):
     items: list[CurationRecordSummary]
     total: int = Field(ge=0)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=50, ge=1, le=100)
+    has_more: bool = False
     applied_state: str | None = None
 
 
@@ -137,12 +170,39 @@ class IngestionRunSummary(BaseModel):
     execution_mode_selected: str | None = None
     dispatch_status: str | None = None
     celery_task_id: str | None = None
+    attempt_count: int | None = None
+    run_retry_count: int | None = None
+    last_started_at: str | None = None
+    last_retry_requested_at: str | None = None
+    failure_phase: str | None = None
+    review_queue: str | None = None
+    queue_assigned_by_user_id: str | None = None
+    queue_assigned_at: str | None = None
+    queue_assignment_note: str | None = None
 
 
 class IngestionRunDetail(IngestionRunSummary):
     run_metadata: dict | None
 
 
+class IngestionRunBulkRetryItem(BaseModel):
+    run_id: str
+    status: Literal["retried", "skipped", "failed"]
+    message: str
+    detail: IngestionRunDetail | None = None
+
+
+class IngestionRunBulkRetryResponse(BaseModel):
+    items: list[IngestionRunBulkRetryItem]
+    total: int = Field(ge=0)
+    retried: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
 class IngestionRunListResponse(BaseModel):
     items: list[IngestionRunSummary]
     total: int = Field(ge=0)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
+    has_more: bool = False

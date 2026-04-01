@@ -1,5 +1,6 @@
 import uuid
 from typing import Annotated
+import logging
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,8 +13,12 @@ from app.schemas import (
     CurationRecordDetail,
     CurationRecordListResponse,
     CurationRecordUpdateRequest,
+    IngestionRunBulkRetryRequest,
+    IngestionRunBulkRetryResponse,
     IngestionRunDetail,
     IngestionRunListResponse,
+    IngestionRunQueueAssignmentRequest,
+    IngestionRunRetryRequest,
     IngestionRunStartRequest,
 )
 from app.services.curation import CurationService
@@ -21,9 +26,10 @@ from app.services.ingestion import IngestionService
 from app.tasks.scraper_tasks import run_source_ingestion
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
-def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | None]:
+def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | int | None]:
     metadata = run_metadata if isinstance(run_metadata, dict) else {}
     execution = metadata.get("execution")
     execution_context = execution if isinstance(execution, dict) else {}
@@ -50,6 +56,17 @@ def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | None]
         "execution_mode_selected": selected_mode,
         "dispatch_status": dispatch_status,
         "celery_task_id": celery_task_id,
+        "attempt_count": execution_context.get("attempt_count"),
+        "run_retry_count": execution_context.get("run_retry_count"),
+        "last_started_at": execution_context.get("last_started_at"),
+        "last_retry_requested_at": execution_context.get("last_retry_requested_at"),
+        "failure_phase": (metadata.get("failure") or {}).get("phase")
+        if isinstance(metadata.get("failure"), dict)
+        else None,
+        "review_queue": execution_context.get("review_queue"),
+        "queue_assigned_by_user_id": execution_context.get("queue_assigned_by_user_id"),
+        "queue_assigned_at": execution_context.get("queue_assigned_at"),
+        "queue_assignment_note": execution_context.get("queue_assignment_note"),
     }
 
 
@@ -111,15 +128,64 @@ async def start_ingestion_run(
 async def list_ingestion_runs(
     current_user: CurationQueueUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    limit: int = Query(default=20, ge=1, le=100),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: str | None = Query(default=None),
+    source_key: str | None = Query(default=None),
+    dispatch_status: str | None = Query(default=None),
 ) -> IngestionRunListResponse:
     service = IngestionService(db)
-    response = await service.list_runs(current_user, limit=limit)
+    response = await service.list_runs(
+        current_user,
+        page=page,
+        page_size=page_size,
+        status_filter=status,
+        source_key=source_key,
+        dispatch_status=dispatch_status,
+    )
     hydrated_items = []
     for item in response.items:
-        detail = await service.get_run(uuid.UUID(item.run_id))
+        detail = await service.get_run(uuid.UUID(item.run_id), actor_user=current_user)
         hydrated_items.append(item.model_copy(update=_extract_run_diagnostics(detail.run_metadata)))
     return response.model_copy(update={"items": hydrated_items})
+
+
+@router.post("/ingestion-runs/{run_id}/retry", response_model=IngestionRunDetail)
+async def retry_ingestion_run(
+    run_id: uuid.UUID,
+    payload: IngestionRunRetryRequest,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunDetail:
+    service = IngestionService(db)
+    detail = await service.retry_run(run_id, payload=payload, actor_user=current_user)
+    await db.commit()
+    return _with_run_diagnostics(detail)
+
+
+@router.post("/ingestion-runs/{run_id}/assign-queue", response_model=IngestionRunDetail)
+async def assign_ingestion_run_queue(
+    run_id: uuid.UUID,
+    payload: IngestionRunQueueAssignmentRequest,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunDetail:
+    service = IngestionService(db)
+    detail = await service.assign_review_queue(run_id, payload=payload, actor_user=current_user)
+    await db.commit()
+    return _with_run_diagnostics(detail)
+
+
+@router.post("/ingestion-runs/bulk-retry", response_model=IngestionRunBulkRetryResponse)
+async def bulk_retry_ingestion_runs(
+    payload: IngestionRunBulkRetryRequest,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunBulkRetryResponse:
+    service = IngestionService(db)
+    response = await service.bulk_retry_runs(payload=payload, actor_user=current_user)
+    await db.commit()
+    return response
 
 
 @router.get("/ingestion-runs/{run_id}", response_model=IngestionRunDetail)
@@ -129,7 +195,7 @@ async def get_ingestion_run(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> IngestionRunDetail:
     service = IngestionService(db)
-    detail = await service.get_run(run_id)
+    detail = await service.get_run(run_id, actor_user=current_user)
     return _with_run_diagnostics(detail)
 
 
@@ -148,13 +214,23 @@ async def list_curation_records(
     current_user: CurationQueueUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     state: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=100),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
 ) -> CurationRecordListResponse:
     service = CurationService(db)
-    items = await service.list_records(current_user, state=state, limit=limit)
+    items, total = await service.list_records(
+        current_user,
+        state=state,
+        page=page,
+        page_size=page_size,
+    )
+    has_more = (page * page_size) < total
     return CurationRecordListResponse(
         items=items,
-        total=len(items),
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=has_more,
         applied_state=state.lower() if state else None,
     )
 
@@ -166,6 +242,7 @@ async def get_curation_record(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CurationRecordDetail:
     service = CurationService(db)
+    logger.info("curation_get_record record_id=%s actor_id=%s", record_id, current_user.id)
     return await service.get_record(record_id, current_user)
 
 
