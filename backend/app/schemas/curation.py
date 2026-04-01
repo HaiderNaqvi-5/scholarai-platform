@@ -179,6 +179,9 @@ class IngestionRunSummary(BaseModel):
     queue_assigned_by_user_id: str | None = None
     queue_assigned_at: str | None = None
     queue_assignment_note: str | None = None
+    snapshot_available: bool = False
+    snapshot_captured_at: str | None = None
+    snapshot_content_length: int | None = None
 
 
 class IngestionRunDetail(IngestionRunSummary):
@@ -198,6 +201,15 @@ class IngestionRunBulkRetryResponse(BaseModel):
     retried: int = Field(ge=0)
     skipped: int = Field(ge=0)
     failed: int = Field(ge=0)
+
+
+class IngestionRunSnapshotResponse(BaseModel):
+    run_id: str
+    available: bool
+    html_content: str | None = None
+    captured_at: str | None = None
+    content_length: int | None = None
+    truncated: bool = False
 
 
 class IngestionRunListResponse(BaseModel):

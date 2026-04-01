@@ -417,6 +417,9 @@ export type IngestionRunSummary = {
   queue_assigned_by_user_id: string | null;
   queue_assigned_at: string | null;
   queue_assignment_note: string | null;
+  snapshot_available: boolean;
+  snapshot_captured_at: string | null;
+  snapshot_content_length: number | null;
 };
 
 export type IngestionRunDetail = IngestionRunSummary & {
@@ -466,6 +469,15 @@ export type IngestionRunBulkRetryResponse = {
   retried: number;
   skipped: number;
   failed: number;
+};
+
+export type IngestionRunSnapshotResponse = {
+  run_id: string;
+  available: boolean;
+  html_content: string | null;
+  captured_at: string | null;
+  content_length: number | null;
+  truncated: boolean;
 };
 
 export type CurationRawImportRequest = {

@@ -29,6 +29,7 @@ from app.schemas.curation import (
     IngestionRunListResponse,
     IngestionRunQueueAssignmentRequest,
     IngestionRunRetryRequest,
+    IngestionRunSnapshotResponse,
     IngestionRunStartRequest,
     IngestionRunSummary,
 )
@@ -70,6 +71,7 @@ MAX_CONTEXT_TEXT_LENGTH = 1600
 MAX_SUMMARY_LENGTH = 350
 MAX_CAPTURE_ATTEMPTS = 2
 CAPTURE_RETRY_BASE_DELAY_SECONDS = 0.75
+MAX_CAPTURED_SNAPSHOT_CHARS = 120_000
 DEFAULT_MAX_RECORDS = 5
 SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
@@ -467,6 +469,59 @@ class IngestionService:
             retried=counts["retried"],
             skipped=counts["skipped"],
             failed=counts["failed"],
+        )
+
+    async def get_run_snapshot(
+        self,
+        run_id: uuid.UUID,
+        *,
+        actor_user: User,
+    ) -> IngestionRunSnapshotResponse:
+        self._assert_actor_scope(actor_user)
+        run = await self._load_run(run_id)
+        self._assert_run_scope(run, actor_user)
+        snapshot = self._read_snapshot_metadata(run.run_metadata)
+        html_content = snapshot.get("html_content")
+        has_snapshot = isinstance(html_content, str) and bool(html_content)
+        return IngestionRunSnapshotResponse(
+            run_id=str(run.id),
+            available=has_snapshot,
+            html_content=html_content if has_snapshot else None,
+            captured_at=snapshot.get("captured_at"),
+            content_length=snapshot.get("content_length"),
+            truncated=bool(snapshot.get("truncated")),
+        )
+
+    async def clear_run_snapshot(
+        self,
+        run_id: uuid.UUID,
+        *,
+        actor_user: User,
+    ) -> IngestionRunSnapshotResponse:
+        self._assert_actor_scope(actor_user)
+        run = await self._load_run(run_id)
+        self._assert_run_scope(run, actor_user)
+        snapshot = self._read_snapshot_metadata(run.run_metadata)
+        run.run_metadata = self._merge_run_metadata(
+            run.run_metadata,
+            {
+                "snapshot": {
+                    "html_content": None,
+                    "captured_at": snapshot.get("captured_at"),
+                    "content_length": 0,
+                    "truncated": False,
+                    "cleared_at": self._now().isoformat(),
+                }
+            },
+        )
+        await self.db.flush()
+        return IngestionRunSnapshotResponse(
+            run_id=str(run.id),
+            available=False,
+            html_content=None,
+            captured_at=snapshot.get("captured_at"),
+            content_length=0,
+            truncated=False,
         )
 
     async def _execute_existing_run(
@@ -1169,6 +1224,24 @@ class IngestionService:
             "content_hash": record.content_hash,
         }
 
+    def _build_snapshot_metadata(self, capture: CaptureResult) -> dict[str, Any]:
+        html = capture.html or ""
+        truncated = len(html) > MAX_CAPTURED_SNAPSHOT_CHARS
+        stored_html = html[:MAX_CAPTURED_SNAPSHOT_CHARS]
+        return {
+            "html_content": stored_html,
+            "captured_at": self._now().isoformat(),
+            "content_length": len(stored_html),
+            "truncated": truncated,
+            "capture_mode": capture.capture_mode,
+            "final_url": capture.final_url,
+        }
+
+    def _read_snapshot_metadata(self, run_metadata: dict[str, Any] | None) -> dict[str, Any]:
+        metadata = run_metadata if isinstance(run_metadata, dict) else {}
+        snapshot = metadata.get("snapshot")
+        return snapshot if isinstance(snapshot, dict) else {}
+
     def _build_skip_record(
         self,
         candidate: ParsedScholarshipCandidate,
@@ -1279,6 +1352,7 @@ class IngestionService:
                     "selected_candidate_count": selected_candidate_count,
                 },
                 "capture": capture.metadata,
+                "snapshot": self._build_snapshot_metadata(capture),
                 "parser": parse_result.diagnostics,
                 "dedup": {
                     **dedup_precheck["diagnostics"],
@@ -1450,6 +1524,7 @@ class IngestionService:
         execution = metadata.get("execution") or {}
         request = metadata.get("request") or {}
         failure = metadata.get("failure") or {}
+        snapshot = self._read_snapshot_metadata(metadata)
 
         def _as_int(value: Any) -> int:
             try:
@@ -1489,6 +1564,11 @@ class IngestionService:
             queue_assigned_by_user_id=execution.get("queue_assigned_by_user_id"),
             queue_assigned_at=execution.get("queue_assigned_at"),
             queue_assignment_note=execution.get("queue_assignment_note"),
+            snapshot_available=bool(snapshot.get("html_content")),
+            snapshot_captured_at=snapshot.get("captured_at"),
+            snapshot_content_length=_as_int(snapshot.get("content_length"))
+            if snapshot.get("content_length") is not None
+            else None,
         )
 
     def _build_detail(self, run: IngestionRun) -> IngestionRunDetail:

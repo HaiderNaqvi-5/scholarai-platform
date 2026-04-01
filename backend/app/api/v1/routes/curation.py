@@ -19,6 +19,7 @@ from app.schemas import (
     IngestionRunListResponse,
     IngestionRunQueueAssignmentRequest,
     IngestionRunRetryRequest,
+    IngestionRunSnapshotResponse,
     IngestionRunStartRequest,
 )
 from app.services.curation import CurationService
@@ -29,10 +30,12 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | int | None]:
+def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | int | bool | None]:
     metadata = run_metadata if isinstance(run_metadata, dict) else {}
     execution = metadata.get("execution")
     execution_context = execution if isinstance(execution, dict) else {}
+    snapshot = metadata.get("snapshot")
+    snapshot_context = snapshot if isinstance(snapshot, dict) else {}
     requested_mode = (
         execution_context.get("requested_mode")
         or metadata.get("requested_mode")
@@ -67,6 +70,11 @@ def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | int |
         "queue_assigned_by_user_id": execution_context.get("queue_assigned_by_user_id"),
         "queue_assigned_at": execution_context.get("queue_assigned_at"),
         "queue_assignment_note": execution_context.get("queue_assignment_note"),
+        "snapshot_available": bool(snapshot_context.get("html_content")),
+        "snapshot_captured_at": snapshot_context.get("captured_at"),
+        "snapshot_content_length": int(snapshot_context.get("content_length"))
+        if snapshot_context.get("content_length") is not None
+        else None,
     }
 
 
@@ -197,6 +205,28 @@ async def get_ingestion_run(
     service = IngestionService(db)
     detail = await service.get_run(run_id, actor_user=current_user)
     return _with_run_diagnostics(detail)
+
+
+@router.get("/ingestion-runs/{run_id}/snapshot", response_model=IngestionRunSnapshotResponse)
+async def get_ingestion_run_snapshot(
+    run_id: uuid.UUID,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunSnapshotResponse:
+    service = IngestionService(db)
+    return await service.get_run_snapshot(run_id, actor_user=current_user)
+
+
+@router.delete("/ingestion-runs/{run_id}/snapshot", response_model=IngestionRunSnapshotResponse)
+async def clear_ingestion_run_snapshot(
+    run_id: uuid.UUID,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunSnapshotResponse:
+    service = IngestionService(db)
+    response = await service.clear_run_snapshot(run_id, actor_user=current_user)
+    await db.commit()
+    return response
 
 
 @router.post("/imports", response_model=CurationRecordDetail)
