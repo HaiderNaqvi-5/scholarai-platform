@@ -57,7 +57,16 @@ def _run_detail_payload(run_id: str, *, status: str, source_key: str, dispatch_s
         "last_started_at": now.isoformat(),
         "last_retry_requested_at": now.isoformat(),
         "failure_phase": None,
+        "snapshot_available": True,
+        "snapshot_captured_at": now.isoformat(),
+        "snapshot_content_length": 37,
         "run_metadata": {
+            "snapshot": {
+                "html_content": "<html><body>Captured snapshot</body></html>",
+                "captured_at": now.isoformat(),
+                "content_length": 37,
+                "truncated": False,
+            },
             "execution": {
                 "requested_mode": "worker",
                 "selected_mode": "inline",
@@ -319,3 +328,76 @@ def test_curation_ingestion_bulk_retry_endpoint_returns_counts(app, client):
     assert payload["retried"] == 1
     assert payload["skipped"] == 1
     assert payload["failed"] == 0
+
+
+def test_curation_ingestion_snapshot_get_and_clear_endpoints(app, client):
+    async def override_current_user():
+        return _DummyCurrentUser()
+
+    async def override_db():
+        yield _NoOpDB()
+
+    run_id = str(uuid4())
+
+    class FakeIngestionService:
+        def __init__(self, _db):
+            self._snapshot = {
+                "run_id": run_id,
+                "available": True,
+                "html_content": "<html><body>Snapshot</body></html>",
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "content_length": 34,
+                "truncated": False,
+            }
+
+        async def get_run_snapshot(self, run_id, *, actor_user):
+            assert str(run_id) == self._snapshot["run_id"]
+            assert actor_user.id is not None
+            from app.schemas.curation import IngestionRunSnapshotResponse
+
+            return IngestionRunSnapshotResponse(**self._snapshot)
+
+        async def clear_run_snapshot(self, run_id, *, actor_user):
+            assert str(run_id) == self._snapshot["run_id"]
+            assert actor_user.id is not None
+            from app.schemas.curation import IngestionRunSnapshotResponse
+
+            return IngestionRunSnapshotResponse(
+                run_id=self._snapshot["run_id"],
+                available=False,
+                html_content=None,
+                captured_at=self._snapshot["captured_at"],
+                content_length=0,
+                truncated=False,
+            )
+
+    original_service = IngestionService
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    import app.api.v1.routes.curation as curation_routes
+
+    curation_routes.IngestionService = FakeIngestionService  # type: ignore[assignment]
+
+    get_response = client.get(
+        f"/api/v1/curation/ingestion-runs/{run_id}/snapshot",
+        headers={"Authorization": "Bearer fake"},
+    )
+    clear_response = client.delete(
+        f"/api/v1/curation/ingestion-runs/{run_id}/snapshot",
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    curation_routes.IngestionService = original_service  # type: ignore[assignment]
+    app.dependency_overrides.clear()
+
+    assert get_response.status_code == 200
+    get_payload = get_response.json()
+    assert get_payload["available"] is True
+    assert "<html>" in (get_payload["html_content"] or "")
+    assert get_payload["content_length"] == 34
+
+    assert clear_response.status_code == 200
+    clear_payload = clear_response.json()
+    assert clear_payload["available"] is False
+    assert clear_payload["html_content"] is None
+    assert clear_payload["content_length"] == 0

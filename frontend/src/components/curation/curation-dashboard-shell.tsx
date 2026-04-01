@@ -24,6 +24,7 @@ import type {
   IngestionRunListResponse,
   IngestionRunQueueAssignmentRequest,
   IngestionRunRetryRequest,
+  IngestionRunSnapshotResponse,
   IngestionRunStartRequest,
   IngestionRunSummary,
 } from "@/lib/types";
@@ -127,6 +128,12 @@ type IngestionBulkState = {
   selectedRunIds: string[];
   queueKey: string;
   queueNote: string;
+  snapshotHtml: string;
+  snapshotMeta: {
+    captured_at: string | null;
+    content_length: number | null;
+    truncated: boolean;
+  } | null;
 };
 
 const EMPTY_EDIT_STATE: EditState = {
@@ -175,6 +182,8 @@ const EMPTY_INGESTION_BULK_STATE: IngestionBulkState = {
   selectedRunIds: [],
   queueKey: "manual-review",
   queueNote: "",
+  snapshotHtml: "",
+  snapshotMeta: null,
 };
 
 export function CurationDashboardShell() {
@@ -269,8 +278,18 @@ export function CurationDashboardShell() {
         );
         if (requestId !== loadRunsRequestRef.current) return;
         setState((current) => ({ ...current, selectedRun: detail }));
+        setIngestionBulkState((current) => ({
+          ...current,
+          snapshotHtml: "",
+          snapshotMeta: null,
+        }));
       } else {
         setState((current) => ({ ...current, selectedRun: null }));
+        setIngestionBulkState((current) => ({
+          ...current,
+          snapshotHtml: "",
+          snapshotMeta: null,
+        }));
       }
     } catch (error) {
       if (requestId !== loadRunsRequestRef.current) return;
@@ -513,6 +532,11 @@ export function CurationDashboardShell() {
         ...current,
         isRunsLoading: false,
         selectedRun: detail,
+      }));
+      setIngestionBulkState((current) => ({
+        ...current,
+        snapshotHtml: "",
+        snapshotMeta: null,
       }));
     } catch (error) {
       setState((current) => ({
@@ -961,6 +985,143 @@ export function CurationDashboardShell() {
     }
   };
 
+  const loadSelectedRunSnapshot = async () => {
+    if (!accessToken || !state.selectedRun || state.isSaving) {
+      return;
+    }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to view ingestion snapshots.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to view ingestion snapshots.",
+        },
+      }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
+    try {
+      const response = await apiRequest<IngestionRunSnapshotResponse>(
+        `/curation/ingestion-runs/${state.selectedRun.run_id}/snapshot`,
+        {
+          token: accessToken,
+        },
+      );
+      setIngestionBulkState((current) => ({
+        ...current,
+        snapshotHtml: response.html_content ?? "",
+        snapshotMeta: {
+          captured_at: response.captured_at,
+          content_length: response.content_length,
+          truncated: response.truncated,
+        },
+      }));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        actionFeedback: {
+          variant: response.available ? "success" : "error",
+          message: response.available
+            ? "Captured HTML snapshot loaded."
+            : "No captured HTML snapshot is available for this run.",
+        },
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
+      }));
+    }
+  };
+
+  const clearSelectedRunSnapshot = async () => {
+    if (!accessToken || !state.selectedRun || state.isSaving) {
+      return;
+    }
+    if (!canRunIngestion) {
+      setState((current) => ({
+        ...current,
+        error: "You do not have permission to clear ingestion snapshots.",
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: "You do not have permission to clear ingestion snapshots.",
+        },
+      }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      isSaving: true,
+      activeAction: "ingestion",
+      error: null,
+      errorContext: null,
+      actionFeedback: null,
+    }));
+    try {
+      await apiRequest<IngestionRunSnapshotResponse>(
+        `/curation/ingestion-runs/${state.selectedRun.run_id}/snapshot`,
+        {
+          method: "DELETE",
+          token: accessToken,
+        },
+      );
+      setIngestionBulkState((current) => ({
+        ...current,
+        snapshotHtml: "",
+        snapshotMeta: null,
+      }));
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        selectedRun: {
+          ...current.selectedRun!,
+          snapshot_available: false,
+          snapshot_content_length: 0,
+        },
+        runs: current.runs.map((run) =>
+          run.run_id === current.selectedRun?.run_id
+            ? { ...run, snapshot_available: false, snapshot_content_length: 0 }
+            : run,
+        ),
+        actionFeedback: {
+          variant: "success",
+          message: "Captured HTML snapshot cleared.",
+        },
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        isSaving: false,
+        activeAction: null,
+        error: resolveErrorMessage(error),
+        errorContext: "action",
+        actionFeedback: {
+          variant: "error",
+          message: resolveErrorMessage(error),
+        },
+      }));
+    }
+  };
+
   const runAction = async (
     action: "approve" | "reject" | "publish" | "unpublish",
   ) => {
@@ -1353,6 +1514,9 @@ export function CurationDashboardShell() {
                   <p className="route-card__description">
                     Queue {run.review_queue ?? "unassigned"}
                   </p>
+                  <p className="route-card__description">
+                    Snapshot {run.snapshot_available ? `${run.snapshot_content_length ?? 0} chars` : "none"}
+                  </p>
                 </button>
               ))}
             </div>
@@ -1423,6 +1587,18 @@ export function CurationDashboardShell() {
                   Queue note: {state.selectedRun.queue_assignment_note ?? "n/a"}
                 </li>
                 <li>
+                  Snapshot available: {state.selectedRun.snapshot_available ? "yes" : "no"}
+                </li>
+                <li>
+                  Snapshot captured at:{" "}
+                  {state.selectedRun.snapshot_captured_at
+                    ? new Date(state.selectedRun.snapshot_captured_at).toLocaleString()
+                    : "n/a"}
+                </li>
+                <li>
+                  Snapshot size: {state.selectedRun.snapshot_content_length ?? 0} chars
+                </li>
+                <li>
                   Completed:{" "}
                   {state.selectedRun.completed_at
                     ? new Date(state.selectedRun.completed_at).toLocaleString()
@@ -1443,7 +1619,54 @@ export function CurationDashboardShell() {
                 >
                   {state.activeAction === "ingestion" ? "Retrying run" : "Retry run"}
                 </button>
+                <button
+                  className="auth-link auth-link--secondary"
+                  data-testid="curation-load-ingestion-snapshot"
+                  disabled={
+                    state.isSaving ||
+                    !canRunIngestion ||
+                    !state.selectedRun.snapshot_available
+                  }
+                  onClick={() => void loadSelectedRunSnapshot()}
+                  type="button"
+                >
+                  {state.activeAction === "ingestion"
+                    ? "Loading snapshot"
+                    : "View captured HTML"}
+                </button>
+                <button
+                  className="auth-link auth-link--secondary"
+                  data-testid="curation-clear-ingestion-snapshot"
+                  disabled={
+                    state.isSaving ||
+                    !canRunIngestion ||
+                    (!state.selectedRun.snapshot_available &&
+                      ingestionBulkState.snapshotHtml.length === 0)
+                  }
+                  onClick={() => void clearSelectedRunSnapshot()}
+                  type="button"
+                >
+                  {state.activeAction === "ingestion"
+                    ? "Clearing snapshot"
+                    : "Clear captured HTML"}
+                </button>
               </div>
+              {ingestionBulkState.snapshotMeta ? (
+                <article className="guidance-callout">
+                  <p className="list-heading">Captured HTML snapshot</p>
+                  <p className="body-copy">
+                    Captured{" "}
+                    {ingestionBulkState.snapshotMeta.captured_at
+                      ? new Date(ingestionBulkState.snapshotMeta.captured_at).toLocaleString()
+                      : "at unknown time"}{" "}
+                    · {ingestionBulkState.snapshotMeta.content_length ?? 0} chars
+                    {ingestionBulkState.snapshotMeta.truncated
+                      ? " · truncated to storage limit"
+                      : ""}
+                  </p>
+                  <pre className="code-note">{ingestionBulkState.snapshotHtml}</pre>
+                </article>
+              ) : null}
             </article>
           ) : null}
         </article>

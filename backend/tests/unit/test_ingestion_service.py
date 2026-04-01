@@ -612,6 +612,49 @@ async def test_assign_review_queue_sets_execution_metadata():
     assert execution["queue_assigned_at"] is not None
 
 
+async def test_get_and_clear_run_snapshot():
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    run = IngestionRun(
+        id=uuid4(),
+        source_registry=session.source,
+        source_registry_id=session.source.id,
+        triggered_by_user_id=actor.id,
+        institution_id=None,
+        status=IngestionRunStatus.PARTIAL,
+        fetch_url=str(session.source.base_url),
+    )
+    run.run_metadata = {
+        "snapshot": {
+            "html_content": "<html><body>Captured</body></html>",
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "content_length": 34,
+            "truncated": False,
+        }
+    }
+    run.created_at = datetime.now(timezone.utc)
+    run.updated_at = datetime.now(timezone.utc)
+    session.run = run
+
+    async def execute_for_run(_query):
+        return FakeResult(run)
+
+    session.execute = execute_for_run
+
+    snapshot = await service.get_run_snapshot(run.id, actor_user=actor)
+    assert snapshot.available is True
+    assert snapshot.html_content is not None
+    assert snapshot.content_length == 34
+
+    cleared = await service.clear_run_snapshot(run.id, actor_user=actor)
+    assert cleared.available is False
+    assert cleared.html_content is None
+    assert cleared.content_length == 0
+    assert run.run_metadata["snapshot"]["html_content"] is None
+
+
 async def test_bulk_retry_runs_returns_mixed_results(monkeypatch):
     session = FakeSession()
     service = IngestionService(session)
@@ -649,6 +692,9 @@ async def test_bulk_retry_runs_returns_mixed_results(monkeypatch):
                 queue_assigned_by_user_id=None,
                 queue_assigned_at=None,
                 queue_assignment_note=None,
+                snapshot_available=False,
+                snapshot_captured_at=None,
+                snapshot_content_length=None,
                 run_metadata={},
             )
         if str(run_id) == run_skip:
