@@ -87,7 +87,7 @@ Current local rollout status:
 | Recommendation system | Phase 1 pipeline active: relational eligibility graph abstraction, pgvector retrieval over published scholarships, heuristic rerank factors, stage-aware rationale, and rules-only fallback parity | Runtime evaluation tooling, threshold tuning, and richer analytics remain incomplete |
 | Document assistance | Submission, processing state, recent drafts, scholarship-grounded bounded feedback, limitation notice | No async larger-job orchestration and no broader multi-source citation density yet |
 | Interview practice | Practice-mode selection, scholarship-targeted sessions, adaptive weakest-dimension follow-up, structured rubric, results view, stored responses, history/trend summary | No voice path and no deeper long-horizon coaching analytics yet |
-| Ingestion pipeline | Source-registry run model, capture path, parsing, raw-record creation, worker hook, run retry API/UI controls, diagnostics-filtered run history, queue assignment, bulk retry operations, and captured HTML snapshot management APIs/UI now exist | Parser coverage remains heuristic and narrow; deeper parser resilience remains incomplete |
+| Ingestion pipeline | Source-registry run model, capture path, parsing, raw-record creation, worker hook, run retry API/UI controls, diagnostics-filtered run history, queue assignment, and bulk retry operations exist | Parser coverage remains heuristic and narrow; captured HTML snapshot management and deeper parser resilience remain incomplete |
 | API contracts | Shared error envelope and list envelopes are active across the mounted list routes | Detail responses, pagination metadata, and route naming still do not match the target docs perfectly |
 | DevOps readiness | Docker Compose, env examples, migration bootstrap, CI sanity, and browser smoke gate exist | Release management, rollback drills, and stronger production-like hardening remain incomplete |
 
@@ -105,7 +105,7 @@ Current local rollout status:
 | Rerank calibration and guardrail tuning | Heuristic weights are implemented but not yet calibrated against judged datasets |
 | Multi-source grounding depth in preparation tools | Grounded context exists but not all guidance items are citation-dense across broader scholarship coverage |
 | Long-horizon interview coaching analytics | Session-level trend summary exists, but richer multi-session coaching plans are not implemented yet |
-| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, bulk retry operations, and captured HTML snapshot view/clear management are now implemented |
+| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, and bulk retry operations are now implemented; captured HTML snapshot management remains open |
 | Fully unified API contract | Route naming, pagination metadata, and some envelope details still diverge from `10_backend_api_and_repo.md` |
 
 ### Future Research Extensions
@@ -161,7 +161,7 @@ Current local rollout status:
 ## Recommended Next 3 Implementation Priorities
 1. Expand grounding depth beyond the current bounded guidance library and increase citation density across broader scholarship coverage.
 2. Expand recommendation benchmark dataset coverage and calibrate rerank weights with judged samples.
-3. Strengthen ingestion coverage with richer parsers and deeper parser resilience.
+3. Strengthen ingestion coverage with richer parsers and captured HTML snapshot management.
 
 ## SLC decision (v0.1)
 ScholarAI now has a coherent internal v0.1 SLC path with real browse, profile, recommendation, preparation, curation, ingestion, migration, and CI smoke flows, but it still needs deeper recommendation and preparation fidelity before it should be treated as a fully mature v0.1 SLC foundation.
