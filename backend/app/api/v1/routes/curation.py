@@ -130,20 +130,21 @@ async def list_ingestion_runs(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    limit: int | None = Query(default=None, ge=1, le=100, description="Deprecated: use page_size instead. When provided, overrides page_size for backward compatibility."),
     status: str | None = Query(default=None),
     source_key: str | None = Query(default=None),
     dispatch_status: str | None = Query(default=None),
 ) -> IngestionRunListResponse:
+    effective_page_size = limit if limit is not None else page_size
     service = IngestionService(db)
-    response = await service.list_runs(
+    return await service.list_runs(
         current_user,
         page=page,
-        page_size=page_size,
+        page_size=effective_page_size,
         status_filter=status,
         source_key=source_key,
         dispatch_status=dispatch_status,
     )
-    return response
 
 
 @router.post("/ingestion-runs/{run_id}/retry", response_model=IngestionRunDetail)
@@ -155,8 +156,48 @@ async def retry_ingestion_run(
 ) -> IngestionRunDetail:
     service = IngestionService(db)
     detail = await service.retry_run(run_id, payload=payload, actor_user=current_user)
+    requested_mode = payload.execution_mode or detail.execution_mode_requested or "inline"
+
+    if requested_mode == "inline":
+        await db.commit()
+        return _with_run_diagnostics(detail)
+
+    run_id_str = detail.run_id
+    max_records = payload.max_records or detail.records_found or 5
     await db.commit()
-    return _with_run_diagnostics(detail)
+
+    try:
+        task_result = run_source_ingestion.apply_async(
+            kwargs={
+                "run_id": run_id_str,
+                "max_records": max_records,
+            }
+        )
+        detail = await service.update_execution_context(
+            uuid.UUID(run_id_str),
+            {
+                "requested_mode": requested_mode,
+                "selected_mode": "worker",
+                "dispatch_status": "retry_queued",
+                "celery_task_id": task_result.id,
+            },
+        )
+        await db.commit()
+        return _with_run_diagnostics(detail)
+    except Exception as exc:
+        detail = await service.execute_run(
+            uuid.UUID(run_id_str),
+            actor_user_id=current_user.id,
+            max_records=max_records,
+            execution_context={
+                "requested_mode": requested_mode,
+                "selected_mode": "inline",
+                "dispatch_status": "retry_inline_fallback",
+                "dispatch_error": str(exc),
+            },
+        )
+        await db.commit()
+        return _with_run_diagnostics(detail)
 
 
 @router.post("/ingestion-runs/{run_id}/assign-queue", response_model=IngestionRunDetail)
@@ -214,13 +255,13 @@ async def list_curation_records(
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> CurationRecordListResponse:
     service = CurationService(db)
-    items, total = await service.list_records(
+    items = await service.list_records(
         current_user,
         state=state,
-        page=page,
-        page_size=page_size,
+        limit=page_size,
     )
-    has_more = (page * page_size) < total
+    total = len(items)
+    has_more = False
     return CurationRecordListResponse(
         items=items,
         total=total,

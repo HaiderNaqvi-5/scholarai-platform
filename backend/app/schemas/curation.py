@@ -70,7 +70,7 @@ class IngestionRunQueueAssignmentRequest(BaseModel):
     def normalize_queue_key(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
-            raise ValueError("queue_key must not be blank or whitespace-only")
+            raise ValueError("queue_key must not be empty or only whitespace")
         return normalized
 
 

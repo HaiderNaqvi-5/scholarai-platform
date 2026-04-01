@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import random
 import re
 import uuid
@@ -33,6 +34,8 @@ from app.schemas.curation import (
     IngestionRunSummary,
 )
 from app.services.curation import CurationService
+
+logger = logging.getLogger(__name__)
 
 SCHOLARSHIP_KEYWORDS = (
     "scholarship",
@@ -285,7 +288,8 @@ class IngestionService:
         )
 
         offset = (page - 1) * page_size
-        query = (
+
+        base_query = (
             select(IngestionRun)
             .join(SourceRegistry)
             .options(selectinload(IngestionRun.source_registry))
@@ -293,26 +297,41 @@ class IngestionService:
         )
 
         if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
-            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
+            base_query = base_query.where(IngestionRun.institution_id == actor_user.institution_id)
         if normalized_status is not None:
-            query = query.where(IngestionRun.status == normalized_status)
+            base_query = base_query.where(IngestionRun.status == normalized_status)
         if normalized_source_key is not None:
-            query = query.where(func.lower(SourceRegistry.source_key) == normalized_source_key)
+            base_query = base_query.where(
+                func.lower(SourceRegistry.source_key) == normalized_source_key
+            )
 
         if normalized_dispatch is not None:
-            # dispatch_status lives inside a JSON field; filter in Python after DB fetch
-            result = await self.db.execute(query)
+            # dispatch_status lives inside JSON run_metadata — must filter in Python
+            result = await self.db.execute(base_query)
             runs = self._result_items(result)
             runs = [run for run in runs if self._read_dispatch_status(run.run_metadata) == normalized_dispatch]
             total = len(runs)
             page_runs = runs[offset : offset + page_size]
         else:
-            count_result = await self.db.execute(
-                select(func.count()).select_from(query.subquery())
+            # Build a separate efficient count query with the same filters
+            count_query = (
+                select(func.count(IngestionRun.id))
+                .select_from(IngestionRun)
+                .join(SourceRegistry)
             )
-            total = count_result.scalar_one()
-            page_result = await self.db.execute(query.offset(offset).limit(page_size))
-            page_runs = self._result_items(page_result)
+            if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
+                count_query = count_query.where(IngestionRun.institution_id == actor_user.institution_id)
+            if normalized_status is not None:
+                count_query = count_query.where(IngestionRun.status == normalized_status)
+            if normalized_source_key is not None:
+                count_query = count_query.where(
+                    func.lower(SourceRegistry.source_key) == normalized_source_key
+                )
+            total_result = await self.db.execute(count_query)
+            total = total_result.scalar_one()
+            paged_query = base_query.offset(offset).limit(page_size)
+            result = await self.db.execute(paged_query)
+            page_runs = self._result_items(result)
 
         items = [self._build_summary(item) for item in page_runs]
         return IngestionRunListResponse(
@@ -368,18 +387,26 @@ class IngestionService:
             },
         )
         await self.db.flush()
-        return await self.execute_run(
-            run.id,
-            actor_user_id=actor_user.id,
-            max_records=selected_max_records,
-            execution_context={
-                "requested_mode": requested_mode,
-                "selected_mode": "inline",
-                "dispatch_status": "retry_inline",
-                "retry_triggered": True,
-                "last_retry_requested_at": retry_timestamp,
-            },
-        )
+
+        execution_context = {
+            "requested_mode": requested_mode,
+            "retry_triggered": True,
+            "last_retry_requested_at": retry_timestamp,
+        }
+
+        if requested_mode == "inline":
+            execution_context["selected_mode"] = "inline"
+            execution_context["dispatch_status"] = "retry_inline"
+            return await self.execute_run(
+                run.id,
+                actor_user_id=actor_user.id,
+                max_records=selected_max_records,
+                execution_context=execution_context,
+            )
+
+        # For worker/auto modes, the route is responsible for Celery dispatch.
+        # Return current run detail so the route can enqueue and update context.
+        return self._build_detail(run)
 
     async def assign_review_queue(
         self,
@@ -396,7 +423,7 @@ class IngestionService:
             run.run_metadata,
             {
                 "execution": {
-                    "review_queue": payload.queue_key.strip(),
+                    "review_queue": payload.queue_key,
                     "queue_assigned_by_user_id": str(actor_user.id),
                     "queue_assigned_at": assigned_at,
                     "queue_assignment_note": payload.note,
@@ -457,13 +484,14 @@ class IngestionService:
                         message=str(exc.detail),
                     )
                 )
-            except Exception as exc:  # pragma: no cover - defensive
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("bulk_retry_runs unexpected error run_id=%s", run_id)
                 counts["failed"] += 1
                 items.append(
                     IngestionRunBulkRetryItem(
                         run_id=run_id_raw,
                         status="failed",
-                        message=str(exc),
+                        message="An unexpected error occurred. Please try again or contact support.",
                     )
                 )
 
