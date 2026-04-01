@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -224,11 +224,13 @@ export function CurationDashboardShell() {
   const [ingestionBulkState, setIngestionBulkState] = useState<IngestionBulkState>(
     EMPTY_INGESTION_BULK_STATE,
   );
+  const loadRunsRequestRef = useRef(0);
 
   const loadRuns = useCallback(async () => {
     if (!accessToken) {
       return;
     }
+    const requestId = ++loadRunsRequestRef.current;
     setState((current) => ({
       ...current,
       isRunsLoading: true,
@@ -252,6 +254,7 @@ export function CurationDashboardShell() {
         `/curation/ingestion-runs?${search.toString()}`,
         { token: accessToken },
       );
+      if (requestId !== loadRunsRequestRef.current) return;
 
       setState((current) => ({
         ...current,
@@ -264,11 +267,13 @@ export function CurationDashboardShell() {
           `/curation/ingestion-runs/${response.items[0].run_id}`,
           { token: accessToken },
         );
+        if (requestId !== loadRunsRequestRef.current) return;
         setState((current) => ({ ...current, selectedRun: detail }));
       } else {
         setState((current) => ({ ...current, selectedRun: null }));
       }
     } catch (error) {
+      if (requestId !== loadRunsRequestRef.current) return;
       setState((current) => ({
         ...current,
         isRunsLoading: false,

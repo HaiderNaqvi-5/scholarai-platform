@@ -80,7 +80,7 @@ export type ScholarshipDetail = ScholarshipListItem & {
 
 export type SavedOpportunityItem = ScholarshipListItem & {
   saved_at: string;
-  tracker_status: "saved" | "in_progress" | "applied" | "closed";
+  tracker_status?: "saved" | "in_progress" | "applied" | "closed";
 };
 
 export type SavedOpportunityListResponse = {
@@ -426,6 +426,9 @@ export type IngestionRunDetail = IngestionRunSummary & {
 export type IngestionRunListResponse = {
   items: IngestionRunSummary[];
   total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
 };
 
 export type IngestionRunStartRequest = {

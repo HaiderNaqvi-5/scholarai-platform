@@ -3,6 +3,12 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class SavedOpportunityStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(min_length=1, max_length=64)
+
+
 class SavedOpportunityItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
