@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -106,7 +106,7 @@ export function InterviewPracticeShell() {
     }
     let isActive = true;
     const loadCoaching = async () => {
-      setState((current) => ({ ...current, isLoadingCoaching: true }));
+      setState((current) => ({ ...current, isLoadingCoaching: true, coachingAnalytics: null }));
       try {
         const coachingAnalytics = await apiRequest<InterviewCoachingAnalyticsResponse>(
           "/interviews/coaching-analytics",
@@ -126,6 +126,7 @@ export function InterviewPracticeShell() {
         }
         setState((current) => ({
           ...current,
+          coachingAnalytics: null,
           isLoadingCoaching: false,
         }));
       }
@@ -134,7 +135,21 @@ export function InterviewPracticeShell() {
     return () => {
       isActive = false;
     };
-  }, [accessToken, state.session?.session_id]);
+  }, [accessToken]);
+
+  const refreshCoachingAnalytics = useCallback(async () => {
+    if (!accessToken) return;
+    setState((current) => ({ ...current, isLoadingCoaching: true, coachingAnalytics: null }));
+    try {
+      const coachingAnalytics = await apiRequest<InterviewCoachingAnalyticsResponse>(
+        "/interviews/coaching-analytics",
+        { token: accessToken },
+      );
+      setState((current) => ({ ...current, coachingAnalytics, isLoadingCoaching: false }));
+    } catch {
+      setState((current) => ({ ...current, coachingAnalytics: null, isLoadingCoaching: false }));
+    }
+  }, [accessToken]);
 
   const currentQuestion = useMemo<InterviewCurrentQuestion | null>(
     () => state.session?.current_question ?? null,
@@ -172,6 +187,7 @@ export function InterviewPracticeShell() {
         session,
         notice: "Session started.",
       }));
+      void refreshCoachingAnalytics();
     } catch (error) {
       setState((current) => ({
         ...current,
@@ -215,9 +231,9 @@ export function InterviewPracticeShell() {
         ...current,
         isSubmitting: false,
         session,
-        coachingAnalytics: current.coachingAnalytics,
         notice: "Answer submitted and scored.",
       }));
+      void refreshCoachingAnalytics();
     } catch (error) {
       setState((current) => ({
         ...current,

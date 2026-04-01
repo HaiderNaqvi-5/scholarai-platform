@@ -104,11 +104,17 @@ class InterviewSessionService:
     ) -> InterviewCoachingAnalyticsResponse:
         result = await self.db.execute(
             select(InterviewSession)
-            .where(InterviewSession.user_id == user_id)
+            .where(
+                InterviewSession.user_id == user_id,
+                InterviewSession.status == InterviewSessionStatus.COMPLETED,
+            )
             .options(selectinload(InterviewSession.responses))
             .order_by(InterviewSession.updated_at.desc())
         )
-        sessions = result.scalars().all()
+        all_sessions = result.scalars().all()
+        # Only include sessions that have at least one response so analytics
+        # reflect completed interview history with actual answers.
+        sessions = [s for s in all_sessions if s.responses]
         if not sessions:
             return InterviewCoachingAnalyticsResponse(
                 session_count=0,
@@ -128,7 +134,9 @@ class InterviewSessionService:
         dimension_totals: dict[str, int] = {}
         dimension_counts: dict[str, int] = {}
 
-        chronological_sessions = sorted(sessions, key=lambda item: item.updated_at)
+        chronological_sessions = sorted(
+            sessions, key=lambda item: item.started_at or item.created_at
+        )
         for session in chronological_sessions:
             sorted_responses = sorted(session.responses, key=lambda item: item.question_index)
             response_items = [self._build_feedback(response) for response in sorted_responses]
