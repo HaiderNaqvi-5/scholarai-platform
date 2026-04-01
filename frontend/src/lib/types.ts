@@ -80,6 +80,7 @@ export type ScholarshipDetail = ScholarshipListItem & {
 
 export type SavedOpportunityItem = ScholarshipListItem & {
   saved_at: string;
+  tracker_status?: "saved" | "in_progress" | "applied" | "closed";
 };
 
 export type SavedOpportunityListResponse = {
@@ -407,6 +408,15 @@ export type IngestionRunSummary = {
   execution_mode_selected: IngestionExecutionMode | null;
   dispatch_status: string | null;
   celery_task_id: string | null;
+  attempt_count: number | null;
+  run_retry_count: number | null;
+  last_started_at: string | null;
+  last_retry_requested_at: string | null;
+  failure_phase: string | null;
+  review_queue: string | null;
+  queue_assigned_by_user_id: string | null;
+  queue_assigned_at: string | null;
+  queue_assignment_note: string | null;
 };
 
 export type IngestionRunDetail = IngestionRunSummary & {
@@ -416,6 +426,9 @@ export type IngestionRunDetail = IngestionRunSummary & {
 export type IngestionRunListResponse = {
   items: IngestionRunSummary[];
   total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
 };
 
 export type IngestionRunStartRequest = {
@@ -425,6 +438,37 @@ export type IngestionRunStartRequest = {
   source_type: string;
   max_records: number;
   execution_mode?: IngestionExecutionMode;
+};
+
+export type IngestionRunRetryRequest = {
+  max_records?: number | null;
+  execution_mode?: IngestionExecutionMode | null;
+};
+
+export type IngestionRunQueueAssignmentRequest = {
+  queue_key: string;
+  note?: string | null;
+};
+
+export type IngestionRunBulkRetryRequest = {
+  run_ids: string[];
+  max_records?: number | null;
+  execution_mode?: IngestionExecutionMode | null;
+};
+
+export type IngestionRunBulkRetryItem = {
+  run_id: string;
+  status: "retried" | "skipped" | "failed";
+  message: string;
+  detail: IngestionRunDetail | null;
+};
+
+export type IngestionRunBulkRetryResponse = {
+  items: IngestionRunBulkRetryItem[];
+  total: number;
+  retried: number;
+  skipped: number;
+  failed: number;
 };
 
 export type CurationRawImportRequest = {
@@ -488,4 +532,37 @@ export type PlatformAnalyticsResponse = {
   total_interview_sessions: number;
   ingestion_runs_total: number;
   ingestion_runs_failed: number;
+};
+
+export type AccessControlManagedUser = {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  auth_token_version: number;
+  effective_capabilities: string[];
+};
+
+export type AccessControlManagedUserListResponse = {
+  items: AccessControlManagedUser[];
+  total: number;
+};
+
+export type AccessControlRoleChangeItem = {
+  audit_id: string;
+  target_user_id: string;
+  actor_user_id: string | null;
+  action: "access_control.role.update" | "access_control.role.revert";
+  previous_role: string;
+  next_role: string;
+  reason: string | null;
+  changed_at: string;
+  reverted_by_audit_id: string | null;
+  is_reversible: boolean;
+};
+
+export type AccessControlRoleChangeListResponse = {
+  items: AccessControlRoleChangeItem[];
+  total: number;
 };
