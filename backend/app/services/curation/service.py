@@ -94,25 +94,35 @@ class CurationService:
         self,
         actor_user: User,
         state: str | None = None,
-        limit: int = 50,
-    ) -> list[CurationRecordSummary]:
+        page: int = 1,
+        page_size: int = 50,
+    ) -> tuple[list[CurationRecordSummary], int]:
+        from sqlalchemy import func as sa_func
+
         self._assert_user_scope(actor_user)
-        query = (
-            select(Scholarship)
-            .options(selectinload(Scholarship.source_registry))
-            .order_by(Scholarship.updated_at.desc(), Scholarship.title.asc())
-            .limit(limit)
-        )
+        base_query = select(Scholarship).options(selectinload(Scholarship.source_registry))
 
         if self._is_university_scoped(actor_user):
-            query = query.where(Scholarship.institution_id == actor_user.institution_id)
+            base_query = base_query.where(Scholarship.institution_id == actor_user.institution_id)
 
         if state:
             parsed_state = self._parse_state(state)
-            query = query.where(Scholarship.record_state == parsed_state)
+            base_query = base_query.where(Scholarship.record_state == parsed_state)
 
-        result = await self.db.execute(query)
-        return [self._build_summary(item) for item in result.scalars().all()]
+        count_result = await self.db.execute(
+            select(sa_func.count()).select_from(base_query.subquery())
+        )
+        total = count_result.scalar_one()
+
+        data_query = (
+            base_query
+            .order_by(Scholarship.updated_at.desc(), Scholarship.title.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self.db.execute(data_query)
+        items = [self._build_summary(item) for item in result.scalars().all()]
+        return items, total
 
     async def get_record(self, record_id: uuid.UUID, actor_user: User) -> CurationRecordDetail:
         record = await self._load_record(record_id, actor_user)

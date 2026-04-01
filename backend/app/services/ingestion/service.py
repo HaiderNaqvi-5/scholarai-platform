@@ -15,7 +15,7 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -274,6 +274,8 @@ class IngestionService:
         source_key: str | None = None,
         dispatch_status: str | None = None,
     ) -> IngestionRunListResponse:
+        from sqlalchemy import func as sa_func
+
         if actor_user is not None:
             self._assert_actor_scope(actor_user)
         normalized_status = self._normalize_status_filter(status_filter)
@@ -291,23 +293,29 @@ class IngestionService:
             .options(selectinload(IngestionRun.source_registry))
             .order_by(IngestionRun.created_at.desc())
         )
-        result = await self.db.execute(query)
-        runs = self._result_items(result)
-        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
-            runs = [run for run in runs if run.institution_id == actor_user.institution_id]
-        if normalized_status is not None:
-            runs = [run for run in runs if run.status == normalized_status]
-        if normalized_source_key is not None:
-            runs = [
-                run
-                for run in runs
-                if run.source_registry and run.source_registry.source_key.lower() == normalized_source_key
-            ]
-        if normalized_dispatch is not None:
-            runs = [run for run in runs if self._read_dispatch_status(run.run_metadata) == normalized_dispatch]
 
-        total = len(runs)
-        page_runs = runs[offset : offset + page_size]
+        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
+            query = query.where(IngestionRun.institution_id == actor_user.institution_id)
+        if normalized_status is not None:
+            query = query.where(IngestionRun.status == normalized_status)
+        if normalized_source_key is not None:
+            query = query.where(sa_func.lower(SourceRegistry.source_key) == normalized_source_key)
+
+        if normalized_dispatch is not None:
+            # dispatch_status lives inside a JSON field; filter in Python after DB fetch
+            result = await self.db.execute(query)
+            runs = self._result_items(result)
+            runs = [run for run in runs if self._read_dispatch_status(run.run_metadata) == normalized_dispatch]
+            total = len(runs)
+            page_runs = runs[offset : offset + page_size]
+        else:
+            count_result = await self.db.execute(
+                select(sa_func.count()).select_from(query.subquery())
+            )
+            total = count_result.scalar_one()
+            page_result = await self.db.execute(query.offset(offset).limit(page_size))
+            page_runs = self._result_items(page_result)
+
         items = [self._build_summary(item) for item in page_runs]
         return IngestionRunListResponse(
             items=items,

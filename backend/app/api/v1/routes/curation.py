@@ -143,11 +143,7 @@ async def list_ingestion_runs(
         source_key=source_key,
         dispatch_status=dispatch_status,
     )
-    hydrated_items = []
-    for item in response.items:
-        detail = await service.get_run(uuid.UUID(item.run_id), actor_user=current_user)
-        hydrated_items.append(item.model_copy(update=_extract_run_diagnostics(detail.run_metadata)))
-    return response.model_copy(update={"items": hydrated_items})
+    return response
 
 
 @router.post("/ingestion-runs/{run_id}/retry", response_model=IngestionRunDetail)
