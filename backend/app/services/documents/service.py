@@ -629,6 +629,18 @@ class DocumentService:
                 }
             )
 
+        has_validated_fact_citation = any(item.get("source_id") == "validated-facts" for item in citations)
+        if validated_facts and not has_validated_fact_citation:
+            citations.append(
+                {
+                    "source_id": "validated-facts",
+                    "title": "Validated scholarship facts",
+                    "url_or_ref": "grounded_context_sections.validated_facts",
+                    "snippet": "Derived from scholarship record fields used in this run.",
+                    "relevance_score": 0.8,
+                }
+            )
+
         for index, guidance in enumerate(retrieved_guidance[:2]):
             citations.append(
                 {
@@ -648,18 +660,6 @@ class DocumentService:
                     "url_or_ref": "local_draft",
                     "snippet": "Guidance generated from submitted draft text.",
                     "relevance_score": 0.55,
-                }
-            )
-
-        has_validated_fact_citation = any(item.get("source_id") == "validated-facts" for item in citations)
-        if validated_facts and not has_validated_fact_citation:
-            citations.append(
-                {
-                    "source_id": "validated-facts",
-                    "title": "Validated scholarship facts",
-                    "url_or_ref": "grounded_context_sections.validated_facts",
-                    "snippet": "Derived from scholarship record fields used in this run.",
-                    "relevance_score": 0.8,
                 }
             )
 

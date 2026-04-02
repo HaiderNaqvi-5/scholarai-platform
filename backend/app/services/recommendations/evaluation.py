@@ -10,7 +10,7 @@ class RecommendationMetricResult:
     precision_at_k: float
     recall_at_k: float
     ndcg_at_k: float
-    mrr_at_k: float
+    mrr_at_k: float | None = None
 
 
 @dataclass(frozen=True)
@@ -119,11 +119,12 @@ class RecommendationEvaluationService:
         for case_metrics in metrics_by_case:
             for metric in case_metrics:
                 if metric.k not in sums:
-                    sums[metric.k] = {"precision_at_k": 0.0, "recall_at_k": 0.0, "ndcg_at_k": 0.0}
+                    sums[metric.k] = {"precision_at_k": 0.0, "recall_at_k": 0.0, "ndcg_at_k": 0.0, "mrr_at_k": 0.0}
                     counts[metric.k] = 0
                 sums[metric.k]["precision_at_k"] += metric.precision_at_k
                 sums[metric.k]["recall_at_k"] += metric.recall_at_k
                 sums[metric.k]["ndcg_at_k"] += metric.ndcg_at_k
+                sums[metric.k]["mrr_at_k"] += metric.mrr_at_k or 0.0
                 counts[metric.k] += 1
 
         return [
@@ -132,6 +133,7 @@ class RecommendationEvaluationService:
                 precision_at_k=round(sums[k]["precision_at_k"] / counts[k], 4),
                 recall_at_k=round(sums[k]["recall_at_k"] / counts[k], 4),
                 ndcg_at_k=round(sums[k]["ndcg_at_k"] / counts[k], 4),
+                mrr_at_k=round(sums[k]["mrr_at_k"] / counts[k], 4),
             )
             for k in sorted(sums)
         ]

@@ -1,8 +1,9 @@
 {
-  "benchmark_id": "v01-edge-case-rank-quality",
-  "name": "v0.1 Edge Case Recommendation Rank Quality",
+  "dataset_id": "v01-edge-case-rank-quality",
+  "version": "2026-04-01",
+  "title": "v0.1 Edge Case Recommendation Rank Quality",
   "description": "Judged relevance scenarios with mixed relevance placement and sparse positives.",
-  "created_at": "2026-04-01T00:00:00Z",
+  "frozen_at": "2026-04-01T00:00:00Z",
   "cases": [
     {
       "case_id": "edge-001",
