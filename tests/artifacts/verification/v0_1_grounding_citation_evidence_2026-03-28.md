@@ -92,7 +92,22 @@ Scope: `DocumentFeedback` grounding/citation upgrade hardening pass.
 - Mentor dashboard citation count compatibility:
   - `frontend/src/components/mentor/mentor-dashboard-shell.tsx`
 
+## Screenshot Evidence (desktop + mobile)
+
+- Grounded document feedback:
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/document-grounded-desktop.png`
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/document-grounded-mobile.png`
+- Weak/partial-grounding feedback:
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/document-weak-desktop.png`
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/document-weak-mobile.png`
+- Mentor trust/citation surface:
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/mentor-citation-count-desktop.png`
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/mentor-citation-count-mobile.png`
+- Owner governance/ops surface:
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/owner-dashboard-desktop.png`
+  - `tests/artifacts/verification/grounding-citation-ui-2026-03-28/owner-dashboard-mobile.png`
+
 ## Notes
 
 - This artifact captures payload and code-level evidence for the grounding/citation stream.
-- Dedicated desktop/mobile screenshot capture for this stream was not produced in this pass.
+- Desktop/mobile screenshot capture is now included in `tests/artifacts/verification/grounding-citation-ui-2026-03-28/`.
