@@ -1,33 +1,68 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization import get_role_capabilities
-from app.models import AuditLog, User, UserRole
+from app.models import AuditLog, Capability, RoleCapability, User, UserCapability, UserRole
 from app.schemas.access_control import (
     AccessControlManagedUser,
     AccessControlManagedUserListResponse,
     AccessControlRoleChangeItem,
     AccessControlRoleChangeListResponse,
 )
-from app.services.auth.service import AuthService
 
 
 class AccessControlService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.auth_service = AuthService(db)
 
     async def list_managed_users(self) -> AccessControlManagedUserListResponse:
         result = await self.db.execute(
             select(User).order_by(User.created_at.desc(), User.email.asc())
         )
         users = result.scalars().all()
+        if not users:
+            return AccessControlManagedUserListResponse(items=[], total=0)
+
+        # Bulk-fetch role capabilities for all distinct roles in one query.
+        distinct_roles = {user.role for user in users}
+        role_caps_result = await self.db.execute(
+            select(RoleCapability.role, Capability.capability_key)
+            .join(Capability, RoleCapability.capability_id == Capability.id)
+            .where(Capability.is_active.is_(True))
+            .where(RoleCapability.role.in_(distinct_roles))
+        )
+        role_capabilities_map: dict[UserRole, set[str]] = {}
+        for role, cap_key in role_caps_result.all():
+            role_capabilities_map.setdefault(role, set()).add(cap_key)
+
+        # Bulk-fetch user-specific non-expired capabilities for all users in one query.
+        user_ids = [user.id for user in users]
+        now_utc = datetime.now(timezone.utc)
+        user_caps_result = await self.db.execute(
+            select(UserCapability.user_id, Capability.capability_key)
+            .join(Capability, UserCapability.capability_id == Capability.id)
+            .where(Capability.is_active.is_(True))
+            .where(UserCapability.user_id.in_(user_ids))
+            .where(
+                (UserCapability.expires_at.is_(None))
+                | (UserCapability.expires_at > now_utc)
+            )
+        )
+        user_capabilities_map: dict[uuid.UUID, set[str]] = {}
+        for user_id, cap_key in user_caps_result.all():
+            user_capabilities_map.setdefault(user_id, set()).add(cap_key)
+
+        # Compute effective capabilities in memory (no further DB queries).
         items: list[AccessControlManagedUser] = []
         for user in users:
-            capabilities = await self.auth_service._resolve_capabilities(user)
+            role_caps = role_capabilities_map.get(user.role, set())
+            effective_role_caps = role_caps or set(get_role_capabilities(user.role))
+            user_caps = user_capabilities_map.get(user.id, set())
+            capabilities = sorted(effective_role_caps | user_caps)
             items.append(
                 AccessControlManagedUser(
                     user_id=user.id,
@@ -171,9 +206,30 @@ class AccessControlService:
 
         result = await self.db.execute(query)
         audits = result.scalars().all()
+
+        # Batch-load any revert audits that reference these update audits to avoid N+1 queries.
+        reverted_by_map: dict[uuid.UUID, AuditLog] = {}
+        audit_ids = [audit.id for audit in audits]
+        if audit_ids:
+            audit_id_strs = [str(aid) for aid in audit_ids]
+            revert_query = select(AuditLog).where(
+                AuditLog.entity_type == "user",
+                AuditLog.action == "access_control.role.revert",
+                AuditLog.before_data["reverted_audit_id"].as_string().in_(audit_id_strs),
+            )
+            revert_result = await self.db.execute(revert_query)
+            for revert_audit in revert_result.scalars().all():
+                if isinstance(revert_audit.before_data, dict):
+                    ref_id_str = revert_audit.before_data.get("reverted_audit_id")
+                    if ref_id_str:
+                        try:
+                            reverted_by_map[uuid.UUID(ref_id_str)] = revert_audit
+                        except ValueError:
+                            pass
+
         items: list[AccessControlRoleChangeItem] = []
         for audit in audits:
-            reverted_by = await self._find_revert_audit(audit.id)
+            reverted_by = reverted_by_map.get(audit.id)
             previous_role = self._extract_role(audit.before_data, "role")
             next_role = self._extract_role(audit.after_data, "role")
             items.append(
@@ -223,16 +279,12 @@ class AccessControlService:
             .where(
                 AuditLog.entity_type == "user",
                 AuditLog.action == "access_control.role.revert",
+                AuditLog.before_data["reverted_audit_id"].as_string() == str(audit_id),
             )
             .order_by(AuditLog.created_at.desc())
+            .limit(1)
         )
-        for candidate in result.scalars().all():
-            if (
-                isinstance(candidate.before_data, dict)
-                and candidate.before_data.get("reverted_audit_id") == str(audit_id)
-            ):
-                return candidate
-        return None
+        return result.scalars().one_or_none()
 
     def _extract_uuid(self, value: str) -> uuid.UUID:
         try:

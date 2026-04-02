@@ -328,7 +328,7 @@ export function OwnerDashboardShell() {
                   type="button"
                   className="auth-link auth-link--primary"
                   onClick={() => void handleUpdateRole()}
-                  disabled={isUpdatingRole || !selectedTargetUserId || !selectedRole}
+                  disabled={isUpdatingRole || !selectedTargetUserId || !selectedRole || !updateReason.trim()}
                 >
                   {isUpdatingRole ? "Updating role..." : "Apply role update"}
                 </button>
