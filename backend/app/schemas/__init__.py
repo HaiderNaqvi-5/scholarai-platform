@@ -73,6 +73,14 @@ from app.schemas.scholarships import (
 from app.schemas.students import StudentProfileResponse, StudentProfileUpsertRequest
 from app.schemas.mentor import MentorFeedbackRequest, MentorFeedbackResponse
 from app.schemas.analytics import PlatformAnalyticsResponse
+from app.schemas.access_control import (
+    AccessControlManagedUser,
+    AccessControlManagedUserListResponse,
+    AccessControlRoleChangeItem,
+    AccessControlRoleChangeListResponse,
+    AccessControlRoleRevertRequest,
+    AccessControlRoleUpdateRequest,
+)
 
 __all__ = [
     "DocumentDetailResponse",
@@ -140,4 +148,10 @@ __all__ = [
     "MentorFeedbackRequest",
     "MentorFeedbackResponse",
     "PlatformAnalyticsResponse",
+    "AccessControlManagedUser",
+    "AccessControlManagedUserListResponse",
+    "AccessControlRoleChangeItem",
+    "AccessControlRoleChangeListResponse",
+    "AccessControlRoleRevertRequest",
+    "AccessControlRoleUpdateRequest",
 ]
