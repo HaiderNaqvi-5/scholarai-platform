@@ -273,7 +273,7 @@ export function DashboardShell() {
           ) : (
             <EmptyState
               title="Profile incomplete"
-              description="Set up your profile so ScholarAI can explain why scholarships match your background."
+              description="Set up your profile so GrantPath AI can explain why scholarships match your background."
               action={
                 <Link className="auth-link auth-link--primary" href="/onboarding">
                   Complete profile

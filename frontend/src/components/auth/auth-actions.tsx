@@ -40,7 +40,7 @@ export function AuthActions() {
     <div className="auth-actions">
       <div className="auth-chip">
         <span className="auth-chip__label">Signed in</span>
-        <strong>{currentUser?.full_name ?? "ScholarAI user"}</strong>
+        <strong>{currentUser?.full_name ?? "GrantPath AI user"}</strong>
       </div>
       <Link className="nav-link nav-link--quiet" href="/dashboard">
         Dashboard

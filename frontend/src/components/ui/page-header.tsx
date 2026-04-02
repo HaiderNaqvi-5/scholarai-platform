@@ -8,7 +8,7 @@ type PageHeaderProps = {
 export function PageHeader({
   title,
   description,
-  eyebrow = "ScholarAI",
+  eyebrow = "GrantPath AI",
   compact = false,
 }: PageHeaderProps) {
   return (

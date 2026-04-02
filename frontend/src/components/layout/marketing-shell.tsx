@@ -32,7 +32,7 @@ export function MarketingShell({
           <Link className="brand-lockup brand-lockup--link" href="/">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-lockup__text">
-              <span className="brand-title">ScholarAI</span>
+              <span className="brand-title">GrantPath AI</span>
             </span>
           </Link>
           <div className="shell-nav__links">
