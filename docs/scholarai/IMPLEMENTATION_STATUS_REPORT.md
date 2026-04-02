@@ -101,8 +101,8 @@ Current local rollout status:
 ### Remaining v0.1 SLC work
 | Feature | Gap |
 |---|---|
-| Recommendation quality evaluation instrumentation | No continuous offline/online scoring harness for ranking quality drift yet |
-| Rerank calibration and guardrail tuning | Heuristic weights are implemented but not yet calibrated against judged datasets |
+| Recommendation quality evaluation instrumentation | Versioned benchmark registry and benchmark evaluation endpoints now exist (`GET /api/v1/recommendations/benchmarks`, `POST /api/v1/recommendations/benchmarks/{dataset_id}/evaluate`); continuous online drift monitoring remains incomplete |
+| Rerank calibration and guardrail tuning | Benchmark thresholds and gate evaluation now run against judged datasets, but ongoing calibration operations and alerting loops remain incomplete |
 | Multi-source grounding depth in preparation tools | Grounded context exists but not all guidance items are citation-dense across broader scholarship coverage |
 | Long-horizon interview coaching analytics | Session-level trend summary exists, but richer multi-session coaching plans are not implemented yet |
 | Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, and bulk retry operations are now implemented; captured HTML snapshot management remains open |

@@ -104,6 +104,36 @@ class RecommendationEvaluationService:
 
         return results
 
+    def aggregate_metrics(
+        self,
+        metrics_by_case: list[list[RecommendationMetricResult]],
+    ) -> list[RecommendationMetricResult]:
+        """Compute average metrics across all cases, grouped by k."""
+        if not metrics_by_case:
+            return []
+
+        sums: dict[int, dict[str, float]] = {}
+        counts: dict[int, int] = {}
+        for case_metrics in metrics_by_case:
+            for metric in case_metrics:
+                if metric.k not in sums:
+                    sums[metric.k] = {"precision_at_k": 0.0, "recall_at_k": 0.0, "ndcg_at_k": 0.0}
+                    counts[metric.k] = 0
+                sums[metric.k]["precision_at_k"] += metric.precision_at_k
+                sums[metric.k]["recall_at_k"] += metric.recall_at_k
+                sums[metric.k]["ndcg_at_k"] += metric.ndcg_at_k
+                counts[metric.k] += 1
+
+        return [
+            RecommendationMetricResult(
+                k=k,
+                precision_at_k=round(sums[k]["precision_at_k"] / counts[k], 4),
+                recall_at_k=round(sums[k]["recall_at_k"] / counts[k], 4),
+                ndcg_at_k=round(sums[k]["ndcg_at_k"] / counts[k], 4),
+            )
+            for k in sorted(sums)
+        ]
+
     def _gte_or_none(self, actual: float, minimum: float | None) -> bool | None:
         if minimum is None:
             return None
