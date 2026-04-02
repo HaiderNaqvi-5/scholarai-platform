@@ -609,3 +609,12 @@ export type AccessControlRoleChangeListResponse = {
   items: AccessControlRoleChangeItem[];
   total: number;
 };
+
+export type AccessControlRoleUpdateRequest = {
+  role: string;
+  reason?: string | null;
+};
+
+export type AccessControlRoleRevertRequest = {
+  reason?: string | null;
+};

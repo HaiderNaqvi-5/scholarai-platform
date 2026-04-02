@@ -10,6 +10,7 @@ export const Capability = {
   DocumentMentorSubmit: "document.mentor.submit",
   AdminAuditRead: "admin.audit.read",
   OwnerSystemRead: "owner.system.read",
+  OwnerSystemControl: "owner.system.control",
 } as const;
 
 type CapabilityValue = (typeof Capability)[keyof typeof Capability];
@@ -48,6 +49,7 @@ const ROLE_TO_CAPABILITIES: Record<string, Set<CapabilityValue>> = {
     Capability.DocumentMentorSubmit,
     Capability.AdminAuditRead,
     Capability.OwnerSystemRead,
+    Capability.OwnerSystemControl,
   ]),
 };
 
