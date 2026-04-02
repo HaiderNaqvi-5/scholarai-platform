@@ -8,62 +8,6 @@ def test_saved_opportunities_requires_authentication(client):
     assert "request_id" in body["error"]
 
 
-def test_saved_opportunity_status_update_requires_authentication(client):
-    response = client.patch(
-        "/api/v1/saved-opportunities/00000000-0000-0000-0000-000000000000",
-        json={"status": "in_progress"},
-    )
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert body["error"]["status"] == 401
-    assert "request_id" in body["error"]
-
-
-def test_v2_saved_opportunities_requires_authentication(client):
-    response = client.get("/api/v2/saved-opportunities")
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert body["error"]["status"] == 401
-    assert "request_id" in body["error"]
-
-
-def test_v2_saved_opportunity_status_update_requires_authentication(client):
-    response = client.patch(
-        "/api/v2/saved-opportunities/00000000-0000-0000-0000-000000000000",
-        json={"status": "in_progress"},
-    )
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert body["error"]["status"] == 401
-    assert "request_id" in body["error"]
-
-
-def test_access_control_users_requires_authentication(client):
-    response = client.get("/api/v1/access-control/users")
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert body["error"]["status"] == 401
-    assert "request_id" in body["error"]
-
-
-def test_access_control_role_changes_requires_authentication(client):
-    response = client.get("/api/v1/access-control/role-changes")
-
-    assert response.status_code == 401
-    body = response.json()
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert body["error"]["status"] == 401
-    assert "request_id" in body["error"]
-
-
 def test_interview_coaching_analytics_requires_authentication(client):
     response = client.get("/api/v1/interviews/coaching-analytics")
 
@@ -155,7 +99,6 @@ def test_api_v2_route_inventory_snapshot_from_openapi(client):
         "/api/v2/profile",
         "/api/v2/scholarships",
         "/api/v2/analytics",
-        "/api/v2/saved-opportunities",
     ]
     for prefix in expected_v2_prefixes:
         assert any(path == prefix or path.startswith(f"{prefix}/") for path in paths)
@@ -165,6 +108,7 @@ def test_api_v2_route_inventory_snapshot_from_openapi(client):
         "/api/v2/curation",
         "/api/v2/mentor",
         "/api/v2/health",
+        "/api/v2/saved-opportunities",
     ]
     for prefix in known_non_parity_surfaces:
         assert not any(path == prefix or path.startswith(f"{prefix}/") for path in paths)

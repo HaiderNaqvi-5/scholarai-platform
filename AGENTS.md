@@ -1,7 +1,7 @@
 # Agent Instructions
 
 ## Workflow
-- Follow the project-local instruction set declared in [`opencode.json`](C:/Users/HP/scholarai-platform/opencode.json):
+- Follow the project-local instruction set declared in [`opencode.json`](opencode.json):
   - Plugin: `ecc-universal`
   - `skills/tdd-workflow/SKILL.md`
   - `skills/security-review/SKILL.md`
@@ -10,9 +10,9 @@
   - `skills/e2e-testing/SKILL.md`
   - `skills/verification-loop/SKILL.md`
   - `skills/api-design/SKILL.md`
-- CI automation is defined in [`.github/workflows/ci.yml`](C:/Users/HP/scholarai-platform/.github/workflows/ci.yml) and currently runs backend sanity, KPI regression, frontend sanity, docs governance, and browser smoke jobs.
+- CI automation is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and currently runs backend sanity, KPI regression, frontend sanity, docs governance, and browser smoke jobs.
 - Mandatory push gate: before any push to GitHub, run all backend unit/integration checks and the full CI-equivalent local suite (backend sanity, KPI regression, frontend lint/type/build, docs governance, and browser smoke) and only push after all pass.
-- No additional agent-local workflow config was discovered in this workspace snapshot beyond [`opencode.json`](C:/Users/HP/scholarai-platform/opencode.json), including under [`frontend/`](C:/Users/HP/scholarai-platform/frontend).
+- No additional agent-local workflow config was discovered in this workspace snapshot beyond [`opencode.json`](opencode.json), including under [`frontend/`](frontend/).
 
 ## Commands
 - Root stack: `docker compose up --build`
@@ -26,7 +26,7 @@
 - Browser smoke: `python tests/e2e/playwright/run_smoke_suite.py` after local backend/frontend services are running
 
 ## Key Files
-- [`opencode.json`](C:/Users/HP/scholarai-platform/opencode.json) is the current source of truth for agent-facing workflow configuration and plugin selection in this workspace.
-- [`.github/workflows/ci.yml`](C:/Users/HP/scholarai-platform/.github/workflows/ci.yml) is the source of truth for CI validation and smoke coverage.
-- [`frontend/package.json`](C:/Users/HP/scholarai-platform/frontend/package.json) defines the active frontend scripts and npm workflow.
-- [`docker-compose.yml`](C:/Users/HP/scholarai-platform/docker-compose.yml) defines the local multi-service runtime stack.
+- [`opencode.json`](opencode.json) is the current source of truth for agent-facing workflow configuration and plugin selection in this workspace.
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the source of truth for CI validation and smoke coverage.
+- [`frontend/package.json`](frontend/package.json) defines the active frontend scripts and npm workflow.
+- [`docker-compose.yml`](docker-compose.yml) defines the local multi-service runtime stack.

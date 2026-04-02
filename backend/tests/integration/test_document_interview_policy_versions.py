@@ -306,20 +306,21 @@ def test_interview_coaching_analytics_response_contract(app, client):
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_db] = override_db
 
-    response = client.get(
-        "/api/v1/interviews/coaching-analytics",
-        headers={"Authorization": "Bearer fake"},
-    )
+    try:
+        response = client.get(
+            "/api/v1/interviews/coaching-analytics",
+            headers={"Authorization": "Bearer fake"},
+        )
 
-    app.dependency_overrides.clear()
-    InterviewSessionService.get_coaching_analytics = original_method
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["session_count"] == 2
-    assert payload["answered_count_total"] == 5
-    assert payload["average_score_overall"] == 3.1
-    assert payload["score_delta_from_first_session"] == 0.6
-    assert payload["weakest_dimension_overall"] == "specificity"
-    assert isinstance(payload["recommended_focuses"], list)
-    assert payload["recent_sessions"]
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["session_count"] == 2
+        assert payload["answered_count_total"] == 5
+        assert payload["average_score_overall"] == 3.1
+        assert payload["score_delta_from_first_session"] == 0.6
+        assert payload["weakest_dimension_overall"] == "specificity"
+        assert isinstance(payload["recommended_focuses"], list)
+        assert payload["recent_sessions"]
+    finally:
+        app.dependency_overrides.clear()
+        InterviewSessionService.get_coaching_analytics = original_method
