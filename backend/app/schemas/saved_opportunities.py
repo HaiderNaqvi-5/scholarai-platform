@@ -1,12 +1,16 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+SavedOpportunityTrackerStatus = Literal["saved", "in_progress", "applied", "closed"]
 
 
 class SavedOpportunityStatusUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: str = Field(min_length=1, max_length=64)
+    status: SavedOpportunityTrackerStatus
 
 
 class SavedOpportunityItem(BaseModel):
@@ -19,6 +23,7 @@ class SavedOpportunityItem(BaseModel):
     deadline_at: datetime | None
     record_state: str
     saved_at: datetime
+    tracker_status: SavedOpportunityTrackerStatus
 
 
 class SavedOpportunityListResponse(BaseModel):
