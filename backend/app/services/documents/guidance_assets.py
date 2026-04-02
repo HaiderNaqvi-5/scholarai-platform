@@ -81,4 +81,36 @@ DOCUMENT_GUIDANCE_LIBRARY: dict[str, list[dict[str, str]]] = {
             "applies_to": "limited_us_scope",
         },
     ],
+    "degree:MS": [
+        {
+            "key": "degree-ms-research-readiness",
+            "topic": "MS readiness",
+            "snippet": "For MS-targeted scholarships, show graduate-level readiness with one concrete research or technical method example.",
+            "applies_to": "ms_degree_scope",
+        },
+    ],
+    "degree:MA": [
+        {
+            "key": "degree-ma-analytic-writing",
+            "topic": "MA readiness",
+            "snippet": "For MA-oriented opportunities, highlight analytical writing rigor and how your prior work informs advanced study goals.",
+            "applies_to": "ma_degree_scope",
+        },
+    ],
+    "field:data-science": [
+        {
+            "key": "field-data-science-method",
+            "topic": "Data science alignment",
+            "snippet": "For data science-aligned opportunities, specify dataset context, modeling choices, and measurable evaluation outcomes.",
+            "applies_to": "data_science_fields",
+        },
+    ],
+    "field:analytics": [
+        {
+            "key": "field-analytics-impact",
+            "topic": "Analytics impact",
+            "snippet": "For analytics-focused scholarships, connect your analysis workflow to a real decision or service-impact outcome.",
+            "applies_to": "analytics_fields",
+        },
+    ],
 }

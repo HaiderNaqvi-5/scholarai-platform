@@ -9,6 +9,7 @@ from app.models import DegreeLevel, RecordState
 from app.services.recommendations import RecommendationService
 from app.services.recommendations.eligibility import evaluate_match
 from app.services.recommendations.service import (
+    RERANK_POLICY_VERSION,
     RetrievedCandidate,
     _compose_recommendation_score,
     _distance_to_similarity,
@@ -280,6 +281,7 @@ async def test_recommendation_service_explanation_payload_matches_ranking_featur
     assert item.heuristic_factors == expected_factors
     assert item.semantic_similarity == pytest.approx(semantic_similarity)
     assert item.fallback_reason is None
+    assert item.rerank_policy_version == RERANK_POLICY_VERSION
     assert item.rule_pass_count == evaluation.passed_rule_count
     assert item.rule_total_count == evaluation.total_rule_count
     assert item.eligibility_graph == evaluation.eligibility_graph
@@ -306,3 +308,28 @@ async def test_recommendation_service_explanation_payload_matches_ranking_featur
         "gpa_alignment",
         "deadline_urgency",
     }
+
+
+async def test_recommendation_score_guardrail_applies_floor(monkeypatch):
+    profile = make_profile(gpa_value=Decimal("4.00"))
+    weak = make_scholarship(
+        title="Weak alignment award",
+        field_tags=["data science"],
+        degree_levels=["MS"],
+        citizenship_rules=[],
+        min_gpa_value=Decimal("4.00"),
+        deadline_at=datetime.now(timezone.utc) + timedelta(days=730),
+    )
+
+    service = RecommendationService(db=None)
+
+    async def fake_vector_candidates(*, search_query, limit):
+        assert limit == 30
+        return [RetrievedCandidate(weak, "pgvector_chunk_similarity", 0.02)], None
+
+    monkeypatch.setattr(service, "_retrieve_pgvector_candidates", fake_vector_candidates)
+    monkeypatch.setattr(service, "_retrieve_db_candidates", no_db_candidates)
+
+    items = await service.build_for_profile(profile, limit=5)
+    assert len(items) == 1
+    assert items[0].estimated_fit_score >= 0.3

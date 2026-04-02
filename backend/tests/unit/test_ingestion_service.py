@@ -248,6 +248,173 @@ async def test_start_run_marks_duplicates_as_skipped(monkeypatch):
     assert detail.run_metadata["skipped_records"][0]["reason"] == "duplicate_source_url"
 
 
+async def test_start_run_creates_candidate_from_jsonld_when_no_anchor_candidates(monkeypatch):
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor_user_id = uuid4()
+    captured_calls = []
+
+    async def fake_capture(_url: str) -> CaptureResult:
+        capture = make_capture(
+            """
+            <html>
+              <head>
+                <title>Structured Funding</title>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "Scholarship",
+                  "name": "Structured Data Science Scholarship",
+                  "description": "Scholarship support for data science master's applicants with analytics experience.",
+                  "url": "/awards/structured-data-science-scholarship"
+                }
+                </script>
+              </head>
+              <body>
+                <p>No traditional scholarship links are rendered in anchors.</p>
+              </body>
+            </html>
+            """
+        )
+        capture.metadata.update(
+            {
+                "retry_policy": {
+                    "max_attempts": 2,
+                    "base_delay_seconds": 0.75,
+                },
+                "attempt": 1,
+                "max_attempts": 2,
+                "retries_used": 0,
+                "attempt_errors": [],
+            }
+        )
+        return capture
+
+    class RecordingCurationService:
+        def __init__(self, _db):
+            pass
+
+        async def import_raw_record(self, payload, actor_id):
+            captured_calls.append((payload, actor_id))
+            return SimpleNamespace(
+                record_id=str(uuid4()),
+                title=payload.title,
+                source_url=str(payload.source_url),
+            )
+
+    monkeypatch.setattr(service, "_capture_source", fake_capture)
+    monkeypatch.setattr(
+        "app.services.ingestion.service.CurationService",
+        RecordingCurationService,
+    )
+
+    detail = await service.start_run(
+        IngestionRunStartRequest(source_key=session.source.source_key, max_records=5),
+        actor_user_id,
+    )
+
+    payload, imported_actor = captured_calls[0]
+    assert detail.status == IngestionRunStatus.COMPLETED.value
+    assert detail.records_found == 1
+    assert detail.records_created == 1
+    assert payload.title == "Structured Data Science Scholarship"
+    assert str(payload.source_url).endswith("/awards/structured-data-science-scholarship")
+    assert payload.provenance_payload["parse_origin"] == "jsonld"
+    assert detail.run_metadata["parser"]["jsonld_candidates"] == 1
+    assert detail.run_metadata["parser"]["anchor_candidates"] == 0
+    assert getattr(imported_actor, "id", None) == actor_user_id
+
+
+async def test_start_run_creates_candidates_from_jsonld_itemlist_with_main_entity_url(monkeypatch):
+    session = FakeSession()
+    session.source = make_source()
+    service = IngestionService(session)
+    actor_user_id = uuid4()
+    captured_calls = []
+
+    async def fake_capture(_url: str) -> CaptureResult:
+        capture = make_capture(
+            """
+            <html>
+              <head>
+                <title>Structured List Funding</title>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "ItemList",
+                  "itemListElement": [
+                    {
+                      "@type": "ListItem",
+                      "position": 1,
+                      "item": {
+                        "@type": "Scholarship",
+                        "name": "Nested Structured Analytics Scholarship",
+                        "description": "Funding for analytics and data science master's study.",
+                        "mainEntityOfPage": {
+                          "@type": "WebPage",
+                          "@id": "/awards/nested-structured-analytics-scholarship"
+                        }
+                      }
+                    }
+                  ]
+                }
+                </script>
+              </head>
+              <body>
+                <p>Scholarship data is emitted through structured list metadata only.</p>
+              </body>
+            </html>
+            """
+        )
+        capture.metadata.update(
+            {
+                "retry_policy": {
+                    "max_attempts": 2,
+                    "base_delay_seconds": 0.75,
+                },
+                "attempt": 1,
+                "max_attempts": 2,
+                "retries_used": 0,
+                "attempt_errors": [],
+            }
+        )
+        return capture
+
+    class RecordingCurationService:
+        def __init__(self, _db):
+            pass
+
+        async def import_raw_record(self, payload, actor_id):
+            captured_calls.append((payload, actor_id))
+            return SimpleNamespace(
+                record_id=str(uuid4()),
+                title=payload.title,
+                source_url=str(payload.source_url),
+            )
+
+    monkeypatch.setattr(service, "_capture_source", fake_capture)
+    monkeypatch.setattr(
+        "app.services.ingestion.service.CurationService",
+        RecordingCurationService,
+    )
+
+    detail = await service.start_run(
+        IngestionRunStartRequest(source_key=session.source.source_key, max_records=5),
+        actor_user_id,
+    )
+
+    payload, imported_actor = captured_calls[0]
+    assert detail.status == IngestionRunStatus.COMPLETED.value
+    assert detail.records_found == 1
+    assert detail.records_created == 1
+    assert payload.title == "Nested Structured Analytics Scholarship"
+    assert str(payload.source_url).endswith("/awards/nested-structured-analytics-scholarship")
+    assert payload.provenance_payload["parse_origin"] == "jsonld"
+    assert detail.run_metadata["parser"]["jsonld_candidates"] == 1
+    assert getattr(imported_actor, "id", None) == actor_user_id
+
+
 async def test_retry_async_retries_flaky_coroutine(monkeypatch):
     sleep_calls = []
 

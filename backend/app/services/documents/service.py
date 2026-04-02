@@ -342,7 +342,12 @@ class DocumentService:
             retrieved_guidance,
             lower_text,
         )
-        citations = self._build_citations(document, grounded_scholarships, validated_facts)
+        citations = self._build_citations(
+            document,
+            grounded_scholarships,
+            validated_facts,
+            retrieved_guidance,
+        )
         coverage_flags = self._build_coverage_flags(lower_text, grounded_scholarships)
         ungrounded_warnings = self._build_ungrounded_warnings(coverage_flags, grounded_scholarships)
         grounding_score = self._calculate_grounding_score(
@@ -609,6 +614,7 @@ class DocumentService:
         document: DocumentRecord,
         grounded_scholarships: list[Any],
         validated_facts: list[dict[str, str]],
+        retrieved_guidance: list[dict[str, str]],
     ) -> list[dict[str, Any]]:
         citations: list[dict[str, Any]] = []
         for index, scholarship in enumerate(grounded_scholarships):
@@ -623,6 +629,17 @@ class DocumentService:
                 }
             )
 
+        for index, guidance in enumerate(retrieved_guidance[:2]):
+            citations.append(
+                {
+                    "source_id": f"guidance:{guidance.get('key', index)}",
+                    "title": f"Writing guidance: {guidance.get('topic', 'General')}",
+                    "url_or_ref": f"grounded_context_sections.retrieved_writing_guidance[{index}]",
+                    "snippet": str(guidance.get("snippet", "Bounded writing guidance snippet."))[:220],
+                    "relevance_score": round(max(0.45, 0.78 - (index * 0.05)), 2),
+                }
+            )
+
         if not citations:
             citations.append(
                 {
@@ -634,7 +651,8 @@ class DocumentService:
                 }
             )
 
-        if validated_facts and len(citations) < 2:
+        has_validated_fact_citation = any(item.get("source_id") == "validated-facts" for item in citations)
+        if validated_facts and not has_validated_fact_citation:
             citations.append(
                 {
                     "source_id": "validated-facts",

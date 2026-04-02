@@ -10,6 +10,7 @@ class RecommendationMetricResult:
     precision_at_k: float
     recall_at_k: float
     ndcg_at_k: float
+    mrr_at_k: float
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class RecommendationEvaluationService:
                 precision_at_k=self._precision_at_k(predicted_ids, judged_relevance, k),
                 recall_at_k=self._recall_at_k(predicted_ids, judged_relevance, k, relevant_total),
                 ndcg_at_k=self._ndcg_at_k(predicted_ids, judged_relevance, k),
+                mrr_at_k=self._mrr_at_k(predicted_ids, judged_relevance, k),
             )
             for k in normalized_k_values
         ]
@@ -187,6 +189,18 @@ class RecommendationEvaluationService:
         if idcg == 0:
             return 0.0
         return round(dcg / idcg, 4)
+
+    def _mrr_at_k(
+        self,
+        predicted_ids: list[str],
+        judged_relevance: dict[str, int],
+        k: int,
+    ) -> float:
+        top_k = predicted_ids[:k]
+        for index, scholarship_id in enumerate(top_k, start=1):
+            if judged_relevance.get(scholarship_id, 0) > 0:
+                return round(1 / index, 4)
+        return 0.0
 
     def _dcg(self, relevances: list[int]) -> float:
         score = 0.0

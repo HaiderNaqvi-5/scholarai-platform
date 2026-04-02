@@ -43,13 +43,23 @@ async def list_scholarships(
     if normalized_sort not in {"deadline", "title", "recent"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sort must be one of deadline, title, or recent",
+            detail={
+                "message": "Sort must be one of deadline, title, or recent",
+                "field": "sort",
+                "allowed_values": ["deadline", "title", "recent"],
+                "received": sort,
+            },
         )
 
     if min_amount is not None and max_amount is not None and min_amount > max_amount:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Minimum amount cannot be greater than maximum amount",
+            detail={
+                "message": "Minimum amount cannot be greater than maximum amount",
+                "field": "min_amount",
+                "min_amount": min_amount,
+                "max_amount": max_amount,
+            },
         )
 
     statement = select(Scholarship).where(

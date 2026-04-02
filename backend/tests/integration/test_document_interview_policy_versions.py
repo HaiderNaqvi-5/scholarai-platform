@@ -271,6 +271,7 @@ def test_interview_coaching_analytics_response_contract(app, client):
 
     async def fake_get_coaching_analytics(self, user_id):
         from app.schemas.interviews import (
+            InterviewCoachingActionPlanItem,
             InterviewCoachingAnalyticsResponse,
             InterviewCoachingRecentSession,
         )
@@ -284,6 +285,17 @@ def test_interview_coaching_analytics_response_contract(app, client):
             weakest_dimension_overall="specificity",
             recommended_focuses=[
                 "Add one concrete example with measurable impact in each answer.",
+            ],
+            action_plan=[
+                InterviewCoachingActionPlanItem(
+                    dimension="specificity",
+                    current_average=2.2,
+                    target_average=3.2,
+                    priority=1,
+                    next_actions=[
+                        "Add one concrete example with measurable impact in each answer.",
+                    ],
+                )
             ],
             recent_sessions=[
                 InterviewCoachingRecentSession(
@@ -320,6 +332,9 @@ def test_interview_coaching_analytics_response_contract(app, client):
         assert payload["score_delta_from_first_session"] == 0.6
         assert payload["weakest_dimension_overall"] == "specificity"
         assert isinstance(payload["recommended_focuses"], list)
+        assert isinstance(payload["action_plan"], list)
+        assert payload["action_plan"]
+        assert payload["action_plan"][0]["dimension"] == "specificity"
         assert payload["recent_sessions"]
     finally:
         app.dependency_overrides.clear()

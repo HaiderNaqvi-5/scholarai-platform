@@ -157,6 +157,14 @@ def retrieve_bounded_writing_guidance(
             keys_to_check.append(f"category:{primary.category.lower()}")
         if primary.country_code:
             keys_to_check.append(f"country:{primary.country_code.upper()}")
+        for level in primary.degree_levels[:2]:
+            normalized_level = level.strip().upper()
+            if normalized_level:
+                keys_to_check.append(f"degree:{normalized_level}")
+        for field_tag in primary.field_tags[:3]:
+            normalized_field = field_tag.strip().lower().replace(" ", "-")
+            if normalized_field:
+                keys_to_check.append(f"field:{normalized_field}")
 
     seen: set[str] = set()
     for key in keys_to_check:
@@ -166,7 +174,7 @@ def retrieve_bounded_writing_guidance(
             seen.add(item["key"])
             selected.append(item)
 
-    return selected[:5]
+    return selected[:10]
 
 
 def flatten_grounded_context_sections(sections: dict[str, Any]) -> list[str]:
