@@ -28,7 +28,7 @@ Use this checklist as the release acceptance source of truth for ScholarAI `v0.1
 | --- | --- | --- |
 | SLC-OPS-001 | Admin can manage structured data lifecycle (add/update/archive) with auditability. | UI proof + audit/event record |
 | SLC-OPS-002 | Owner can review stage conformance and governance policy adherence. | UI proof + governance artifact |
-| SLC-OPS-003 | Role assignment and permission updates are tracked and reversible. | UI proof + audit record |
+| SLC-OPS-003 | Role assignment and permission updates are tracked and reversible. | API + UI proof + audit record |
 
 ## Trust Boundaries
 
@@ -56,6 +56,7 @@ Use this checklist as the release acceptance source of truth for ScholarAI `v0.1
 | SLC-ROLE-003 | Complete | `frontend/src/app/owner/page.tsx`, `frontend/src/components/auth/owner-route.tsx`, `frontend/src/components/owner/owner-dashboard-shell.tsx` |
 | SLC-ROLE-004 | Complete | `frontend/src/app/mentor/page.tsx`, `frontend/src/components/mentor/mentor-dashboard-shell.tsx`, `backend/tests/integration/test_mentor_review_workflow.py` |
 | SLC-ROLE-005 | Complete | `frontend/src/components/dashboard/dashboard-shell.tsx`, `frontend/src/components/scholarships/scholarship-browse-shell.tsx`, `frontend/src/components/recommendations/recommendation-workspace.tsx`, `frontend/src/components/scholarships/scholarship-detail-shell.tsx` |
+| SLC-OPS-003 | Complete | `backend/app/api/v1/routes/access_control.py`, `backend/app/services/access_control/service.py`, `backend/tests/integration/test_access_control_routes.py`, `frontend/src/components/owner/owner-dashboard-shell.tsx`, `frontend/src/lib/api.ts` |
 | SLC-TRUST-001 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
 | SLC-TRUST-002 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
 | SLC-TRUST-003 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |

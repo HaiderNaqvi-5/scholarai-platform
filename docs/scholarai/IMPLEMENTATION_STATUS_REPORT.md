@@ -16,6 +16,7 @@ Current local rollout status:
 - Backend capability dependencies, claim validation, and institution-scope controls are implemented.
 - Frontend route-level and navigation-level capability checks are implemented.
 - Frontend component-level action controls inside curation and mentor dashboards are in progress (button-level gating pass active).
+- Owner governance now includes access-control operations for managed-user listing, role updates, and audited role reverts (`/api/v1/access-control/*`) surfaced in the owner home.
 
 ## Implemented Features
 ### Backend and platform foundation
