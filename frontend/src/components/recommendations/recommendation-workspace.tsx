@@ -33,7 +33,8 @@ type RecommendationState = {
 };
 
 export function RecommendationWorkspace() {
-  const { accessToken } = useAuth();
+  const { accessToken, currentUser } = useAuth();
+  const isTestUser = currentUser?.role?.toLowerCase() === "enduser_student";
   const [state, setState] = useState<RecommendationState>({
     isLoading: true,
     error: null,
@@ -109,7 +110,7 @@ export function RecommendationWorkspace() {
   );
 
   const handleSave = async (scholarshipId: string) => {
-    if (!accessToken) return;
+    if (!accessToken || isTestUser) return;
     setState((current) => ({
       ...current,
       actionError: null,
@@ -147,7 +148,7 @@ export function RecommendationWorkspace() {
   };
 
   const handleUnsave = async (scholarshipId: string) => {
-    if (!accessToken) return;
+    if (!accessToken || isTestUser) return;
     setState((current) => ({
       ...current,
       actionError: null,
@@ -373,7 +374,7 @@ export function RecommendationWorkspace() {
                               ? "auth-link auth-link--secondary"
                               : "auth-link auth-link--primary"
                           }
-                          disabled={state.activeSaveId === item.scholarship_id}
+                          disabled={state.activeSaveId === item.scholarship_id || isTestUser}
                           onClick={() =>
                             void (isSaved
                               ? handleUnsave(item.scholarship_id)
@@ -385,6 +386,8 @@ export function RecommendationWorkspace() {
                         >
                           {state.activeSaveId === item.scholarship_id
                             ? "Updating…"
+                            : isTestUser
+                              ? "Test-user locked"
                             : isSaved
                               ? "Saved"
                               : "Save"}

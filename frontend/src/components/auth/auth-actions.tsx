@@ -18,6 +18,11 @@ export function AuthActions() {
     Capability.AdminAuditRead,
     Capability.OwnerSystemRead,
   ]);
+  const canSeeOwner = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.OwnerSystemRead,
+  );
 
   if (isLoading) {
     return <div className="auth-actions auth-actions--loading" />;
@@ -53,6 +58,11 @@ export function AuthActions() {
       {canSeeAdmin ? (
         <Link className="nav-link nav-link--quiet" href="/admin">
           Admin
+        </Link>
+      ) : null}
+      {canSeeOwner ? (
+        <Link className="nav-link nav-link--quiet" href="/owner">
+          Owner
         </Link>
       ) : null}
       <button
