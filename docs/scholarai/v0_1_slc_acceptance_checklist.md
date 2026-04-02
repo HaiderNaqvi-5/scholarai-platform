@@ -50,6 +50,12 @@ Use this checklist as the release acceptance source of truth for ScholarAI `v0.1
 
 | ID | Status | Evidence Link(s) |
 | --- | --- | --- |
+| SLC-CORE-005 | Complete | `backend/app/api/v1/routes/saved_opportunities.py`, `backend/app/services/saved_opportunities/service.py`, `backend/tests/integration/test_saved_opportunity_status_flow.py`, `frontend/src/components/dashboard/dashboard-shell.tsx` |
+| SLC-ROLE-001 | Complete | `frontend/src/app/dashboard/page.tsx`, `frontend/src/components/dashboard/dashboard-shell.tsx` |
+| SLC-ROLE-002 | Complete | `frontend/src/app/admin/page.tsx`, `frontend/src/components/admin/analytics-dashboard-shell.tsx` |
+| SLC-ROLE-003 | Complete | `frontend/src/app/owner/page.tsx`, `frontend/src/components/auth/owner-route.tsx`, `frontend/src/components/owner/owner-dashboard-shell.tsx` |
+| SLC-ROLE-004 | Complete | `frontend/src/app/mentor/page.tsx`, `frontend/src/components/mentor/mentor-dashboard-shell.tsx`, `backend/tests/integration/test_mentor_review_workflow.py` |
+| SLC-ROLE-005 | Complete | `frontend/src/components/dashboard/dashboard-shell.tsx`, `frontend/src/components/scholarships/scholarship-browse-shell.tsx`, `frontend/src/components/recommendations/recommendation-workspace.tsx`, `frontend/src/components/scholarships/scholarship-detail-shell.tsx` |
 | SLC-TRUST-001 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
 | SLC-TRUST-002 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |
 | SLC-TRUST-003 | In Progress | [Grounding/Citation evidence artifact](https://github.com/HaiderNaqvi-5/scholarai-platform/blob/split/pr50-ci-e2e-smoke/tests/artifacts/verification/v0_1_grounding_citation_evidence_2026-03-28.md) *(evidence tracked in PR #54 artifacts)* |

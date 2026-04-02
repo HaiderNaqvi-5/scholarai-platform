@@ -83,11 +83,11 @@ Current local rollout status:
 | Feature | What exists | What is still missing |
 |---|---|---|
 | Scholarship discovery experience | Public browse, query, field filter, deadline window, sort, save actions, and detail page | Filtering is still narrow and corpus-aware rather than broad search/discovery depth |
-| Core student journey | Public browse -> detail plus signup -> profile -> recommendations -> save now works | Compare workflows, deeper search refinement, and stronger action-planning surfaces are still thin |
-| Recommendation system | Phase 1 pipeline active: relational eligibility graph abstraction, pgvector retrieval over published scholarships, heuristic rerank factors, stage-aware rationale, and rules-only fallback parity | Runtime evaluation tooling, threshold tuning, and richer analytics remain incomplete |
-| Document assistance | Submission, processing state, recent drafts, scholarship-grounded bounded feedback, limitation notice | No async larger-job orchestration and no broader multi-source citation density yet |
-| Interview practice | Practice-mode selection, scholarship-targeted sessions, adaptive weakest-dimension follow-up, structured rubric, results view, stored responses, history/trend summary | No voice path and no deeper long-horizon coaching analytics yet |
-| Ingestion pipeline | Source-registry run model, capture path, parsing, raw-record creation, worker hook, run retry API/UI controls, diagnostics-filtered run history, queue assignment, and bulk retry operations exist | Parser coverage remains heuristic and narrow; captured HTML snapshot management and deeper parser resilience remain incomplete |
+| Core student journey | Public browse -> detail plus signup -> profile -> recommendations -> save now works, with tracker status transitions for saved/in-progress/applied/closed reflected on the student dashboard | Compare workflows, deeper search refinement, and stronger action-planning surfaces are still thin |
+| Recommendation system | Phase 1 pipeline active: relational eligibility graph abstraction, pgvector retrieval over published scholarships, calibrated heuristic rerank factors (guardrail floor/cap + policy version), stage-aware rationale, rules-only fallback parity, plus benchmark dataset registry with multiple judged datasets, benchmark list/evaluate APIs, KPI snapshot recording, and MRR@K instrumentation | Online drift automation and richer calibration analytics remain incomplete |
+| Document assistance | Submission, processing state, recent drafts, scholarship-grounded bounded feedback, limitation notice, expanded bounded guidance retrieval across category/country/degree/field dimensions, and denser scholarship+guidance citations in feedback | No async larger-job orchestration yet |
+| Interview practice | Practice-mode selection, scholarship-targeted sessions, adaptive weakest-dimension follow-up, structured rubric, results view, stored responses, history/trend summary, long-horizon coaching analytics aggregates, and deterministic action-plan items with measurable targets | No voice path and no AI-generated longitudinal intervention automation yet |
+| Ingestion pipeline | Source-registry run model, capture path, parsing, raw-record creation, worker hook, run retry API/UI controls, diagnostics-filtered run history, queue assignment, bulk retry operations, and captured HTML snapshot management exist | Parser coverage remains heuristic and narrow, and deeper parser resilience remains incomplete |
 | API contracts | Shared error envelope and list envelopes are active across the mounted list routes | Detail responses, pagination metadata, and route naming still do not match the target docs perfectly |
 | DevOps readiness | Docker Compose, env examples, migration bootstrap, CI sanity, and browser smoke gate exist | Release management, rollback drills, and stronger production-like hardening remain incomplete |
 
@@ -101,12 +101,13 @@ Current local rollout status:
 ### Remaining v0.1 SLC work
 | Feature | Gap |
 |---|---|
-| Recommendation quality evaluation instrumentation | No continuous offline/online scoring harness for ranking quality drift yet |
-| Rerank calibration and guardrail tuning | Heuristic weights are implemented but not yet calibrated against judged datasets |
-| Multi-source grounding depth in preparation tools | Grounded context exists but not all guidance items are citation-dense across broader scholarship coverage |
-| Long-horizon interview coaching analytics | Session-level trend summary exists, but richer multi-session coaching plans are not implemented yet |
-| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, and bulk retry operations are now implemented; captured HTML snapshot management remains open |
+| Recommendation quality evaluation instrumentation | Offline benchmark registry now includes multiple judged datasets with stricter integrity validation and benchmark evaluation APIs with KPI snapshot recording; continuous online drift automation is still open |
+| Rerank calibration and guardrail tuning | Guardrail floor/cap and rerank policy versioning are implemented; broader judged-set calibration and iterative tuning loops remain open |
+| Multi-source grounding depth in preparation tools | Grounded context and citation density were expanded for bounded document guidance; broader corpus coverage and async orchestration still remain |
+| Long-horizon interview coaching analytics | Multi-session coaching aggregates and deterministic action-plan automation are implemented; richer adaptive intervention orchestration remains open |
+| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, bulk retry operations, and captured HTML snapshot management are implemented; broader parser hardening remains open |
 | Fully unified API contract | Route naming, pagination metadata, and some envelope details still diverge from `10_backend_api_and_repo.md` |
+| v0.1 role-home completeness | Student, admin, owner, mentor, and test-user constrained home surfaces are now implemented and mapped in the acceptance checklist artifacts |
 
 ### Future Research Extensions
 | Feature | Status |
