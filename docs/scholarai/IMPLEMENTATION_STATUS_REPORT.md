@@ -102,11 +102,11 @@ Current local rollout status:
 ### Remaining v0.1 SLC work
 | Feature | Gap |
 |---|---|
-| Recommendation quality evaluation instrumentation | Offline benchmark registry now includes multiple judged datasets with stricter integrity validation and benchmark evaluation APIs with KPI snapshot recording; continuous online drift automation is still open |
-| Rerank calibration and guardrail tuning | Guardrail floor/cap and rerank policy versioning are implemented; broader judged-set calibration and iterative tuning loops remain open |
-| Multi-source grounding depth in preparation tools | Grounded context and citation density were expanded for bounded document guidance; broader corpus coverage and async orchestration still remain |
-| Long-horizon interview coaching analytics | Multi-session coaching aggregates and deterministic action-plan automation are implemented; richer adaptive intervention orchestration remains open |
-| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, bulk retry operations, and captured HTML snapshot management are implemented; broader parser hardening remains open |
+| Recommendation quality evaluation instrumentation | Versioned benchmark registry and benchmark evaluation endpoints now exist (`GET /api/v1/recommendations/benchmarks`, `POST /api/v1/recommendations/benchmarks/{dataset_id}/evaluate`); continuous online drift monitoring remains incomplete |
+| Rerank calibration and guardrail tuning | Benchmark thresholds and gate evaluation now run against judged datasets, but ongoing calibration operations and alerting loops remain incomplete |
+| Multi-source grounding depth in preparation tools | Grounded context exists but not all guidance items are citation-dense across broader scholarship coverage |
+| Long-horizon interview coaching analytics | Session-level trend summary exists, but richer multi-session coaching plans are not implemented yet |
+| Richer ingestion review controls | Run retry, run diagnostics filtering, queue assignment, and bulk retry operations are now implemented; captured HTML snapshot management remains open |
 | Fully unified API contract | Route naming, pagination metadata, and some envelope details still diverge from `10_backend_api_and_repo.md` |
 | v0.1 role-home completeness | Student, admin, owner, mentor, and test-user constrained home surfaces are now implemented and mapped in the acceptance checklist artifacts |
 
