@@ -43,6 +43,8 @@ from app.schemas.interviews import (
     InterviewSessionSummaryResponse,
 )
 from app.schemas.recommendations import (
+    RecommendationBenchmarkEvaluationResponse,
+    RecommendationBenchmarkListResponse,
     RecommendationEvaluationRequest,
     RecommendationEvaluationResponse,
     RecommendationItem,
@@ -99,6 +101,8 @@ __all__ = [
     "InterviewSessionSummaryResponse",
     "RecommendationItem",
     "RecommendationListResponse",
+    "RecommendationBenchmarkEvaluationResponse",
+    "RecommendationBenchmarkListResponse",
     "RecommendationEvaluationRequest",
     "RecommendationEvaluationResponse",
     "RecommendationMetricItem",

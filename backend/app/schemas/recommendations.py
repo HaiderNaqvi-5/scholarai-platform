@@ -143,47 +143,93 @@ class RecommendationListResponse(BaseModel):
 
 class RecommendationBenchmarkGatePassRateItem(BaseModel):
     k: int = Field(ge=1)
-    precision_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
-    recall_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
-    ndcg_at_k_pass_rate: float = Field(ge=0.0, le=1.0)
+    pass_rate: float = Field(ge=0.0, le=1.0)
 
 
 class RecommendationBenchmarkCaseResult(BaseModel):
     case_id: str
-    predicted_ids: list[str]
+    profile_label: str | None = None
     metrics: list[RecommendationMetricItem]
+    kpi_gates: list[RecommendationKPIGateItem] = Field(default_factory=list)
     kpi_passed: bool | None = None
 
 
-class RecommendationBenchmarkSummary(BaseModel):
-    benchmark_id: str
-    name: str
-    case_count: int = Field(ge=0)
-    passed_count: int = Field(ge=0)
-    failed_count: int = Field(ge=0)
-    gate_pass_rate: float = Field(ge=0.0, le=1.0)
-    created_at: datetime
-
-
 class RecommendationBenchmarkAggregate(BaseModel):
-    benchmark_id: str
-    gate_pass_rates: list[RecommendationBenchmarkGatePassRateItem]
-    overall_pass_rate: float = Field(ge=0.0, le=1.0)
+    case_count: int = Field(ge=0)
+    pass_count: int = Field(ge=0)
+    pass_rate: float = Field(ge=0.0, le=1.0)
+    average_metrics: list[RecommendationMetricItem] = Field(default_factory=list)
+    gate_pass_rates: list[RecommendationBenchmarkGatePassRateItem] = Field(default_factory=list)
+
+
+# --- JSON dataset input schemas (used by RecommendationBenchmarkRegistry) ---
+
+class RecommendationBenchmarkThresholdItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    recall_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    ndcg_at_k_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    ndcg_delta_min: float | None = None
+
+
+class RecommendationBenchmarkBaselineMetricItem(BaseModel):
+    k: int = Field(ge=1)
+    precision_at_k: float = Field(ge=0.0, le=1.0)
+    recall_at_k: float = Field(ge=0.0, le=1.0)
+    ndcg_at_k: float = Field(ge=0.0, le=1.0)
+
+
+class RecommendationBenchmarkInputCase(BaseModel):
+    case_id: str
+    profile_label: str | None = None
+    predicted_ids: list[str]
+    judged_relevance: dict[str, int]
+
+    @model_validator(mode="after")
+    def validate_judged_relevance_values(self) -> "RecommendationBenchmarkInputCase":
+        for doc_id, score in self.judged_relevance.items():
+            if score < 0:
+                raise ValueError(
+                    f"judged_relevance values must be >= 0; got {score!r} for doc '{doc_id}'"
+                )
+        return self
 
 
 class RecommendationBenchmarkDataset(BaseModel):
-    benchmark_id: str
-    name: str
+    dataset_id: str
+    version: str
+    title: str
     description: str | None = None
-    cases: list[RecommendationBenchmarkCaseResult]
+    frozen_at: str | None = None
+    k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10])
+    thresholds: list[RecommendationBenchmarkThresholdItem] = Field(default_factory=list)
+    baseline_metrics: list[RecommendationBenchmarkBaselineMetricItem] = Field(default_factory=list)
+    cases: list[RecommendationBenchmarkInputCase] = Field(default_factory=list)
 
 
-class RecommendationBenchmarkEvaluationResponse(BaseModel):
-    summary: RecommendationBenchmarkSummary
-    aggregate: RecommendationBenchmarkAggregate
-    cases: list[RecommendationBenchmarkCaseResult]
+# --- API response schemas ---
+
+class RecommendationBenchmarkListItem(BaseModel):
+    dataset_id: str
+    version: str
+    title: str
+    frozen_at: str | None = None
+    case_count: int = Field(ge=0)
+    k_values: list[int]
+    policy_version: str
 
 
 class RecommendationBenchmarkListResponse(BaseModel):
-    items: list[RecommendationBenchmarkSummary]
+    items: list[RecommendationBenchmarkListItem]
     total: int = Field(ge=0)
+
+
+class RecommendationBenchmarkEvaluationResponse(BaseModel):
+    dataset_id: str
+    version: str
+    title: str
+    policy_version: str
+    metric_set: str
+    pipeline_version: str
+    case_results: list[RecommendationBenchmarkCaseResult]
+    aggregate: RecommendationBenchmarkAggregate

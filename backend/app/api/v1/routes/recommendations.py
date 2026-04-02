@@ -24,6 +24,7 @@ from app.schemas.recommendations import (
 )
 from app.services.recommendations import RecommendationEvaluationService, RecommendationService
 from app.services.recommendations.benchmark_registry import (
+    RecommendationBenchmarkDatasetNotFoundError,
     RecommendationBenchmarkRegistry,
     RecommendationBenchmarkRegistryError,
 )
@@ -34,6 +35,7 @@ from app.services.kpi_policy import (
 )
 from app.services.kpi_snapshot_service import KPISnapshotService
 from app.services.students import StudentService
+from scholarai_common.errors import ErrorCode, ScholarAIException
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -178,9 +180,11 @@ async def list_recommendation_benchmarks(
     try:
         datasets = registry.list_datasets()
     except RecommendationBenchmarkRegistryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+        logger.error("Failed to load recommendation benchmarks: %s", exc, exc_info=True)
+        raise ScholarAIException(
+            code=ErrorCode.INTERNAL_SERVER_ERROR,
+            message="Failed to load recommendation benchmarks.",
+            status_code=500,
         ) from exc
 
     policy_version = get_recommendation_kpi_policy_version()
@@ -213,27 +217,42 @@ async def evaluate_recommendation_benchmark(
 
     try:
         dataset = registry.get_dataset(dataset_id)
+    except RecommendationBenchmarkDatasetNotFoundError as exc:
+        raise ScholarAIException(
+            code=ErrorCode.NOT_FOUND,
+            message=f"Benchmark dataset '{dataset_id}' not found.",
+            status_code=404,
+        ) from exc
     except RecommendationBenchmarkRegistryError as exc:
-        if "not found" in str(exc).lower():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+        logger.error(
+            "Failed to load recommendation benchmark dataset '%s': %s",
+            dataset_id,
+            exc,
+            exc_info=True,
+        )
+        raise ScholarAIException(
+            code=ErrorCode.INTERNAL_SERVER_ERROR,
+            message="Failed to load benchmark dataset.",
+            status_code=500,
         ) from exc
 
-    threshold_models = [
-        RecommendationMetricThreshold(
-            k=item.k,
-            precision_at_k_min=item.precision_at_k_min,
-            recall_at_k_min=item.recall_at_k_min,
-            ndcg_at_k_min=item.ndcg_at_k_min,
-            ndcg_delta_min=item.ndcg_delta_min,
+    if dataset.thresholds:
+        threshold_models = [
+            RecommendationMetricThreshold(
+                k=item.k,
+                precision_at_k_min=item.precision_at_k_min,
+                recall_at_k_min=item.recall_at_k_min,
+                ndcg_at_k_min=item.ndcg_at_k_min,
+                ndcg_delta_min=item.ndcg_delta_min,
+            )
+            for item in dataset.thresholds
+        ]
+    else:
+        logger.warning(
+            "Dataset %s has no KPI thresholds defined; falling back to default recommendation thresholds.",
+            dataset_id,
         )
-        for item in dataset.thresholds
-    ]
+        threshold_models = get_recommendation_default_thresholds()
     baseline_metrics = [
         RecommendationMetricResult(
             k=item.k,

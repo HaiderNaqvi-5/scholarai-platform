@@ -63,5 +63,5 @@ def test_registry_rejects_invalid_dataset_schema(tmp_path):
     bad_path.write_text(json.dumps(bad_payload), encoding="utf-8")
 
     registry = RecommendationBenchmarkRegistry(dataset_dir=tmp_path)
-    with pytest.raises(RecommendationBenchmarkRegistryError, match="Invalid benchmark dataset schema"):
+    with pytest.raises(RecommendationBenchmarkRegistryError, match="has an invalid schema"):
         registry.list_datasets()

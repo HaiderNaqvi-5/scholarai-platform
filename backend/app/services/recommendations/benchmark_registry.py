@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -9,8 +10,14 @@ from app.schemas.recommendations import RecommendationBenchmarkDataset
 
 BENCHMARK_DATASET_DIR = Path(__file__).resolve().parents[2] / "data" / "recommendation_benchmarks"
 
+logger = logging.getLogger(__name__)
+
 
 class RecommendationBenchmarkRegistryError(RuntimeError):
+    pass
+
+
+class RecommendationBenchmarkDatasetNotFoundError(RecommendationBenchmarkRegistryError):
     pass
 
 
@@ -20,8 +27,9 @@ class RecommendationBenchmarkRegistry:
 
     def list_datasets(self) -> list[RecommendationBenchmarkDataset]:
         if not self.dataset_dir.exists():
+            logger.error("Benchmark dataset directory is missing: %s", self.dataset_dir)
             raise RecommendationBenchmarkRegistryError(
-                f"Benchmark dataset directory is missing: {self.dataset_dir}"
+                "Benchmark dataset directory is not configured correctly."
             )
 
         datasets: list[RecommendationBenchmarkDataset] = []
@@ -29,8 +37,9 @@ class RecommendationBenchmarkRegistry:
             datasets.append(self._load_dataset_file(file_path))
 
         if not datasets:
+            logger.error("No benchmark dataset files found in: %s", self.dataset_dir)
             raise RecommendationBenchmarkRegistryError(
-                f"No benchmark dataset files found in {self.dataset_dir}"
+                "No benchmark datasets are currently available."
             )
 
         return datasets
@@ -41,7 +50,7 @@ class RecommendationBenchmarkRegistry:
             if dataset.dataset_id.strip().lower() == normalized_id:
                 return dataset
 
-        raise RecommendationBenchmarkRegistryError(
+        raise RecommendationBenchmarkDatasetNotFoundError(
             f"Benchmark dataset not found: {dataset_id}"
         )
 
@@ -56,6 +65,9 @@ class RecommendationBenchmarkRegistry:
         try:
             return RecommendationBenchmarkDataset.model_validate(payload)
         except ValidationError as exc:
+            logger.error(
+                "Invalid benchmark dataset schema in %s: %s", file_path.name, exc
+            )
             raise RecommendationBenchmarkRegistryError(
-                f"Invalid benchmark dataset schema in {file_path.name}: {exc}"
+                f"Benchmark dataset file '{file_path.name}' has an invalid schema."
             ) from exc

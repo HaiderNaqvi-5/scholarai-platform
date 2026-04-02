@@ -28,31 +28,32 @@ def test_recommendation_benchmark_endpoints_authorized(app, client):
         return _DummyCurrentUser()
 
     app.dependency_overrides[get_current_user] = override_current_user
+    try:
+        list_response = client.get(
+            "/api/v1/recommendations/benchmarks",
+            headers={"Authorization": "Bearer fake"},
+        )
+        assert list_response.status_code == 200
+        list_payload = list_response.json()
+        assert list_payload["total"] >= 1
+        first = list_payload["items"][0]
+        assert first["dataset_id"] == "v0_1_judged_core_set"
+        assert first["policy_version"] == "reco.kpi.v1"
 
-    list_response = client.get(
-        "/api/v1/recommendations/benchmarks",
-        headers={"Authorization": "Bearer fake"},
-    )
-    assert list_response.status_code == 200
-    list_payload = list_response.json()
-    assert list_payload["total"] >= 1
-    first = list_payload["items"][0]
-    assert first["dataset_id"] == "v0_1_judged_core_set"
-    assert first["policy_version"] == "reco.kpi.v1"
+        eval_response = client.post(
+            "/api/v1/recommendations/benchmarks/v0_1_judged_core_set/evaluate",
+            headers={"Authorization": "Bearer fake"},
+        )
 
-    eval_response = client.post(
-        "/api/v1/recommendations/benchmarks/v0_1_judged_core_set/evaluate",
-        headers={"Authorization": "Bearer fake"},
-    )
-    app.dependency_overrides.clear()
-
-    assert eval_response.status_code == 200
-    eval_payload = eval_response.json()
-    assert eval_payload["dataset_id"] == "v0_1_judged_core_set"
-    assert eval_payload["policy_version"] == "reco.kpi.v1"
-    assert eval_payload["aggregate"]["case_count"] >= 1
-    assert 0 <= eval_payload["aggregate"]["pass_rate"] <= 1
-    assert len(eval_payload["case_results"]) >= 1
+        assert eval_response.status_code == 200
+        eval_payload = eval_response.json()
+        assert eval_payload["dataset_id"] == "v0_1_judged_core_set"
+        assert eval_payload["policy_version"] == "reco.kpi.v1"
+        assert eval_payload["aggregate"]["case_count"] >= 1
+        assert 0 <= eval_payload["aggregate"]["pass_rate"] <= 1
+        assert len(eval_payload["case_results"]) >= 1
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_recommendation_benchmark_not_found_returns_404(app, client):
@@ -60,11 +61,13 @@ def test_recommendation_benchmark_not_found_returns_404(app, client):
         return _DummyCurrentUser()
 
     app.dependency_overrides[get_current_user] = override_current_user
-    response = client.post(
-        "/api/v1/recommendations/benchmarks/not-a-real-dataset/evaluate",
-        headers={"Authorization": "Bearer fake"},
-    )
-    app.dependency_overrides.clear()
+    try:
+        response = client.post(
+            "/api/v1/recommendations/benchmarks/not-a-real-dataset/evaluate",
+            headers={"Authorization": "Bearer fake"},
+        )
 
-    assert response.status_code == 404
-    assert "not found" in response.json()["error"]["message"].lower()
+        assert response.status_code == 404
+        assert "not found" in response.json()["error"]["message"].lower()
+    finally:
+        app.dependency_overrides.clear()
