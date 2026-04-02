@@ -8,6 +8,19 @@ def test_saved_opportunities_requires_authentication(client):
     assert "request_id" in body["error"]
 
 
+def test_saved_opportunity_status_update_requires_authentication(client):
+    response = client.patch(
+        "/api/v1/saved-opportunities/00000000-0000-0000-0000-000000000000/status",
+        json={"status": "applied"},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["error"]["status"] == 401
+    assert "request_id" in body["error"]
+
+
 def test_interview_coaching_analytics_requires_authentication(client):
     response = client.get("/api/v1/interviews/coaching-analytics")
 
@@ -84,6 +97,18 @@ def test_v1_deprecation_headers_and_v2_route_available(client):
     assert v2_response.status_code == 401
     assert v2_response.headers.get("X-API-Contract-Version") == "v2"
     assert v2_response.headers.get("Deprecation") is None
+
+
+def test_recommendation_benchmark_routes_require_authentication(client):
+    list_response = client.get("/api/v1/recommendations/benchmarks")
+    assert list_response.status_code == 401
+    list_body = list_response.json()
+    assert list_body["error"]["code"] == "UNAUTHORIZED"
+
+    eval_response = client.post("/api/v1/recommendations/benchmarks/v01-core-rank-quality/evaluate")
+    assert eval_response.status_code == 401
+    eval_body = eval_response.json()
+    assert eval_body["error"]["code"] == "UNAUTHORIZED"
 
 
 def test_api_v2_route_inventory_snapshot_from_openapi(client):

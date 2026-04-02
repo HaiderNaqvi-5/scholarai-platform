@@ -35,6 +35,7 @@ from app.schemas.health import ErrorDetail, ErrorEnvelope, HealthResponse
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
+    InterviewCoachingActionPlanItem,
     InterviewCoachingAnalyticsResponse,
     InterviewCoachingRecentSession,
     InterviewCurrentQuestionResponse,
@@ -55,6 +56,7 @@ from app.schemas.recommendations import (
 from app.schemas.saved_opportunities import (
     SavedOpportunityItem,
     SavedOpportunityListResponse,
+    SavedOpportunityStatusUpdateRequest,
 )
 from app.schemas.scholarships import (
     ScholarshipAppliedFilters,
@@ -65,6 +67,14 @@ from app.schemas.scholarships import (
 from app.schemas.students import StudentProfileResponse, StudentProfileUpsertRequest
 from app.schemas.mentor import MentorFeedbackRequest, MentorFeedbackResponse
 from app.schemas.analytics import PlatformAnalyticsResponse
+from app.schemas.access_control import (
+    AccessControlManagedUser,
+    AccessControlManagedUserListResponse,
+    AccessControlRoleChangeItem,
+    AccessControlRoleChangeListResponse,
+    AccessControlRoleRevertRequest,
+    AccessControlRoleUpdateRequest,
+)
 
 __all__ = [
     "DocumentDetailResponse",
@@ -93,6 +103,7 @@ __all__ = [
     "HealthResponse",
     "InterviewAnswerFeedback",
     "InterviewAnswerRequest",
+    "InterviewCoachingActionPlanItem",
     "InterviewCoachingAnalyticsResponse",
     "InterviewCoachingRecentSession",
     "InterviewCurrentQuestionResponse",
@@ -109,6 +120,7 @@ __all__ = [
     "RecommendationRequest",
     "SavedOpportunityItem",
     "SavedOpportunityListResponse",
+    "SavedOpportunityStatusUpdateRequest",
     "ScholarshipAppliedFilters",
     "ScholarshipDetailResponse",
     "ScholarshipListItem",
@@ -124,4 +136,10 @@ __all__ = [
     "MentorFeedbackRequest",
     "MentorFeedbackResponse",
     "PlatformAnalyticsResponse",
+    "AccessControlManagedUser",
+    "AccessControlManagedUserListResponse",
+    "AccessControlRoleChangeItem",
+    "AccessControlRoleChangeListResponse",
+    "AccessControlRoleRevertRequest",
+    "AccessControlRoleUpdateRequest",
 ]

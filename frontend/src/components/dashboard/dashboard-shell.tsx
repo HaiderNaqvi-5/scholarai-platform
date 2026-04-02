@@ -28,10 +28,19 @@ type DashboardDataState = {
   published: ScholarshipListItem[];
 };
 
+type TrackerStatus = SavedOpportunityItem["tracker_status"];
+
+const TRACKER_STATUS_LABELS: Record<TrackerStatus, string> = {
+  saved: "Saved",
+  in_progress: "In progress",
+  applied: "Applied",
+  closed: "Closed",
+};
+
 export function DashboardShell() {
   const { accessToken, currentUser } = useAuth();
   const [pendingActionByScholarshipId, setPendingActionByScholarshipId] = useState<
-    Record<string, "save" | "unsave" | undefined>
+    Record<string, "save" | "unsave" | "status" | undefined>
   >({});
   const [actionFeedback, setActionFeedback] = useState<{
     message: string;
@@ -109,11 +118,20 @@ export function DashboardShell() {
     () => new Set(state.saved.map((item) => item.scholarship_id)),
     [state.saved],
   );
+  const progressCounts = useMemo(
+    () => ({
+      saved: state.saved.filter((item) => item.tracker_status === "saved").length,
+      inProgress: state.saved.filter((item) => item.tracker_status === "in_progress").length,
+      applied: state.saved.filter((item) => item.tracker_status === "applied").length,
+    }),
+    [state.saved],
+  );
 
   const profileReady = Boolean(state.profile);
+  const isTestUser = currentUser?.role?.toLowerCase() === "enduser_student";
 
   const handleSave = async (scholarshipId: string) => {
-    if (!accessToken) {
+    if (!accessToken || isTestUser) {
       return;
     }
 
@@ -148,7 +166,7 @@ export function DashboardShell() {
   };
 
   const handleUnsave = async (scholarshipId: string) => {
-    if (!accessToken) {
+    if (!accessToken || isTestUser) {
       return;
     }
 
@@ -179,6 +197,47 @@ export function DashboardShell() {
     }
   };
 
+  const handleTrackerStatusChange = async (
+    scholarshipId: string,
+    status: TrackerStatus,
+  ) => {
+    if (!accessToken || isTestUser) {
+      return;
+    }
+
+    setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: "status" }));
+    setActionFeedback(null);
+
+    try {
+      const updatedItem = await apiRequest<SavedOpportunityItem>(
+        `/saved-opportunities/${scholarshipId}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status }),
+          token: accessToken,
+        },
+      );
+
+      setState((current) => ({
+        ...current,
+        saved: current.saved.map((item) =>
+          item.scholarship_id === scholarshipId ? updatedItem : item,
+        ),
+      }));
+      setActionFeedback({
+        message: `Tracker status updated to ${TRACKER_STATUS_LABELS[status].toLowerCase()}.`,
+        variant: "success",
+      });
+    } catch (error) {
+      setActionFeedback({
+        message: getApiErrorMessage(error, "Unable to update tracker status right now."),
+        variant: "error",
+      });
+    } finally {
+      setPendingActionByScholarshipId((current) => ({ ...current, [scholarshipId]: undefined }));
+    }
+  };
+
   return (
     <AppShell
       eyebrow="Dashboard"
@@ -195,9 +254,21 @@ export function DashboardShell() {
             label={profileReady ? "Profile ready" : "Profile needed"}
             variant={profileReady ? "generated" : "warning"}
           />
+          {isTestUser ? (
+            <StatusBadge label="Test-user mode (non-production)" variant="warning" />
+          ) : null}
         </div>
       }
     >
+      {isTestUser ? (
+        <section className="surface-card">
+          <PageHeader
+            eyebrow="Test-user mode"
+            title="This home is non-production and constrained."
+            description="Tracking updates and shortlist mutations are disabled for test-user validation accounts."
+          />
+        </section>
+      ) : null}
       {state.error ? (
         <section className="surface-card" data-testid="dashboard-error">
           <PageHeader
@@ -214,8 +285,18 @@ export function DashboardShell() {
       <section className="metrics-grid" data-testid="dashboard-shell">
         <article className="data-point">
           <p className="data-point__label">Saved</p>
-          <strong>{state.saved.length}</strong>
-          <p className="body-copy">Opportunities on your shortlist.</p>
+          <strong>{progressCounts.saved}</strong>
+          <p className="body-copy">Tracked but not started.</p>
+        </article>
+        <article className="data-point">
+          <p className="data-point__label">In progress</p>
+          <strong>{progressCounts.inProgress}</strong>
+          <p className="body-copy">Active opportunities in your workflow.</p>
+        </article>
+        <article className="data-point">
+          <p className="data-point__label">Applied</p>
+          <strong>{progressCounts.applied}</strong>
+          <p className="body-copy">Applications already submitted.</p>
         </article>
         <article className="data-point">
           <p className="data-point__label">Profile</p>
@@ -225,11 +306,6 @@ export function DashboardShell() {
               ? "Recommendations are personalized to your profile."
               : "Complete your profile to unlock recommendations."}
           </p>
-        </article>
-        <article className="data-point">
-          <p className="data-point__label">Preparation</p>
-          <strong>Documents & Interview</strong>
-          <p className="body-copy">Writing feedback and practice scoring available.</p>
         </article>
       </section>
 
@@ -273,7 +349,7 @@ export function DashboardShell() {
           ) : (
             <EmptyState
               title="Profile incomplete"
-              description="Set up your profile so ScholarAI can explain why scholarships match your background."
+              description="Set up your profile so GrantPath AI can explain why scholarships match your background."
               action={
                 <Link className="auth-link auth-link--primary" href="/onboarding">
                   Complete profile
@@ -302,7 +378,18 @@ export function DashboardShell() {
                 return (
                   <article className="opportunity-card" key={item.scholarship_id}>
                     <div className="meta-row">
-                      <StatusBadge label="Published" variant="validated" />
+                      <StatusBadge
+                        label={TRACKER_STATUS_LABELS[item.tracker_status]}
+                        variant={
+                          item.tracker_status === "saved"
+                            ? "neutral"
+                            : item.tracker_status === "in_progress"
+                              ? "generated"
+                              : item.tracker_status === "applied"
+                                ? "validated"
+                                : "warning"
+                        }
+                      />
                       <span className="route-card__label">
                         Saved {new Date(item.saved_at).toLocaleDateString()}
                       </span>
@@ -311,6 +398,25 @@ export function DashboardShell() {
                     <p className="route-card__description">
                       {item.provider_name ?? "Provider not listed"} · {item.country_code}
                     </p>
+                    <label className="form-field">
+                      <span className="route-card__label">Progress status</span>
+                      <select
+                        className="text-input"
+                        disabled={isPending || isTestUser}
+                        onChange={(event) =>
+                          void handleTrackerStatusChange(
+                            item.scholarship_id,
+                            event.target.value as TrackerStatus,
+                          )
+                        }
+                        value={item.tracker_status}
+                      >
+                        <option value="saved">Saved</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="applied">Applied</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </label>
                     <div className="dashboard-actions">
                       <Link className="nav-link" href={`/scholarships/${item.scholarship_id}`}>
                         View details
@@ -318,7 +424,7 @@ export function DashboardShell() {
                       <button
                         className="auth-link auth-link--secondary"
                         onClick={() => void handleUnsave(item.scholarship_id)}
-                        disabled={isPending}
+                        disabled={isPending || isTestUser}
                         type="button"
                       >
                         {pendingAction === "unsave" ? "Removing..." : "Remove"}
@@ -349,21 +455,31 @@ export function DashboardShell() {
           description="Pick up where you left off across recommendations, writing, and interview practice."
         />
         <div className="dashboard-grid dashboard-grid--tight">
-          <EntryCard
-            href="/recommendations"
-            label="Recommendations"
-            description="Review scholarship matches ranked by your profile."
-          />
-          <EntryCard
-            href="/document-feedback"
-            label="Documents"
-            description="Get structured feedback on application writing."
-          />
-          <EntryCard
-            href="/interview"
-            label="Interview"
-            description="Practice responses with rubric-based scoring."
-          />
+          {isTestUser ? (
+            <EntryCard
+              href="/scholarships"
+              label="Scholarships"
+              description="Test-user accounts are limited to non-production browse and verification workflows."
+            />
+          ) : (
+            <>
+              <EntryCard
+                href="/recommendations"
+                label="Recommendations"
+                description="Review scholarship matches ranked by your profile."
+              />
+              <EntryCard
+                href="/document-feedback"
+                label="Documents"
+                description="Get structured feedback on application writing."
+              />
+              <EntryCard
+                href="/interview"
+                label="Interview"
+                description="Practice responses with rubric-based scoring."
+              />
+            </>
+          )}
         </div>
       </section>
 
@@ -410,7 +526,7 @@ export function DashboardShell() {
                           ? handleUnsave(item.scholarship_id)
                           : handleSave(item.scholarship_id))
                       }
-                      disabled={isPending}
+                      disabled={isPending || isTestUser}
                       type="button"
                     >
                       {pendingAction === "save"

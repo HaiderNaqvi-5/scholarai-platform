@@ -11,7 +11,7 @@ export function Footer() {
             <Link className="brand-lockup brand-lockup--link" href="/">
               <span className="brand-mark" aria-hidden="true" />
               <span className="brand-lockup__text">
-                <span className="brand-title">ScholarAI</span>
+                <span className="brand-title">GrantPath AI</span>
               </span>
             </Link>
           </div>
@@ -27,7 +27,7 @@ export function Footer() {
             </Link>
           </nav>
           <p className="site-footer__copy">
-            © {year} ScholarAI. A research project, not a commercial product.
+            © {year} GrantPath AI. A research project, not a commercial product.
           </p>
         </div>
       </div>

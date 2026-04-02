@@ -25,11 +25,11 @@ const monoFont = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ScholarAI — Scholarship Planning",
-    template: "%s | ScholarAI",
+    default: "GrantPath AI — Scholarship Planning",
+    template: "%s | GrantPath AI",
   },
   description:
-    "Find scholarships that fit your profile. ScholarAI combines a curated catalog with profile-aware recommendations and structured preparation tools.",
+    "Find scholarships that fit your profile. GrantPath AI combines a curated catalog with profile-aware recommendations and structured preparation tools.",
 };
 
 export default function RootLayout({

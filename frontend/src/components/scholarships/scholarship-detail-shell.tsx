@@ -42,7 +42,8 @@ function parseCompareIds(raw: string | null): string[] {
 }
 
 export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: string }) {
-  const { accessToken, isAuthenticated } = useAuth();
+  const { accessToken, isAuthenticated, currentUser } = useAuth();
+  const isTestUser = currentUser?.role?.toLowerCase() === "enduser_student";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [state, setState] = useState<DetailState>({
@@ -104,7 +105,7 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
   }, [accessToken, scholarshipId]);
 
   const handleSaveToggle = async () => {
-    if (!accessToken || !state.item) return;
+    if (!accessToken || !state.item || isTestUser) return;
 
     setState((current) => ({
       ...current,
@@ -380,7 +381,7 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
                           ? "auth-link auth-link--secondary"
                           : "auth-link auth-link--primary"
                       }
-                      disabled={state.isSaving}
+                      disabled={state.isSaving || isTestUser}
                       onClick={() => void handleSaveToggle()}
                       type="button"
                       aria-pressed={state.isSaved}
@@ -388,6 +389,8 @@ export function ScholarshipDetailShell({ scholarshipId }: { scholarshipId: strin
                     >
                       {state.isSaving
                         ? "Updating…"
+                        : isTestUser
+                          ? "Test-user locked"
                         : state.isSaved
                           ? "Saved"
                           : "Save to shortlist"}

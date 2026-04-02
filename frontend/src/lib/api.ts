@@ -1,4 +1,9 @@
 import type {
+  AccessControlManagedUserListResponse,
+  AccessControlRoleChangeItem,
+  AccessControlRoleChangeListResponse,
+  AccessControlRoleRevertRequest,
+  AccessControlRoleUpdateRequest,
   ApiError,
   DocumentListResponse,
   DocumentDetail,
@@ -104,4 +109,61 @@ export async function submitMentorFeedback(
 
 export async function getAdminAnalytics(token?: string | null) {
   return apiRequest<PlatformAnalyticsResponse>("/analytics", { token });
+}
+
+export async function getAccessControlManagedUsers(token?: string | null) {
+  return apiRequest<AccessControlManagedUserListResponse>("/access-control/users", {
+    token,
+  });
+}
+
+export async function getAccessControlRoleChanges(
+  token?: string | null,
+  options?: {
+    target_user_id?: string;
+    limit?: number;
+  },
+) {
+  const search = new URLSearchParams();
+  if (options?.target_user_id) {
+    search.set("target_user_id", options.target_user_id);
+  }
+  if (typeof options?.limit === "number") {
+    search.set("limit", String(options.limit));
+  }
+  const query = search.toString();
+  const path = query
+    ? `/access-control/role-changes?${query}`
+    : "/access-control/role-changes";
+  return apiRequest<AccessControlRoleChangeListResponse>(path, { token });
+}
+
+export async function updateAccessControlUserRole(
+  targetUserId: string,
+  payload: AccessControlRoleUpdateRequest,
+  token?: string | null,
+) {
+  return apiRequest<AccessControlRoleChangeItem>(
+    `/access-control/users/${targetUserId}/role`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      token,
+    },
+  );
+}
+
+export async function revertAccessControlRoleChange(
+  auditId: string,
+  payload: AccessControlRoleRevertRequest,
+  token?: string | null,
+) {
+  return apiRequest<AccessControlRoleChangeItem>(
+    `/access-control/role-changes/${auditId}/revert`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      token,
+    },
+  );
 }

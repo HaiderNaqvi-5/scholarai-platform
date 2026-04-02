@@ -18,6 +18,11 @@ export function AuthActions() {
     Capability.AdminAuditRead,
     Capability.OwnerSystemRead,
   ]);
+  const canSeeOwner = hasCapability(
+    currentUser,
+    accessToken,
+    Capability.OwnerSystemRead,
+  );
 
   if (isLoading) {
     return <div className="auth-actions auth-actions--loading" />;
@@ -40,7 +45,7 @@ export function AuthActions() {
     <div className="auth-actions">
       <div className="auth-chip">
         <span className="auth-chip__label">Signed in</span>
-        <strong>{currentUser?.full_name ?? "ScholarAI user"}</strong>
+        <strong>{currentUser?.full_name ?? "GrantPath AI user"}</strong>
       </div>
       <Link className="nav-link nav-link--quiet" href="/dashboard">
         Dashboard
@@ -53,6 +58,11 @@ export function AuthActions() {
       {canSeeAdmin ? (
         <Link className="nav-link nav-link--quiet" href="/admin">
           Admin
+        </Link>
+      ) : null}
+      {canSeeOwner ? (
+        <Link className="nav-link nav-link--quiet" href="/owner">
+          Owner
         </Link>
       ) : null}
       <button

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.routes import (
+    access_control,
     analytics,
     auth,
     curation,
@@ -37,3 +38,8 @@ router.include_router(mentor.router, prefix="/mentor", tags=["Mentor Dashboard"]
 # Backward-compatible alias for older clients.
 router.include_router(mentor.router, prefix="/mentors", tags=["Mentor Dashboard"])
 router.include_router(analytics.router, prefix="/analytics", tags=["Admin Analytics"])
+router.include_router(
+    access_control.router,
+    prefix="/access-control",
+    tags=["Access Control"],
+)

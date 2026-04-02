@@ -29,7 +29,7 @@ function SignupPageContent() {
   return (
     <MarketingShell
       eyebrow="Create account"
-      title="Get started with ScholarAI."
+      title="Get started with GrantPath AI."
       description="Set up takes less than a minute, then you can jump straight to profile and recommendations."
     >
       <section className="auth-grid">

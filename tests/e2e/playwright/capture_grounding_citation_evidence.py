@@ -55,12 +55,15 @@ def login(page: Page, email: str, password: str, next_path: str) -> None:
 
 
 def fetch_first_scholarship_id() -> str:
-    with urlopen("http://localhost:8000/api/v1/scholarships?limit=1") as response:
+    with urlopen("http://localhost:8000/api/v1/scholarships?page=1&page_size=1") as response:
         payload = json.loads(response.read().decode("utf-8"))
     first = (payload.get("items") or [None])[0]
-    if not first or not first.get("id"):
+    scholarship_id = None
+    if isinstance(first, dict):
+        scholarship_id = first.get("id") or first.get("scholarship_id")
+    if not scholarship_id:
         raise RuntimeError("Unable to resolve a scholarship ID for grounding evidence.")
-    return str(first["id"])
+    return str(scholarship_id)
 
 
 def submit_document(page: Page, text: str, title: str, scholarship_id: str) -> None:

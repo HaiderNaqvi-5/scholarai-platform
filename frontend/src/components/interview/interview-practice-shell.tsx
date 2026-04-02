@@ -18,7 +18,8 @@ import type {
   InterviewSessionSummary,
 } from "@/lib/types";
 
-const LATEST_SESSION_KEY = "scholarai.latest_interview_session";
+const LATEST_SESSION_KEY = "grantpath.latest_interview_session";
+const LEGACY_LATEST_SESSION_KEY = "scholarai.latest_interview_session";
 
 type InterviewState = {
   isLoading: boolean;
@@ -51,7 +52,9 @@ export function InterviewPracticeShell() {
   useEffect(() => {
     if (!accessToken) return;
 
-    const sessionId = localStorage.getItem(LATEST_SESSION_KEY);
+    const sessionId =
+      localStorage.getItem(LATEST_SESSION_KEY) ??
+      localStorage.getItem(LEGACY_LATEST_SESSION_KEY);
     if (!sessionId) {
       setState((current) => ({ ...current, isLoading: false }));
       return;
@@ -600,6 +603,36 @@ export function InterviewPracticeShell() {
               ) : (
                 <p className="body-copy">
                   Complete additional responses to unlock coaching recommendations.
+                </p>
+              )}
+            </article>
+
+            <article>
+              <p className="list-heading">Action plan</p>
+              {state.coachingAnalytics.action_plan.length ? (
+                <div className="surface-list">
+                  {state.coachingAnalytics.action_plan.map((item) => (
+                    <article key={`${item.dimension}-${item.priority}`}>
+                      <div className="meta-row">
+                        <StatusBadge
+                          label={`Priority ${item.priority}`}
+                          variant={item.priority === 1 ? "warning" : "planned"}
+                        />
+                        <span className="route-card__label">
+                          {item.dimension} · {item.current_average.toFixed(2)} → {item.target_average.toFixed(2)}
+                        </span>
+                      </div>
+                      <ul className="detail-list">
+                        {item.next_actions.map((action) => (
+                          <li key={action}>{action}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="body-copy">
+                  Action plans appear after enough scored responses are available.
                 </p>
               )}
             </article>

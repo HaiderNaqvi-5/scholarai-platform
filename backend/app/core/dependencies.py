@@ -288,6 +288,10 @@ AdminAuditUser = Annotated[
     User,
     Depends(require_any_capability(Capability.ADMIN_AUDIT_READ, Capability.OWNER_SYSTEM_READ)),
 ]
+OwnerControlUser = Annotated[
+    User,
+    Depends(require_capability(Capability.OWNER_SYSTEM_CONTROL)),
+]
 
 MentorReviewUser = Annotated[
     User,

@@ -7,7 +7,7 @@ export default function LandingPage() {
     <MarketingShell
       eyebrow="Scholarship planning"
       title="Find the right scholarships. Know why they fit."
-      description="ScholarAI combines a curated Canada-first catalog with profile-aware recommendations and structured preparation tools."
+      description="GrantPath AI combines a curated Canada-first catalog with profile-aware recommendations and structured preparation tools."
       actions={
         <>
           <Link className="auth-link auth-link--primary" href="/signup">
@@ -50,7 +50,7 @@ export default function LandingPage() {
           <p className="section-eyebrow">How it works</p>
           <h2 className="section-title">A clear path from discovery to preparation.</h2>
           <p className="body-copy">
-            ScholarAI is structured so each step narrows your attention instead of adding more tools to manage.
+            GrantPath AI is structured so each step narrows your attention instead of adding more tools to manage.
           </p>
         </article>
         <article className="surface-panel">

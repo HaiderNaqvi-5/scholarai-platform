@@ -80,7 +80,7 @@ export type ScholarshipDetail = ScholarshipListItem & {
 
 export type SavedOpportunityItem = ScholarshipListItem & {
   saved_at: string;
-  tracker_status?: "saved" | "in_progress" | "applied" | "closed";
+  tracker_status: "saved" | "in_progress" | "applied" | "closed";
 };
 
 export type SavedOpportunityListResponse = {
@@ -350,6 +350,14 @@ export type InterviewCoachingRecentSession = {
   updated_at: string;
 };
 
+export type InterviewCoachingActionPlanItem = {
+  dimension: string;
+  current_average: number;
+  target_average: number;
+  priority: number;
+  next_actions: string[];
+};
+
 export type InterviewCoachingAnalyticsResponse = {
   session_count: number;
   answered_count_total: number;
@@ -357,6 +365,7 @@ export type InterviewCoachingAnalyticsResponse = {
   score_delta_from_first_session: number | null;
   weakest_dimension_overall: string | null;
   recommended_focuses: string[];
+  action_plan: InterviewCoachingActionPlanItem[];
   recent_sessions: InterviewCoachingRecentSession[];
 };
 
@@ -599,4 +608,13 @@ export type AccessControlRoleChangeItem = {
 export type AccessControlRoleChangeListResponse = {
   items: AccessControlRoleChangeItem[];
   total: number;
+};
+
+export type AccessControlRoleUpdateRequest = {
+  role: string;
+  reason?: string | null;
+};
+
+export type AccessControlRoleRevertRequest = {
+  reason?: string | null;
 };

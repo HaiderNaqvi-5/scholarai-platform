@@ -106,6 +106,14 @@ class InterviewCoachingRecentSession(BaseModel):
     updated_at: datetime
 
 
+class InterviewCoachingActionPlanItem(BaseModel):
+    dimension: str
+    current_average: float | None
+    target_average: float
+    priority: int = Field(ge=1)
+    next_actions: list[str]
+
+
 class InterviewCoachingAnalyticsResponse(BaseModel):
     session_count: int = Field(ge=0)
     answered_count_total: int = Field(ge=0)
@@ -113,6 +121,7 @@ class InterviewCoachingAnalyticsResponse(BaseModel):
     score_delta_from_first_session: float | None
     weakest_dimension_overall: str | None
     recommended_focuses: list[str]
+    action_plan: list[InterviewCoachingActionPlanItem] = Field(default_factory=list)
     recent_sessions: list[InterviewCoachingRecentSession]
 
 

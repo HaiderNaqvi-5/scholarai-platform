@@ -97,7 +97,8 @@ function parseCompareIds(raw: string | null): string[] {
 }
 
 export function ScholarshipBrowseShell() {
-  const { accessToken, isAuthenticated } = useAuth();
+  const { accessToken, isAuthenticated, currentUser } = useAuth();
+  const isTestUser = currentUser?.role?.toLowerCase() === "enduser_student";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
@@ -288,7 +289,7 @@ export function ScholarshipBrowseShell() {
   };
 
   const handleSaveToggle = async (scholarshipId: string, isSaved: boolean) => {
-    if (!accessToken) return;
+    if (!accessToken || isTestUser) return;
 
     setState((current) => ({ ...current, isSaving: scholarshipId, error: null }));
 
@@ -614,7 +615,7 @@ export function ScholarshipBrowseShell() {
                                   ? "auth-link auth-link--secondary"
                                   : "auth-link auth-link--primary"
                               }
-                              disabled={state.isSaving === item.scholarship_id}
+                              disabled={state.isSaving === item.scholarship_id || isTestUser}
                               onClick={() =>
                                 void handleSaveToggle(item.scholarship_id, isSaved)
                               }
@@ -622,6 +623,8 @@ export function ScholarshipBrowseShell() {
                             >
                               {state.isSaving === item.scholarship_id
                                 ? "Updating…"
+                                : isTestUser
+                                  ? "Test-user locked"
                                 : isSaved
                                   ? "Saved"
                                   : "Save"}

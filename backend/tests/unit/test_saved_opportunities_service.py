@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models import RecordState
+from app.models import ApplicationStatus, RecordState
 from app.services.saved_opportunities import SavedOpportunityService
 
 pytestmark = pytest.mark.asyncio
@@ -75,10 +75,12 @@ async def test_saved_opportunities_service_filters_to_published_records():
                 all_items=[
                     SimpleNamespace(
                         scholarship=published,
+                        status=ApplicationStatus.SAVED,
                         created_at=datetime.now(timezone.utc),
                     ),
                     SimpleNamespace(
                         scholarship=validated,
+                        status=ApplicationStatus.SAVED,
                         created_at=datetime.now(timezone.utc),
                     ),
                 ]
@@ -129,6 +131,50 @@ async def test_saved_opportunities_service_save_creates_entry_for_published_reco
     assert item.scholarship_id == str(scholarship_id)
     assert item.record_state == "published"
     assert len(session.added) == 1
+    assert item.tracker_status == "saved"
+
+
+async def test_saved_opportunities_service_update_status_updates_tracker_state():
+    scholarship_id = uuid4()
+    scholarship = SimpleNamespace(
+        id=scholarship_id,
+        title="Published Scholarship",
+        provider_name="Provider",
+        country_code="CA",
+        deadline_at=None,
+        record_state=RecordState.PUBLISHED,
+        source_url="https://example.com/ca/scholarship",
+        summary="Published summary",
+    )
+    session = FakeSession(
+        [
+            ScalarResult(
+                one=SimpleNamespace(
+                    id=uuid4(),
+                    scholarship_id=scholarship_id,
+                    scholarship=scholarship,
+                    status=ApplicationStatus.SAVED,
+                    created_at=datetime.now(timezone.utc),
+                )
+            )
+        ]
+    )
+    service = SavedOpportunityService(session)
+
+    item = await service.update_status(uuid4(), scholarship_id, "applied")
+
+    assert item.scholarship_id == str(scholarship_id)
+    assert item.tracker_status == "applied"
+
+
+async def test_saved_opportunities_service_update_status_raises_when_missing():
+    session = FakeSession([ScalarResult(one=None)])
+    service = SavedOpportunityService(session)
+
+    with pytest.raises(HTTPException) as caught:
+        await service.update_status(uuid4(), uuid4(), "in_progress")
+
+    assert caught.value.status_code == 404
 
 
 async def test_saved_opportunities_service_remove_deletes_existing_saved_entry():

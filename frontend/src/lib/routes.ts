@@ -18,7 +18,7 @@ export const marketingNavLinks: NavLink[] = [
   {
     href: "/#how-it-works",
     label: "How it works",
-    description: "Understand the ScholarAI workflow.",
+    description: "Understand the GrantPath AI workflow.",
   },
 ];
 

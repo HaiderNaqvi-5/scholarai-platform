@@ -1,4 +1,5 @@
-export const THEME_STORAGE_KEY = "scholarai.theme";
+export const THEME_STORAGE_KEY = "grantpath.theme";
+const LEGACY_THEME_STORAGE_KEY = "scholarai.theme";
 
 export type Theme = "light" | "dark";
 
@@ -11,7 +12,9 @@ export function readStoredTheme(): Theme | null {
     return null;
   }
 
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  const storedTheme =
+    window.localStorage.getItem(THEME_STORAGE_KEY) ??
+    window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
   if (!storedTheme || !isTheme(storedTheme)) {
     return null;
   }
