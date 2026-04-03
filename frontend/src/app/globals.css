@@ -127,6 +127,11 @@ textarea {
   font: inherit;
 }
 
+:where(a, button, [role="button"], input, select, textarea, .toggle-chip):focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 /* ── Layout shells ────────────────────────────── */
 
 .page-shell {
@@ -507,6 +512,40 @@ textarea {
   line-height: 1.65;
 }
 
+.recommendation-advanced {
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.recommendation-advanced[open] {
+  border-style: solid;
+}
+
+.recommendation-advanced__summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: var(--ink-800);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.recommendation-advanced__body {
+  padding: 0 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-next-step {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(46, 91, 154, 0.16);
+  border-radius: 12px;
+  background: rgba(46, 91, 154, 0.06);
+}
+
 /* ── Inline meta ─────────────────────────────── */
 
 .dashboard-actions,
@@ -653,8 +692,15 @@ textarea {
 }
 
 .theme-toggle__icon {
-  font-size: 0.85rem;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.theme-toggle__icon-svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .theme-toggle__text {
@@ -757,9 +803,9 @@ textarea {
   border-color: var(--border-strong);
 }
 
-.text-input:focus,
-.text-area:focus,
-.file-input:focus {
+.text-input:focus-visible,
+.text-area:focus-visible,
+.file-input:focus-visible {
   outline: none;
   background: var(--white);
   border-color: rgba(46, 91, 154, 0.5);
@@ -782,14 +828,6 @@ textarea {
 .file-input {
   min-height: 44px;
   padding: 10px 14px;
-}
-
-.text-input:focus,
-.text-area:focus,
-.file-input:focus {
-  outline: none;
-  border-color: rgba(46, 91, 154, 0.26);
-  box-shadow: var(--shadow-focus);
 }
 
 .form-error {
@@ -894,6 +932,64 @@ textarea {
 .info-band {
   border: 1px solid var(--border-soft);
   background: rgba(247, 245, 240, 0.88);
+}
+
+.onboarding-progress {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-step-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.onboarding-step--done {
+  border-color: rgba(66, 107, 90, 0.24);
+  background: rgba(66, 107, 90, 0.08);
+}
+
+.onboarding-step__index {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--ink-800);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.onboarding-step__content {
+  display: grid;
+  gap: 2px;
+}
+
+.onboarding-step__label {
+  color: var(--ink-950);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.onboarding-step__detail {
+  color: var(--ink-500);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 /* ── Hero cards ──────────────────────────────── */
