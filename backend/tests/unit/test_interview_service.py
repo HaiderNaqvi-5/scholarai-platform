@@ -414,4 +414,9 @@ async def test_interview_service_coaching_analytics_across_sessions():
     assert result.score_delta_from_first_session == 1.0
     assert result.weakest_dimension_overall == "specificity"
     assert result.recommended_focuses
+    assert len(result.action_plan) >= 1
+    assert result.action_plan[0].dimension == "specificity"
+    assert result.action_plan[0].priority == 1
+    assert result.action_plan[0].target_average >= result.action_plan[0].current_average
+    assert result.action_plan[0].next_actions
     assert len(result.recent_sessions) == 2

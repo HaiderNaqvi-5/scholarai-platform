@@ -106,3 +106,29 @@ def test_public_scholarships_invalid_sort_uses_error_envelope(client):
     assert body["error"]["code"] == "BAD_REQUEST"
     assert body["error"]["status"] == 400
     assert "request_id" in body["error"]
+    assert body["error"]["details"]["field"] == "sort"
+    assert body["error"]["details"]["received"] == "unknown"
+    assert "deadline" in body["error"]["details"]["allowed_values"]
+
+
+def test_public_scholarships_amount_window_conflict_uses_structured_error_details(client):
+    response = client.get("/api/v1/scholarships?min_amount=5000&max_amount=100")
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"]["code"] == "BAD_REQUEST"
+    assert body["error"]["details"]["field"] == "min_amount"
+    assert body["error"]["details"]["min_amount"] == 5000
+    assert body["error"]["details"]["max_amount"] == 100
+
+
+def test_public_scholarships_validation_error_includes_details(client):
+    response = client.get("/api/v1/scholarships?query=a")
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "REQUEST_VALIDATION_ERROR"
+    assert body["error"]["status"] == 422
+    assert isinstance(body["error"]["details"]["field"], list)
+    assert body["error"]["details"]["field"][0] == "query"
+    assert body["error"]["details"]["errors"]

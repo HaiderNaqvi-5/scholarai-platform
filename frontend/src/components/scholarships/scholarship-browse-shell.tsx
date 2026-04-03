@@ -169,20 +169,20 @@ export function ScholarshipBrowseShell() {
         if (minAmount.trim()) query.set("min_amount", minAmount.trim());
         if (maxAmount.trim()) query.set("max_amount", maxAmount.trim());
 
-        const scholarshipPromise = apiRequest<ScholarshipListResponse>(
-          `/scholarships?${query.toString()}`,
-        );
         const savedPromise = accessToken
           ? apiRequest<SavedOpportunityListResponse>("/saved-opportunities", {
               token: accessToken,
-            })
+            }).catch(() => ({
+              items: [],
+              total: 0,
+            } satisfies SavedOpportunityListResponse))
           : Promise.resolve({
               items: [],
               total: 0,
             } satisfies SavedOpportunityListResponse);
 
         const [scholarships, saved] = await Promise.all([
-          scholarshipPromise,
+          apiRequest<ScholarshipListResponse>(`/scholarships?${query.toString()}`),
           savedPromise,
         ]);
 

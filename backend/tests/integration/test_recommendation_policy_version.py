@@ -49,3 +49,4 @@ def test_recommendation_evaluate_returns_policy_version_when_authorized(app, cli
     payload = response.json()
     assert payload["policy_version"] == "reco.kpi.v1"
     assert payload["kpi_passed"] is not None
+    assert all("mrr_at_k" in metric for metric in payload["metrics"])

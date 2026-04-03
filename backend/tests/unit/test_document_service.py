@@ -8,6 +8,7 @@ from starlette.datastructures import Headers
 
 from app.models import DocumentType, RecordState, Scholarship
 from app.services.documents import DocumentService
+from app.services.documents.grounding import retrieve_bounded_writing_guidance
 from app.services.documents import service as document_service_module
 
 pytestmark = pytest.mark.asyncio
@@ -280,3 +281,51 @@ async def test_quality_metrics_supports_structured_and_legacy_citations():
 
     legacy_metrics = service._build_quality_metrics(legacy_payload, sections)
     assert legacy_metrics.citation_coverage_ratio == 1.0
+
+
+def test_retrieve_bounded_guidance_expands_degree_and_field_dimensions():
+    scholarship = _published_ca_scholarship()
+    scholarship.category = "stem"
+    guidance = retrieve_bounded_writing_guidance("sop", [scholarship])
+    keys = {item["key"] for item in guidance}
+
+    assert "general-evidence" in keys
+    assert "sop-structure" in keys
+    assert "stem-rigor" in keys
+    assert "canada-fit" in keys
+    assert "degree-ms-research-readiness" in keys
+    assert "field-data-science-method" in keys
+    assert "field-analytics-impact" in keys
+
+
+async def test_grounded_feedback_citations_include_guidance_context_references():
+    scholarship = _published_ca_scholarship()
+    scholarship.category = "stem"
+    session = FakeSession({scholarship.id: scholarship})
+    service = DocumentService(session)
+
+    async def fake_load_document(user_id, document_id):
+        document = session.added[0]
+        feedback = session.added[1]
+        document.feedback_entries = [feedback]
+        document.id = document_id
+        document.user_id = user_id
+        return document
+
+    service._load_document = fake_load_document  # type: ignore[method-assign]
+
+    result = await service.submit_document(
+        user_id=uuid4(),
+        document_type="sop",
+        title="Guidance-Cited SOP",
+        content_text=(
+            "I want to pursue graduate study in data science and build public-impact analytics systems. "
+            "My capstone modeled service demand and informed resource planning decisions."
+        ),
+        scholarship_id=str(scholarship.id),
+    )
+
+    feedback = result.latest_feedback
+    assert feedback is not None
+    assert any(c.source_id.startswith("guidance:") for c in feedback.citations)
+    assert any(c.source_id == "validated-facts" for c in feedback.citations)

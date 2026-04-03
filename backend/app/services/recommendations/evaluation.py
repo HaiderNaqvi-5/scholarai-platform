@@ -10,6 +10,7 @@ class RecommendationMetricResult:
     precision_at_k: float
     recall_at_k: float
     ndcg_at_k: float
+    mrr_at_k: float | None = None
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class RecommendationEvaluationService:
                 precision_at_k=self._precision_at_k(predicted_ids, judged_relevance, k),
                 recall_at_k=self._recall_at_k(predicted_ids, judged_relevance, k, relevant_total),
                 ndcg_at_k=self._ndcg_at_k(predicted_ids, judged_relevance, k),
+                mrr_at_k=self._mrr_at_k(predicted_ids, judged_relevance, k),
             )
             for k in normalized_k_values
         ]
@@ -117,11 +119,12 @@ class RecommendationEvaluationService:
         for case_metrics in metrics_by_case:
             for metric in case_metrics:
                 if metric.k not in sums:
-                    sums[metric.k] = {"precision_at_k": 0.0, "recall_at_k": 0.0, "ndcg_at_k": 0.0}
+                    sums[metric.k] = {"precision_at_k": 0.0, "recall_at_k": 0.0, "ndcg_at_k": 0.0, "mrr_at_k": 0.0}
                     counts[metric.k] = 0
                 sums[metric.k]["precision_at_k"] += metric.precision_at_k
                 sums[metric.k]["recall_at_k"] += metric.recall_at_k
                 sums[metric.k]["ndcg_at_k"] += metric.ndcg_at_k
+                sums[metric.k]["mrr_at_k"] += metric.mrr_at_k or 0.0
                 counts[metric.k] += 1
 
         return [
@@ -130,6 +133,7 @@ class RecommendationEvaluationService:
                 precision_at_k=round(sums[k]["precision_at_k"] / counts[k], 4),
                 recall_at_k=round(sums[k]["recall_at_k"] / counts[k], 4),
                 ndcg_at_k=round(sums[k]["ndcg_at_k"] / counts[k], 4),
+                mrr_at_k=round(sums[k]["mrr_at_k"] / counts[k], 4),
             )
             for k in sorted(sums)
         ]
@@ -187,6 +191,18 @@ class RecommendationEvaluationService:
         if idcg == 0:
             return 0.0
         return round(dcg / idcg, 4)
+
+    def _mrr_at_k(
+        self,
+        predicted_ids: list[str],
+        judged_relevance: dict[str, int],
+        k: int,
+    ) -> float:
+        top_k = predicted_ids[:k]
+        for index, scholarship_id in enumerate(top_k, start=1):
+            if judged_relevance.get(scholarship_id, 0) > 0:
+                return round(1 / index, 4)
+        return 0.0
 
     def _dcg(self, relevances: list[int]) -> float:
         score = 0.0

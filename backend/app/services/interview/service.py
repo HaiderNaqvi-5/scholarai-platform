@@ -17,6 +17,7 @@ from app.models import (
 from app.schemas.interviews import (
     InterviewAnswerFeedback,
     InterviewAnswerRequest,
+    InterviewCoachingActionPlanItem,
     InterviewCoachingAnalyticsResponse,
     InterviewCoachingRecentSession,
     InterviewCurrentQuestionResponse,
@@ -123,6 +124,7 @@ class InterviewSessionService:
                 score_delta_from_first_session=None,
                 weakest_dimension_overall=None,
                 recommended_focuses=[],
+                action_plan=[],
                 recent_sessions=[],
             )
 
@@ -135,7 +137,8 @@ class InterviewSessionService:
         dimension_counts: dict[str, int] = {}
 
         chronological_sessions = sorted(
-            sessions, key=lambda item: item.started_at or item.created_at
+            sessions,
+            key=lambda item: item.updated_at or item.started_at or item.created_at or datetime.min.replace(tzinfo=timezone.utc),
         )
         for session in chronological_sessions:
             sorted_responses = sorted(session.responses, key=lambda item: item.question_index)
@@ -188,6 +191,7 @@ class InterviewSessionService:
             else None
         )
         recommended_focuses = self._build_recommended_focuses(dimension_averages)
+        action_plan = self._build_action_plan(dimension_averages)
 
         score_delta_from_first_session = None
         if first_session_avg is not None and latest_session_avg is not None:
@@ -212,6 +216,7 @@ class InterviewSessionService:
             score_delta_from_first_session=score_delta_from_first_session,
             weakest_dimension_overall=weakest_dimension_overall,
             recommended_focuses=recommended_focuses,
+            action_plan=action_plan,
             recent_sessions=recent_sessions,
         )
 
@@ -517,3 +522,52 @@ class InterviewSessionService:
                 )
             )
         return focuses
+
+    def _build_action_plan(
+        self,
+        dimension_averages: dict[str, float],
+    ) -> list[InterviewCoachingActionPlanItem]:
+        if not dimension_averages:
+            return []
+
+        action_templates: dict[str, list[str]] = {
+            "clarity": [
+                "Use a three-step answer frame: context, action, measurable result.",
+                "Cut filler phrases and keep each answer under 90 seconds.",
+            ],
+            "relevance": [
+                "Start by directly answering the prompt before adding examples.",
+                "Link each example to scholarship goals within the first two sentences.",
+            ],
+            "confidence": [
+                "Use first-person ownership language for decisions and outcomes.",
+                "Replace tentative verbs with specific action verbs.",
+            ],
+            "specificity": [
+                "Add at least one numeric outcome in each answer.",
+                "Name one concrete project, role, or deliverable per response.",
+            ],
+        }
+
+        prioritized = sorted(
+            dimension_averages.items(),
+            key=lambda item: (item[1], item[0]),
+        )
+        plan: list[InterviewCoachingActionPlanItem] = []
+        for index, (dimension, score) in enumerate(prioritized[:3], start=1):
+            target_average = min(4.0, round(max(score + 0.4, 3.2), 2))
+            plan.append(
+                InterviewCoachingActionPlanItem(
+                    dimension=dimension,
+                    current_average=round(score, 2),
+                    target_average=target_average,
+                    priority=index,
+                    next_actions=action_templates.get(
+                        dimension,
+                        [
+                            f"Strengthen {dimension} using concise evidence-backed examples.",
+                        ],
+                    ),
+                )
+            )
+        return plan

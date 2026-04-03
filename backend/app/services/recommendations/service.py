@@ -35,6 +35,19 @@ class RetrievedCandidate:
     semantic_similarity: float | None
 
 
+RERANK_POLICY_VERSION = "reco.rerank.v1"
+RERANK_FLOOR_SCORE = 0.3
+RERANK_CAP_SCORE = 0.99
+RERANK_WEIGHTS = {
+    "rule_pass_counts": 0.34,
+    "field_alignment": 0.2,
+    "country_alignment": 0.18,
+    "semantic_similarity": 0.14,
+    "gpa_alignment": 0.09,
+    "deadline_urgency": 0.05,
+}
+
+
 class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -112,6 +125,7 @@ class RecommendationService:
                     rule_pass_count=evaluation.passed_rule_count,
                     rule_total_count=evaluation.total_rule_count,
                     heuristic_factors=heuristic_factors,
+                    rerank_policy_version=RERANK_POLICY_VERSION,
                     fallback_reason=fallback_reason,
                     eligibility_graph=evaluation.eligibility_graph,
                     signal_language={
@@ -317,14 +331,7 @@ def _compose_recommendation_score(
         "deadline_urgency": round(evaluation.deadline_urgency, 4),
     }
 
-    weights = {
-        "rule_pass_counts": 0.32,
-        "field_alignment": 0.18,
-        "country_alignment": 0.18,
-        "semantic_similarity": 0.16,
-        "gpa_alignment": 0.1,
-        "deadline_urgency": 0.06,
-    }
+    weights = dict(RERANK_WEIGHTS)
     if semantic_similarity is None:
         weights.pop("semantic_similarity")
 
@@ -333,7 +340,8 @@ def _compose_recommendation_score(
     for key, weight in weights.items():
         score += factors[key] * (weight / weight_total)
 
-    return round(min(score, 0.99), 4), factors
+    calibrated_score = max(RERANK_FLOOR_SCORE, min(score, RERANK_CAP_SCORE))
+    return round(calibrated_score, 4), factors
 
 
 def _distance_to_similarity(distance: float) -> float:

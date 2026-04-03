@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import random
 import re
 import uuid
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import wraps
@@ -936,6 +938,7 @@ class IngestionService:
         diagnostics = {
             "anchor_candidates": 0,
             "table_candidates": 0,
+            "jsonld_candidates": 0,
             "fallback_used": False,
             "same_host": base_host,
         }
@@ -976,6 +979,21 @@ class IngestionService:
             candidates.append(candidate)
             diagnostics["table_candidates"] += 1
 
+        for candidate in self._candidates_from_jsonld(
+            source=source,
+            capture=capture,
+            soup=soup,
+            page_summary=page_summary,
+            page_title=page_title,
+            base_host=base_host,
+        ):
+            candidate_url = str(candidate.source_url)
+            if candidate_url in seen_urls:
+                continue
+            seen_urls.add(candidate_url)
+            candidates.append(candidate)
+            diagnostics["jsonld_candidates"] += 1
+
         if not candidates and self._candidate_text_in_scope(source, f"{page_title} {page_summary or ''} {page_text}"):
             fallback_candidate = self._build_candidate(
                 source=source,
@@ -992,6 +1010,143 @@ class IngestionService:
 
         diagnostics["candidate_count"] = len(candidates)
         return ParseCandidatesResult(candidates=candidates, diagnostics=diagnostics)
+
+    def _candidates_from_jsonld(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        soup: BeautifulSoup,
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> list[ParsedScholarshipCandidate]:
+        candidates: list[ParsedScholarshipCandidate] = []
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = script.string or script.get_text(" ", strip=True)
+            if not raw:
+                continue
+            parsed_payload = self._parse_jsonld_payload(raw)
+            if parsed_payload is None:
+                continue
+            for item in self._flatten_jsonld_items(parsed_payload):
+                candidate = self._candidate_from_jsonld_item(
+                    source=source,
+                    capture=capture,
+                    item=item,
+                    page_summary=page_summary,
+                    page_title=page_title,
+                    base_host=base_host,
+                )
+                if candidate is not None:
+                    candidates.append(candidate)
+        return candidates
+
+    def _parse_jsonld_payload(self, raw: str) -> Any | None:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+
+    def _flatten_jsonld_items(self, payload: Any) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        queue: deque[Any] = deque([payload])
+        while queue:
+            current = queue.popleft()
+            if isinstance(current, list):
+                queue.extend(current)
+                continue
+            if not isinstance(current, dict):
+                continue
+            graph_items = current.get("@graph")
+            if isinstance(graph_items, list):
+                queue.extend(graph_items)
+            list_items = current.get("itemListElement")
+            if isinstance(list_items, list):
+                queue.extend(list_items)
+            nested_item = current.get("item")
+            if isinstance(nested_item, (dict, list)):
+                queue.append(nested_item)
+            items.append(current)
+        return items
+
+    def _candidate_from_jsonld_item(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        item: dict[str, Any],
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> ParsedScholarshipCandidate | None:
+        type_value = item.get("@type")
+        type_values: list[str]
+        if isinstance(type_value, str):
+            type_values = [type_value.lower()]
+        elif isinstance(type_value, list):
+            type_values = [str(value).lower() for value in type_value]
+        else:
+            type_values = []
+
+        if not any(
+            any(token in value for token in ("scholarship", "grant", "fellowship", "educationaloccupationalprogram"))
+            for value in type_values
+        ):
+            return None
+
+        resolved_url = self._resolve_jsonld_url(item=item, capture=capture)
+        if resolved_url is None:
+            return None
+        parsed_url = urlparse(resolved_url)
+        if parsed_url.scheme not in {"http", "https"}:
+            return None
+        if parsed_url.netloc and parsed_url.netloc != base_host:
+            return None
+
+        raw_title = item.get("name") or item.get("headline") or page_title
+        title = self._clean_text(str(raw_title))
+        if len(title) < 3:
+            return None
+
+        description = item.get("description")
+        description_text = self._clean_text(str(description)) if isinstance(description, str) else ""
+        combined_text = self._clean_text(f"{title} {description_text} {page_summary or ''}")
+        if not self._candidate_text_in_scope(source, combined_text):
+            return None
+
+        return self._build_candidate(
+            source=source,
+            capture=capture,
+            resolved_url=resolved_url,
+            title=title,
+            combined_text=combined_text,
+            context_text=description_text or page_summary or page_title,
+            parse_origin="jsonld",
+        )
+
+    def _resolve_jsonld_url(
+        self,
+        *,
+        item: dict[str, Any],
+        capture: CaptureResult,
+    ) -> str | None:
+        url_candidate = item.get("url")
+        if not isinstance(url_candidate, str) or not url_candidate.strip():
+            main_entity = item.get("mainEntityOfPage")
+            if isinstance(main_entity, str):
+                url_candidate = main_entity
+            elif isinstance(main_entity, dict):
+                if isinstance(main_entity.get("url"), str):
+                    url_candidate = main_entity.get("url")
+                elif isinstance(main_entity.get("@id"), str):
+                    url_candidate = main_entity.get("@id")
+            elif isinstance(item.get("@id"), str):
+                url_candidate = item.get("@id")
+
+        if not isinstance(url_candidate, str) or not url_candidate.strip():
+            return None
+        return urljoin(capture.final_url, url_candidate.strip())
 
     async def _precheck_existing_candidates(
         self,

@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models import UserRole
 
@@ -15,6 +16,14 @@ class _DummyCurrentUser:
         }
 
 
+class _NoOpDB:
+    def add(self, _value):
+        return None
+
+    async def flush(self):
+        return None
+
+
 def test_recommendation_benchmark_list_requires_auth(client):
     response = client.get("/api/v1/recommendations/benchmarks")
 
@@ -27,7 +36,11 @@ def test_recommendation_benchmark_endpoints_authorized(app, client):
     async def override_current_user():
         return _DummyCurrentUser()
 
+    async def override_db():
+        yield _NoOpDB()
+
     app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
     try:
         list_response = client.get(
             "/api/v1/recommendations/benchmarks",
@@ -36,9 +49,10 @@ def test_recommendation_benchmark_endpoints_authorized(app, client):
         assert list_response.status_code == 200
         list_payload = list_response.json()
         assert list_payload["total"] >= 1
-        first = list_payload["items"][0]
-        assert first["dataset_id"] == "v0_1_judged_core_set"
-        assert first["policy_version"] == "reco.kpi.v1"
+        dataset_ids = {item["dataset_id"] for item in list_payload["items"]}
+        assert "v0_1_judged_core_set" in dataset_ids
+        core_item = next(item for item in list_payload["items"] if item["dataset_id"] == "v0_1_judged_core_set")
+        assert core_item["policy_version"] == "reco.kpi.v1"
 
         eval_response = client.post(
             "/api/v1/recommendations/benchmarks/v0_1_judged_core_set/evaluate",
@@ -60,7 +74,11 @@ def test_recommendation_benchmark_not_found_returns_404(app, client):
     async def override_current_user():
         return _DummyCurrentUser()
 
+    async def override_db():
+        yield _NoOpDB()
+
     app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.post(
             "/api/v1/recommendations/benchmarks/not-a-real-dataset/evaluate",

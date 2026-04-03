@@ -9,7 +9,7 @@ API_BASE_URL = os.getenv("DEMO_API_BASE_URL", "http://localhost:8000/api/v1")
 
 def main() -> None:
     email = f"demo-seeded-{int(time())}@example.com"
-    password = "strongpass1"
+    password = "StrongPass1!x"
 
     with httpx.Client(timeout=30.0) as client:
         register_response = client.post(

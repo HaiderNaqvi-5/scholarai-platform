@@ -1,0 +1,33 @@
+{
+  "dataset_id": "v01-edge-case-rank-quality",
+  "version": "2026-04-01",
+  "title": "v0.1 Edge Case Recommendation Rank Quality",
+  "description": "Judged relevance scenarios with mixed relevance placement and sparse positives.",
+  "frozen_at": "2026-04-01T00:00:00Z",
+  "cases": [
+    {
+      "case_id": "edge-001",
+      "predicted_ids": ["e1", "e2", "e3", "e4", "e5"],
+      "judged_relevance": {
+        "e1": 0,
+        "e2": 1,
+        "e3": 0,
+        "e4": 3,
+        "e5": 2
+      },
+      "k_values": [1, 3, 5]
+    },
+    {
+      "case_id": "edge-002",
+      "predicted_ids": ["z1", "z2", "z3", "z4", "z5"],
+      "judged_relevance": {
+        "z1": 0,
+        "z2": 0,
+        "z3": 1,
+        "z4": 0,
+        "z5": 0
+      },
+      "k_values": [1, 3, 5]
+    }
+  ]
+}

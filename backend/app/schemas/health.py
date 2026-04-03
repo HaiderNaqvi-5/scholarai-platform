@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,6 +17,7 @@ class ErrorDetail(BaseModel):
     message: str
     request_id: str | None = None
     status: int
+    details: dict[str, Any] | list[Any] | None = None
 
 
 class ErrorEnvelope(BaseModel):

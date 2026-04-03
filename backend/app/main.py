@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
             status_code=exc.status_code,
             code=exc.code.value,
             message=exc.message,
+            details=_normalize_error_details(exc.detail),
         )
 
     @app.exception_handler(StarletteHTTPException)
@@ -80,11 +82,13 @@ def create_app() -> FastAPI:
         request: Request,
         exc: StarletteHTTPException,
     ) -> JSONResponse:
+        message, details = _extract_http_exception_payload(exc.detail)
         return build_error_response(
             request=request,
             status_code=exc.status_code,
             code=http_error_code(exc.status_code),
-            message=str(exc.detail),
+            message=message,
+            details=details,
         )
 
     @app.exception_handler(RequestValidationError)
@@ -94,11 +98,13 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         first_error = exc.errors()[0] if exc.errors() else {}
         message = first_error.get("msg", "Request validation failed")
+        details = _build_validation_error_details(exc)
         return build_error_response(
             request=request,
             status_code=422,
             code="REQUEST_VALIDATION_ERROR",
             message=message,
+            details=details,
         )
 
     @app.exception_handler(SQLAlchemyError)
@@ -166,6 +172,7 @@ def build_error_response(
     status_code: int,
     code: str,
     message: str,
+    details: dict[str, Any] | list[Any] | None = None,
 ) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     payload = ErrorEnvelope(
@@ -174,6 +181,7 @@ def build_error_response(
             message=message,
             request_id=request_id,
             status=status_code,
+            details=details,
         )
     )
     return JSONResponse(status_code=status_code, content=payload.model_dump())
@@ -189,6 +197,61 @@ def http_error_code(status_code: int) -> str:
         422: "REQUEST_VALIDATION_ERROR",
     }
     return mapping.get(status_code, "HTTP_ERROR")
+
+
+def _normalize_error_details(
+    detail: Any,
+) -> dict[str, Any] | list[Any] | None:
+    if detail is None:
+        return None
+    if isinstance(detail, (dict, list)):
+        return detail
+    return {"detail": str(detail)}
+
+
+def _extract_http_exception_payload(
+    detail: Any,
+) -> tuple[str, dict[str, Any] | list[Any] | None]:
+    details = _normalize_error_details(detail)
+
+    if isinstance(detail, str):
+        return detail, details
+
+    if isinstance(detail, dict):
+        if isinstance(detail.get("message"), str):
+            return detail["message"], details
+        if isinstance(detail.get("detail"), str):
+            return detail["detail"], details
+
+    if isinstance(detail, list):
+        return "Request failed", details
+
+    if detail is None:
+        return "Request failed", None
+
+    return str(detail), details
+
+
+def _build_validation_error_details(exc: RequestValidationError) -> dict[str, Any]:
+    normalized_errors: list[dict[str, Any]] = []
+    for error in exc.errors():
+        location = error.get("loc")
+        if isinstance(location, tuple):
+            location = list(location)
+        normalized_errors.append(
+            {
+                "loc": location,
+                "msg": error.get("msg"),
+                "type": error.get("type"),
+                "input": error.get("input"),
+            }
+        )
+
+    first = normalized_errors[0] if normalized_errors else {}
+    return {
+        "field": first.get("loc"),
+        "errors": normalized_errors,
+    }
 
 
 def _v1_sunset_header_value(deprecation_days: int) -> str:
