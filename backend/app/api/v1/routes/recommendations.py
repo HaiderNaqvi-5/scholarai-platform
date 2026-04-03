@@ -149,6 +149,7 @@ async def evaluate_recommendations(
                 precision_at_k=metric.precision_at_k,
                 recall_at_k=metric.recall_at_k,
                 ndcg_at_k=metric.ndcg_at_k,
+                mrr_at_k=metric.mrr_at_k,
             )
             for metric in metric_results
         ],
@@ -210,10 +211,11 @@ async def list_recommendation_benchmarks(
 async def evaluate_recommendation_benchmark(
     dataset_id: str,
     current_user: RecommendationEvaluationUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RecommendationBenchmarkEvaluationResponse:
-    del current_user
     registry = RecommendationBenchmarkRegistry()
     evaluation_service = RecommendationEvaluationService()
+    snapshot_service = KPISnapshotService(db)
 
     try:
         dataset = registry.get_dataset(dataset_id)
@@ -296,6 +298,7 @@ async def evaluate_recommendation_benchmark(
                         precision_at_k=item.precision_at_k,
                         recall_at_k=item.recall_at_k,
                         ndcg_at_k=item.ndcg_at_k,
+                        mrr_at_k=item.mrr_at_k,
                     )
                     for item in metric_results
                 ],
@@ -328,6 +331,7 @@ async def evaluate_recommendation_benchmark(
                 precision_at_k=item.precision_at_k,
                 recall_at_k=item.recall_at_k,
                 ndcg_at_k=item.ndcg_at_k,
+                mrr_at_k=item.mrr_at_k,
             )
             for item in average_metrics
         ],
@@ -340,11 +344,35 @@ async def evaluate_recommendation_benchmark(
         ],
     )
 
+    policy_version = get_recommendation_kpi_policy_version()
+    kpi_passed = pass_count == case_count if case_count else True
+    await snapshot_service.record_recommendation_snapshot(
+        user_id=current_user.id,
+        policy_version=policy_version,
+        kpi_passed=kpi_passed,
+        metrics_payload=[
+            {
+                "k": item.k,
+                "precision_at_k": item.precision_at_k,
+                "recall_at_k": item.recall_at_k,
+                "ndcg_at_k": item.ndcg_at_k,
+            }
+            for item in average_metrics
+        ],
+        gates_payload=[
+            {
+                "k": k,
+                "pass_rate": round(gate_counts.get(k, 0) / case_count, 4) if case_count else 0.0,
+            }
+            for k in sorted({metric.k for metric in average_metrics})
+        ],
+    )
+
     return RecommendationBenchmarkEvaluationResponse(
         dataset_id=dataset.dataset_id,
         version=dataset.version,
         title=dataset.title,
-        policy_version=get_recommendation_kpi_policy_version(),
+        policy_version=policy_version,
         metric_set="precision_at_k,recall_at_k,ndcg_at_k",
         pipeline_version="recommendations.phase1.v1",
         case_results=case_results,

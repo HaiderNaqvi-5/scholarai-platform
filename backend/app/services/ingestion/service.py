@@ -7,6 +7,7 @@ import logging
 import random
 import re
 import uuid
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import wraps
@@ -1049,9 +1050,9 @@ class IngestionService:
 
     def _flatten_jsonld_items(self, payload: Any) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
-        queue: list[Any] = [payload]
+        queue: deque[Any] = deque([payload])
         while queue:
-            current = queue.pop(0)
+            current = queue.popleft()
             if isinstance(current, list):
                 queue.extend(current)
                 continue

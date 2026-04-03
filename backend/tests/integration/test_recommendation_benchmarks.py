@@ -31,10 +31,11 @@ class _NoOpDB:
 
 def _benchmark_dataset_payload():
     return {
-        "benchmark_id": "v01-core-rank-quality",
-        "name": "v0.1 Core Recommendation Rank Quality",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_id": "v01-core-rank-quality",
+        "version": "2026-04-01",
+        "title": "v0.1 Core Recommendation Rank Quality",
         "description": "test benchmark",
+        "frozen_at": datetime.now(timezone.utc).isoformat(),
         "cases": [
             {
                 "case_id": "case-1",
@@ -54,10 +55,11 @@ def _benchmark_dataset_payload():
 
 def _edge_benchmark_dataset_payload():
     return {
-        "benchmark_id": "v01-edge-case-rank-quality",
-        "name": "v0.1 Edge Case Recommendation Rank Quality",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_id": "v01-edge-case-rank-quality",
+        "version": "2026-04-01",
+        "title": "v0.1 Edge Case Recommendation Rank Quality",
         "description": "edge benchmark",
+        "frozen_at": datetime.now(timezone.utc).isoformat(),
         "cases": [
             {
                 "case_id": "edge-1",
@@ -83,6 +85,7 @@ def test_recommendation_benchmarks_list_and_evaluate(app, client):
 
     import app.api.v1.routes.recommendations as recommendation_routes
     from app.schemas.recommendations import RecommendationBenchmarkDataset
+    from app.services.recommendations.benchmark_registry import RecommendationBenchmarkDatasetNotFoundError
 
     class FakeBenchmarkRegistry:
         def __init__(self):
@@ -95,11 +98,11 @@ def test_recommendation_benchmarks_list_and_evaluate(app, client):
             return [self.dataset, self.edge_dataset]
 
         def get_dataset(self, dataset_id: str):
-            if dataset_id == self.dataset.benchmark_id:
+            if dataset_id == self.dataset.dataset_id:
                 return self.dataset
-            if dataset_id == self.edge_dataset.benchmark_id:
+            if dataset_id == self.edge_dataset.dataset_id:
                 return self.edge_dataset
-            return None
+            raise RecommendationBenchmarkDatasetNotFoundError(f"Benchmark dataset not found: {dataset_id}")
 
     original_registry = recommendation_routes.RecommendationBenchmarkRegistry
     recommendation_routes.RecommendationBenchmarkRegistry = FakeBenchmarkRegistry
@@ -111,14 +114,13 @@ def test_recommendation_benchmarks_list_and_evaluate(app, client):
         assert list_response.status_code == 200
         list_payload = list_response.json()
         assert list_payload["total"] == 2
-        by_id = {item["benchmark_id"]: item for item in list_payload["items"]}
+        by_id = {item["dataset_id"]: item for item in list_payload["items"]}
         assert "v01-core-rank-quality" in by_id
         assert "v01-edge-case-rank-quality" in by_id
         assert by_id["v01-core-rank-quality"]["case_count"] == 2
         assert by_id["v01-edge-case-rank-quality"]["case_count"] == 1
-        assert "created_at" in by_id["v01-core-rank-quality"]
-        assert "passed_count" in by_id["v01-core-rank-quality"]
-        assert "failed_count" in by_id["v01-core-rank-quality"]
+        assert "frozen_at" in by_id["v01-core-rank-quality"]
+        assert "policy_version" in by_id["v01-core-rank-quality"]
 
         evaluate_response = client.post(
             "/api/v1/recommendations/benchmarks/v01-core-rank-quality/evaluate",
@@ -126,11 +128,17 @@ def test_recommendation_benchmarks_list_and_evaluate(app, client):
         )
         assert evaluate_response.status_code == 200
         evaluate_payload = evaluate_response.json()
-        assert evaluate_payload["summary"]["benchmark_id"] == "v01-core-rank-quality"
-        assert len(evaluate_payload["cases"]) == 2
+        assert evaluate_payload["dataset_id"] == "v01-core-rank-quality"
+        assert len(evaluate_payload["case_results"]) == 2
         assert len(evaluate_payload["aggregate"]["gate_pass_rates"]) >= 1
-        assert evaluate_payload["summary"]["passed_count"] + evaluate_payload["summary"]["failed_count"] == 2
-        assert all("mrr_at_k" in metric for case in evaluate_payload["cases"] for metric in case["metrics"])
+        assert evaluate_payload["aggregate"]["pass_count"] + (
+            evaluate_payload["aggregate"]["case_count"] - evaluate_payload["aggregate"]["pass_count"]
+        ) == 2
+        assert all(
+            "mrr_at_k" in metric
+            for case in evaluate_payload["case_results"]
+            for metric in case["metrics"]
+        )
         assert len(db.recorded_snapshots) == 1
         assert db.recorded_snapshots[0].policy_version == "reco.kpi.v1"
 

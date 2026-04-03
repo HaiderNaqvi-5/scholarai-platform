@@ -25,6 +25,7 @@ class RecommendationMetricItem(BaseModel):
     precision_at_k: float = Field(ge=0.0, le=1.0)
     recall_at_k: float = Field(ge=0.0, le=1.0)
     ndcg_at_k: float = Field(ge=0.0, le=1.0)
+    mrr_at_k: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class RecommendationMetricThresholdItem(BaseModel):
@@ -124,6 +125,7 @@ class RecommendationItem(BaseModel):
     eligibility_graph: dict[str, Any]
     signal_language: RecommendationSignalLanguage | None = None
     rationale: RecommendationRationale | None = None
+    rerank_policy_version: str | None = None
 
 
 class RecommendationResponseMeta(BaseModel):
