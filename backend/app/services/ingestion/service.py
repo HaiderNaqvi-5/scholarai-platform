@@ -585,10 +585,11 @@ class IngestionService:
                     f"No pages captured from {run.fetch_url}; ingestion run aborted"
                 )
             capture = captures[0]
-            merged_candidates: list = []
-            for cap in captures:
-                page_result = self._parse_candidates(run.source_registry, cap)
-                merged_candidates.extend(page_result.candidates)
+            parse_result = self._parse_candidates(run.source_registry, capture)
+            merged_candidates: list = list(parse_result.candidates)
+            for cap in captures[1:]:
+                extra = self._parse_candidates(run.source_registry, cap)
+                merged_candidates.extend(extra.candidates)
             seen_urls: set[str] = set()
             deduped: list = []
             for cand in merged_candidates:
@@ -597,6 +598,10 @@ class IngestionService:
                     continue
                 seen_urls.add(key)
                 deduped.append(cand)
+            parse_result = ParseCandidatesResult(
+                candidates=deduped,
+                diagnostics=parse_result.diagnostics,
+            )
             selected_candidates = deduped[:max_records]
             dedup_precheck = await self._precheck_existing_candidates(selected_candidates)
 
