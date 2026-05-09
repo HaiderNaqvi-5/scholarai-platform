@@ -45,7 +45,7 @@ class DocumentEvaluator:
         else:
             self.embedder = None
             
-        if ChatGoogleGenerativeAI is None:
+        if ChatGoogleGenerativeAI is None or SystemMessage is None or HumanMessage is None:
             self.llm = None
         else:
             self.llm = ChatGoogleGenerativeAI(
