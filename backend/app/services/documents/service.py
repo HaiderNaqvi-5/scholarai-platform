@@ -1,9 +1,12 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
 from fastapi import HTTPException, UploadFile, status
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload

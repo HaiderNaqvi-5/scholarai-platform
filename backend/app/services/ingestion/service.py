@@ -579,9 +579,30 @@ class IngestionService:
         failed_records: list[dict[str, Any]] = []
 
         try:
-            capture = await self._capture_source(run.fetch_url)
+            captures = await self._capture_source_with_pagination(run.fetch_url, max_pages=3)
+            if not captures:
+                raise RuntimeError(
+                    f"No pages captured from {run.fetch_url}; ingestion run aborted"
+                )
+            capture = captures[0]
             parse_result = self._parse_candidates(run.source_registry, capture)
-            selected_candidates = parse_result.candidates[:max_records]
+            merged_candidates: list = list(parse_result.candidates)
+            for cap in captures[1:]:
+                extra = self._parse_candidates(run.source_registry, cap)
+                merged_candidates.extend(extra.candidates)
+            seen_urls: set[str] = set()
+            deduped: list = []
+            for cand in merged_candidates:
+                key = str(cand.source_url)
+                if key in seen_urls:
+                    continue
+                seen_urls.add(key)
+                deduped.append(cand)
+            parse_result = ParseCandidatesResult(
+                candidates=deduped,
+                diagnostics=parse_result.diagnostics,
+            )
+            selected_candidates = deduped[:max_records]
             dedup_precheck = await self._precheck_existing_candidates(selected_candidates)
 
             effective_actor_id = actor_user_id or run.triggered_by_user_id or SYSTEM_ACTOR_ID
@@ -921,6 +942,37 @@ class IngestionService:
                 "transport_errors": transport_errors,
             },
         )
+
+    async def _capture_source_with_pagination(
+        self,
+        url: str,
+        max_pages: int = 3,
+    ) -> list[CaptureResult]:
+        """Capture a listing URL plus up to (max_pages - 1) follow-on pages
+        discovered via <link rel='next'> or visible 'Next' anchors.
+        Stops on cycles or when no next link is found.
+        """
+        results: list[CaptureResult] = []
+        seen: set[str] = set()
+        current = url
+
+        for _ in range(max(1, max_pages)):
+            if current in seen:
+                break
+            seen.add(current)
+            capture = await self._capture_source(current)
+            results.append(capture)
+
+            soup = BeautifulSoup(capture.html, "lxml")
+            next_link = soup.find("link", rel="next") or soup.find(
+                "a", string=lambda s: bool(s) and "next" in s.lower()
+            )
+            href = (next_link.get("href") if next_link else None) or None
+            if not href:
+                break
+            current = urljoin(capture.final_url, href)
+
+        return results
 
     def _parse_candidates(
         self,

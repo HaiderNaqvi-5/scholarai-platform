@@ -1,16 +1,31 @@
+import logging
 import os
 import uuid
 from typing import Any, Dict, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+try:
+    from langchain_core.messages import SystemMessage, HumanMessage
+except ImportError:
+    SystemMessage = None
+    HumanMessage = None
+    logger.info("langchain_core unavailable; document RAG messages disabled")
+
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
+    logger.info("langchain_google_genai unavailable; document RAG LLM disabled")
 
 try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
     SentenceTransformer = None
+    logger.info("sentence_transformers unavailable; document RAG embedder disabled")
 
 from app.models.models import ScholarshipChunk
 
@@ -30,12 +45,28 @@ class DocumentEvaluator:
         else:
             self.embedder = None
             
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash", 
-            temperature=0.2,
-        ).with_structured_output(RAGFeedbackResponse)
+        if ChatGoogleGenerativeAI is None or SystemMessage is None or HumanMessage is None:
+            self.llm = None
+        else:
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                temperature=0.2,
+            ).with_structured_output(RAGFeedbackResponse)
 
     async def evaluate_document(self, document_text: str, scholarship_id: Any = None) -> dict:
+        if self.llm is None:
+            return {
+                "summary": "Scholarship-grounded LLM evaluator unavailable in this environment.",
+                "strengths": [],
+                "revision_priorities": [],
+                "caution_notes": [
+                    "RAG path disabled because langchain_google_genai is not installed.",
+                ],
+                "citations": [],
+                "grounded_context": [
+                    "Feedback was not augmented because the LLM client could not be imported.",
+                ],
+            }
         context_chunks = []
         if scholarship_id:
             # Fetch priority chunks for the linked scholarship

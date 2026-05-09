@@ -4,6 +4,8 @@ import logging
 import uuid
 from dataclasses import dataclass
 
+logger = logging.getLogger(__name__)
+
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,7 +1,10 @@
 import os
+import logging
 from typing import List, Dict, Any
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.models import Scholarship
+
+logger = logging.getLogger(__name__)
 
 class OpenSearchHybridRetriever:
     def __init__(self):
@@ -55,8 +58,8 @@ class OpenSearchHybridRetriever:
         try:
             response = self.client.search(index=self.index_name, body=search_query)
             return [hit["_source"] for hit in response["hits"]["hits"]]
-        except Exception as e:
-            print(f"OpenSearch Search Error: {e}")
+        except Exception:
+            logger.warning("OpenSearch search error", exc_info=True)
             return []
 
     async def index_scholarship(self, scholarship: Scholarship, embedding: List[float]):
@@ -80,8 +83,8 @@ class OpenSearchHybridRetriever:
         }
         try:
             self.client.index(index=self.index_name, id=str(scholarship.id), body=document, refresh=True)
-        except Exception as e:
-            print(f"OpenSearch Indexing Error: {e}")
+        except Exception:
+            logger.warning("OpenSearch indexing error", exc_info=True)
 
     async def delete_scholarship(self, scholarship_id: str):
         """
@@ -90,8 +93,8 @@ class OpenSearchHybridRetriever:
         try:
             if self.client.indices.exists(index=self.index_name):
                 self.client.delete(index=self.index_name, id=scholarship_id, ignore=[404])
-        except Exception as e:
-            print(f"OpenSearch Deletion Error: {e}")
+        except Exception:
+            logger.warning("OpenSearch deletion error", exc_info=True)
 
     async def create_index_if_not_exists(self):
         """
