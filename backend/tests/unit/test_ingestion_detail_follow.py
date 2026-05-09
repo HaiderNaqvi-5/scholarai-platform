@@ -48,3 +48,51 @@ def test_parser_emits_distinct_detail_urls():
     assert all("/about" not in url for url in award_urls)
     # No two candidates may share a source_url.
     assert len(award_urls) == len(set(award_urls))
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_capture_follows_rel_next_up_to_depth(monkeypatch):
+    """When the listing page declares <link rel='next' href='/awards?page=2'>,
+    the capture chain must follow it once and merge candidates."""
+    from app.services.ingestion import service as ing_service
+
+    page1 = """
+    <html><head>
+        <title>Page 1</title>
+        <link rel='next' href='/awards?page=2'/>
+    </head><body>
+        <a href='/awards/mds-excellence'>MDS Excellence Award</a>
+    </body></html>
+    """
+    page2 = """
+    <html><head><title>Page 2</title></head><body>
+        <a href='/awards/mds-international'>MDS International Scholarship</a>
+    </body></html>
+    """
+
+    captures = {
+        "https://www.grad.ubc.ca/awards": page1,
+        "https://www.grad.ubc.ca/awards?page=2": page2,
+    }
+
+    async def _fake_capture(self, url):
+        return ing_service.CaptureResult(
+            html=captures[url],
+            final_url=url,
+            title="t",
+            capture_mode="test",
+            metadata={"requested_url": url},
+        )
+
+    monkeypatch.setattr(ing_service.IngestionService, "_capture_source", _fake_capture)
+
+    service = ing_service.IngestionService(db=None)
+    multi = await service._capture_source_with_pagination(
+        "https://www.grad.ubc.ca/awards",
+        max_pages=3,
+    )
+    assert len(multi) == 2
+    assert {m.final_url for m in multi} == set(captures.keys())
