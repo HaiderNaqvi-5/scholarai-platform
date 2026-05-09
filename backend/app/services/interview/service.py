@@ -1,6 +1,9 @@
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -54,9 +57,11 @@ class InterviewSessionService:
                 from app.services.interview.evaluator import InterviewEvaluator
 
                 self.evaluator = InterviewEvaluator()
-            except Exception as exc:  # pragma: no cover
-                print(f"Failed to load AI integrations: {exc}")
-
+            except Exception:  # pragma: no cover
+                logger.warning(
+                    "Failed to load InterviewEvaluator; falling back to rules",
+                    exc_info=True,
+                )
 
     async def start_session(
         self,
@@ -258,8 +263,12 @@ class InterviewSessionService:
                     audio_b64=payload.audio_b64 or "",
                     text_answer=payload.answer_text or "",
                 )
-            except Exception as exc:  # pragma: no cover
-                print(f"Gemini evaluation failed, falling back to rules: {exc}")
+            except Exception:  # pragma: no cover
+                logger.warning(
+                    "Gemini answer evaluation failed; falling back to rules",
+                    exc_info=True,
+                )
+
 
         if not feedback:
             fallback_text = payload.answer_text or "The audio processing failed. This is a fallback."
