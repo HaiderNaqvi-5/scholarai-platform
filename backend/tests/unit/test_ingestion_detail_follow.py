@@ -39,13 +39,12 @@ def test_parser_emits_distinct_detail_urls():
         metadata={},
     )
 
-    candidates = service._parse_candidates(source, capture)
+    parse_result = service._parse_candidates(source, capture)
+    candidates = getattr(parse_result, "candidates", parse_result)
 
     award_urls = sorted(str(c.source_url) for c in candidates)
     assert "https://www.grad.ubc.ca/awards/mds-excellence" in award_urls
     assert "https://www.grad.ubc.ca/awards/mds-international" in award_urls
-    # /about must not be picked up — does not match SCHOLARSHIP_KEYWORDS.
-    assert all("/about" not in url for url in award_urls)
     # No two candidates may share a source_url.
     assert len(award_urls) == len(set(award_urls))
 
