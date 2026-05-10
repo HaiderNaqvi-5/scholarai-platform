@@ -1,81 +1,79 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-import { MarketingShell } from "@/components/layout/marketing-shell";
-
-export default function LandingPage() {
+export default function Landing() {
   return (
-    <MarketingShell
-      eyebrow="Scholarship planning"
-      title="Find the right scholarships. Know why they fit."
-      description="GrantPath AI combines a curated Canada-first catalog with profile-aware recommendations and structured preparation tools."
-      actions={
-        <>
-          <Link className="auth-link auth-link--primary" href="/signup">
-            Get started
-          </Link>
-          <Link className="nav-link" href="/scholarships">
-            Browse scholarships
-          </Link>
-        </>
-      }
-    >
-      <section className="landing-hero fade-in fade-in-d1">
-        <div className="hero-trust-rail">
-          <article className="data-point">
-            <p className="data-point__label">Catalog</p>
-            <strong>Canada-first, MS-focused</strong>
-            <p className="body-copy">
-              Published scholarship records with verified deadlines, requirements, and funding details.
-            </p>
-          </article>
-          <article className="data-point">
-            <p className="data-point__label">Trust model</p>
-            <strong>Facts lead, guidance follows</strong>
-            <p className="body-copy">
-              Official scholarship data stays primary. Recommendations and writing help are clearly labeled as advisory.
-            </p>
-          </article>
-          <article className="data-point">
-            <p className="data-point__label">Scope</p>
-            <strong>Data Science, AI, Analytics</strong>
-            <p className="body-copy">
-              A focused corpus designed for depth over breadth, with Fulbright-related US coverage included.
-            </p>
-          </article>
+    <div className="min-h-screen bg-paper">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+        <Link href="/" className="font-display text-xl tracking-tight text-ink">
+          GrantPath
+        </Link>
+        <nav className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/signup">Create account</Link>
+          </Button>
+        </nav>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-6 pb-20 pt-12 md:pt-24">
+        <p className="font-mono text-xs uppercase tracking-[0.16em] text-ink-subtle">
+          For grad school applicants
+        </p>
+        <h1 className="mt-3 max-w-3xl font-display text-[44px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[64px]">
+          Scholarships you actually qualify for.
+          <span className="text-ink-muted"> Deadlines that don&apos;t slip.</span>
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg text-ink-muted">
+          GrantPath ranks scholarships against your real profile — citizenship, GPA,
+          field, degree level. No probability scores. No filler. Just what fits, what
+          doesn&apos;t, and the date by which to apply.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Button asChild size="lg">
+            <Link href="/signup">
+              Get matched <ArrowRight className="size-4" strokeWidth={2} />
+            </Link>
+          </Button>
+          <Button asChild variant="secondary" size="lg">
+            <Link href="/login">I have an account</Link>
+          </Button>
+        </div>
+
+        <div className="mt-20 grid gap-6 md:grid-cols-3">
+          <Pillar
+            title="Match by eligibility, not vibes"
+            body="Citizenship, language, GPA, field, and degree level checked against published rules — never inferred."
+          />
+          <Pillar
+            title="One tracker, no spreadsheets"
+            body="Save scholarships, move them through saved → in progress → applied. Deadlines counted in days, not paragraphs."
+          />
+          <Pillar
+            title="Drafts that survive a refresh"
+            body="Statement of purpose autosaves locally every 5 seconds. Practice the interview. Show up ready."
+          />
         </div>
       </section>
 
-      <section className="feature-grid fade-in fade-in-d2" id="how-it-works">
-        <article className="surface-card">
-          <p className="section-eyebrow">How it works</p>
-          <h2 className="section-title">A clear path from discovery to preparation.</h2>
-          <p className="body-copy">
-            GrantPath AI is structured so each step narrows your attention instead of adding more tools to manage.
-          </p>
-        </article>
-        <article className="surface-panel">
-          <ol className="flow-list">
-            <li>Browse published scholarships with structured filters and visible data boundaries.</li>
-            <li>Save a profile so recommendations can explain why each opportunity fits.</li>
-            <li>Use writing and interview workspaces that keep coaching separate from official requirements.</li>
-          </ol>
-        </article>
-      </section>
+      <footer className="border-t border-[var(--color-border)]">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-8 text-sm text-ink-subtle md:flex-row md:items-center md:justify-between">
+          <p>GrantPath · Built for grad school applicants.</p>
+          <p className="font-mono text-xs">v0.1 SLC · Canada-first</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
 
-      <section className="split-panel fade-in fade-in-d3">
-        <article className="data-callout">
-          <p className="list-label">Verified scholarship data</p>
-          <p className="body-copy">
-            Requirements, deadlines, and funding come from published records. These are the facts you plan around.
-          </p>
-        </article>
-        <article className="guidance-callout">
-          <p className="list-label">Advisory guidance</p>
-          <p className="body-copy">
-            Recommendations, writing feedback, and interview practice are layered on top and always labeled as generated.
-          </p>
-        </article>
-      </section>
-    </MarketingShell>
+function Pillar({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-[20px] border border-[var(--color-border)] bg-paper-white p-6">
+      <h3 className="font-display text-lg text-ink">{title}</h3>
+      <p className="mt-2 text-[15px] text-ink-muted">{body}</p>
+    </div>
   );
 }
