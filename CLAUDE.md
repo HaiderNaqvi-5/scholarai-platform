@@ -145,6 +145,13 @@ class <Domain>Service:
 
 ## Implementation status (live — see `IMPLEMENTATION_STATUS_REPORT.md` for evidence links)
 
+### Test health snapshot (verified 2026-05-10 on `main@5549d52`)
+- `pytest backend/tests/unit` — **118 passed**, 0 failed (29.3s)
+- `pytest backend/tests/integration` — **50 passed**, 0 failed (5.3s)
+- `python -m compileall backend/app backend/tests` — clean
+- `python scripts/docs_governance_check.py` — 0 terminology / link / canonical-tail failures
+- Rerun: `pytest backend/tests/unit backend/tests/integration -q && python scripts/docs_governance_check.py`
+
 ### Done
 - FastAPI modular monolith + Alembic migration-driven bootstrap + seeded demo dataset + rehearsal scripts.
 - CI sanity + KPI regression + browser-smoke gates.
@@ -170,6 +177,10 @@ class <Domain>Service:
 - Open SLC IDs without execution evidence yet: SLC-CORE-001/002/003, SLC-OPS-001/002.
 - `shared/` and `infra/` remain documentation scaffolding only.
 - Deferred: broad geography, marketplace/mentor commerce, partner APIs, institution analytics, tenant partitioning, graph experimentation, ML reranking ablations, larger judged-set evaluation tooling.
+
+### Known low-priority issues (from 2026-05-10 audit)
+- `backend/tests/unit/test_document_service.py:286` — `test_retrieve_bounded_guidance_expands_degree_and_field_dimensions` carries `@pytest.mark.asyncio` but is sync; pytest-asyncio warns and skips the async path. Drop the decorator or make the test `async def`.
+- Local `.venv` drifts from `backend/requirements.txt` pins (Python 3.14 + fastapi 0.135 + sqlalchemy 2.0.48 vs pinned Python 3.12 + fastapi 0.115 + sqlalchemy 2.0.35). CI uses Python 3.12; local devs should rebuild with `py -3.12 -m venv .venv312 && .venv312\Scripts\python -m pip install -r backend/requirements.txt`.
 
 ### Next 3 priorities (per status report)
 1. Expand grounding depth + citation density across broader scholarship coverage.
