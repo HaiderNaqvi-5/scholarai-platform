@@ -15,6 +15,12 @@ services:
       opensearch:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/livez || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     networks:
       - internal
       - public
@@ -22,6 +28,7 @@ services:
   frontend:
     build:
       context: ./frontend
+    container_name: frontend
     ports:
       - "3000:3000"
     env_file: ${ENV_FILE:-.env.example}
@@ -63,9 +70,12 @@ services:
       - "7474:7474"
       - "7687:7687"
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-password} 'RETURN 1'"]
-      interval: 10s
+      # TCP probe on Bolt port. Avoids cypher-shell JVM cold-start (>5s) which
+      # causes false-unhealthy under load. Bolt listening = server ready for queries.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/7687' || exit 1"]
+      interval: 15s
       timeout: 5s
+      start_period: 30s
       retries: 5
     deploy:
       resources:
@@ -101,6 +111,8 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms1024m -Xmx1024m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-ScholarAI_Secure_123!}
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
     deploy:
       resources:
         limits:
@@ -140,6 +152,12 @@ services:
       opensearch:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app:celery_app inspect ping -d celery@$$HOSTNAME -t 8 || exit 1"]
+      interval: 60s
+      timeout: 15s
+      start_period: 45s
+      retries: 3
     networks:
       - internal
 
@@ -156,6 +174,12 @@ services:
       opensearch:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q beat /proc/1/cmdline || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     networks:
       - internal
 

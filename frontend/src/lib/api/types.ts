@@ -4,13 +4,14 @@
  */
 
 export type Role =
-  | "ENDUSER_STUDENT"
-  | "MENTOR"
-  | "ADMIN"
-  | "OWNER"
-  | "DEV"
-  | "INTERNAL_USER"
-  | "UNIVERSITY";
+  | "enduser_student"
+  | "student"
+  | "mentor"
+  | "admin"
+  | "owner"
+  | "dev"
+  | "internal_user"
+  | "university";
 
 export type User = {
   id: string;
@@ -29,16 +30,16 @@ export type TokenResponse = {
 };
 
 export type StudentProfile = {
+  id: string;
   user_id: string;
-  full_name: string;
-  citizenship: string;
-  language_scores?: { test: string; score: number }[] | null;
-  gpa?: number | null;
-  gpa_scale?: number | null;
-  degree_level?: "BS" | "MS" | "PHD" | null;
-  field_tags?: string[] | null;
-  graduation_year?: number | null;
-  updated_at?: string;
+  citizenship_country_code: string;
+  gpa_value?: number | null;
+  gpa_scale: number;
+  target_field: string;
+  target_degree_level: "BS" | "MS" | "PHD";
+  target_country_code: string;
+  language_test_type?: string | null;
+  language_test_score?: number | null;
 };
 
 export type Scholarship = {

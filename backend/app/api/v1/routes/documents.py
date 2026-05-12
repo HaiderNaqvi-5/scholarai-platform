@@ -12,7 +12,9 @@ from app.schemas import (
     DocumentListResponse,
     DocumentSubmissionResponse,
 )
+from app.schemas.sop import SOPDraftRequest, SOPDraftResponse
 from app.services.documents import DocumentService
+from app.services.documents.sop_builder import SOPBuilderService
 
 router = APIRouter()
 
@@ -35,6 +37,22 @@ async def get_document(
 ) -> DocumentDetailResponse:
     service = DocumentService(db)
     return await service.get_document(current_user.id, document_id)
+
+
+@router.post("/sop/draft", response_model=SOPDraftResponse, status_code=status.HTTP_201_CREATED)
+async def generate_sop_draft(
+    payload: SOPDraftRequest,
+    current_user: DocumentCreateUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SOPDraftResponse:
+    """Pakistan-context SOP builder (PRD §7).
+
+    Free tier is gated to one SOP per account; Elite tier receives line-by-line
+    paragraph feedback alongside the draft. Persists the generated draft as a
+    DocumentRecord so it shows up in GET /documents and /documents/{id}.
+    """
+    service = SOPBuilderService(db)
+    return await service.draft(current_user, payload)
 
 
 @router.post("", response_model=DocumentSubmissionResponse, status_code=status.HTTP_201_CREATED)

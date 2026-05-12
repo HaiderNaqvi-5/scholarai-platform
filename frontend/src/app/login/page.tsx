@@ -56,11 +56,12 @@ function LoginInner() {
         <h1 className="mt-6 font-display text-2xl text-ink">Sign in</h1>
         <p className="mt-1 text-sm text-ink-muted">Pick up where you left off.</p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate data-testid="login-form">
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               autoComplete="email"
               required
@@ -73,6 +74,7 @@ function LoginInner() {
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               autoComplete="current-password"
               required
@@ -89,6 +91,36 @@ function LoginInner() {
             Sign in
           </Button>
         </form>
+
+        <div className="mt-4 space-y-2">
+          <p className="text-xs text-ink-muted">Demo accounts</p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setEmail("student@example.com");
+                setPassword("strongpass1");
+              }}
+            >
+              Student
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                setEmail("admin@example.com");
+                setPassword("strongpass1");
+              }}
+            >
+              Admin
+            </Button>
+          </div>
+        </div>
 
         <p className="mt-6 text-sm text-ink-muted">
           New here?{" "}

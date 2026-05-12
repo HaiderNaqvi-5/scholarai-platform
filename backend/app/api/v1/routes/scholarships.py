@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.dependencies import CurrentUser
 from app.models import RecordState, Scholarship, ScholarshipRequirement
 from app.schemas import (
     ScholarshipAppliedFilters,
@@ -15,7 +16,13 @@ from app.schemas import (
     ScholarshipListItem,
     ScholarshipListResponse,
 )
+from app.schemas.scholarships_match import (
+    ScholarshipMatchRequest,
+    ScholarshipMatchResponse,
+)
 from app.services.recommendations.eligibility import scholarship_in_scope
+from app.services.scholarships import ScholarshipMatchService
+from app.services.students import StudentService
 
 router = APIRouter()
 
@@ -138,6 +145,23 @@ async def list_scholarships(
             sort=normalized_sort,
         ),
     )
+
+
+@router.post("/match", response_model=ScholarshipMatchResponse)
+async def match_scholarships(
+    payload: ScholarshipMatchRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScholarshipMatchResponse:
+    """Pakistan-tuned scholarship matching (PRD §5).
+
+    Auto-populates eligibility criteria from the authenticated student profile.
+    Body fields override profile values. Free-tier callers receive only the
+    top 3 eligible matches in full plus a locked summary list.
+    """
+    profile = await StudentService(db).get_profile(current_user.id)
+    service = ScholarshipMatchService(db)
+    return await service.match(current_user, profile, payload)
 
 
 @router.get("/{scholarship_id}", response_model=ScholarshipDetailResponse)

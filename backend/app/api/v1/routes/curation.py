@@ -285,13 +285,13 @@ async def list_curation_records(
     page_size: int = Query(default=50, ge=1, le=100),
 ) -> CurationRecordListResponse:
     service = CurationService(db)
-    items = await service.list_records(
+    items, total = await service.list_records(
         current_user,
         state=state,
-        limit=page_size,
+        page=page,
+        page_size=page_size,
     )
-    total = len(items)
-    has_more = False
+    has_more = page * page_size < total
     return CurationRecordListResponse(
         items=items,
         total=total,

@@ -120,15 +120,33 @@ src/
 | Sprint | Scope | State |
 |--------|-------|-------|
 | S1 | Foundation: tokens, REST, AuthProvider, RoleGuard, AppShell, marketing/login/signup/onboarding/feed | **Done** (`f01bc08`) |
-| S2 | Auth + Onboarding polish; profile edit page | Pending |
-| S3 | Discover (filters + URL state) + Saved (kanban with optimistic drag) | Pending |
-| S4 | Full RecommendationCard with stage chips, factor lists, EligibilityMatrix | Pending |
-| S5 | Documents: upload + four-partition feedback (validated / retrieved / generated / limitations) | Pending |
-| S6 | Interviews: adaptive Q/A loop + RubricRadar + coaching analytics | Pending |
-| S7 | Mentor: pending queue + split-pane review | Pending |
-| S8 | Admin / Curation: ingestion mgmt + curation state-machine UI | Pending |
-| S9 | Owner / Health: RBAC mutations + audit + KPI dashboard | Pending |
-| S10 | Polish: a11y axe-core, responsive matrix, Playwright E2E, browser-smoke re-point | Pending |
+| S2 | Profile edit (optimistic, PUT /profile), Settings (sign out + account info) | **Done** |
+| S3 | Discover (sticky filter bar + URL state), ScholarshipCard, Scholarship detail, Saved kanban (HTML5 drag, optimistic status) | **Done** |
+| S4 | RecommendationCard with stage chips, supporting/limiting factors, expandable EligibilityMatrix (5 axes: citizenship/degree/GPA/field/language) | **Done** |
+| S5 | Documents list, /documents/new (paste-or-upload + grounding selector + 5s autosave), /documents/[id] four-partition FeedbackPartition with auto-poll | **Done** |
+| S6 | Interviews list (modes + analytics), session adaptive Q/A loop + RubricRadar (recharts) + trend chips + recommended focus | **Done** |
+| S7 | Mentor queue, split-pane review form (summary/strengths/revision_priorities/caution_notes ListEditor) | **Done** |
+| S8 | Admin ingestion (start/filter/bulk-retry/select), run detail (diagnostics + snapshot viewer/clear), curation list, curation detail (raw→validated→published with audit notes) | **Done** |
+| S9 | Admin overview (KPI alerts polled 60s + stats grid), Users (role mutation Dialog w/ reason), Audit (revert Dialog), Rec-eval (benchmarks + per-case + aggregate) | **Done** |
+| S10 | Polish: data-testid added (login-form, app-shell, name attrs); auth smoke re-pointed to /feed. **Remaining**: axe-core gate, responsive matrix at 375/768/1024/1440, full smoke selector re-point for documents/recs/curation/interview/curation, RBAC matrix Playwright spec | Partial |
+
+## UI primitives
+
+- `ui/button` (CVA, asChild Slot, `loading`, `tap-target`)
+- `ui/input`, `ui/label` (Radix Label)
+- `ui/card` (Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter)
+- `ui/badge` (tones: validated, generated, caution, danger, neutral, ink)
+- `ui/skeleton`
+- `ui/dialog` (Radix Dialog wrapper — Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose). Used by admin/users + admin/audit modals.
+- `ui/tabs` (Radix Tabs wrapper).
+- `ui/select` (Radix Select wrapper). Forms still use native `<select>` where simpler — both are acceptable.
+
+## Shared feature components
+
+- `scholarship/ScholarshipCard` — generic list card (used by /discover).
+- `scholarship/RecommendationCard` — feed card with stage chips, factor lists, expandable EligibilityMatrix.
+- `scholarship/EligibilityMatrix` — 5-axis eligibility table comparing student profile vs scholarship rules.
+- `interview/RubricRadar` — recharts radar over `InterviewRubricDimension[]`.
 
 ## Verification before marking work complete
 

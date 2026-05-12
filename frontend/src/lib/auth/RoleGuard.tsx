@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import type { Role } from "@/lib/api";
 
-const STUDENT_ROLES: Role[] = ["ENDUSER_STUDENT", "INTERNAL_USER", "DEV", "ADMIN", "OWNER"];
-const MENTOR_ROLES: Role[] = ["MENTOR", "ADMIN", "OWNER"];
-const ADMIN_ROLES: Role[] = ["ADMIN", "OWNER"];
-const OWNER_ROLES: Role[] = ["OWNER"];
+const STUDENT_ROLES: Role[] = ["enduser_student", "student", "internal_user", "dev", "admin", "owner"];
+const MENTOR_ROLES: Role[] = ["mentor", "admin", "owner"];
+const ADMIN_ROLES: Role[] = ["admin", "owner"];
+const OWNER_ROLES: Role[] = ["owner"];
 
 export const ROLE_GROUPS = {
   student: STUDENT_ROLES,

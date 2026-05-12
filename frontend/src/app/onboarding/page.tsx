@@ -28,14 +28,21 @@ const COUNTRIES = [
   { code: "BD", label: "Bangladesh" },
   { code: "NG", label: "Nigeria" },
   { code: "EG", label: "Egypt" },
-  { code: "CA", label: "Canada" },
-  { code: "US", label: "United States" },
   { code: "OTHER", label: "Other" },
+];
+
+const TARGET_COUNTRIES = [
+  { code: "GB", label: "United Kingdom" },
+  { code: "US", label: "United States" },
+  { code: "CA", label: "Canada" },
+  { code: "DE", label: "Germany" },
+  { code: "AU", label: "Australia" },
 ];
 
 type Draft = {
   full_name: string;
   citizenship: string;
+  target_country: string;
   language_score: string;
   language_test: "IELTS" | "TOEFL" | "PTE" | "NONE";
   gpa: string;
@@ -53,7 +60,8 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState<Draft>({
     full_name: "",
-    citizenship: "",
+    citizenship: "PK",
+    target_country: "GB",
     language_score: "",
     language_test: "IELTS",
     gpa: "",
@@ -101,23 +109,27 @@ export default function OnboardingPage() {
   async function submit() {
     setSubmitting(true);
     try {
+      const cc = draft.citizenship === "OTHER" ? "ZZ" : draft.citizenship;
       await endpoints.profile.upsert({
-        full_name: draft.full_name,
-        citizenship: draft.citizenship,
-        gpa: draft.gpa ? Number(draft.gpa) : null,
-        gpa_scale: draft.gpa_scale ? Number(draft.gpa_scale) : null,
-        degree_level: draft.degree_level,
-        field_tags: draft.field_tags,
-        language_scores:
+        citizenship_country_code: cc,
+        gpa_value: draft.gpa ? Number(draft.gpa) : null,
+        gpa_scale: draft.gpa_scale ? Number(draft.gpa_scale) : 4.0,
+        target_field: draft.field_tags.join(", ") || "Data Science",
+        target_degree_level: draft.degree_level,
+        target_country_code: draft.target_country,
+        language_test_type:
+          draft.language_test !== "NONE" ? draft.language_test : null,
+        language_test_score:
           draft.language_test !== "NONE" && draft.language_score
-            ? [{ test: draft.language_test, score: Number(draft.language_score) }]
-            : [],
+            ? Number(draft.language_score)
+            : null,
       });
       localStorage.removeItem(STORAGE_KEY);
       toast.success("Profile saved.");
       router.replace("/feed");
-    } catch {
-      toast.error("Couldn't save profile. Try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Couldn't save profile. Try again.";
+      toast.error(msg);
       setSubmitting(false);
     }
   }
@@ -220,6 +232,21 @@ export default function OnboardingPage() {
 
         {step === 3 && (
           <>
+            <Field label="Where do you want to study?" htmlFor="target_country" hint="Required — funded programs in this country.">
+              <select
+                id="target_country"
+                value={draft.target_country}
+                onChange={(e) => update("target_country", e.target.value)}
+                className="h-11 w-full rounded-[12px] border border-[var(--color-border)] bg-paper-white px-3 text-[15px]"
+              >
+                {TARGET_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
             <Field label="Which degree are you applying for?" htmlFor="degree" hint="Required.">
               <div className="flex flex-wrap gap-2">
                 {(["BS", "MS", "PHD"] as const).map((d) => (

@@ -7,6 +7,36 @@ from app.models import DegreeLevel, StudentProfile
 from app.schemas.students import StudentProfileUpsertRequest
 
 
+_PROFILE_SIMPLE_FIELDS = (
+    "citizenship_country_code",
+    "gpa_value",
+    "gpa_scale",
+    "target_field",
+    "target_country_code",
+    "target_countries",
+    "target_fields",
+    "language_test_type",
+    "language_test_score",
+    "hec_degree_level",
+    "pakistani_university",
+    "cgpa_scale_choice",
+    "degree_subject",
+    "graduation_year",
+    "ielts_score",
+    "toefl_score",
+    "gre_quant",
+    "gre_verbal",
+    "has_research_publications",
+    "research_publication_count",
+    "funding_requirement",
+    "intake_target",
+    "city_of_origin",
+    "can_afford_application_fees",
+    "needs_gre_waiver",
+    "family_has_funds_for_bank_statement",
+)
+
+
 class StudentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -24,32 +54,21 @@ class StudentService:
     ) -> StudentProfile:
         profile = await self.get_profile(user_id)
         values = payload.model_dump()
+        values["target_degree_level"] = DegreeLevel(values["target_degree_level"])
 
         if profile is None:
-            profile = StudentProfile(
-                user_id=user_id,
-                citizenship_country_code=values["citizenship_country_code"],
-                gpa_value=values["gpa_value"],
-                gpa_scale=values["gpa_scale"],
-                target_field=values["target_field"],
-                target_degree_level=DegreeLevel(values["target_degree_level"]),
-                target_country_code=values["target_country_code"],
-                language_test_type=values["language_test_type"],
-                language_test_score=values["language_test_score"],
-            )
+            profile = StudentProfile(user_id=user_id, **{
+                "target_degree_level": values["target_degree_level"],
+                **{k: values[k] for k in _PROFILE_SIMPLE_FIELDS},
+            })
             self.db.add(profile)
             await self.db.flush()
             await self.db.refresh(profile)
             return profile
 
-        profile.citizenship_country_code = values["citizenship_country_code"]
-        profile.gpa_value = values["gpa_value"]
-        profile.gpa_scale = values["gpa_scale"]
-        profile.target_field = values["target_field"]
-        profile.target_degree_level = DegreeLevel(values["target_degree_level"])
-        profile.target_country_code = values["target_country_code"]
-        profile.language_test_type = values["language_test_type"]
-        profile.language_test_score = values["language_test_score"]
+        for field in _PROFILE_SIMPLE_FIELDS:
+            setattr(profile, field, values[field])
+        profile.target_degree_level = values["target_degree_level"]
 
         await self.db.flush()
         await self.db.refresh(profile)

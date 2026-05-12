@@ -1,27 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { endpoints } from "@/lib/api";
+import type { SavedOpportunity } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RecommendationCard } from "@/components/scholarship/RecommendationCard";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { formatAmount, formatDeadline } from "@/lib/utils";
 
 export default function FeedPage() {
   const auth = useAuth();
+  const qc = useQueryClient();
+
   const profileQ = useQuery({
     queryKey: ["profile"],
     queryFn: endpoints.profile.get,
     retry: false,
   });
+
   const recsQ = useQuery({
     queryKey: ["recommendations", "feed"],
     queryFn: () => endpoints.recommendations.build(10),
     enabled: profileQ.isSuccess,
+  });
+
+  const savedQ = useQuery({
+    queryKey: ["saved"],
+    queryFn: endpoints.saved.list,
+    enabled: profileQ.isSuccess,
+  });
+  const savedSet = useMemo(
+    () => new Set(savedQ.data?.items.map((s) => s.scholarship_id) ?? []),
+    [savedQ.data],
+  );
+
+  const toggleSave = useMutation({
+    mutationFn: async ({ id, currentlySaved }: { id: string; currentlySaved: boolean }) => {
+      if (currentlySaved) await endpoints.saved.remove(id);
+      else await endpoints.saved.add(id);
+    },
+    onMutate: async ({ id, currentlySaved }) => {
+      await qc.cancelQueries({ queryKey: ["saved"] });
+      const prev = qc.getQueryData<{ items: SavedOpportunity[] }>(["saved"]);
+      qc.setQueryData<{ items: SavedOpportunity[] } | undefined>(["saved"], (old) => {
+        if (!old) return old;
+        if (currentlySaved) return { items: old.items.filter((x) => x.scholarship_id !== id) };
+        const sch = recsQ.data?.items.find((r) => r.scholarship.id === id)?.scholarship;
+        if (!sch) return old;
+        return {
+          items: [
+            ...old.items,
+            {
+              scholarship_id: id,
+              scholarship: sch,
+              status: "saved" as const,
+              saved_at: new Date().toISOString(),
+            },
+          ],
+        };
+      });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      qc.setQueryData(["saved"], ctx?.prev);
+      toast.error("Couldn't update saved list.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["saved"] }),
   });
 
   const userName = auth.status === "authed" ? auth.user.full_name?.split(" ")[0] : null;
@@ -52,7 +100,7 @@ export default function FeedPage() {
       {recsQ.isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+            <Skeleton key={i} className="h-44 w-full" />
           ))}
         </div>
       ) : null}
@@ -76,77 +124,18 @@ export default function FeedPage() {
       <ul className="space-y-3">
         {recsQ.data?.items.map((rec) => (
           <li key={rec.scholarship.id}>
-            <RecommendationRow item={rec} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function RecommendationRow({ item }: { item: NonNullable<ReturnType<typeof useQuery>["data"]> extends infer T ? T : never }) {
-  // typed inline to avoid pulling type re-export
-  const rec = item as unknown as import("@/lib/api").RecommendationItem;
-  const s = rec.scholarship;
-  const dl = s.deadline ? formatDeadline(s.deadline) : null;
-  return (
-    <Card className="hover:border-ink-muted">
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div className="flex-1">
-          <CardTitle>
-            <Link href={`/scholarships/${s.id}`} className="hover:underline underline-offset-4">
-              {s.title}
-            </Link>
-          </CardTitle>
-          <p className="mt-1 text-sm text-ink-muted">
-            {s.provider} · {s.country_code}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          {dl ? (
-            <Badge tone={dl.tone === "urgent" ? "caution" : dl.tone === "passed" ? "danger" : "neutral"}>
-              {dl.label}
-            </Badge>
-          ) : null}
-          <span className="font-mono text-sm text-ink">
-            {formatAmount(s.amount_max ?? s.amount_min, s.currency || "CAD")}
-          </span>
-        </div>
-      </CardHeader>
-      <CardBody className="space-y-3">
-        <div className="flex flex-wrap gap-1.5">
-          {rec.stages.map((stage) => (
-            <Badge key={stage.name} tone={stage.status === "passed" || stage.status === "applied" ? "validated" : "neutral"}>
-              {stage.name}
-            </Badge>
-          ))}
-        </div>
-        {(rec.supporting_factors?.length ?? 0) > 0 ? (
-          <FactorList tone="validated" label="Supports" factors={rec.supporting_factors} />
-        ) : null}
-        {(rec.limiting_factors?.length ?? 0) > 0 ? (
-          <FactorList tone="caution" label="Limits" factors={rec.limiting_factors} />
-        ) : null}
-        <p className="flex items-center gap-1.5 text-xs text-ink-subtle">
-          <Sparkles className="size-3" strokeWidth={2} aria-hidden /> Ranked from your profile and
-          published eligibility rules.
-        </p>
-      </CardBody>
-    </Card>
-  );
-}
-
-function FactorList({ tone, label, factors }: { tone: "validated" | "caution"; label: string; factors: string[] }) {
-  return (
-    <div className="text-sm">
-      <p className="text-xs font-medium uppercase tracking-wider text-ink-subtle">{label}</p>
-      <ul className="mt-1 space-y-1">
-        {factors.map((f, i) => (
-          <li
-            key={i}
-            className={`pl-3 ${tone === "validated" ? "validated-stripe" : "caution-stripe"}`}
-          >
-            {f}
+            <RecommendationCard
+              item={rec}
+              profile={profileQ.data}
+              saved={savedSet.has(rec.scholarship.id)}
+              saving={toggleSave.isPending && toggleSave.variables?.id === rec.scholarship.id}
+              onToggleSave={() =>
+                toggleSave.mutate({
+                  id: rec.scholarship.id,
+                  currentlySaved: savedSet.has(rec.scholarship.id),
+                })
+              }
+            />
           </li>
         ))}
       </ul>

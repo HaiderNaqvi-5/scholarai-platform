@@ -31,10 +31,54 @@ class AuthService:
             password_hash=hash_password(payload.password),
             full_name=payload.full_name,
         )
+        if payload.billing_country:
+            user.billing_country = payload.billing_country
+        user.marketing_consent = bool(getattr(payload, "marketing_consent", False))
         self.db.add(user)
         await self.db.flush()
         await self.db.refresh(user)
+        await self._record_signup_consent(user, payload)
         return user
+
+    async def _record_signup_consent(self, user: User, payload: UserCreate) -> None:
+        """Persist initial terms + privacy consent if the signup payload carries
+        versions. Late binding to avoid an import cycle with app.core.consent."""
+
+        terms_version = getattr(payload, "terms_version", None)
+        privacy_version = getattr(payload, "privacy_version", None)
+        if not (terms_version and privacy_version and getattr(payload, "accepted", False)):
+            return
+
+        from app.core.consent import record_consent  # local import (cycle guard)
+
+        for consent_type, version in (
+            ("terms", terms_version),
+            ("privacy", privacy_version),
+        ):
+            try:
+                await record_consent(
+                    self.db,
+                    user,
+                    consent_type=consent_type,
+                    version=version,
+                    granted=True,
+                )
+            except Exception:
+                # Consent capture is best-effort at signup; the gated routes
+                # will re-prompt if the audit row is missing.
+                continue
+
+        if getattr(payload, "marketing_consent", False):
+            try:
+                await record_consent(
+                    self.db,
+                    user,
+                    consent_type="marketing",
+                    version="1.0",
+                    granted=True,
+                )
+            except Exception:
+                pass
 
     async def login(self, payload: UserLogin) -> TokenResponse:
         result = await self.db.execute(select(User).where(User.email == payload.email.lower()))

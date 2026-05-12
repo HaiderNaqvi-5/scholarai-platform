@@ -26,7 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir --default-timeout=600 --retries 10 \
+    --find-links=/wheels -r requirements.txt
 
 COPY . .
 
@@ -36,7 +38,8 @@ USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+# Image is process-agnostic (same image runs uvicorn, celery worker, celery beat).
+# Healthchecks live at the orchestration layer (docker-compose.yml / k8s manifests),
+# not baked into the image. Each service defines a check appropriate to its process.
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
