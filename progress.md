@@ -1,33 +1,68 @@
-# Progress — 2026-05-13 (session: test refactor for Pakistan PRD)
+# Progress — 2026-05-14
 
-**Branch:** `feat/scraper-optimization`
+**Branch:** `feat/phase-c-and-scraper-wip` (pushed to origin)
 
-## Tasks completed
-- Ran backend pytest baseline. Initial transient cross-file failure on `test_b2b_share_persists_lead_with_snapshot` and two ingestion cache tests; both reproducibly resolved once the file state stabilised (242/242 unit, 50/50 integration on isolated runs).
-- Audited the SCHOLARAI_PAKISTAN_PRD (sections 0, 0.5, 0.6, 1–10) against the existing backend test surface (`backend/tests/unit/*.py`, `backend/tests/integration/*.py`).
-- Mapped every PRD acceptance bullet to an existing test. Coverage is already extensive: dedicated suites exist for plan guard, waitlist/pricing, CGPA conversion, Pakistan dataset, Pakistan recommendation matching, scholarship match service, tracker, SOP builder, visa interview, privacy/B2B, profile Pakistan fields, demo seed.
-- Identified two real gaps and one drift:
-  1. PRD §0.6 critical rule — "matching engine has ZERO imports from referral_enrollments/institutions tables" — had no automated guard.
-  2. PRD §10 demo readiness — `backend/scripts/demo_seed_pakistan.py` was not pinned by any test, so the Zara Khan persona, plan=elite, 2099 expiry, and consent grants could regress silently.
-  3. `tests/unit/test_privacy_and_b2b.py::_profile()` SimpleNamespace fixture was missing `gpa_scale` and the migration-0019 B2B fields that `services/privacy/b2b_share.py::_profile_snapshot` now reads — caused intermittent failure depending on file state.
-- Filled the gaps:
-  - Added `backend/tests/unit/test_b2b_trust_boundary.py` — AST-walks every module under `app/services/recommendations` and `app/services/scholarships` and asserts none of them reference `Institution`, `InstitutionStudent`, `ReferralEnrollment`, `UniversityLead`, or the equivalent table names. Two parametrized tests × two packages = 4 assertions.
-  - Added `backend/tests/unit/test_demo_seed_pakistan.py` — 12 static checks on `scripts/demo_seed_pakistan.py` covering demo email, plan=elite, PKR currency, PK billing country, 2099 expiry, 5 consent grants, NUST persona, three-plan waitlist placeholders, scholarship/university/visa-question seed minimums (≥10, ≥30, ≥70 with required country splits), and a syntax-parse check.
-  - Extended `_profile()` fixture in `tests/unit/test_privacy_and_b2b.py` with every field `_profile_snapshot` consumes (`gpa_scale`, `gmat_score`, `sat_score`, `budget_pkr_max`, `target_university_ids`, `current_university_id`, `hec_degree_level`, `intake_target`, `phone_e164`, `whatsapp_e164`, `current_employer`, `current_job_title`, `household_income_band`, `father_occupation`, `referral_source`, etc.) so the snapshot test is resilient to migration-0019 field additions.
-- Re-ran the full backend suite: **306 passed, 0 failed**.
+Branched off `feat/scraper-optimization` after Phase C re-verify on `feat/pakistan-pivot-merge`. Carries the Pakistan-pivot baseline plus four scraper-optimization PRs and the B2B Phase C handoff.
 
-## Files touched
-- `backend/tests/unit/test_b2b_trust_boundary.py` — NEW.
-- `backend/tests/unit/test_demo_seed_pakistan.py` — NEW.
-- `backend/tests/unit/test_privacy_and_b2b.py` — extended `_profile()` fixture with the B2B/Phase-C field surface.
+## Tasks completed this session
 
-## Open work / not in scope this session
-- Frontend has no test surface (no `*.test.*` or `__tests__` under `frontend/src`). PRD §1–§10 frontend acceptance is currently only covered by the Playwright smoke suite at `tests/e2e/playwright/`. Adding component-level tests was de-scoped.
-- Migration-0019 Pydantic schema tests (`gmat_score`, `sat_score`, `budget_pkr_max`, `target_university_ids`, `current_university_id`) — these fields are not on this branch's `app/schemas/student.py`, only on the b2b_share consumer side. When the schema branch merges, add round-trip tests under `tests/unit/test_profile_pakistan_fields.py`.
+### Phase C — B2B data-capture, frontend edit surface + snapshot expansion
+- `frontend/src/app/(student)/profile/page.tsx` (913 lines): 6-card rewrite — Contact / Academic / Tests / Goal / Aspirations / Background. Exposes all 25+ editable `StudentProfile` fields. `/api/v1/universities?country=<first target>` powers the shortlist picker. Optimistic save preserved. `bunx --bun tsc --noEmit` profile-clean (only pre-existing `EligibilityMatrix.tsx` drift remains, unrelated).
+- `backend/app/services/privacy/b2b_share.py::_profile_snapshot`: extended to surface every new B2B field at share time. DPA + `b2b_share_consent` enforcement unchanged.
+- `backend/tests/unit/test_privacy_and_b2b.py`: `_profile` SimpleNamespace fixture extended with all new snapshot fields. 14/14 tests green.
+
+### Scraper optimization PRs (chained on top of `feat/scraper-optimization`)
+- **`1bdde98` Conditional GET.** IngestionService stores per-source `ETag` / `Last-Modified`; subsequent fetches send `If-None-Match` / `If-Modified-Since`. `304 Not Modified` short-circuits — no parse, no LLM call, no DB write.
+- **`457b047` Sitemap + RSS/Atom feed discovery.** New `source_feed` table (migration `20260514_0020_ingestion_caching.py`). IngestionService now resolves robots.txt → sitemap-index → URLs and parses RSS/Atom feeds before falling back to full-page scrape. Only newer-than-`last_seen_at` entries get fetched.
+- **`fbdf473` DiscoveryService.** Crawl one level from a seed aggregator URL, keyword-filter outbound links, classify each candidate via Claude, return high-confidence `DiscoveredSource[]` for admin review. No auto-registration.
+- **`5db76fb`** export `DiscoveryService` from `app/services/ingestion/__init__.py`.
+- **`779490f` Tests + docs.** `test_ingestion_service` (ETag short-circuit + feed parsing), `test_discovery_service` (keyword filter + monkeypatched LLM classifier + confidence threshold), `test_b2b_trust_boundary` (PRD §0.6 enforcement: recommendation engine MUST NOT import from `university_leads` / `institutions`), `test_demo_seed_pakistan` (orchestrator coverage). Plus CLAUDE.md + this progress.md.
+
+### Housekeeping
+- `.gitignore`: `graphify-out/` (4.7M AST cache from the graphify skill) now excluded.
+- `CLAUDE.md`: appended scraper-pass note + Phase C done note. 116 lines, under the 200-line cap.
+- Earlier this session: branch confusion — `git checkout` mid-task from `feat/pakistan-pivot-merge` → `feat/scraper-optimization` made it look like edits had been reverted. They had only moved off the working tree. Re-verified Phase C work was already committed as `c096dc8` on `feat/pakistan-pivot-merge`.
+- Pushed `feat/phase-c-and-scraper-wip` to `origin`. PR URL: `https://github.com/HaiderNaqvi-5/scholarai-platform/pull/new/feat/phase-c-and-scraper-wip`.
+
+## Files touched this session
+- `backend/alembic/versions/20260514_0020_ingestion_caching.py` — new (source_feed table + ETag/Last-Modified columns on source_registry).
+- `backend/app/models/models.py` — `SourceFeed` ORM model + ETag/Last-Modified columns on `SourceRegistry`.
+- `backend/app/models/__init__.py` — export `SourceFeed`.
+- `backend/app/services/ingestion/__init__.py` — export `DiscoveryService`.
+- `backend/app/services/ingestion/service.py` — conditional-GET, sitemap parsing, feed parsing.
+- `backend/app/services/ingestion/discovery.py` — new module (233 lines).
+- `backend/app/services/privacy/b2b_share.py` — extended `_profile_snapshot` (already on `feat/pakistan-pivot-merge` HEAD as part of `c096dc8`).
+- `frontend/src/app/(student)/profile/page.tsx` — 6-card rewrite (same commit).
+- `backend/tests/unit/test_ingestion_service.py` — ETag + feed tests (257 lines).
+- `backend/tests/unit/test_discovery_service.py` — new (193 lines).
+- `backend/tests/unit/test_b2b_trust_boundary.py` — new (92 lines).
+- `backend/tests/unit/test_demo_seed_pakistan.py` — new (118 lines).
+- `backend/tests/unit/test_privacy_and_b2b.py` — fixture extension.
+- `.gitignore`, `CLAUDE.md`, `progress.md`.
+
+## In-progress / next
+- Open PR on GitHub for `feat/phase-c-and-scraper-wip` if user wants review. URL above.
+- Apply migration `20260514_0020_ingestion_caching` against the live dev DB before exercising conditional GET / feed discovery end-to-end:
+  `docker exec scholarai-platform-backend-1 alembic upgrade head`.
+- Wire `/admin/sources` UI to surface `DiscoveryService` results for human approval. Currently the service is admin-callable but has no frontend route.
+- Pre-existing `frontend/src/components/scholarship/EligibilityMatrix.tsx` drift still blocks a fully-green typecheck (19 errors, all in that one file: uses `profile.citizenship` / `degree_level` / `gpa` / `field_tags` / `language_scores` — none on current `StudentProfile`). Out of scope this session.
+- Frontend container has no healthcheck (low priority; nothing depends on it).
+- `broker_connection_retry_on_startup=True` deprecation in `app/tasks/celery_app.py` — still deferred per the "no cosmetic" rule.
+
+## Open bugs / blockers
+- None known. `/livez` 200; `/api/v1/universities` returns 30 rows for `country=GB` (401 without auth = correct).
 
 ## Commands to resume
-- `cd backend && python -m pytest tests/unit tests/integration -q`
-- Selective: `python -m pytest tests/unit/test_b2b_trust_boundary.py tests/unit/test_demo_seed_pakistan.py -v`
-- Live demo seed (requires running DB): `cd backend && python scripts/demo_seed_pakistan.py`
-- API: `cd backend && python -m uvicorn app.main:app --reload`
-- Frontend: `cd frontend && bun dev` (port 3001)
+- Stack: `cd scholarai-platform && docker compose up -d`
+- Migrations: `docker exec scholarai-platform-backend-1 alembic upgrade head`
+- Frontend dev: `cd scholarai-platform/frontend && bun dev` (port 3001)
+- Backend reload after a code change: `docker cp <path> scholarai-platform-backend-1:/app/<same-path> && docker restart scholarai-platform-backend-1`
+- Health: `curl http://localhost:8000/livez && curl http://localhost:8000/readyz`
+- Tests:
+  - `docker exec scholarai-platform-backend-1 pytest tests/unit/test_privacy_and_b2b.py -q`
+  - `docker exec scholarai-platform-backend-1 pytest tests/unit/test_ingestion_service.py -q`
+  - `docker exec scholarai-platform-backend-1 pytest tests/unit/test_discovery_service.py -q`
+  - `docker exec scholarai-platform-backend-1 pytest tests/unit/test_b2b_trust_boundary.py -q`
+  - `docker exec scholarai-platform-backend-1 pytest tests/unit/test_demo_seed_pakistan.py -q`
+- Typecheck: `cd scholarai-platform/frontend && bunx --bun tsc --noEmit`
+- Push gate (per `AGENTS.md`): backend unit+integration, KPI regression, frontend lint/typecheck/build, docs governance, browser smoke.
