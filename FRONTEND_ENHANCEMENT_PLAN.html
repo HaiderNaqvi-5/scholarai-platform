@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScholarAI — Frontend Enhancement Plan</title>
+<style>
+  :root {
+    --ink: #0C1117;
+    --ink-muted: #334155;
+    --ink-subtle: #64748B;
+    --paper: #F7F5F0;
+    --paper-warm: #F1EDE4;
+    --paper-dim: #E7E1D5;
+    --paper-white: #FFFDF9;
+    --validated: #426B5A;
+    --validated-soft: #DDE9E2;
+    --caution: #B7791F;
+    --caution-soft: #F4E7CF;
+    --danger: #B94A48;
+    --danger-soft: #F4D8D6;
+    --generated: #2E5B9A;
+    --generated-soft: #DCE6F4;
+    --gold: #8B6914;
+    --gold-soft: #F5EDD6;
+    --border: rgba(12,17,23,0.08);
+    --shadow: 0 4px 20px rgba(12,17,23,0.07);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .doc-header {
+    background: var(--ink);
+    color: #fff;
+    padding: 48px 64px;
+  }
+  .doc-header .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 12px;
+  }
+  .doc-header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  .doc-header .subtitle {
+    font-size: 16px;
+    color: rgba(255,255,255,0.65);
+    max-width: 640px;
+  }
+  .doc-header .meta {
+    display: flex; gap: 32px; margin-top: 28px;
+  }
+  .doc-header .meta-item {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .doc-header .meta-label { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: .08em; }
+  .doc-header .meta-value { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
+
+  /* LAYOUT */
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 64px; }
+
+  /* SECTION */
+  section { margin-bottom: 64px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-subtle);
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  p { color: var(--ink-muted); margin-bottom: 12px; }
+
+  /* COMPETITIVE TABLE */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 16px; }
+  .compare-table th {
+    background: var(--paper-warm);
+    padding: 10px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-muted);
+    border-bottom: 2px solid var(--border);
+  }
+  .compare-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table td:first-child { font-weight: 500; color: var(--ink); width: 200px; }
+  .win { color: var(--validated); font-weight: 500; }
+  .lose { color: var(--danger); }
+  .neutral { color: var(--caution); font-weight: 500; }
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 99px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .03em;
+  }
+  .badge-win { background: var(--validated-soft); color: var(--validated); }
+  .badge-lose { background: var(--danger-soft); color: var(--danger); }
+  .badge-neutral { background: var(--caution-soft); color: var(--caution); }
+  .badge-info { background: var(--generated-soft); color: var(--generated); }
+
+  /* PROBLEMS */
+  .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .problem-card {
+    background: var(--danger-soft);
+    border: 1px solid rgba(185,74,72,.15);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+  }
+  .problem-card h4 { font-size: 14px; font-weight: 600; color: var(--danger); margin-bottom: 6px; }
+  .problem-card p { font-size: 13px; color: #7a3331; margin: 0; }
+
+  /* SPRINT CARDS */
+  .sprint-list { display: flex; flex-direction: column; gap: 24px; margin-top: 8px; }
+  .sprint-card {
+    background: var(--paper-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .sprint-header {
+    display: flex; align-items: flex-start; gap: 20px;
+    padding: 24px 28px 20px;
+  }
+  .sprint-number {
+    min-width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .sprint-meta { flex: 1; }
+  .sprint-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sprint-subtitle { font-size: 13px; color: var(--ink-subtle); }
+  .sprint-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .sprint-tag {
+    background: var(--paper-warm);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 3px 10px;
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+  .sprint-effort {
+    min-width: 80px; text-align: right;
+    font-size: 12px; color: var(--ink-subtle);
+  }
+  .sprint-effort span {
+    display: block;
+    font-size: 18px; font-weight: 700;
+    color: var(--ink);
+  }
+  .sprint-body {
+    border-top: 1px solid var(--border);
+    padding: 20px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+  }
+  .sprint-col-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .08em;
+    color: var(--ink-subtle);
+    margin-bottom: 10px;
+  }
+  .task-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .task-list li {
+    font-size: 13px; color: var(--ink-muted);
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .task-list li::before {
+    content: "→";
+    position: absolute; left: 0;
+    color: var(--ink-subtle);
+    font-size: 11px;
+    top: 1px;
+  }
+  .task-list li strong { color: var(--ink); font-weight: 500; }
+  .gate-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .gate-list li {
+    font-size: 12.5px; color: var(--ink-muted);
+    padding-left: 18px;
+    position: relative;
+    line-height: 1.4;
+  }
+  .gate-list li::before {
+    content: "✓";
+    position: absolute; left: 0;
+    color: var(--validated);
+    font-weight: 700;
+    font-size: 11px;
+    top: 1px;
+  }
+
+  /* COLORS per sprint */
+  .s1 .sprint-number { background: #1B2633; color: #fff; }
+  .s2 .sprint-number { background: var(--generated-soft); color: var(--generated); }
+  .s3 .sprint-number { background: var(--validated-soft); color: var(--validated); }
+  .s4 .sprint-number { background: #EAE4FF; color: #5B3FC5; }
+  .s5 .sprint-number { background: var(--caution-soft); color: var(--caution); }
+  .s6 .sprint-number { background: #FFE4F0; color: #9B2258; }
+  .s7 .sprint-number { background: #E0F4FF; color: #0369A1; }
+  .s8 .sprint-number { background: var(--gold-soft); color: var(--gold); }
+  .s9 .sprint-number { background: var(--paper-dim); color: var(--ink-muted); }
+
+  /* UX PRINCIPLES */
+  .principles-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .principle-card {
+    background: var(--paper-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+  }
+  .principle-card .icon { font-size: 22px; margin-bottom: 10px; }
+  .principle-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .principle-card p { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+  /* DIFFERENTIATORS */
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .diff-card {
+    background: var(--paper-white);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--validated);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+  }
+  .diff-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .diff-card p { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+  /* ONBOARDING FLOW */
+  .flow-steps { display: flex; gap: 0; margin-top: 20px; }
+  .flow-step {
+    flex: 1;
+    padding: 18px 16px;
+    background: var(--paper-white);
+    border: 1px solid var(--border);
+    border-right: none;
+    position: relative;
+  }
+  .flow-step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .flow-step:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; }
+  .flow-step .step-n {
+    font-size: 11px; font-weight: 700; color: var(--ink-subtle);
+    text-transform: uppercase; letter-spacing: .08em;
+    margin-bottom: 6px;
+  }
+  .flow-step h4 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .flow-step ul { list-style: none; }
+  .flow-step ul li {
+    font-size: 11.5px; color: var(--ink-muted);
+    padding-left: 12px; position: relative;
+    margin-bottom: 4px;
+  }
+  .flow-step ul li::before { content: "·"; position: absolute; left: 2px; color: var(--ink-subtle); }
+  .flow-step .time-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--validated);
+    font-weight: 600;
+  }
+
+  /* PRIORITY TABLE */
+  .priority-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 16px; }
+  .priority-table th {
+    background: var(--paper-warm);
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-muted);
+    border-bottom: 2px solid var(--border);
+  }
+  .priority-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink-muted);
+    vertical-align: middle;
+  }
+  .priority-table tr:last-child td { border-bottom: none; }
+  .priority-table td:first-child { font-weight: 500; color: var(--ink); }
+  .p1 { background: var(--danger-soft); color: var(--danger) !important; font-weight: 700 !important; }
+  .p2 { background: var(--caution-soft); color: var(--caution) !important; font-weight: 600 !important; }
+  .p3 { background: var(--validated-soft); color: var(--validated) !important; font-weight: 600 !important; }
+
+  /* TIMELINE */
+  .timeline { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 16px; }
+  .tl-block {
+    padding: 10px 8px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .tl-label { font-size: 10px; color: var(--ink-subtle); margin-top: 4px; }
+
+  /* FOOTER */
+  .doc-footer {
+    background: var(--paper-warm);
+    border-top: 1px solid var(--border);
+    padding: 32px 64px;
+    font-size: 13px;
+    color: var(--ink-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .doc-footer strong { color: var(--ink); }
+
+  /* CALLOUT */
+  .callout {
+    background: var(--generated-soft);
+    border: 1px solid rgba(46,91,154,.2);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin-top: 16px;
+  }
+  .callout h4 { font-size: 13px; font-weight: 600; color: var(--generated); margin-bottom: 6px; }
+  .callout p { font-size: 13px; color: #1e3d6b; margin: 0; line-height: 1.5; }
+
+  @media print {
+    body { background: white; }
+    .container { padding: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="doc-header">
+  <div class="eyebrow">ScholarAI Pakistan — Design & Engineering Brief</div>
+  <h1>Frontend Enhancement Plan<br>v2.0 Pakistan Pivot</h1>
+  <p class="subtitle">A sprint-by-sprint plan to build a frontend that beats GoScholar.ai for Pakistani students — intentional UX, frictionless flows, zero AI slugishness.</p>
+  <div class="meta">
+    <div class="meta-item">
+      <span class="meta-label">Version</span>
+      <span class="meta-value">2.0 — Pakistan Pivot</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Created</span>
+      <span class="meta-value">May 2026</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Total Sprints</span>
+      <span class="meta-value">9 sprints</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Est. Frontend Effort</span>
+      <span class="meta-value">~26 dev-days</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Target</span>
+      <span class="meta-value">Beat GoScholar.ai for PK</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- COMPETITIVE ANALYSIS -->
+<section>
+  <div class="section-label">01 — Competitive Analysis</div>
+  <h2>Where GoScholar wins today — and where we own them</h2>
+  <p>GoScholar is built for African students. Their edge is emotional storytelling and a fast match promise. Our edge is Pakistan-specific depth that no platform offers anywhere.</p>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>GoScholar.ai</th>
+        <th>ScholarAI (current)</th>
+        <th>ScholarAI (after this plan)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Landing emotional hook</td>
+        <td class="win">Founder story by an African grad — "I got lucky, you shouldn't have to"</td>
+        <td class="lose">Generic: "For grad school applicants." No identity.</td>
+        <td><span class="badge badge-win">✓ Owned</span> Pakistani student story, PKR cost pain, visa fear hook</td>
+      </tr>
+      <tr>
+        <td>Match speed promise</td>
+        <td class="win">"Results in under 60 seconds" — repeated 4× on page</td>
+        <td class="lose">No such promise. No urgency.</td>
+        <td><span class="badge badge-win">✓ Owned</span> "Find your match in 60 seconds" in hero + CTA</td>
+      </tr>
+      <tr>
+        <td>Live preview in hero</td>
+        <td class="win">Animated card showing "12 schools found for you" in hero</td>
+        <td class="lose">No preview — blank hero with two buttons</td>
+        <td><span class="badge badge-win">✓ Owned</span> Static match card preview: Chevening 96% match</td>
+      </tr>
+      <tr>
+        <td>Onboarding friction</td>
+        <td class="neutral">~3 min, basic fields</td>
+        <td class="lose">~2 min but generic — no Pakistan fields, no university autocomplete</td>
+        <td><span class="badge badge-win">✓ Better</span> Pakistan-specific, smart defaults, ~3 min with more depth</td>
+      </tr>
+      <tr>
+        <td>Visa interview simulator</td>
+        <td class="lose">"Coming Soon" — NOT built</td>
+        <td class="neutral">Shell exists (not functional)</td>
+        <td><span class="badge badge-win">✓ We Win</span> Full UK/USA/Canada/Germany simulator — first in market</td>
+      </tr>
+      <tr>
+        <td>SOP builder</td>
+        <td class="neutral">Generic AI writing assistant</td>
+        <td class="lose">Shell exists (not functional)</td>
+        <td><span class="badge badge-win">✓ We Win</span> Pakistan-context SOP: HEC, NUST, ties to Pakistan</td>
+      </tr>
+      <tr>
+        <td>Application tracker</td>
+        <td class="neutral">Basic kanban board</td>
+        <td class="lose">Saved list only — no stages, no checklist</td>
+        <td><span class="badge badge-win">✓ Better</span> 6-column kanban + HEC attestation checklist</td>
+      </tr>
+      <tr>
+        <td>CGPA / grading context</td>
+        <td class="lose">None</td>
+        <td class="lose">None</td>
+        <td><span class="badge badge-win">✓ We Win</span> Pakistani CGPA → US GPA conversion shown in results</td>
+      </tr>
+      <tr>
+        <td>Social proof</td>
+        <td class="win">525+ students, real success stories with names</td>
+        <td class="lose">None</td>
+        <td><span class="badge badge-neutral">~</span> Stats + testimonial placeholders (seed 3 stories)</td>
+      </tr>
+      <tr>
+        <td>Mobile UX</td>
+        <td class="neutral">Decent but desktop-first</td>
+        <td class="lose">Not tested, likely broken at 375px</td>
+        <td><span class="badge badge-win">✓ Better</span> Mobile-first rewrite, WhatsApp share integration</td>
+      </tr>
+      <tr>
+        <td>Freemium / pricing</td>
+        <td class="neutral">Paid plan exists, basic gating</td>
+        <td class="lose">None — everything free, no gates</td>
+        <td><span class="badge badge-win">✓ Owned</span> Smart freemium with blur, UpgradeWall, PKR pricing</td>
+      </tr>
+      <tr>
+        <td>Country-specific content</td>
+        <td class="neutral">African students broadly, not country-specific</td>
+        <td class="lose">Canada-first currently, Pakistan pivot incomplete</td>
+        <td><span class="badge badge-win">✓ We Win</span> Pakistan-first, PKR context everywhere</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- CURRENT PROBLEMS -->
+<section>
+  <div class="section-label">02 — Current Frontend Problems</div>
+  <h2>What's broken or missing right now</h2>
+  <div class="problem-grid">
+    <div class="problem-card">
+      <h4>No Pakistan identity</h4>
+      <p>Landing says "For grad school applicants." Brand is "GrantPath" on landing but "ScholarAI" everywhere else. No Pakistani student feels this was made for them.</p>
+    </div>
+    <div class="problem-card">
+      <h4>Onboarding misses Pakistani fields</h4>
+      <p>Current form asks generic GPA/citizenship — no university name autocomplete, no CGPA scale context, no intake target, no financial context. Students can't complete a meaningful profile.</p>
+    </div>
+    <div class="problem-card">
+      <h4>5 features are placeholder stubs</h4>
+      <p>Scholarship Finder, Application Tracker, SOP Builder, Visa Interview, and Upgrade Page all show "PlaceholderRoute." The product is incomplete for the demo path.</p>
+    </div>
+    <div class="problem-card">
+      <h4>Dashboard is opaque</h4>
+      <p>"For you" and "Discover" labels tell the student nothing about what actions to take. No clear next step, no urgency, no features surfaced.</p>
+    </div>
+    <div class="problem-card">
+      <h4>No freemium model in UI</h4>
+      <p>No UpgradeWall, no blur effect, no pricing page, no plan gates. The freemium model is in the PRD but not implemented anywhere in the frontend.</p>
+    </div>
+    <div class="problem-card">
+      <h4>Mobile not tested</h4>
+      <p>Pakistani students are mobile-first. No 375px testing, sidebar likely broken on mobile, kanban not responsive. This is a critical gap.</p>
+    </div>
+  </div>
+</section>
+
+<!-- UX PRINCIPLES -->
+<section>
+  <div class="section-label">03 — Design Principles for This Rebuild</div>
+  <h2>Non-negotiable UX rules</h2>
+  <p>These override any default behavior. GoScholar wins on emotion — we win on depth + trust + Pakistan specificity.</p>
+  <div class="principles-grid">
+    <div class="principle-card">
+      <div class="icon">⚡</div>
+      <h4>Zero AI theatre</h4>
+      <p>No fake streaming, no loading spinners on REST data. Scholarship cards render once. Skeletons show once per route. Instant perceived performance.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">🎯</div>
+      <h4>One CTA at a time</h4>
+      <p>Every screen has exactly one primary action. Landing → "Find My Scholarships." Feed → "View Match." Onboarding → "Continue." No decision paralysis.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">🇵🇰</div>
+      <h4>Pakistan context everywhere</h4>
+      <p>PKR pricing, Pakistani university names, CGPA/HEC context, visa fear language. Every screen should feel built for a student from Lahore or Karachi.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">📱</div>
+      <h4>Mobile-first, WhatsApp-aware</h4>
+      <p>375px is the primary canvas. Share-to-WhatsApp on scholarship cards. Bottom navigation on mobile. Tap targets ≥44px on every action.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">🔒</div>
+      <h4>Show locked, never hide</h4>
+      <p>Free tier sees blurred results with counts: "9 more matches including 2 fully funded." UpgradeWall shows specific context from the API — never generic "unlock this."</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">✅</div>
+      <h4>Validated ≠ AI generated</h4>
+      <p>Scholarship facts (deadlines, amounts) always in validated green stripe. AI-generated text (SOP draft, explanations) always in generated blue stripe + Sparkles icon.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">🏃</div>
+      <h4>Frictionless onboarding</h4>
+      <p>Under 3 minutes. Smart defaults for common Pakistani universities. localStorage autosave every keystroke. No required fields that block progress except degree + countries.</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">🎨</div>
+      <h4>No emoji as UI</h4>
+      <p>Lucide SVG icons only in UI chrome. Emoji only in content (country flags in scholarship names, the PRD uses them — keep in data, not chrome).</p>
+    </div>
+    <div class="principle-card">
+      <div class="icon">📊</div>
+      <h4>Urgency is real, not fake</h4>
+      <p>"Chevening closes in 47 days" is a real deadline countdown. Scholarship cards show red border when &lt;30 days. Never manufactured false urgency.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DIFFERENTIATORS -->
+<section>
+  <div class="section-label">04 — Unique Differentiators vs GoScholar</div>
+  <h2>What we have that they don't — and must make visible</h2>
+  <div class="diff-grid">
+    <div class="diff-card">
+      <h4>Visa Interview Simulator — First in Market</h4>
+      <p>GoScholar's "Visa Preparation" is listed as "Coming Soon." We have 70 seeded questions for UK, USA, Canada, Germany with AI rubric evaluation. This is the headline feature — put it front and center on landing and dashboard.</p>
+    </div>
+    <div class="diff-card">
+      <h4>Pakistani CGPA Conversion Context</h4>
+      <p>"Your 3.6 CGPA from NUST is equivalent to a 3.5 US GPA" — no competitor shows this. Surface in every scholarship match card. Makes our eligibility filtering feel more honest and expert.</p>
+    </div>
+    <div class="diff-card">
+      <h4>SOP with Pakistani Academic Context</h4>
+      <p>Understands HEC degrees, Pakistani university prestige, ties-to-Pakistan framing for government scholarships, visa officer reading lens. GoScholar's AI assistant is generic.</p>
+    </div>
+    <div class="diff-card">
+      <h4>HEC Attestation Awareness</h4>
+      <p>Every application tracker card has HEC Degree Attestation in the checklist — labeled "required for UK/Germany." This is a Pakistani-specific pain point no other platform surfaces.</p>
+    </div>
+    <div class="diff-card">
+      <h4>PKR-First Freemium Pricing</h4>
+      <p>"Less than one consultant meeting — PKR 2,499/month." Positioned specifically against the consultant market in Pakistan. Conversion copy that resonates culturally, not just functionally.</p>
+    </div>
+    <div class="diff-card">
+      <h4>Multi-Channel Alert System</h4>
+      <p>Elite: Email + SMS + WhatsApp alerts for deadlines. WhatsApp is the communication layer in Pakistan. GoScholar has no WhatsApp integration. This is a real retention moat.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ONBOARDING FLOW DESIGN -->
+<section>
+  <div class="section-label">05 — Onboarding Flow Redesign</div>
+  <h2>Pakistan-specific 4-step onboarding (under 3 minutes)</h2>
+  <p>Replace the current generic 4-step form. Every field must feel relevant to a Pakistani MS applicant. Smart defaults, no walls, autosave on every change.</p>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-n">Step 1</div>
+      <h4>About You</h4>
+      <ul>
+        <li>Full name</li>
+        <li>City (Karachi, Lahore, Islamabad…)</li>
+        <li>Pakistani university (autocomplete: NUST, LUMS, FAST, UET, IBA, QAU, COMSATS…)</li>
+        <li>Degree subject (CS, EE, Data Science…)</li>
+        <li>Graduation year</li>
+      </ul>
+      <div class="time-note">~45 seconds</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-n">Step 2</div>
+      <h4>Academic Record</h4>
+      <ul>
+        <li>CGPA value</li>
+        <li>CGPA scale (4.0 standard / 4.0 HEC)</li>
+        <li>HEC degree level (Bachelor / Master / MPhil)</li>
+        <li>Research publications? (yes/no + count)</li>
+        <li>Show US GPA equivalent live</li>
+      </ul>
+      <div class="time-note">~45 seconds</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-n">Step 3</div>
+      <h4>Test Scores</h4>
+      <ul>
+        <li>IELTS score (or "not taken yet")</li>
+        <li>TOEFL score (optional)</li>
+        <li>GRE Quant / Verbal (optional)</li>
+        <li>GRE waiver needed? (toggle)</li>
+        <li>Clear "all optional" messaging</li>
+      </ul>
+      <div class="time-note">~30 seconds</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-n">Step 4</div>
+      <h4>Your Goal</h4>
+      <ul>
+        <li>Target degree (MS / PhD / MBA)</li>
+        <li>Target countries (multi-select flags)</li>
+        <li>Target fields (CS, DS/AI, EE…)</li>
+        <li>Funding: Fully funded only / Partial OK</li>
+        <li>Intake target (Sep 2025 / Jan 2026…)</li>
+      </ul>
+      <div class="time-note">~45 seconds</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-n">Step 5</div>
+      <h4>Financial Context</h4>
+      <ul>
+        <li>Can afford application fees?</li>
+        <li>Family has funds for bank statement?</li>
+        <li>Brief — 3 toggles only</li>
+        <li>Skip option visible</li>
+        <li>→ Redirect to Dashboard</li>
+      </ul>
+      <div class="time-note">~20 seconds</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h4>Critical UX decisions for onboarding</h4>
+    <p>
+      1. Show progress bar at top with steps + "~3 min" estimate. <br>
+      2. Show CGPA US-equivalent inline as student types ("Your 3.6 = ~3.5 US GPA") — builds trust immediately. <br>
+      3. Pakistani university field: searchable dropdown with 20 top universities pre-loaded, free-text fallback. <br>
+      4. Step 4 country select: show country flags as large tappable cards (not a dropdown) — mobile-friendly + satisfying. <br>
+      5. "Continue" should always be enabled — no field blocks progress except target_degree + target_countries on Step 4. <br>
+      6. On the final step, CTA changes to "Find My Scholarships →" not "Save."
+    </p>
+  </div>
+</section>
+
+<!-- SPRINT PLAN -->
+<section>
+  <div class="section-label">06 — Sprint-by-Sprint Build Plan</div>
+  <h2>9 sprints to a frontend that beats GoScholar</h2>
+  <p>Each sprint is self-contained. No sprint depends on the next being complete before it can be tested. Build in order — foundational sprints unlock later features.</p>
+
+  <div class="sprint-list">
+
+    <!-- SPRINT 1 -->
+    <div class="sprint-card s1">
+      <div class="sprint-header">
+        <div class="sprint-number">S1</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Pakistan Landing Page</div>
+          <div class="sprint-subtitle">Route: <code>/</code> — Public, no auth. Replaces generic GrantPath landing.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">High priority</span>
+            <span class="sprint-tag">Conversion critical</span>
+            <span class="sprint-tag">Mobile-first</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Hero:</strong> Headline "No consultant. No fees. Find fully-funded programs abroad." + 60-second promise + static match card preview showing Chevening 96% match</li>
+            <li><strong>Problem section:</strong> 4 cards — PKR consultant cost, WhatsApp chaos, visa fear, currency pain</li>
+            <li><strong>How it works:</strong> 4 horizontal steps with icons (profile → match → track → apply)</li>
+            <li><strong>Featured scholarships:</strong> 5 cards (Chevening, Fulbright, DAAD, Commonwealth, HEC) with flag + funding + deadline</li>
+            <li><strong>Stats bar:</strong> 150K+ students abroad, 62% want to go, 0 dedicated platforms</li>
+            <li><strong>Visa simulator callout:</strong> "Ace your visa interview — Practice with AI" (highlight vs GoScholar Coming Soon)</li>
+            <li><strong>Footer:</strong> "Are you a university? Partner with us →" mailto link</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Brand name: <strong>ScholarAI Pakistan</strong> (resolve GrantPath/ScholarAI confusion — use ScholarAI everywhere)</li>
+            <li>Hero CTA: single button "Find My Scholarships →" — not two buttons</li>
+            <li>Hero sub-CTA: small link "Already have an account? Sign in"</li>
+            <li>Match preview card: static, shows confidence scores, funding badge, deadline countdown — loads instantly</li>
+            <li>Landing does NOT auto-redirect logged-in users — let them see the page, then click to dashboard</li>
+            <li>LCP target: &lt;1.8s. No heavy images. Hero uses CSS gradient + SVG illustration.</li>
+            <li>Mobile: single column, hero card hidden on &lt;640px, CTA full-width</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Loads in &lt;2s (Lighthouse mobile)</li>
+            <li>"Find My Scholarships" → /signup if logged out, /feed if logged in</li>
+            <li>All 4 landing sections render on 375px mobile</li>
+            <li>5 scholarship cards show correctly</li>
+            <li>No GrantPath brand anywhere — all ScholarAI Pakistan</li>
+            <li>Footer mailto link works</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 2 -->
+    <div class="sprint-card s2">
+      <div class="sprint-header">
+        <div class="sprint-number">S2</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Pakistan Onboarding Redesign</div>
+          <div class="sprint-subtitle">Route: <code>/onboarding</code> — 5-step wizard, Pakistan-specific fields, under 3 minutes.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">High priority</span>
+            <span class="sprint-tag">Depends on: backend migration (PRD §1)</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Step 1:</strong> Name + city (select) + Pakistani university (searchable autocomplete) + degree subject + graduation year</li>
+            <li><strong>Step 2:</strong> CGPA value + scale selector + HEC level + publications toggle + count. Show US-equivalent inline.</li>
+            <li><strong>Step 3:</strong> IELTS / TOEFL / GRE scores (all optional, "not taken yet" option). GRE waiver toggle.</li>
+            <li><strong>Step 4:</strong> Target degree + countries (flag cards, multi-select) + target fields (chips) + funding requirement + intake target</li>
+            <li><strong>Step 5:</strong> 3 financial toggles + skip button + "Find My Scholarships" CTA</li>
+            <li><strong>Progress bar:</strong> Top of page, step dots with labels + "~X min left" estimate</li>
+            <li><strong>Animated transitions:</strong> Slide left/right between steps (CSS transform, respects prefers-reduced-motion)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Pakistani university autocomplete: hardcode 25 top universities, free-text for others</li>
+            <li>CGPA live conversion: debounced 300ms, shows "≈ 3.5 US GPA" below field in validated-green</li>
+            <li>Country select: use large flag emoji + country name cards (4-col grid on mobile). UK, USA, Canada, Germany, Australia, Ireland, Netherlands.</li>
+            <li>Fields multi-select: pill chips (CS, DS/AI, EE, Business, Engineering, Medicine, Other)</li>
+            <li>Back/Continue pattern: Back never loses data. Continue on Step 4 = last required step.</li>
+            <li>localStorage autosave: save on every field change, not just on Continue</li>
+            <li>If student has existing profile data, pre-fill all fields from API on mount</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>All 5 steps complete in &lt;3 min (user test)</li>
+            <li>CGPA converter shows live US equivalent</li>
+            <li>All new Pakistan fields persist to backend</li>
+            <li>Existing demo account still works</li>
+            <li>Progress bar shows correct step + time estimate</li>
+            <li>Slides animate between steps</li>
+            <li>All fields autosave to localStorage</li>
+            <li>Redirect to /feed after Step 5</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 3 -->
+    <div class="sprint-card s3">
+      <div class="sprint-header">
+        <div class="sprint-number">S3</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Dashboard Redesign</div>
+          <div class="sprint-subtitle">Route: <code>/feed</code> — Feature-forward dashboard replacing opaque "For you" label.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">High priority</span>
+            <span class="sprint-tag">Navigation restructure</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>2</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Welcome bar:</strong> "Hi Zara. 3 scholarships close in 60 days." with deadline count</li>
+            <li><strong>Demo mode banner:</strong> Yellow strip "Demo mode — all Elite features unlocked. Pro PKR 2,499/mo · Elite PKR 7,999/mo"</li>
+            <li><strong>Action grid (2×2):</strong> Find Scholarships, Practice Visa Interview, Write SOP, Application Tracker — each with icon, 1-line description, arrow</li>
+            <li><strong>Recent matches:</strong> Top 3 matched scholarships from /recommendations, compact cards</li>
+            <li><strong>Tracker summary:</strong> Small widget showing stage counts (Researching 2, Applied 1)</li>
+            <li><strong>Upcoming deadlines:</strong> Next 3 deadlines from tracker with countdown badges</li>
+            <li><strong>Sidebar relabel:</strong> "Find Scholarships" / "Visa Interview" / "SOP Builder" / "Tracker" instead of generic labels</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Action grid is the primary UI — not the recommendations list. Recommendations move to a secondary section.</li>
+            <li>If profile is incomplete (missing target countries), show an onboarding completion nudge above action grid</li>
+            <li>Sidebar navigation: rename sections. "Apply" → "Explore". "For you" → "My Matches". Add "Tracker" and "Interview Prep".</li>
+            <li>Demo banner: sticky at top, dismissible (remembers dismiss in localStorage), gold color.</li>
+            <li>Tracker summary and deadline widgets: only show after student has tracker items — otherwise show "Add your first scholarship to track" CTA</li>
+            <li>Loading: skeleton for action grid loads first (instant), then recommendations load below async</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Action grid visible above fold on 1280px desktop</li>
+            <li>Demo banner shows with correct pricing</li>
+            <li>Sidebar shows renamed items</li>
+            <li>Top 3 matches render with skeletons then data</li>
+            <li>Incomplete profile shows nudge</li>
+            <li>Mobile: action grid 1-col, all tap targets ≥44px</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 4 -->
+    <div class="sprint-card s4">
+      <div class="sprint-header">
+        <div class="sprint-number">S4</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Scholarship Finder (Match Page)</div>
+          <div class="sprint-subtitle">Route: <code>/dashboard/scholarships/match</code> — New page, POST /scholarships/match integration.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">New route</span>
+            <span class="sprint-tag">Freemium gates</span>
+            <span class="sprint-tag">Depends on: PRD §5 backend</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Summary bar:</strong> "4 fully funded scholarships match your profile. 9 more with Pro."</li>
+            <li><strong>3 tabs:</strong> Eligible | Partially Eligible | Stretch (with counts per tab)</li>
+            <li><strong>Match card:</strong> Scholarship name + country flag + funding badge + deadline countdown + CGPA match note + match reason + "View Details" + "Add to Tracker" buttons</li>
+            <li><strong>Freemium blur:</strong> Results 4+ blurred with overlay: "9 more including 2 fully funded — unlock with Pro (PKR 2,499/mo)" + UpgradeWall component</li>
+            <li><strong>Filter bar:</strong> Country, Funding type, Deadline (collapsible on mobile)</li>
+            <li><strong>Empty state:</strong> "Complete your profile to see matches" with link to /onboarding</li>
+            <li><strong>CGPA context inline:</strong> On each card: "Your 3.6 CGPA qualifies" in validated-green stripe</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Page auto-runs the match on load (from profile) — student doesn't have to submit a form</li>
+            <li>Override inputs: small "Refine your profile" link reveals an edit panel (not a full form) for quick adjustments</li>
+            <li>Blur implementation: CSS blur(4px) + opacity overlay + lock icon + count text. Never hide the card entirely.</li>
+            <li>Deadline countdown: "47 days" in neutral, "29 days" in caution-amber, "&lt;14 days" in danger-red border</li>
+            <li>"Add to Tracker" is an optimistic mutation — card shows added state immediately, syncs to backend</li>
+            <li>Partially eligible: show what's missing: "Missing: IELTS score. Add it to qualify fully."</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Student with complete profile sees ≥3 matches</li>
+            <li>Eligible vs partially eligible correctly tabbed</li>
+            <li>Results 4+ are blurred for free tier</li>
+            <li>UpgradeWall shows PKR-correct price</li>
+            <li>Deadline countdown is accurate</li>
+            <li>"Add to Tracker" persists to tracker page</li>
+            <li>CGPA conversion note visible on each card</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 5 -->
+    <div class="sprint-card s5">
+      <div class="sprint-header">
+        <div class="sprint-number">S5</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Application Tracker (Kanban)</div>
+          <div class="sprint-subtitle">Route: <code>/dashboard/tracker</code> — 6-column kanban, drag-and-drop, document checklist.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">New route</span>
+            <span class="sprint-tag">@hello-pangea/dnd</span>
+            <span class="sprint-tag">Depends on: PRD §6 backend</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>4</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>6 columns:</strong> Researching → Preparing Documents → Applied → Interview/Test → Decision → Accepted</li>
+            <li><strong>Tracker card:</strong> Program name + university + country flag + deadline countdown badge + "X/13 docs" progress pill</li>
+            <li><strong>Card urgency:</strong> Red left border (&lt;30d), orange left border (31–60d), no border (&gt;60d)</li>
+            <li><strong>Click to expand:</strong> Reveals full document checklist with individual checkboxes</li>
+            <li><strong>HEC attestation:</strong> Labeled "HEC Degree Attestation — required for UK/Germany" with info tooltip</li>
+            <li><strong>Deadline alert banner:</strong> Sticky top — "Chevening deadline in 12 days — 3 documents still missing"</li>
+            <li><strong>Add item:</strong> "+" button on each column, modal with: university, program, country, deadline, scholarship link (optional)</li>
+            <li><strong>Freemium gate:</strong> 4th item for free tier shows UpgradeWall instead of add modal</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Drag-and-drop: use @hello-pangea/dnd (DragDropContext → Droppable per column → Draggable per card). PATCH stage on drop.</li>
+            <li>Horizontal scroll on mobile: columns are 280px wide, overflow-x scrollable with momentum</li>
+            <li>Checklist state: optimistic update (checkbox toggles immediately), PATCH /tracker/{id}/checklist debounced 500ms</li>
+            <li>Empty column state: dashed border + "Drag cards here" — not blank white space</li>
+            <li>Deadline banner: only shows if any item has deadline &lt;30d AND checklist &lt;100%. Dismissible per session.</li>
+            <li>Alert banner links directly to the tracker card — smooth scroll + flash animation on the card</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Cards drag between all 6 columns</li>
+            <li>Stage change persists after page reload</li>
+            <li>Document checklist persists per card</li>
+            <li>HEC attestation checkbox visible and labeled</li>
+            <li>Deadline urgency colors correct</li>
+            <li>Alert banner shows for near-deadline items</li>
+            <li>Free tier sees UpgradeWall on 4th item</li>
+            <li>Mobile horizontal scroll works on iOS</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 6 -->
+    <div class="sprint-card s6">
+      <div class="sprint-header">
+        <div class="sprint-number">S6</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">SOP Builder</div>
+          <div class="sprint-subtitle">Route: <code>/dashboard/documents/sop</code> — Two-panel layout, Pakistan-context prompting.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">New route</span>
+            <span class="sprint-tag">Pakistani SOP context</span>
+            <span class="sprint-tag">Depends on: PRD §7 backend</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Two-panel layout:</strong> Left = input form (40%), Right = SOP preview (60%). Stacked on mobile.</li>
+            <li><strong>Form steps (4):</strong> Academic background (pre-filled from profile) → Research &amp; work experience → Why this program/country → Career goals &amp; Pakistan context</li>
+            <li><strong>Scholarship select:</strong> Dropdown: "Targeting a scholarship? (optional)" — pulls from tracker items or search</li>
+            <li><strong>Right panel:</strong> Skeleton during generation → rendered draft with paragraph labels [Opening] [Background] [Experience] [Motivation] [Goals] [Closing]</li>
+            <li><strong>Actions on draft:</strong> Copy to clipboard, Download .txt, Regenerate, "Change something" (scrolls back to form)</li>
+            <li><strong>Validated/AI partition:</strong> Scholarship facts in validated-green stripe, AI draft content in generated-blue stripe</li>
+            <li><strong>Disclaimer:</strong> Below draft in caution-amber: "Personalize this — admissions committees detect generic AI writing."</li>
+            <li><strong>Freemium gate:</strong> Second generation for free tier → UpgradeWall with SOP-specific copy</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Form pre-fills: academic_background auto-populated from profile (university, CGPA, degree, field). Student edits, doesn't start from scratch.</li>
+            <li>Generation: POST /documents → loading state shows "Writing your SOP..." with progress bar (estimated 15s). Not a spinner — a progress bar with milestone labels.</li>
+            <li>Paragraph labels: subtle "OPENING PARAGRAPH" label above each section in ink-subtle color. Makes AI structure visible and editable.</li>
+            <li>Elite side panel: if elite plan, show line-by-line feedback accordion (strength / weakness / suggestion per paragraph)</li>
+            <li>Mobile: form collapses to top, preview slides below. Tab switcher: "Form" | "Preview"</li>
+            <li>Draft storage: saved as a Document record — accessible from /dashboard/documents list</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Form pre-fills from profile on load</li>
+            <li>Generation completes in &lt;30s with progress bar</li>
+            <li>Draft is 600–800 words with 6 labeled paragraphs</li>
+            <li>Pakistan-specific framing visible in draft</li>
+            <li>Copy to clipboard and .txt download work</li>
+            <li>Free tier sees UpgradeWall on 2nd generation</li>
+            <li>Scholarship selection changes draft content</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 7 -->
+    <div class="sprint-card s7">
+      <div class="sprint-header">
+        <div class="sprint-number">S7</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Visa Interview Simulator</div>
+          <div class="sprint-subtitle">Route: <code>/dashboard/interview</code> — UK/USA/Canada/Germany. First-in-market feature.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">Headline differentiator</span>
+            <span class="sprint-tag">Study + Exam modes</span>
+            <span class="sprint-tag">Depends on: PRD §8 backend</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>4</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Setup screen:</strong> Country cards (UK flag, USA, Canada, Germany) + mode toggle (Study/Exam) + "Start Session" CTA</li>
+            <li><strong>Interview screen:</strong> Progress bar "Q 3 of 10" + timer + category badge (Finances, Ties, Motivation) + question in large text + textarea + Submit Answer</li>
+            <li><strong>Feedback panel (study mode):</strong> Score meters (Clarity/Confidence/Relevance) + red flag warnings in danger-red + "What was good" in validated + "What to add" in caution + "Ideal answer" in generated + "Next Question →"</li>
+            <li><strong>Exam mode:</strong> No feedback between questions — shows next question immediately after submit</li>
+            <li><strong>Freemium gate:</strong> After Q3 for free tier — show partial summary + "You got 2 red flags. Finish for PKR 2,499/mo." UpgradeWall</li>
+            <li><strong>Session summary:</strong> Radar chart (Clarity/Confidence/Relevance/Red Flag Avoidance) + Q-by-Q table + improvements list + Practice Again / Download Summary</li>
+            <li><strong>Elite badge:</strong> "Download Transcript" button on summary for Elite users</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Textarea: large, no character limit shown. Placeholder: "Type your answer as you would speak it. Be natural, not rehearsed."</li>
+            <li>Submit button: disabled when textarea empty. Shows "Evaluating..." state on click — not a spinner, just the button text changes.</li>
+            <li>Red flag display: each flag in a danger-soft pill. Never shown in exam mode until summary.</li>
+            <li>Radar chart: use a lightweight SVG radar (no Chart.js overhead) — 4 axes. Animate in on mount.</li>
+            <li>Timer: only visible in exam mode. Counts UP (not down) — shows session duration, not a countdown pressure.</li>
+            <li>Mobile: full-screen question + textarea. Feedback panel slides up from bottom as a sheet.</li>
+            <li>Category badge: makes student aware of what the question is testing. Rotates per question.</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Can complete 10-question UK session end-to-end</li>
+            <li>Study mode shows feedback after every answer</li>
+            <li>Exam mode suppresses feedback until summary</li>
+            <li>Red flags detected for bad answer ("I plan to stay in UK")</li>
+            <li>Free tier UpgradeWall shows after Q3 with red flag count</li>
+            <li>Summary radar chart renders correctly</li>
+            <li>All 4 countries selectable and functional</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 8 -->
+    <div class="sprint-card s8">
+      <div class="sprint-header">
+        <div class="sprint-number">S8</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Upgrade Page + UpgradeWall Component</div>
+          <div class="sprint-subtitle">Routes: <code>/upgrade</code> + component used across S4–S7. Currency switcher PKR/GBP/EUR/AED/USD.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">Freemium gates</span>
+            <span class="sprint-tag">No Stripe — waitlist only</span>
+            <span class="sprint-tag">Depends on: PRD §0.5</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>2</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Currency switcher:</strong> Sticky top tabs PKR | GBP | EUR | AED | USD. Default from billing_country. Switches all prices on page.</li>
+            <li><strong>4 pricing cards:</strong> Explorer (Free) + Pro (PKR 2,499 "Most Popular" badge) + Elite (PKR 7,999 "For serious applicants") + Institution (Contact us)</li>
+            <li><strong>Comparison table:</strong> Features as rows (scholarship matching, SOP builder, visa interview, tracker, professor email, etc.) × tiers as columns</li>
+            <li><strong>CTA buttons:</strong> Pro/Elite → inline waitlist form (email + plan pre-selected). Institution → mailto:partnerships@scholarai.pk</li>
+            <li><strong>Anchor copy:</strong> Under Pro: "2 months = less than 1 consultant meeting." Under Elite: "For Pakistani families in UK/UAE — less than a coffee per week."</li>
+            <li><strong>UpgradeWall component:</strong> Used on Scholarship Finder (blur), SOP Builder (2nd gen), Tracker (4th item), Interview (Q3+). Takes message + price from API 402 response. Never generic.</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Pro card: gold/amber ring, "Most Popular" badge in caution-amber. Slightly larger card.</li>
+            <li>Waitlist form: appears inline below CTA (accordion), never navigates away. Fields: email + plan pre-selected. Submit → "You're on the list. We'll email you when payments go live."</li>
+            <li>UpgradeWall: never redirect. Shows context-specific message from API. Lock icon (Lucide) + message + Pro CTA + optional Elite CTA. Background: paper-white, border: gold-soft.</li>
+            <li>Comparison table: checkmark (Lucide Check) = included, em dash "—" = not included, star (Lucide Star) = Elite only</li>
+            <li>Institution card: no price shown, "Contact us" button opens mailto. Never shows in student upgrade wall.</li>
+            <li>Institution tier invisible from student UI — only visible on /upgrade page at the rightmost column</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Currency switcher changes all prices instantly</li>
+            <li>PKR default for PK accounts</li>
+            <li>Waitlist form saves email + plan to DB</li>
+            <li>Institution CTA sends mailto correctly</li>
+            <li>UpgradeWall renders with API message on all 4 gated pages</li>
+            <li>UpgradeWall shows showElite=true on SOP + Interview only</li>
+            <li>No Stripe, no checkout, no real payment flow</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPRINT 9 -->
+    <div class="sprint-card s9">
+      <div class="sprint-header">
+        <div class="sprint-number">S9</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Polish, A11y &amp; E2E</div>
+          <div class="sprint-subtitle">Axe-core audit, Playwright E2E F1–F3, mobile matrix, performance budget, bundle audit.</div>
+          <div class="sprint-tags">
+            <span class="sprint-tag">Final gate</span>
+            <span class="sprint-tag">Depends on: S1–S8 complete</span>
+          </div>
+        </div>
+        <div class="sprint-effort"><span>2</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>A11y:</strong> Install axe-core devDep, run on all 9 new routes, fix violations. Target: 0 critical axe violations.</li>
+            <li><strong>Playwright E2E:</strong> F1 (auth smoke: signup → onboarding → dashboard), F2 (scholarship finder: match → add to tracker), F3 (SOP builder: generate → download)</li>
+            <li><strong>Mobile breakpoints:</strong> Test 375/640/768/1024/1440 on all new routes. Fix any layout breaks.</li>
+            <li><strong>Performance audit:</strong> Lighthouse mobile on /onboarding and /dashboard/scholarships/match. Target LCP &lt;1.8s, INP &lt;200ms.</li>
+            <li><strong>Bundle audit:</strong> Check initial JS ≤180KB gzipped per route. Tree-shake any Radix full-barrel imports.</li>
+            <li><strong>WhatsApp share:</strong> Add "Share on WhatsApp" to scholarship cards (window.open wa.me link with scholarship name + deadline).</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>WhatsApp share: only on scholarship detail and match cards. Not on SOP or interview pages.</li>
+            <li>Keyboard navigation: Tab through all form steps works. Esc closes any open dialog/drawer. / focuses search anywhere in AppShell.</li>
+            <li>prefers-reduced-motion: disable all slide/fade animations. Kanban drag still functional.</li>
+            <li>Focus rings: visible on all interactive elements. Uses var(--color-ring) blue.</li>
+            <li>Error states: all forms show field-level errors. "Couldn't load. [Retry]" — never bare "Network error".</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>0 critical axe violations on all routes</li>
+            <li>E2E F1–F3 pass in CI</li>
+            <li>Mobile matrix verified at 375/768/1024/1440</li>
+            <li>LCP &lt;1.8s on /feed and /dashboard/scholarships/match</li>
+            <li>INP &lt;200ms on save toggle and kanban drag</li>
+            <li>Initial JS ≤180KB gzipped per route</li>
+            <li>WhatsApp share works on mobile</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- PRIORITY MATRIX -->
+<section>
+  <div class="section-label">07 — Priority Matrix</div>
+  <h2>What to build first if time is tight</h2>
+  <p>If FYP deadline pressure forces cuts, use this matrix. P1 = demo-blocking. P2 = differentiating. P3 = polish.</p>
+
+  <table class="priority-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Priority</th>
+        <th>Effort</th>
+        <th>Impact</th>
+        <th>If skipped…</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Pakistan Landing Page (S1)</td>
+        <td><span class="badge p1">P1 — Demo blocking</span></td>
+        <td>3 days</td>
+        <td>First impression, conversion</td>
+        <td>Demo starts with a page that says "For grad school applicants" — kills credibility</td>
+      </tr>
+      <tr>
+        <td>Onboarding Redesign (S2)</td>
+        <td><span class="badge p1">P1 — Demo blocking</span></td>
+        <td>3 days</td>
+        <td>Profile quality → match quality</td>
+        <td>Demo student can't fill Pakistani fields, matches are generic</td>
+      </tr>
+      <tr>
+        <td>Dashboard Redesign (S3)</td>
+        <td><span class="badge p1">P1 — Demo blocking</span></td>
+        <td>2 days</td>
+        <td>Navigation and feature discovery</td>
+        <td>Evaluator lands on "For you" with no clear path to any feature</td>
+      </tr>
+      <tr>
+        <td>Visa Interview Simulator (S7)</td>
+        <td><span class="badge p1">P1 — Headline feature</span></td>
+        <td>4 days</td>
+        <td>Unique differentiator vs GoScholar</td>
+        <td>Our biggest advantage over GoScholar stays invisible</td>
+      </tr>
+      <tr>
+        <td>Scholarship Finder (S4)</td>
+        <td><span class="badge p2">P2 — High impact</span></td>
+        <td>3 days</td>
+        <td>Core value proposition</td>
+        <td>Recommendations still work from /feed — tolerable fallback</td>
+      </tr>
+      <tr>
+        <td>SOP Builder (S6)</td>
+        <td><span class="badge p2">P2 — High impact</span></td>
+        <td>3 days</td>
+        <td>Pakistani context differentiator</td>
+        <td>Document shell still accessible but not functional</td>
+      </tr>
+      <tr>
+        <td>Application Tracker (S5)</td>
+        <td><span class="badge p2">P2 — Expected feature</span></td>
+        <td>4 days</td>
+        <td>Retention feature</td>
+        <td>Saved list is a weak fallback — evaluators notice</td>
+      </tr>
+      <tr>
+        <td>Upgrade Page + UpgradeWall (S8)</td>
+        <td><span class="badge p2">P2 — Business model</span></td>
+        <td>2 days</td>
+        <td>Freemium model visible</td>
+        <td>Business model invisible — platform looks like a free tool with no plan</td>
+      </tr>
+      <tr>
+        <td>Polish &amp; E2E (S9)</td>
+        <td><span class="badge p3">P3 — Quality gate</span></td>
+        <td>2 days</td>
+        <td>Demo stability</td>
+        <td>Risk of demo crashes on mobile or edge cases</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- NEW FILES -->
+<section>
+  <div class="section-label">08 — New Files &amp; Routes Summary</div>
+  <h2>What gets created, modified, or renamed</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>File / Route</th>
+        <th>Action</th>
+        <th>Sprint</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>src/app/page.tsx</code></td>
+        <td><span class="badge badge-info">Rewrite</span></td>
+        <td>S1</td>
+        <td>Complete Pakistan landing page. Remove GrantPath brand.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/onboarding/page.tsx</code></td>
+        <td><span class="badge badge-info">Rewrite</span></td>
+        <td>S2</td>
+        <td>5-step Pakistan-specific wizard. Extend from 4 to 5 steps.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/(student)/feed/page.tsx</code></td>
+        <td><span class="badge badge-neutral">Extend</span></td>
+        <td>S3</td>
+        <td>Add action grid, demo banner, tracker summary widget.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/(student)/dashboard/scholarships/match/page.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S4</td>
+        <td>Scholarship finder. POST /scholarships/match. Freemium blur.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/(student)/dashboard/tracker/page.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S5</td>
+        <td>6-column kanban. @hello-pangea/dnd. Document checklist.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/(student)/dashboard/documents/sop/page.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S6</td>
+        <td>Two-panel SOP builder. Replaces generic documents/new.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/(student)/interviews/page.tsx</code></td>
+        <td><span class="badge badge-info">Rewrite</span></td>
+        <td>S7</td>
+        <td>Full visa interview simulator. Country cards → Q&amp;A → summary.</td>
+      </tr>
+      <tr>
+        <td><code>src/app/upgrade/page.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S8</td>
+        <td>Pricing page. Currency switcher. Waitlist form. No Stripe.</td>
+      </tr>
+      <tr>
+        <td><code>src/components/UpgradeWall/index.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S8</td>
+        <td>Context-aware upgrade gate. Takes message + price from API 402.</td>
+      </tr>
+      <tr>
+        <td><code>src/components/shell/Sidebar.tsx</code></td>
+        <td><span class="badge badge-neutral">Extend</span></td>
+        <td>S3</td>
+        <td>Rename nav items. Add Tracker, Interview Prep, SOP Builder links.</td>
+      </tr>
+      <tr>
+        <td><code>src/lib/api/endpoints/tracker.ts</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S5</td>
+        <td>Tracker API endpoints (GET/POST/PATCH stage/PATCH checklist/DELETE).</td>
+      </tr>
+      <tr>
+        <td><code>src/lib/api/endpoints/scholarships.ts</code></td>
+        <td><span class="badge badge-neutral">Extend</span></td>
+        <td>S4</td>
+        <td>Add POST /scholarships/match endpoint call.</td>
+      </tr>
+      <tr>
+        <td><code>src/components/ui/radar-chart.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S7</td>
+        <td>Lightweight SVG radar for interview summary. No Chart.js.</td>
+      </tr>
+      <tr>
+        <td><code>src/components/ui/blur-gate.tsx</code></td>
+        <td><span class="badge badge-win">New</span></td>
+        <td>S4</td>
+        <td>CSS blur wrapper + overlay + count text. Used on scholarship cards 4+.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- DEPENDENCIES -->
+<section>
+  <div class="section-label">09 — New npm Dependencies</div>
+  <h2>What to install</h2>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Package</th><th>Version</th><th>Why</th><th>Sprint</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>@hello-pangea/dnd</code></td>
+        <td>latest</td>
+        <td>Drag-and-drop for Kanban tracker. Fork of react-beautiful-dnd, React 18/19 compatible.</td>
+        <td>S5</td>
+      </tr>
+      <tr>
+        <td><code>axe-core</code> (devDep)</td>
+        <td>latest</td>
+        <td>Accessibility audit in CI + local dev.</td>
+        <td>S9</td>
+      </tr>
+      <tr>
+        <td><code>@playwright/test</code></td>
+        <td>latest</td>
+        <td>E2E tests F1–F3. Already partially configured.</td>
+        <td>S9</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <h4>Do NOT add these packages</h4>
+    <p>
+      <strong>No Chart.js</strong> — use lightweight SVG radar for interview summary. Chart.js is ~200KB, blows the 180KB route budget.<br>
+      <strong>No date-fns or moment</strong> — use native Intl.RelativeTimeFormat for deadline countdowns. Already works in all target browsers.<br>
+      <strong>No framer-motion</strong> — CSS transforms + transitions are sufficient for step transitions in onboarding and feedback panels. Keep bundle lean.
+    </p>
+  </div>
+</section>
+
+</div>
+
+<div class="doc-footer">
+  <div>
+    <strong>ScholarAI Pakistan</strong> · Frontend Enhancement Plan v2.0 · May 2026
+  </div>
+  <div>
+    9 sprints · ~26 dev-days · Beat GoScholar for Pakistani students
+  </div>
+</div>
+
+</body>
+</html>

@@ -131,6 +131,21 @@ def create_app() -> FastAPI:
             message="Unexpected server error",
         )
 
+    @app.get("/livez", tags=["system"])
+    async def liveness_probe() -> dict[str, str]:
+        # Process-liveness only. No I/O, no deps. Container orchestrator HEALTHCHECK target.
+        return {"status": "alive"}
+
+    @app.get("/readyz", tags=["system"])
+    async def readiness_probe() -> Response:
+        # Readiness gate: DB reachable. No analytics. Safe for load-balancer probes.
+        try:
+            async with async_session_factory() as db:
+                await db.execute(text("SELECT 1"))
+            return JSONResponse({"status": "ready"}, status_code=200)
+        except Exception:
+            return JSONResponse({"status": "not_ready"}, status_code=503)
+
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     async def health_check() -> HealthResponse:
         db_ok = False

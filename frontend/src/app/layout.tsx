@@ -1,56 +1,51 @@
-import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/next";
-
-import { AuthProvider } from "@/components/auth/auth-provider";
-import { ThemeProvider } from "@/components/theme/theme-provider";
+import type { Metadata, Viewport } from "next";
+import { Sora, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
-const displayFont = Sora({
+const display = Sora({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
   variable: "--font-display",
-  subsets: ["latin"],
+  display: "swap",
 });
 
-const uiFont = IBM_Plex_Sans({
+const ui = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
   variable: "--font-ui",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const monoFont = IBM_Plex_Mono({
-  variable: "--font-mono",
+const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
+  variable: "--font-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "GrantPath AI — Scholarship Planning",
-    template: "%s | GrantPath AI",
+    default: "GrantPath",
+    template: "%s · GrantPath",
   },
   description:
-    "Find scholarships that fit your profile. GrantPath AI combines a curated catalog with profile-aware recommendations and structured preparation tools.",
+    "Find scholarships you actually qualify for. Save deadlines, draft your statement, practice the interview.",
+  applicationName: "GrantPath",
+  formatDetection: { telephone: false, email: false },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#F7F5F0",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="light">
-      <body
-        className={`${displayFont.variable} ${uiFont.variable} ${monoFont.variable} app-body`}
-      >
-        <a className="skip-link" href="#main-content">
-          Skip to content
-        </a>
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
-        <SpeedInsights />
-        <Analytics />
+    <html lang="en" className={`${display.variable} ${ui.variable} ${mono.variable}`}>
+      <body className="bg-paper text-ink antialiased">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

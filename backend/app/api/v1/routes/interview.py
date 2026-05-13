@@ -1,11 +1,16 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import InterviewCreateUser, InterviewReadUser, InterviewRespondUser
+from app.core.dependencies import (
+    CurrentUser,
+    InterviewCreateUser,
+    InterviewReadUser,
+    InterviewRespondUser,
+)
 from app.schemas import (
     InterviewAnswerRequest,
     InterviewCoachingAnalyticsResponse,
@@ -13,7 +18,15 @@ from app.schemas import (
     InterviewSessionStartRequest,
     InterviewSessionSummaryResponse,
 )
+from app.schemas.visa_interview import (
+    VisaInterviewAnswerRequest,
+    VisaInterviewAnswerResponse,
+    VisaInterviewSessionSummary,
+    VisaInterviewStartRequest,
+    VisaInterviewStartResponse,
+)
 from app.services.interview import InterviewSessionService
+from app.services.visa_interview import VisaInterviewService
 
 router = APIRouter()
 
@@ -59,6 +72,64 @@ async def get_interview_question(
 ) -> InterviewCurrentQuestionResponse:
     service = InterviewSessionService(db)
     return await service.get_current_question(current_user.id, session_id)
+
+
+# ----------------------------------------------------------------------
+# Pakistan-pivot visa interview simulator (Feature 8, PRD §8)
+# ----------------------------------------------------------------------
+
+
+@router.post(
+    "/visa/start",
+    response_model=VisaInterviewStartResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def start_visa_interview(
+    payload: VisaInterviewStartRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> VisaInterviewStartResponse:
+    service = VisaInterviewService(db)
+    try:
+        return await service.start(current_user, payload)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/visa/{session_id}/answer",
+    response_model=VisaInterviewAnswerResponse,
+)
+async def submit_visa_answer(
+    session_id: uuid.UUID,
+    payload: VisaInterviewAnswerRequest,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> VisaInterviewAnswerResponse:
+    service = VisaInterviewService(db)
+    try:
+        return await service.answer(current_user, session_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.get(
+    "/visa/{session_id}/summary",
+    response_model=VisaInterviewSessionSummary,
+)
+async def get_visa_session_summary(
+    session_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> VisaInterviewSessionSummary:
+    service = VisaInterviewService(db)
+    try:
+        return await service.summary(current_user, session_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
 @router.post("/{session_id}/responses", response_model=InterviewSessionSummaryResponse)

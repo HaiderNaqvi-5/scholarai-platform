@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    Date as sa_Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
@@ -54,6 +56,31 @@ class InstitutionAccessLevel(enum.StrEnum):
 
 class DegreeLevel(enum.StrEnum):
     MS = "MS"
+    PHD = "PHD"
+    MBA = "MBA"
+    MENG = "MENG"
+
+
+class UserPlan(enum.StrEnum):
+    FREE = "free"
+    PRO = "pro"
+    ELITE = "elite"
+    INSTITUTION = "institution"
+
+
+PLAN_RANK = {
+    UserPlan.FREE: 0,
+    UserPlan.PRO: 1,
+    UserPlan.ELITE: 2,
+    UserPlan.INSTITUTION: 3,
+}
+
+
+class InstitutionType(enum.StrEnum):
+    SCHOOL = "school"
+    UNIVERSITY = "university"
+    HEC = "hec"
+    OTHER = "other"
 
 
 class RecordState(enum.StrEnum):
@@ -127,6 +154,11 @@ class Institution(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seat_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dpa_signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -171,6 +203,25 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     auth_token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    plan: Mapped[str] = mapped_column(String(16), default="free", nullable=False)
+    plan_currency: Mapped[str] = mapped_column(String(8), default="PKR", nullable=False)
+    plan_activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+
+    # Pakistan pivot — privacy / consent / soft-delete (Feature 9.5)
+    data_consent_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    data_consent_granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    data_consent_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data_consent_user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    marketing_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    b2b_share_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    b2b_share_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    gdpr_erasure_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    account_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    parent_consent_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    date_of_birth = mapped_column(sa_Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -382,6 +433,52 @@ class StudentProfile(Base):
     target_country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     language_test_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     language_test_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+
+    # --- Pakistan pivot fields (Feature 1) -------------------------------
+    target_countries: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String(2)),
+        nullable=False,
+        server_default=text("ARRAY[]::varchar[]"),
+        default=list,
+    )
+    target_fields: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String(64)),
+        nullable=False,
+        server_default=text("ARRAY[]::varchar[]"),
+        default=list,
+    )
+    hec_degree_level: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    pakistani_university: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    cgpa_scale_choice: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    degree_subject: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    graduation_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    toefl_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ielts_score: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    gre_quant: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gre_verbal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    has_research_publications: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    research_publication_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    funding_requirement: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    intake_target: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    city_of_origin: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    can_afford_application_fees: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    needs_gre_waiver: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    family_has_funds_for_bank_statement: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # B2B-valuable contact + lead-scoring fields (Feature 9.5; nullable, opt-in)
+    phone_e164: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    whatsapp_e164: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    father_occupation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    household_income_band: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    current_employer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    current_job_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    years_work_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    github_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    referral_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    lead_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lead_score_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -914,6 +1011,8 @@ class InterviewSession(Base):
     current_question_index: Mapped[int] = mapped_column(nullable=False, default=0)
     total_questions: Mapped[int] = mapped_column(nullable=False, default=0)
     question_set: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    visa_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -1082,3 +1181,392 @@ class InterviewKPISnapshot(Base):
         Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
         Index("ix_interview_kpi_snapshots_session_id", "session_id"),
     )
+
+
+# ============================================================================
+# Pakistan pivot (Feature 1) — freemium / B2B scaffolding tables
+# ============================================================================
+
+
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    plan: Mapped[str] = mapped_column(String(16), nullable=False, default="pro")
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, default="PKR")
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class InstitutionStudent(Base):
+    __tablename__ = "institution_students"
+
+    institution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class University(Base):
+    __tablename__ = "universities"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    country: Mapped[str] = mapped_column(String(2), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accepts_hec_degrees: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    has_pakistani_alumni_network: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    offers_gta_gra: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    avg_visa_approval_rate_pk: Mapped[float | None] = mapped_column(Numeric(4, 3), nullable=True)
+    requires_gre: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    accepts_ielts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    accepts_toefl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    min_ielts_overall: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    min_ielts_each_band: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    min_cgpa: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    application_fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    application_fee_waiver_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    intake_months: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String(12)),
+        nullable=False,
+        server_default=text("ARRAY[]::varchar[]"),
+        default=list,
+    )
+    fields_offered: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(String(64)),
+        nullable=False,
+        server_default=text("ARRAY[]::varchar[]"),
+        default=list,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_universities_country", "country"),
+        Index("ix_universities_name", "name"),
+    )
+
+
+class VisaInterviewQuestion(Base):
+    __tablename__ = "visa_interview_questions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    country: Mapped[str] = mapped_column(String(2), nullable=False)
+    visa_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    ideal_answer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    difficulty: Mapped[str] = mapped_column(String(8), nullable=False, default="medium")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_visa_q_country_visa_active", "country", "visa_type", "is_active"),
+    )
+
+
+class TrackerStage(enum.StrEnum):
+    RESEARCHING = "researching"
+    PREPARING = "preparing"
+    APPLIED = "applied"
+    INTERVIEW = "interview"
+    DECISION = "decision"
+    ACCEPTED = "accepted"
+
+
+TRACKER_STAGES: tuple[str, ...] = tuple(member.value for member in TrackerStage)
+
+
+_DEFAULT_DOCUMENT_CHECKLIST: dict[str, bool] = {
+    "transcripts": False,
+    "degree_certificate": False,
+    "ielts_certificate": False,
+    "gre_scores": False,
+    "sop_draft": False,
+    "sop_final": False,
+    "cv_resume": False,
+    "lor_1": False,
+    "lor_2": False,
+    "lor_3": False,
+    "bank_statement": False,
+    "hec_attestation": False,
+    "passport_copy": False,
+    "application_fee_paid": False,
+}
+
+
+def default_document_checklist() -> dict[str, bool]:
+    return dict(_DEFAULT_DOCUMENT_CHECKLIST)
+
+
+class ApplicationTrackerItem(Base):
+    __tablename__ = "application_tracker_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scholarship_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scholarships.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    university_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("universities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    program_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    university_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    stage: Mapped[str] = mapped_column(String(32), nullable=False, default=TrackerStage.RESEARCHING.value)
+    deadline = mapped_column(sa_Date, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_checklist: Mapped[dict] = mapped_column(
+        postgresql.JSONB,
+        nullable=False,
+        default=default_document_checklist,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ConsentAuditLog(Base):
+    __tablename__ = "consent_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    consent_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    version: Mapped[str] = mapped_column(String(16), nullable=False)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_consent_user_type_time", "user_id", "consent_type", "granted_at"),
+    )
+
+
+class DataExportRequest(Base):
+    __tablename__ = "data_export_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    download_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+
+
+class DataDeletionRequest(Base):
+    __tablename__ = "data_deletion_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+
+
+class UniversityLead(Base):
+    __tablename__ = "university_leads"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    university_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("universities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    share_reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    shared_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    shared_with_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    profile_snapshot: Mapped[dict] = mapped_column(
+        postgresql.JSONB,
+        nullable=False,
+        default=dict,
+    )
+    consent_audit_log_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("consent_audit_log.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    __table_args__ = (
+        Index("ix_university_leads_university", "university_id"),
+    )
+
+
+class LegalDocument(Base):
+    __tablename__ = "legal_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    slug: Mapped[str] = mapped_column(String(32), nullable=False)
+    version: Mapped[str] = mapped_column(String(16), nullable=False)
+    body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    sha256_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_legal_doc_slug_current", "slug", "is_current"),
+    )
+
+
+class ReferralEnrollment(Base):
+    __tablename__ = "referral_enrollments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    university_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    invoiced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+

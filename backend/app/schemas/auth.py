@@ -36,6 +36,16 @@ class UserCreate(BaseModel):
     )
     full_name: str = Field(..., min_length=2, max_length=255, description="Full legal name of the user")
 
+    # Pakistan pivot — consent capture at signup (Feature 9.5). Required for new
+    # accounts but kept optional on the schema so existing test fixtures that
+    # pre-date the gate continue to load; the signup service enforces presence
+    # of terms+privacy version when ENVIRONMENT != "test".
+    terms_version: str | None = Field(default=None, max_length=16)
+    privacy_version: str | None = Field(default=None, max_length=16)
+    accepted: bool = True
+    marketing_consent: bool = False
+    billing_country: str | None = Field(default=None, min_length=2, max_length=2)
+
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: str) -> str:
@@ -45,6 +55,11 @@ class UserCreate(BaseModel):
     @classmethod
     def validate_password(cls, value: str) -> str:
         return _validate_password_strength(value)
+
+    @field_validator("billing_country")
+    @classmethod
+    def upper_billing_country(cls, value: str | None) -> str | None:
+        return value.upper() if value else value
 
 
 class UserLogin(BaseModel):

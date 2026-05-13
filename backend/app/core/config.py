@@ -79,6 +79,14 @@ class Settings(BaseSettings):
     DEMO_ADMIN_PASSWORD: str = "strongpass1"
     DEMO_ADMIN_FULL_NAME: str = "ScholarAI Demo Admin"
 
+    # Pakistan pivot — Claude wiring (Feature 7 / 8). Falls back to deterministic
+    # templates if no key is configured so CI and offline dev stay green.
+    ANTHROPIC_API_KEY: str | None = None
+    ANTHROPIC_MODEL_FAST: str = "claude-haiku-4-5-20251001"
+    ANTHROPIC_MODEL_DEEP: str = "claude-sonnet-4-6"
+    LLM_REQUEST_TIMEOUT_SECONDS: int = 30
+    LLM_FALLBACK_DETERMINISTIC: bool = True
+
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
         if env_name not in {"production", "staging"}:

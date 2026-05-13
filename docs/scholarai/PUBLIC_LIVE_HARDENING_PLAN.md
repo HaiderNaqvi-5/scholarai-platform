@@ -62,7 +62,7 @@ What is missing:
 
 ### 2. Auth And Session Robustness
 Current evidence:
-- [frontend/src/components/auth/auth-provider.tsx](../../frontend/src/components/auth/auth-provider.tsx) stores access and refresh tokens in `localStorage`.
+- [frontend/src/lib/auth/AuthProvider.tsx](../../frontend/src/lib/auth/AuthProvider.tsx) stores access and refresh tokens in `localStorage` (greenfield rebuild on `feat/frontend-greenfield`).
 - [backend/app/services/auth/service.py](../../backend/app/services/auth/service.py) issues stateless refresh tokens and immediately reissues new ones.
 - [backend/app/api/v1/routes/auth.py](../../backend/app/api/v1/routes/auth.py) exposes register, login, refresh, and `/me`, but no account verification, password reset, or device/session invalidation.
 
@@ -97,7 +97,7 @@ What is missing:
 Current evidence:
 - [backend/app/main.py](../../backend/app/main.py) now provides a nested error envelope and request IDs.
 - Contract cleanup is partial; not all endpoints are normalized to the same list-envelope style described in [10_backend_api_and_repo.md](../../docs/scholarai/10_backend_api_and_repo.md).
-- [frontend/src/lib/api.ts](../../frontend/src/lib/api.ts) parses the current error envelope but UI-level fallback patterns remain uneven.
+- [frontend/src/lib/api/client.ts](../../frontend/src/lib/api/client.ts) parses the current error envelope but UI-level fallback patterns remain uneven.
 
 Gap:
 - Better than before, but still not public-facing API quality.
@@ -264,7 +264,7 @@ For a small team, that order is correct because the highest public risk is trust
 
 ### Public-facing UX and docs
 - [frontend/src/app/page.tsx](../../frontend/src/app/page.tsx)
-- [frontend/src/components/layout/marketing-shell.tsx](../../frontend/src/components/layout/marketing-shell.tsx)
+- Marketing landing is inlined in `frontend/src/app/page.tsx` after the greenfield rebuild; no separate `marketing-shell` component exists.
 - [README.md](../../README.md)
 - [docs/scholarai/DEMO_READINESS_AUDIT.md](../../docs/scholarai/DEMO_READINESS_AUDIT.md)
 - [docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md](../../docs/scholarai/INTERNAL_HANDOFF_PACKAGE.md)

@@ -1,116 +1,101 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth/AuthProvider";
+import { ApiError } from "@/lib/api";
 
-import { MarketingShell } from "@/components/layout/marketing-shell";
-import { isApiError, useAuth } from "@/components/auth/auth-provider";
-
-function SignupPageContent() {
+export default function SignupPage() {
+  const auth = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading, register } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const nextPath = searchParams.get("next") ?? "/onboarding";
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace(nextPath);
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
+      return;
     }
-  }, [isAuthenticated, isLoading, nextPath, router]);
+    setSubmitting(true);
+    setError(null);
+    try {
+      await auth.signup({ email, password, full_name: fullName || undefined });
+      router.replace("/onboarding");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Couldn't create your account.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <MarketingShell
-      eyebrow="Create account"
-      title="Get started with GrantPath AI."
-      description="Set up takes less than a minute, then you can jump straight to profile and recommendations."
-    >
-      <section className="auth-grid">
-        <form
-          className="surface-card auth-form"
-          data-testid="signup-form"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setError(null);
-            setIsSubmitting(true);
-            try {
-              await register({ full_name: fullName, email, password });
-              router.push(nextPath);
-            } catch (caughtError) {
-              setError(
-                isApiError(caughtError)
-                  ? caughtError.message
-                  : "The signup request failed.",
-              );
-            } finally {
-              setIsSubmitting(false);
-            }
-          }}
-        >
-          <label className="form-field">
-            <span className="route-card__label">Full name</span>
-            <input
-              className="text-input"
-              name="full_name"
-              onChange={(event) => setFullName(event.target.value)}
-              placeholder="Your name"
-              type="text"
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+      <div className="w-full max-w-sm">
+        <Link href="/" className="font-display text-lg text-ink">GrantPath</Link>
+        <h1 className="mt-6 font-display text-2xl text-ink">Create your account</h1>
+        <p className="mt-1 text-sm text-ink-muted">Two minutes. No credit card.</p>
+
+        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+          <div className="space-y-1.5">
+            <Label htmlFor="fullName">Your name</Label>
+            <Input
+              id="fullName"
+              autoComplete="name"
               value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoFocus
             />
-          </label>
-          <label className="form-field">
-            <span className="route-card__label">Email</span>
-            <input
-              className="text-input"
-              name="email"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="student@example.com"
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
               type="email"
+              autoComplete="email"
+              required
               value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-          </label>
-          <label className="form-field">
-            <span className="route-card__label">Password</span>
-            <input
-              className="text-input"
-              name="password"
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="At least 8 characters"
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
               type="password"
+              autoComplete="new-password"
+              minLength={12}
+              required
               value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
-          </label>
-          {error ? <p className="form-error">{error}</p> : null}
-          <button className="auth-link auth-link--primary" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Creating account..." : "Create account"}
-          </button>
+            <p className="text-xs text-ink-subtle">Minimum 12 characters.</p>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-danger">{error}</p>
+          ) : null}
+          <Button type="submit" loading={submitting} className="w-full" size="lg">
+            Create account
+          </Button>
         </form>
-        <article className="surface-panel">
-          <p className="section-eyebrow">Already have an account?</p>
-          <h2 className="section-title">Pick up where you left off.</h2>
-          <p className="body-copy">
-            Your shortlist, profile, and preparation work are waiting for you.
-          </p>
-          <Link className="nav-link" href="/login">
+
+        <p className="mt-6 text-sm text-ink-muted">
+          Have an account?{" "}
+          <Link href="/login" className="text-generated underline-offset-2 hover:underline">
             Sign in
           </Link>
-        </article>
-      </section>
-    </MarketingShell>
-  );
-}
-
-export default function SignupPage() {
-  return (
-    <Suspense fallback={null}>
-      <SignupPageContent />
-    </Suspense>
+        </p>
+      </div>
+    </div>
   );
 }
