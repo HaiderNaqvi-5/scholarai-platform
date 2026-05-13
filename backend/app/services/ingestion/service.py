@@ -579,12 +579,53 @@ class IngestionService:
         failed_records: list[dict[str, Any]] = []
 
         try:
+            source = run.source_registry
+            prior_etag = getattr(source, "last_etag", None)
+            prior_last_modified = getattr(source, "last_modified", None)
+            if prior_etag or prior_last_modified:
+                try:
+                    cached = await self._capture_source_once_with_cache(
+                        url=run.fetch_url,
+                        attempt=1,
+                        prior_etag=prior_etag,
+                        prior_last_modified=prior_last_modified,
+                    )
+                except Exception:
+                    cached = None
+                if cached is not None and cached.metadata.get("cache_hit"):
+                    run.capture_mode = cached.capture_mode
+                    run.parser_name = "official_page_parser_v3"
+                    run.records_found = 0
+                    run.records_created = 0
+                    run.records_skipped = 0
+                    run.completed_at = self._now()
+                    run.failure_reason = None
+                    run.status = IngestionRunStatus.COMPLETED
+                    run.run_metadata = self._merge_run_metadata(
+                        run.run_metadata,
+                        {
+                            "cache_hit": True,
+                            "skipped_reason": "http_304_not_modified",
+                            "cache_etag": cached.metadata.get("etag"),
+                            "cache_last_modified": cached.metadata.get("last_modified"),
+                        },
+                    )
+                    await self.db.flush()
+                    return self._build_detail(run)
+
             captures = await self._capture_source_with_pagination(run.fetch_url, max_pages=3)
             if not captures:
                 raise RuntimeError(
                     f"No pages captured from {run.fetch_url}; ingestion run aborted"
                 )
             capture = captures[0]
+            new_etag = capture.metadata.get("etag") if capture else None
+            new_last_modified = capture.metadata.get("last_modified") if capture else None
+            if source is not None:
+                if new_etag:
+                    source.last_etag = new_etag
+                if new_last_modified:
+                    source.last_modified = new_last_modified
             parse_result = self._parse_candidates(run.source_registry, capture)
             merged_candidates: list = list(parse_result.candidates)
             for cap in captures[1:]:
@@ -870,6 +911,72 @@ class IngestionService:
         if isinstance(exc, httpx.HTTPStatusError):
             return 500 <= exc.response.status_code <= 599
         return False
+
+    async def _capture_source_once_with_cache(
+        self,
+        url: str,
+        attempt: int,
+        prior_etag: str | None = None,
+        prior_last_modified: str | None = None,
+    ) -> CaptureResult:
+        """Conditional GET via httpx with If-None-Match / If-Modified-Since.
+
+        On HTTP 304 the response is short-circuited and `metadata.cache_hit=True`.
+        On any other 2xx the full HTML is returned with fresh `etag`/`last_modified`
+        in metadata so the caller can persist them back to `SourceRegistry`.
+        """
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+        headers: dict[str, str] = {"User-Agent": user_agent}
+        if prior_etag:
+            headers["If-None-Match"] = prior_etag
+        if prior_last_modified:
+            headers["If-Modified-Since"] = prior_last_modified
+
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            response = await client.get(url, headers=headers)
+
+        new_etag = response.headers.get("ETag")
+        new_last_modified = response.headers.get("Last-Modified")
+
+        if response.status_code == 304:
+            return CaptureResult(
+                html="",
+                final_url=str(response.url),
+                title=None,
+                capture_mode="httpx_cached",
+                metadata={
+                    "requested_url": url,
+                    "final_url": str(response.url),
+                    "page_title": None,
+                    "status_code": 304,
+                    "cache_hit": True,
+                    "etag": new_etag or prior_etag,
+                    "last_modified": new_last_modified or prior_last_modified,
+                    "attempt": attempt,
+                    "transport_errors": [],
+                },
+            )
+
+        response.raise_for_status()
+        html = response.text
+        title = self._extract_title(html)
+        return CaptureResult(
+            html=html,
+            final_url=str(response.url),
+            title=title,
+            capture_mode="httpx_cached",
+            metadata={
+                "requested_url": url,
+                "final_url": str(response.url),
+                "page_title": title,
+                "status_code": response.status_code,
+                "cache_hit": False,
+                "etag": new_etag,
+                "last_modified": new_last_modified,
+                "attempt": attempt,
+                "transport_errors": [],
+            },
+        )
 
     async def _capture_source_once(self, url: str, attempt: int) -> CaptureResult:
         transport_errors: list[dict[str, Any]] = []

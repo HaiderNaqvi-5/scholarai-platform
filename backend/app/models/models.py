@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date as sa_Date,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -518,6 +519,15 @@ class SourceRegistry(Base):
         index=True,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_etag: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_modified: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    crawl_delay_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discover_feeds: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

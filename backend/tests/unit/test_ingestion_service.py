@@ -891,3 +891,92 @@ class ExceptionWrapper:
     @staticmethod
     def http_status_error(*, request, response):
         return httpx.HTTPStatusError("bad request", request=request, response=response)
+
+
+async def test_conditional_get_short_circuits_on_304(monkeypatch):
+    """PR 1: When prior ETag is sent and origin returns 304, capture short-circuits with cache_hit=True."""
+    captured_headers: dict[str, str] = {}
+
+    class FakeResp:
+        status_code = 304
+        headers = {"ETag": "W/abc", "Last-Modified": "Wed, 12 May 2026 10:00:00 GMT"}
+        text = ""
+        url = "https://www.chevening.org/scholarship/pakistan/"
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            if headers:
+                captured_headers.update(headers)
+            return FakeResp()
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    result = await svc._capture_source_once_with_cache(
+        url="https://www.chevening.org/scholarship/pakistan/",
+        attempt=1,
+        prior_etag="W/abc",
+        prior_last_modified="Wed, 12 May 2026 10:00:00 GMT",
+    )
+
+    assert result.metadata.get("cache_hit") is True
+    assert result.metadata.get("status_code") == 304
+    assert captured_headers.get("If-None-Match") == "W/abc"
+    assert captured_headers.get("If-Modified-Since") == "Wed, 12 May 2026 10:00:00 GMT"
+    assert result.capture_mode == "httpx_cached"
+    assert result.html == ""
+
+
+async def test_conditional_get_returns_full_capture_on_200(monkeypatch):
+    """PR 1: When prior ETag mismatches, origin returns 200 with new ETag in metadata."""
+
+    class FakeResp:
+        status_code = 200
+        headers = {"ETag": "W/new", "Last-Modified": "Thu, 13 May 2026 11:00:00 GMT"}
+        text = "<html><head><title>Chevening</title></head><body>fresh</body></html>"
+        url = "https://www.chevening.org/scholarship/pakistan/"
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            return FakeResp()
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    result = await svc._capture_source_once_with_cache(
+        url="https://www.chevening.org/scholarship/pakistan/",
+        attempt=1,
+        prior_etag="W/old",
+        prior_last_modified=None,
+    )
+
+    assert result.metadata.get("cache_hit") is False
+    assert result.metadata.get("status_code") == 200
+    assert result.metadata.get("etag") == "W/new"
+    assert result.metadata.get("last_modified") == "Thu, 13 May 2026 11:00:00 GMT"
+    assert result.html.startswith("<html>")
+    assert result.capture_mode == "httpx_cached"
