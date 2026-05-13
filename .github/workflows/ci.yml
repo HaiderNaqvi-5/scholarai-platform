@@ -189,11 +189,12 @@ jobs:
           exit 1
 
       - name: Run critical browser smoke
+        # TODO(S10): REMOVE continue-on-error AS THE FIRST TASK OF FRONTEND PASS S10.
         # Smoke selectors are stale across the greenfield frontend rebuild
-        # (S1-S9 already in; Frontend Pass S10 re-points data-testids).
-        # AGENTS.md / CLAUDE.md push gate explicitly relaxes smoke on this
-        # branch until S10 lands. Keep the step running so regressions still
-        # show up in the job log, but do not block the PR on stale selectors.
+        # (S1-S9 already in; S10 re-points data-testids). Until then, smoke
+        # is HUMAN-GATED, not CI-gated — see AGENTS.md push gate. PRs touching
+        # auth / api routes / app shell MUST run run_smoke_suite.py locally
+        # and paste the result in the PR before merge. CI advisory only here.
         continue-on-error: true
         run: |
           python tests/e2e/playwright/public_scholarship_browse_smoke.py
