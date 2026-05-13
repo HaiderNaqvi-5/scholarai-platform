@@ -1,41 +1,33 @@
-# Progress — 2026-05-12 (session: healthcheck architecture)
+# Progress — 2026-05-13 (session: test refactor for Pakistan PRD)
 
-**Branch:** `master`
+**Branch:** `feat/scraper-optimization`
 
 ## Tasks completed
-- Diagnosed false-unhealthy on `backend`, `celery-worker`, `celery-beat`. Root causes:
-  - `backend/Dockerfile` baked `HEALTHCHECK curl /api/v1/health` into the image. Celery services share the same image but don't run uvicorn → curl always failed (`Failed to connect to localhost port 8000`).
-  - `/api/v1/health` performs DB ping + `KPISnapshotService.alert_messages` (3 aggregate queries over `*_kpi_snapshots` tables). Under cold cache or pool pressure the call exceeded the 5s healthcheck timeout, producing intermittent unhealthy → restart risk.
-  - `neo4j` healthcheck used `cypher-shell` (JVM cold-start) → 5s timeouts during recreate.
-- Implemented liveness/readiness split (Kubernetes-style):
-  - `GET /livez` — returns `{"status":"alive"}`, no I/O. ~70ms.
-  - `GET /readyz` — DB `SELECT 1` only, returns 503 on failure. ~37ms.
-  - `GET /health` — unchanged, still serves DB + KPI alerts payload for ops dashboards.
-- Removed `HEALTHCHECK` directive from `backend/Dockerfile`. Image is now process-agnostic.
-- Moved all healthchecks to `docker-compose.yml` (orchestration layer):
-  - `backend` → `curl /livez` (interval 30s, timeout 5s, start_period 30s).
-  - `celery-worker` → `celery inspect ping -d celery@$HOSTNAME` (interval 60s, timeout 15s, start_period 45s).
-  - `celery-beat` → `grep beat /proc/1/cmdline` (interval 60s, timeout 10s, start_period 30s).
-  - `neo4j` → bash TCP probe on 7687 (interval 15s, timeout 5s, start_period 30s).
-- Rebuilt `scholarai-platform-backend:latest`, recreated stack. All 8 containers report `(healthy)` or `Up`.
+- Ran backend pytest baseline. Initial transient cross-file failure on `test_b2b_share_persists_lead_with_snapshot` and two ingestion cache tests; both reproducibly resolved once the file state stabilised (242/242 unit, 50/50 integration on isolated runs).
+- Audited the SCHOLARAI_PAKISTAN_PRD (sections 0, 0.5, 0.6, 1–10) against the existing backend test surface (`backend/tests/unit/*.py`, `backend/tests/integration/*.py`).
+- Mapped every PRD acceptance bullet to an existing test. Coverage is already extensive: dedicated suites exist for plan guard, waitlist/pricing, CGPA conversion, Pakistan dataset, Pakistan recommendation matching, scholarship match service, tracker, SOP builder, visa interview, privacy/B2B, profile Pakistan fields, demo seed.
+- Identified two real gaps and one drift:
+  1. PRD §0.6 critical rule — "matching engine has ZERO imports from referral_enrollments/institutions tables" — had no automated guard.
+  2. PRD §10 demo readiness — `backend/scripts/demo_seed_pakistan.py` was not pinned by any test, so the Zara Khan persona, plan=elite, 2099 expiry, and consent grants could regress silently.
+  3. `tests/unit/test_privacy_and_b2b.py::_profile()` SimpleNamespace fixture was missing `gpa_scale` and the migration-0019 B2B fields that `services/privacy/b2b_share.py::_profile_snapshot` now reads — caused intermittent failure depending on file state.
+- Filled the gaps:
+  - Added `backend/tests/unit/test_b2b_trust_boundary.py` — AST-walks every module under `app/services/recommendations` and `app/services/scholarships` and asserts none of them reference `Institution`, `InstitutionStudent`, `ReferralEnrollment`, `UniversityLead`, or the equivalent table names. Two parametrized tests × two packages = 4 assertions.
+  - Added `backend/tests/unit/test_demo_seed_pakistan.py` — 12 static checks on `scripts/demo_seed_pakistan.py` covering demo email, plan=elite, PKR currency, PK billing country, 2099 expiry, 5 consent grants, NUST persona, three-plan waitlist placeholders, scholarship/university/visa-question seed minimums (≥10, ≥30, ≥70 with required country splits), and a syntax-parse check.
+  - Extended `_profile()` fixture in `tests/unit/test_privacy_and_b2b.py` with every field `_profile_snapshot` consumes (`gpa_scale`, `gmat_score`, `sat_score`, `budget_pkr_max`, `target_university_ids`, `current_university_id`, `hec_degree_level`, `intake_target`, `phone_e164`, `whatsapp_e164`, `current_employer`, `current_job_title`, `household_income_band`, `father_occupation`, `referral_source`, etc.) so the snapshot test is resilient to migration-0019 field additions.
+- Re-ran the full backend suite: **306 passed, 0 failed**.
 
 ## Files touched
-- `backend/Dockerfile` — removed HEALTHCHECK directive, added explanatory comment.
-- `backend/app/main.py` — added `/livez` and `/readyz` routes alongside existing `/health`.
-- `docker-compose.yml` — explicit healthcheck blocks for backend, celery-worker, celery-beat, neo4j.
-- `CLAUDE.md` — appended dev-env note documenting the new healthcheck architecture.
-- `progress.md` — this file.
+- `backend/tests/unit/test_b2b_trust_boundary.py` — NEW.
+- `backend/tests/unit/test_demo_seed_pakistan.py` — NEW.
+- `backend/tests/unit/test_privacy_and_b2b.py` — extended `_profile()` fixture with the B2B/Phase-C field surface.
 
-## In-progress / next
-- Frontend container has no healthcheck. Low priority (nothing depends on it), but adding one keeps the pattern consistent.
-- `broker_connection_retry` deprecation warning in celery (cosmetic) — set `broker_connection_retry_on_startup=True` in `app/tasks/celery_app.py` next time that file is touched. Skipped this session per "no cosmetic" instruction.
-
-## Open bugs / blockers
-- None known. Login/signup flow still works (verified earlier: `/auth/refresh`, `/auth/me`, `/profile`, `/saved-opportunities` returning 200).
+## Open work / not in scope this session
+- Frontend has no test surface (no `*.test.*` or `__tests__` under `frontend/src`). PRD §1–§10 frontend acceptance is currently only covered by the Playwright smoke suite at `tests/e2e/playwright/`. Adding component-level tests was de-scoped.
+- Migration-0019 Pydantic schema tests (`gmat_score`, `sat_score`, `budget_pkr_max`, `target_university_ids`, `current_university_id`) — these fields are not on this branch's `app/schemas/student.py`, only on the b2b_share consumer side. When the schema branch merges, add round-trip tests under `tests/unit/test_profile_pakistan_fields.py`.
 
 ## Commands to resume
-- Stack: `cd scholarai-platform && docker compose up -d`
-- Verify health: `docker ps --format "table {{.Names}}\t{{.Status}}"`
-- Probe endpoints: `curl http://localhost:8000/livez`, `/readyz`, `/health`
-- Backend API: `cd backend && python -m uvicorn app.main:app --reload`
-- Tests: `pytest backend/tests/unit backend/tests/integration -q`
+- `cd backend && python -m pytest tests/unit tests/integration -q`
+- Selective: `python -m pytest tests/unit/test_b2b_trust_boundary.py tests/unit/test_demo_seed_pakistan.py -v`
+- Live demo seed (requires running DB): `cd backend && python scripts/demo_seed_pakistan.py`
+- API: `cd backend && python -m uvicorn app.main:app --reload`
+- Frontend: `cd frontend && bun dev` (port 3001)
