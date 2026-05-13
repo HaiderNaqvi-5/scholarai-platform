@@ -18,14 +18,16 @@ function evaluate(s: Scholarship, p: StudentProfile | undefined): Row[] {
   // Citizenship
   if (s.citizenship_rules && s.citizenship_rules.length > 0) {
     const req = s.citizenship_rules.join(", ");
-    if (!p?.citizenship) {
+    if (!p?.citizenship_country_code) {
       rows.push({ axis: "Citizenship", status: "unknown", student: "Not set", required: req });
     } else {
-      const ok = s.citizenship_rules.includes(p.citizenship) || s.citizenship_rules.includes("ANY");
+      const ok =
+        s.citizenship_rules.includes(p.citizenship_country_code) ||
+        s.citizenship_rules.includes("ANY");
       rows.push({
         axis: "Citizenship",
         status: ok ? "pass" : "fail",
-        student: p.citizenship,
+        student: p.citizenship_country_code,
         required: req,
       });
     }
@@ -33,7 +35,7 @@ function evaluate(s: Scholarship, p: StudentProfile | undefined): Row[] {
     rows.push({
       axis: "Citizenship",
       status: "pass",
-      student: p?.citizenship ?? "—",
+      student: p?.citizenship_country_code ?? "—",
       required: "Any",
     });
   }
@@ -41,18 +43,18 @@ function evaluate(s: Scholarship, p: StudentProfile | undefined): Row[] {
   // Degree
   rows.push({
     axis: "Degree",
-    status: !p?.degree_level
+    status: !p?.target_degree_level
       ? "unknown"
-      : p.degree_level === s.degree_level
+      : p.target_degree_level === s.degree_level
         ? "pass"
         : "fail",
-    student: p?.degree_level ?? "Not set",
+    student: p?.target_degree_level ?? "Not set",
     required: s.degree_level,
   });
 
   // GPA
   if (s.min_gpa != null) {
-    if (p?.gpa == null || p.gpa_scale == null) {
+    if (p?.gpa_value == null || p.gpa_scale == null) {
       rows.push({
         axis: "GPA",
         status: "unknown",
@@ -60,11 +62,11 @@ function evaluate(s: Scholarship, p: StudentProfile | undefined): Row[] {
         required: `≥ ${s.min_gpa}`,
       });
     } else {
-      const normalized = (p.gpa / p.gpa_scale) * 4.0;
+      const normalized = (p.gpa_value / p.gpa_scale) * 4.0;
       rows.push({
         axis: "GPA",
         status: normalized >= s.min_gpa ? "pass" : "fail",
-        student: `${p.gpa}/${p.gpa_scale}`,
+        student: `${p.gpa_value}/${p.gpa_scale}`,
         required: `≥ ${s.min_gpa}`,
       });
     }
@@ -72,43 +74,42 @@ function evaluate(s: Scholarship, p: StudentProfile | undefined): Row[] {
     rows.push({
       axis: "GPA",
       status: "pass",
-      student: p?.gpa != null ? `${p.gpa}/${p.gpa_scale ?? "?"}` : "—",
+      student: p?.gpa_value != null ? `${p.gpa_value}/${p.gpa_scale ?? "?"}` : "—",
       required: "Any",
     });
   }
 
   // Field
   if (s.field_tags.length > 0) {
-    const overlap = (p?.field_tags ?? []).some((t) => s.field_tags.includes(t));
+    const studentField = p?.target_field?.toLowerCase();
+    const overlap = studentField
+      ? s.field_tags.some((t) => t.toLowerCase() === studentField)
+      : false;
     rows.push({
       axis: "Field",
-      status: !p?.field_tags
-        ? "unknown"
-        : overlap
-          ? "pass"
-          : "fail",
-      student: (p?.field_tags ?? []).slice(0, 2).join(", ") || "Not set",
+      status: !studentField ? "unknown" : overlap ? "pass" : "fail",
+      student: p?.target_field ?? "Not set",
       required: s.field_tags.slice(0, 2).join(", ") + (s.field_tags.length > 2 ? "…" : ""),
     });
   }
 
   // Language
   if (s.language_requirements && s.language_requirements.length > 0) {
-    const studentScores = p?.language_scores ?? [];
+    const studentTest = p?.language_test_type ?? null;
+    const studentScore = p?.language_test_score ?? null;
     const req = s.language_requirements
       .map((r) => `${r.test} ${r.min_score}+`)
       .join(", ");
-    if (studentScores.length === 0) {
+    if (!studentTest || studentScore == null) {
       rows.push({ axis: "Language", status: "unknown", student: "Not set", required: req });
     } else {
-      const ok = s.language_requirements.some((r) => {
-        const have = studentScores.find((x) => x.test === r.test);
-        return have && have.score >= r.min_score;
-      });
+      const ok = s.language_requirements.some(
+        (r) => r.test === studentTest && studentScore >= r.min_score,
+      );
       rows.push({
         axis: "Language",
         status: ok ? "pass" : "fail",
-        student: studentScores.map((x) => `${x.test} ${x.score}`).join(", "),
+        student: `${studentTest} ${studentScore}`,
         required: req,
       });
     }
