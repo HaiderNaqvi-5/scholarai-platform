@@ -27,6 +27,8 @@ LLM = Anthropic Claude (`anthropic` SDK). Haiku 4.5 default; Sonnet 4.6 for SOP 
 ## Push gate (per AGENTS.md)
 All must pass before push: backend unit+integration, KPI regression, frontend lint/typecheck/build, docs governance, browser smoke. Smoke relaxed on greenfield branch until S10 / Frontend Pass.
 
+**CI temp flag (PR #84):** the `browser-smoke` step in `.github/workflows/ci.yml` carries `continue-on-error: true` because the greenfield rebuild left smoke `data-testid` selectors stale. The step still runs and logs, but a green `browser-smoke` job does NOT mean smoke passed — check the step log. **This flag must be removed during S10 / Frontend Pass, once smoke selectors are re-pointed to the rebuilt UI.**
+
 ## Demo accounts
 - student@example.com / strongpass1 (legacy seed)
 - admin@example.com / strongpass1
@@ -90,7 +92,7 @@ All must pass before push: backend unit+integration, KPI regression, frontend li
 3. Trace requirements → code → e2e before declaring feature done. Evidence > assertion.
 
 ## Open work
-- Frontend Pass: onboarding 4-step Pakistan → /scholarships/match → /tracker Kanban → SOP two-panel → visa interview UI → /upgrade pricing → UpgradeWall → Pakistan landing → consent UI + cookie banner + settings privacy → re-point smoke selectors.
+- Frontend Pass: onboarding 4-step Pakistan → /scholarships/match → /tracker Kanban → SOP two-panel → visa interview UI → /upgrade pricing → UpgradeWall → Pakistan landing → consent UI + cookie banner + settings privacy → re-point smoke selectors → **remove `continue-on-error: true` from the `browser-smoke` step in `.github/workflows/ci.yml`**.
 - ~~Apply migrations 0014–0018 against live dev DB and run seed orchestrator before manual smoke.~~ **Done 2026-05-12**: alembic at head `20260511_0018`; `demo_seed_pakistan.py` ran (20 PK scholarships, 30 universities, 70 visa Q, 5 legal docs, demo `zara.khan@example.com`).
 - Update `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` to reflect Pakistan pivot.
 - Run KPI regression + docs governance to clear push gate.
