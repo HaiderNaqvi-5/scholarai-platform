@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date as sa_Date,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -518,6 +519,15 @@ class SourceRegistry(Base):
         index=True,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_etag: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_modified: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    crawl_delay_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discover_feeds: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -538,6 +548,47 @@ class SourceRegistry(Base):
         "IngestionRun",
         back_populates="source_registry",
         cascade="all, delete-orphan",
+    )
+    feeds: Mapped[list["SourceFeed"]] = relationship(
+        "SourceFeed",
+        back_populates="source",
+        cascade="all, delete-orphan",
+    )
+
+
+class SourceFeed(Base):
+    __tablename__ = "source_feed"
+    __table_args__ = (
+        Index("ix_source_feed_source_id", "source_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("source_registry.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    feed_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    feed_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    source: Mapped["SourceRegistry"] = relationship(
+        "SourceRegistry",
+        back_populates="feeds",
     )
 
 

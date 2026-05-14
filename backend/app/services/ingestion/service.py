@@ -80,6 +80,10 @@ MAX_CAPTURED_SNAPSHOT_CHARS = 120_000
 DEFAULT_MAX_RECORDS = 5
 SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
+# PR 2: sitemap + feed discovery regex helpers
+_SITEMAP_LOC_RE = re.compile(r"<loc>\s*([^<]+?)\s*</loc>", re.IGNORECASE)
+_ROBOTS_SITEMAP_RE = re.compile(r"(?im)^\s*sitemap\s*:\s*(\S+)\s*$")
+
 
 def retry_async(max_retries: int = 3, delay: float = 1.0):
     def decorator(func):
@@ -579,12 +583,81 @@ class IngestionService:
         failed_records: list[dict[str, Any]] = []
 
         try:
+            source = run.source_registry
+            prior_etag = getattr(source, "last_etag", None)
+            prior_last_modified = getattr(source, "last_modified", None)
+            if prior_etag or prior_last_modified:
+                try:
+                    cached = await self._capture_source_once_with_cache(
+                        url=run.fetch_url,
+                        attempt=1,
+                        prior_etag=prior_etag,
+                        prior_last_modified=prior_last_modified,
+                    )
+                except Exception:
+                    cached = None
+                if cached is not None and cached.metadata.get("cache_hit"):
+                    run.capture_mode = cached.capture_mode
+                    run.parser_name = "official_page_parser_v3"
+                    run.records_found = 0
+                    run.records_created = 0
+                    run.records_skipped = 0
+                    run.completed_at = self._now()
+                    run.failure_reason = None
+                    run.status = IngestionRunStatus.COMPLETED
+                    run.run_metadata = self._merge_run_metadata(
+                        run.run_metadata,
+                        {
+                            "cache_hit": True,
+                            "skipped_reason": "http_304_not_modified",
+                            "cache_etag": cached.metadata.get("etag"),
+                            "cache_last_modified": cached.metadata.get("last_modified"),
+                        },
+                    )
+                    await self.db.flush()
+                    return self._build_detail(run)
+
             captures = await self._capture_source_with_pagination(run.fetch_url, max_pages=3)
             if not captures:
                 raise RuntimeError(
                     f"No pages captured from {run.fetch_url}; ingestion run aborted"
                 )
             capture = captures[0]
+            new_etag = capture.metadata.get("etag") if capture else None
+            new_last_modified = capture.metadata.get("last_modified") if capture else None
+            if source is not None:
+                if new_etag:
+                    source.last_etag = new_etag
+                if new_last_modified:
+                    source.last_modified = new_last_modified
+
+            # PR 2: opt-in sitemap + RSS/Atom discovery beyond the seed fetch_url
+            discovered_urls: list[str] = []
+            if source is not None and getattr(source, "discover_feeds", False):
+                try:
+                    discovered_urls = await self._discover_source_urls(
+                        base_url=source.base_url,
+                        scope_keywords=self._derive_scope_keywords(source),
+                    )
+                except Exception as discovery_exc:  # pragma: no cover - defensive
+                    logger.warning(
+                        "discovery_failed source=%s err=%s",
+                        source.source_key,
+                        discovery_exc,
+                    )
+
+            for extra_url in discovered_urls:
+                if extra_url == run.fetch_url:
+                    continue
+                try:
+                    extra_capture = await self._capture_source(extra_url)
+                except Exception as extra_exc:
+                    logger.info(
+                        "discovery_capture_skip url=%s err=%s", extra_url, extra_exc
+                    )
+                    continue
+                captures.append(extra_capture)
+
             parse_result = self._parse_candidates(run.source_registry, capture)
             merged_candidates: list = list(parse_result.candidates)
             for cap in captures[1:]:
@@ -871,6 +944,72 @@ class IngestionService:
             return 500 <= exc.response.status_code <= 599
         return False
 
+    async def _capture_source_once_with_cache(
+        self,
+        url: str,
+        attempt: int,
+        prior_etag: str | None = None,
+        prior_last_modified: str | None = None,
+    ) -> CaptureResult:
+        """Conditional GET via httpx with If-None-Match / If-Modified-Since.
+
+        On HTTP 304 the response is short-circuited and `metadata.cache_hit=True`.
+        On any other 2xx the full HTML is returned with fresh `etag`/`last_modified`
+        in metadata so the caller can persist them back to `SourceRegistry`.
+        """
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+        headers: dict[str, str] = {"User-Agent": user_agent}
+        if prior_etag:
+            headers["If-None-Match"] = prior_etag
+        if prior_last_modified:
+            headers["If-Modified-Since"] = prior_last_modified
+
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            response = await client.get(url, headers=headers)
+
+        new_etag = response.headers.get("ETag")
+        new_last_modified = response.headers.get("Last-Modified")
+
+        if response.status_code == 304:
+            return CaptureResult(
+                html="",
+                final_url=str(response.url),
+                title=None,
+                capture_mode="httpx_cached",
+                metadata={
+                    "requested_url": url,
+                    "final_url": str(response.url),
+                    "page_title": None,
+                    "status_code": 304,
+                    "cache_hit": True,
+                    "etag": new_etag or prior_etag,
+                    "last_modified": new_last_modified or prior_last_modified,
+                    "attempt": attempt,
+                    "transport_errors": [],
+                },
+            )
+
+        response.raise_for_status()
+        html = response.text
+        title = self._extract_title(html)
+        return CaptureResult(
+            html=html,
+            final_url=str(response.url),
+            title=title,
+            capture_mode="httpx_cached",
+            metadata={
+                "requested_url": url,
+                "final_url": str(response.url),
+                "page_title": title,
+                "status_code": response.status_code,
+                "cache_hit": False,
+                "etag": new_etag,
+                "last_modified": new_last_modified,
+                "attempt": attempt,
+                "transport_errors": [],
+            },
+        )
+
     async def _capture_source_once(self, url: str, attempt: int) -> CaptureResult:
         transport_errors: list[dict[str, Any]] = []
         user_agent = "ScholarAI-Internal-Ingestion/0.1"
@@ -942,6 +1081,152 @@ class IngestionService:
                 "transport_errors": transport_errors,
             },
         )
+
+    def _derive_scope_keywords(self, source: SourceRegistry) -> list[str]:
+        """Scope keywords for sitemap/RSS filtering: scholarship vocabulary + source-specific tokens."""
+        seeds: list[str] = ["scholarship", "award", "fellowship", "grant", "bursary", "scheme"]
+        if source.source_key:
+            seeds.extend(part for part in source.source_key.split("-") if part)
+        if source.display_name:
+            display_first = source.display_name.lower().split()
+            if display_first:
+                seeds.append(display_first[0])
+        return list({s.lower() for s in seeds if s})
+
+    async def _discover_source_urls(
+        self,
+        base_url: str,
+        scope_keywords: list[str],
+        try_homepage_feeds: bool = True,
+        max_urls: int = 200,
+    ) -> list[str]:
+        """Return scholarship-likely URLs from robots.txt → sitemap(s) → RSS/Atom feeds.
+
+        Filters URLs by `scope_keywords` (case-insensitive substring match) so the
+        parse stage isn't asked to inspect /about, /contact, /sitemap, etc. Only URLs
+        sharing host with `base_url` are returned.
+        """
+        keywords = [kw.lower() for kw in scope_keywords if kw]
+
+        def _in_scope(u: str) -> bool:
+            ul = u.lower()
+            return any(kw in ul for kw in keywords)
+
+        base = base_url if base_url.endswith("/") else base_url + "/"
+        parsed_base = urlparse(base)
+        base_host = parsed_base.netloc
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+        discovered: set[str] = set()
+
+        # 1. robots.txt → Sitemap directives
+        sitemap_urls: list[str] = []
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), follow_redirects=True) as client:
+                r = await client.get(urljoin(base, "/robots.txt"), headers={"User-Agent": user_agent})
+                if r.status_code == 200:
+                    for match in _ROBOTS_SITEMAP_RE.finditer(r.text):
+                        sitemap_urls.append(match.group(1).strip())
+        except (httpx.HTTPError, OSError):
+            pass
+
+        # 2. Fall back to /sitemap.xml at root if robots didn't surface any
+        if not sitemap_urls:
+            sitemap_urls.append(urljoin(base, "/sitemap.xml"))
+
+        for sitemap_url in sitemap_urls:
+            try:
+                discovered.update(await self._parse_sitemap(sitemap_url, _in_scope, max_urls))
+            except (httpx.HTTPError, OSError):
+                continue
+
+        # 3. RSS/Atom feeds via homepage <link rel="alternate">
+        if try_homepage_feeds:
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), follow_redirects=True) as client:
+                    r = await client.get(base, headers={"User-Agent": user_agent})
+                    if r.status_code == 200:
+                        soup = BeautifulSoup(r.text, "html.parser")
+                        for link in soup.find_all("link", rel="alternate"):
+                            if not isinstance(link, Tag):
+                                continue
+                            mime = (link.get("type") or "").lower()
+                            if "rss" in mime or "atom" in mime:
+                                feed_href = link.get("href") or ""
+                                if not feed_href:
+                                    continue
+                                feed_url = urljoin(base, feed_href)
+                                try:
+                                    discovered.update(
+                                        await self._parse_feed(feed_url, _in_scope, max_urls)
+                                    )
+                                except (httpx.HTTPError, OSError):
+                                    continue
+            except (httpx.HTTPError, OSError):
+                pass
+
+        # 4. Enforce same-host
+        same_host = {u for u in discovered if urlparse(u).netloc == base_host}
+        return sorted(same_host)[:max_urls]
+
+    async def _parse_sitemap(
+        self,
+        sitemap_url: str,
+        in_scope,
+        max_urls: int,
+    ) -> set[str]:
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), follow_redirects=True) as client:
+            r = await client.get(sitemap_url, headers={"User-Agent": user_agent})
+        if r.status_code != 200:
+            return set()
+        out: set[str] = set()
+        for match in _SITEMAP_LOC_RE.finditer(r.text):
+            candidate = match.group(1).strip()
+            if candidate.endswith(".xml") or candidate.endswith(".xml.gz"):
+                # nested sitemap-index — recurse one level
+                try:
+                    out.update(await self._parse_sitemap(candidate, in_scope, max_urls - len(out)))
+                except (httpx.HTTPError, OSError):
+                    continue
+            elif in_scope(candidate):
+                out.add(candidate)
+            if len(out) >= max_urls:
+                break
+        return out
+
+    async def _parse_feed(
+        self,
+        feed_url: str,
+        in_scope,
+        max_urls: int,
+    ) -> set[str]:
+        user_agent = "ScholarAI-Internal-Ingestion/0.1"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), follow_redirects=True) as client:
+            r = await client.get(feed_url, headers={"User-Agent": user_agent})
+        if r.status_code != 200:
+            return set()
+        soup = BeautifulSoup(r.text, "xml")
+        out: set[str] = set()
+        # RSS: <item><link>...</link></item>
+        for item in soup.find_all("item"):
+            link_tag = item.find("link") if isinstance(item, Tag) else None
+            if link_tag is None:
+                continue
+            link_text = link_tag.text.strip() if link_tag.text else ""
+            if link_text and in_scope(link_text):
+                out.add(link_text)
+            if len(out) >= max_urls:
+                break
+        # Atom: <entry><link href="..."/></entry>
+        for entry in soup.find_all("entry"):
+            if len(out) >= max_urls:
+                break
+            link_tag = entry.find("link") if isinstance(entry, Tag) else None
+            if isinstance(link_tag, Tag):
+                href = link_tag.get("href") or ""
+                if href and in_scope(href):
+                    out.add(href)
+        return out
 
     async def _capture_source_with_pagination(
         self,

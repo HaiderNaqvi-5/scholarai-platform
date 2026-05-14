@@ -891,3 +891,260 @@ class ExceptionWrapper:
     @staticmethod
     def http_status_error(*, request, response):
         return httpx.HTTPStatusError("bad request", request=request, response=response)
+
+
+async def test_conditional_get_short_circuits_on_304(monkeypatch):
+    """PR 1: When prior ETag is sent and origin returns 304, capture short-circuits with cache_hit=True."""
+    captured_headers: dict[str, str] = {}
+
+    class FakeResp:
+        status_code = 304
+        headers = {"ETag": "W/abc", "Last-Modified": "Wed, 12 May 2026 10:00:00 GMT"}
+        text = ""
+        url = "https://www.chevening.org/scholarship/pakistan/"
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            if headers:
+                captured_headers.update(headers)
+            return FakeResp()
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    result = await svc._capture_source_once_with_cache(
+        url="https://www.chevening.org/scholarship/pakistan/",
+        attempt=1,
+        prior_etag="W/abc",
+        prior_last_modified="Wed, 12 May 2026 10:00:00 GMT",
+    )
+
+    assert result.metadata.get("cache_hit") is True
+    assert result.metadata.get("status_code") == 304
+    assert captured_headers.get("If-None-Match") == "W/abc"
+    assert captured_headers.get("If-Modified-Since") == "Wed, 12 May 2026 10:00:00 GMT"
+    assert result.capture_mode == "httpx_cached"
+    assert result.html == ""
+
+
+async def test_conditional_get_returns_full_capture_on_200(monkeypatch):
+    """PR 1: When prior ETag mismatches, origin returns 200 with new ETag in metadata."""
+
+    class FakeResp:
+        status_code = 200
+        headers = {"ETag": "W/new", "Last-Modified": "Thu, 13 May 2026 11:00:00 GMT"}
+        text = "<html><head><title>Chevening</title></head><body>fresh</body></html>"
+        url = "https://www.chevening.org/scholarship/pakistan/"
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            return FakeResp()
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    result = await svc._capture_source_once_with_cache(
+        url="https://www.chevening.org/scholarship/pakistan/",
+        attempt=1,
+        prior_etag="W/old",
+        prior_last_modified=None,
+    )
+
+    assert result.metadata.get("cache_hit") is False
+    assert result.metadata.get("status_code") == 200
+    assert result.metadata.get("etag") == "W/new"
+    assert result.metadata.get("last_modified") == "Thu, 13 May 2026 11:00:00 GMT"
+    assert result.html.startswith("<html>")
+    assert result.capture_mode == "httpx_cached"
+
+
+# ---------- PR 2: Sitemap + RSS/Atom feed discovery ----------
+
+
+async def test_discover_urls_from_robots_sitemap(monkeypatch):
+    """PR 2: robots.txt Sitemap: directives are followed and in-scope URLs are returned."""
+
+    robots = (
+        "User-agent: *\n"
+        "Disallow: /admin\n"
+        "Sitemap: https://example.gov/sitemap.xml\n"
+    )
+    sitemap = (
+        '<?xml version="1.0"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "  <url><loc>https://example.gov/scholarships/chevening-2027</loc></url>"
+        "  <url><loc>https://example.gov/scholarships/fulbright-pk</loc></url>"
+        "  <url><loc>https://example.gov/about</loc></url>"
+        "</urlset>"
+    )
+
+    class FakeResp:
+        def __init__(self, text: str, status_code: int = 200):
+            self.text = text
+            self.status_code = status_code
+            self.headers: dict[str, str] = {}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            if url.endswith("robots.txt"):
+                return FakeResp(robots)
+            if url.endswith("sitemap.xml"):
+                return FakeResp(sitemap)
+            return FakeResp("", status_code=404)
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    urls = await svc._discover_source_urls(
+        base_url="https://example.gov/",
+        scope_keywords=["scholarship", "chevening", "fulbright"],
+        try_homepage_feeds=False,
+    )
+
+    assert "https://example.gov/scholarships/chevening-2027" in urls
+    assert "https://example.gov/scholarships/fulbright-pk" in urls
+    assert "https://example.gov/about" not in urls
+
+
+async def test_discover_urls_from_rss_link_alternate(monkeypatch):
+    """PR 2: homepage <link rel='alternate' type='rss+xml'> feeds yield in-scope URLs."""
+
+    homepage = (
+        '<html><head>'
+        '<link rel="alternate" type="application/rss+xml" href="/feeds/scholarships.rss"/>'
+        "</head><body>home</body></html>"
+    )
+    rss = (
+        '<rss version="2.0"><channel>'
+        "<item><link>https://example.org/awards/daad-2027</link>"
+        "<title>DAAD 2027</title></item>"
+        "<item><link>https://example.org/news/conference</link>"
+        "<title>Conference</title></item>"
+        "</channel></rss>"
+    )
+
+    class FakeResp:
+        def __init__(self, text: str, status_code: int = 200):
+            self.text = text
+            self.status_code = status_code
+            self.headers: dict[str, str] = {}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            if url.endswith("robots.txt"):
+                return FakeResp("", status_code=404)
+            if url.endswith("sitemap.xml"):
+                return FakeResp("", status_code=404)
+            if url.endswith(".rss") or url.endswith(".rss/"):
+                return FakeResp(rss)
+            return FakeResp(homepage)
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    urls = await svc._discover_source_urls(
+        base_url="https://example.org/",
+        scope_keywords=["scholarship", "daad", "award"],
+        try_homepage_feeds=True,
+    )
+
+    assert "https://example.org/awards/daad-2027" in urls
+    assert "https://example.org/news/conference" not in urls
+
+
+async def test_discover_urls_filters_off_host(monkeypatch):
+    """PR 2: discovered URLs must share host with base_url."""
+
+    sitemap = (
+        '<?xml version="1.0"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "  <url><loc>https://example.gov/scholarships/x</loc></url>"
+        "  <url><loc>https://other.com/scholarships/leak</loc></url>"
+        "</urlset>"
+    )
+
+    class FakeResp:
+        def __init__(self, text: str, status_code: int = 200):
+            self.text = text
+            self.status_code = status_code
+            self.headers: dict[str, str] = {}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return None
+
+        async def get(self, url, headers=None, **kw):
+            if url.endswith("robots.txt"):
+                return FakeResp("", status_code=404)
+            if url.endswith("sitemap.xml"):
+                return FakeResp(sitemap)
+            return FakeResp("", status_code=404)
+
+    monkeypatch.setattr(
+        "app.services.ingestion.service.httpx.AsyncClient",
+        lambda **kw: FakeClient(),
+    )
+
+    svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+    urls = await svc._discover_source_urls(
+        base_url="https://example.gov/",
+        scope_keywords=["scholarship"],
+        try_homepage_feeds=False,
+    )
+
+    assert "https://example.gov/scholarships/x" in urls
+    assert "https://other.com/scholarships/leak" not in urls
