@@ -184,7 +184,9 @@ class SOPBuilderService:
         await _assert_sop_quota(self.db, user)
 
         scholarship_context = await self._scholarship_context(payload.scholarship_id)
-        draft_text, used_llm, model_used = self._generate_draft(payload, scholarship_context)
+        draft_text, used_llm, model_used = await self._generate_draft(
+            user, payload, scholarship_context
+        )
         paragraphs = _split_paragraphs(draft_text)
 
         document = DocumentRecord(
@@ -220,7 +222,7 @@ class SOPBuilderService:
 
         line_feedback: list[SOPParagraphFeedback] | None = None
         if has_plan_at_least(user, "elite", "institution"):
-            line_feedback = self._generate_line_feedback(draft_text, paragraphs)
+            line_feedback = await self._generate_line_feedback(user, draft_text, paragraphs)
 
         # Canonical quota accounting — runs once per draft() call. Both the
         # draft and the optional Elite line-feedback share this same bucket
@@ -262,46 +264,61 @@ class SOPBuilderService:
             facts.append(f"Application deadline: {row.deadline_at.date().isoformat()}.")
         return {"facts": facts, "summary": row.summary, "tags": list(row.field_tags or [])}
 
-    def _generate_draft(
+    async def _generate_draft(
         self,
+        user: User,
         payload: SOPDraftRequest,
         scholarship_context: dict[str, Any] | None,
     ) -> tuple[str, bool, str]:
         user_prompt = _build_user_prompt(payload, scholarship_context)
-        if self.llm.available:
-            try:
-                text = self.llm.call_text(
-                    system_prompt=SOP_SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    model=settings.ANTHROPIC_MODEL_DEEP,
-                    max_tokens=1800,
-                    temperature=0.4,
-                )
-                if text and _word_count(text) >= 300:
-                    return text, True, settings.ANTHROPIC_MODEL_DEEP
-                logger.warning("Claude SOP draft too short; falling back to template.")
-            except LLMUnavailableError:
-                pass
-            except Exception:  # pragma: no cover - network failures
-                logger.exception("Claude SOP draft failed; falling back to deterministic template.")
+        try:
+            text = await self.llm.complete_with_accounting(
+                db=self.db,
+                user=user,
+                endpoint="documents.sop.draft",
+                system_prompt=SOP_SYSTEM_PROMPT,
+                user_prompt=user_prompt,
+                model=settings.ANTHROPIC_MODEL_DEEP,
+                max_tokens=1800,
+                temperature=0.4,
+            )
+            if isinstance(text, str) and text and _word_count(text) >= 300:
+                return text, True, settings.ANTHROPIC_MODEL_DEEP
+            logger.warning("Claude SOP draft too short; falling back to template.")
+        except LLMUnavailableError:
+            pass
+        except HTTPException:
+            # Burn-cap exhaustion (429) — propagate to caller.
+            raise
+        except Exception:  # pragma: no cover - network failures
+            logger.exception("Claude SOP draft failed; falling back to deterministic template.")
         return _deterministic_draft(payload, scholarship_context), False, "deterministic_template"
 
-    def _generate_line_feedback(
+    async def _generate_line_feedback(
         self,
+        user: User,
         draft_text: str,
         paragraphs: list[str],
     ) -> list[SOPParagraphFeedback]:
-        if not self.llm.available:
-            return _deterministic_line_feedback(paragraphs)
         try:
-            data = self.llm.call_json(
+            data = await self.llm.complete_with_accounting(
+                db=self.db,
+                user=user,
+                endpoint="documents.sop.line_feedback",
                 system_prompt=LINE_FEEDBACK_SYSTEM_PROMPT,
                 user_prompt=f"SOP draft:\n\n{draft_text}",
                 model=settings.ANTHROPIC_MODEL_DEEP,
                 max_tokens=1500,
                 temperature=0.2,
+                json_mode=True,
             )
-        except (LLMUnavailableError, Exception):  # pragma: no cover - network failures
+        except LLMUnavailableError:
+            return _deterministic_line_feedback(paragraphs)
+        except HTTPException:
+            raise
+        except Exception:  # pragma: no cover - network failures
+            return _deterministic_line_feedback(paragraphs)
+        if not isinstance(data, dict):
             return _deterministic_line_feedback(paragraphs)
         rows = data.get("paragraphs") or []
         feedback: list[SOPParagraphFeedback] = []

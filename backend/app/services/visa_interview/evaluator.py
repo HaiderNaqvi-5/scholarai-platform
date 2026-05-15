@@ -11,7 +11,11 @@ import logging
 import re
 from typing import Any
 
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import settings
+from app.models import User
 from app.services.llm import AnthropicClient, LLMUnavailableError
 
 
@@ -139,24 +143,30 @@ def evaluate_answer_deterministic(
     }
 
 
-def evaluate_answer(
+async def evaluate_answer(
     *,
+    db: AsyncSession,
+    user: User,
     country: str,
     question_text: str,
     category: str,
     answer_text: str,
     llm: AnthropicClient | None = None,
 ) -> dict[str, Any]:
+    """Evaluate one visa-interview answer.
+
+    Uses ``complete_with_accounting`` so every Claude call is pre-flighted
+    against the user's burn cap and post-recorded in ``usage_ledger``.
+    Falls back deterministically when no API key is configured or when the
+    SDK raises — the deterministic path writes nothing to the ledger
+    (handled inside ``complete_with_accounting``'s synthetic zero-cost row).
+    """
     client = llm or AnthropicClient()
-    if not client.available:
-        return evaluate_answer_deterministic(
-            country=country,
-            question_text=question_text,
-            category=category,
-            answer_text=answer_text,
-        )
     try:
-        data = client.call_json(
+        data = await client.complete_with_accounting(
+            db=db,
+            user=user,
+            endpoint="interviews.visa.evaluator",
             system_prompt=VISA_EVAL_SYSTEM_PROMPT.format(
                 country=country, question=question_text, answer=answer_text
             ),
@@ -164,8 +174,19 @@ def evaluate_answer(
             model=settings.ANTHROPIC_MODEL_FAST,
             max_tokens=900,
             temperature=0.1,
+            json_mode=True,
         )
-    except (LLMUnavailableError, Exception):  # pragma: no cover - network failures
+    except LLMUnavailableError:
+        return evaluate_answer_deterministic(
+            country=country,
+            question_text=question_text,
+            category=category,
+            answer_text=answer_text,
+        )
+    except HTTPException:
+        # Burn-cap exhaustion (429) — propagate to caller.
+        raise
+    except Exception:  # pragma: no cover - network failures
         return evaluate_answer_deterministic(
             country=country,
             question_text=question_text,
@@ -173,6 +194,13 @@ def evaluate_answer(
             answer_text=answer_text,
         )
 
+    if not isinstance(data, dict):
+        return evaluate_answer_deterministic(
+            country=country,
+            question_text=question_text,
+            category=category,
+            answer_text=answer_text,
+        )
     return _normalise_rubric(data)
 
 

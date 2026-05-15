@@ -59,6 +59,9 @@ def _user(plan: str = "free", currency: str = "PKR", lifetime_sop_count: int = 0
 class _FakeResult:
     """Stub for ``Result`` covering both legacy ``.scalar()`` and the new
     ``.scalar_one_or_none()`` call path used by ``_assert_sop_quota``.
+    Also exposes ``.scalar_one()`` so the burn-cap pre-flight query
+    (``coalesce(sum(...), 0)``) finds a numeric default when the queue is
+    drained.
     """
 
     def __init__(self, scalar=None):
@@ -66,6 +69,12 @@ class _FakeResult:
 
     def scalar(self):
         return self._scalar
+
+    def scalar_one(self):
+        # `_assert_within_burn_cap` reads a `SUM(...)` aggregate; the fake
+        # DB returns 0 for any drained queue position so spent-to-date is 0
+        # and the assertion always passes in unit tests.
+        return self._scalar if self._scalar is not None else 0
 
     def scalar_one_or_none(self):
         return self._scalar
