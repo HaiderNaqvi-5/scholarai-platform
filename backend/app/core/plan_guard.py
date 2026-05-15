@@ -24,11 +24,11 @@ PLAN_RANK: dict[str, int] = {
 
 
 PRICE_BY_CURRENCY: dict[str, str] = {
-    "PKR": "PKR 2,499/month",
-    "GBP": "£6.99/month",
-    "EUR": "€7.99/month",
-    "AED": "AED 29/month",
-    "USD": "$8.99/month",
+    "PKR": "PKR 2,999/month",
+    "GBP": "£8.49/month",
+    "EUR": "€9.49/month",
+    "AED": "AED 39/month",
+    "USD": "$9.99/month",
 }
 
 
@@ -108,3 +108,24 @@ def assert_plan_or_raise(
     depends on per-row state (e.g. user already has 1 free SOP)."""
     if not has_plan_at_least(user, *allowed_plans):
         raise_plan_required(user, allowed_plans, message=message, extra=extra)
+
+
+# Q1 retier caps -----------------------------------------------------------
+MATCH_CAP: dict[str, int] = {"free": 3, "pro": 6, "elite": 12, "institution": 12}
+TRACKER_CAP: dict[str, int] = {"free": 3, "pro": 6, "elite": 12, "institution": 50}
+MONTHLY_SOP_CAP: dict[str, int] = {"free": 0, "pro": 5, "elite": 10, "institution": 50}
+LIFETIME_FREE_SOP: int = 1
+PRO_BLURRED_BEST_FIT_COUNT: int = 3
+
+BEST_FIT_REVEAL_PLANS: frozenset[str] = frozenset({"elite", "institution"})
+PREMIUM_VISIBLE_PLANS: frozenset[str] = frozenset({"pro", "elite", "institution"})
+
+
+def can_reveal_best_fit(user: User) -> bool:
+    """True when the user's plan exposes the eligible (best-fit) match bucket."""
+    return (user.plan or "free").lower() in BEST_FIT_REVEAL_PLANS
+
+
+def can_see_premium(user: User) -> bool:
+    """True when the user's plan can view premium-tier scholarships."""
+    return (user.plan or "free").lower() in PREMIUM_VISIBLE_PLANS
