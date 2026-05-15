@@ -1,38 +1,75 @@
 """POST /api/v1/scholarships/match service (Feature 5, PRD §5).
 
-Classifies published scholarships against a Pakistani student profile into
-three buckets: eligible / partially_eligible / stretch.
+Internal classification (eligible / partial / stretch) drives sort order
+but never leaks to the public API surface. The public response — see
+``app.schemas.scholarships_match.MatchResponse`` — exposes only neutral
+fields (id, name, provider, country_code, funding_amount, deadline,
+compatibility, locked) plus an optional ``UnlockOffer``.
 
-Free-tier users see the first three eligible matches in full; everything
-after that is returned in a locked list with minimal fields so the
-frontend can blur it and surface an upgrade prompt.
+Per-plan policy (Q1 retier, Task 7):
+- free: returns up to MATCH_CAP["free"] rows from the bottom bucket only,
+  and offers a Pro upgrade.
+- pro: returns up to MATCH_CAP["pro"] rows; the first
+  PRO_BLURRED_BEST_FIT_COUNT bottom-bucket rows render as locked
+  placeholders, with an Elite upgrade offer.
+- elite / institution: full reveal, no upgrade offer.
+
+A separate internal method ``match_internal`` returns the legacy rich
+shape (still typed as ``ScholarshipMatchResponse`` -> compat alias) for
+callers that need bucket-level access (e.g. the Elite strategy report).
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plan_guard import (
+    MATCH_CAP,
+    PRO_BLURRED_BEST_FIT_COUNT,
     PRICE_BY_CURRENCY,
+    can_reveal_best_fit,
+    can_see_premium,
     get_price_for_currency,
     has_plan_at_least,
 )
-from app.models import RecordState, Scholarship, StudentProfile, User
+from app.models import (
+    RecordState,
+    Scholarship,
+    ScholarshipTier,
+    StudentProfile,
+    User,
+)
 from app.schemas.scholarships_match import (
     LockedScholarshipCard,
+    MatchResponse,
     ScholarshipMatchCard,
+    ScholarshipMatchOut,
     ScholarshipMatchRequest,
-    ScholarshipMatchResponse,
+    UnlockOffer,
     UpgradePromptPayload,
 )
 
 
 _FREE_VISIBLE_LIMIT = 3
 _STRETCH_CGPA_TOLERANCE = 0.2
+
+# Placeholder copy for locked rows. Kept neutral — no bucket/tier words.
+_LOCKED_PLACEHOLDER = "Reveal with upgrade"
+
+
+# Funding-type tokens that count as "fully funded". Re-exported from
+# app.services.scholarships.__init__ so other services (reports, alerts,
+# tracker dashboards) consume one canonical set.
+FULLY_FUNDED_TYPES: frozenset[str] = frozenset({"full", "fully_funded", "gta_gra"})
+
+
+def is_fully_funded(funding_type: str | None) -> bool:
+    return (funding_type or "").lower() in FULLY_FUNDED_TYPES
 
 
 class ScholarshipMatchService:
@@ -44,9 +81,105 @@ class ScholarshipMatchService:
         user: User,
         profile: StudentProfile | None,
         payload: ScholarshipMatchRequest,
-    ) -> ScholarshipMatchResponse:
+        *,
+        top_n: int | None = None,
+    ) -> MatchResponse:
+        """Public match endpoint.
+
+        Returns a neutral ``MatchResponse`` — no internal vocabulary leaks.
+
+        ``top_n`` is an internal cap used by callers that need only the top
+        few matches before plan policy applies. It is applied to the merged
+        pre-policy pool, NOT to individual buckets, so callers consistently
+        get the highest-scoring rows across the whole pool. The route
+        caller passes None.
+        """
+        bundle = await self._classify_and_sort(user, profile, payload)
+        merged = _flatten_buckets(bundle)
+        if top_n is not None:
+            merged = merged[:top_n]
+            # Rebuild bundle from the truncated merge so policy still has
+            # per-bucket knowledge.
+            bundle = _split_back_into_buckets(merged)
+
+        plan = (user.plan or "free").lower()
+        items: list[ScholarshipMatchOut]
+        offer: UnlockOffer | None = None
+
+        if plan == "free":
+            # Free sees only the bottom bucket, up to MATCH_CAP["free"].
+            cap = MATCH_CAP["free"]
+            visible = bundle.stretch[:cap]
+            items = [_to_public(card, locked=False) for card in visible]
+            # Offer Pro whenever there are any matches at all to upgrade
+            # towards — the Pro pool covers all three internal buckets.
+            total_pool = len(bundle.eligible) + len(bundle.partial) + len(bundle.stretch)
+            if total_pool > len(visible):
+                hidden = total_pool - len(visible)
+                offer = UnlockOffer(
+                    to_plan="pro",
+                    locked_count=hidden,
+                    headline="More personalised matches available",
+                    message="Upgrade to Pro to see your full match list.",
+                )
+        elif plan == "pro":
+            cap = MATCH_CAP["pro"]
+            pool = merged[:cap]
+            items, blurred_count = _apply_pro_blur(pool)
+            if blurred_count > 0 and not can_reveal_best_fit(user):
+                offer = UnlockOffer(
+                    to_plan="elite",
+                    locked_count=blurred_count,
+                    headline=(
+                        f"{blurred_count} match{'es' if blurred_count != 1 else ''} reserved"
+                    ),
+                    message=(
+                        "Upgrade to Elite to reveal matches personalised to your profile."
+                    ),
+                )
+        else:
+            # Elite / institution — full reveal up to plan cap, no offer.
+            cap = MATCH_CAP.get(plan, MATCH_CAP["elite"])
+            pool = merged[:cap]
+            items = [_to_public(card, locked=False) for _bucket, card in pool]
+
+        return MatchResponse(items=items, unlock_offer=offer)
+
+    async def match_internal(
+        self,
+        user: User,
+        profile: StudentProfile | None,
+        payload: ScholarshipMatchRequest,
+        *,
+        top_n: int | None = None,
+    ) -> "_InternalMatchBundle":
+        """Bucket-aware result for internal callers (e.g. strategy report).
+
+        Returns the rich, classified buckets unchanged. Never serialise this
+        directly to a client — its field names ("eligible", "partial",
+        "stretch") would leak internal vocabulary.
+        """
+        bundle = await self._classify_and_sort(user, profile, payload)
+        if top_n is not None:
+            merged = _flatten_buckets(bundle)[:top_n]
+            bundle = _split_back_into_buckets(merged)
+        return bundle
+
+    # ------------------------------------------------------------------
+    # Pipeline
+    # ------------------------------------------------------------------
+
+    async def _classify_and_sort(
+        self,
+        user: User,
+        profile: StudentProfile | None,
+        payload: ScholarshipMatchRequest,
+    ) -> "_InternalMatchBundle":
         criteria = self._resolve_criteria(profile, payload)
-        scholarships = await self._fetch_published_scholarships()
+        include_premium = can_see_premium(user)
+        scholarships = await self._fetch_published_scholarships(
+            include_premium=include_premium
+        )
 
         eligible: list[ScholarshipMatchCard] = []
         partial: list[ScholarshipMatchCard] = []
@@ -65,8 +198,8 @@ class ScholarshipMatchService:
             else:
                 stretch.append(card)
 
-        for bucket in (eligible, partial, stretch):
-            bucket.sort(key=_sort_key)
+        for group in (eligible, partial, stretch):
+            group.sort(key=_sort_key)
 
         if has_plan_at_least(user, "elite", "institution"):
             for card in (*eligible, *partial, *stretch):
@@ -74,59 +207,7 @@ class ScholarshipMatchService:
                     card.deadline_days is not None and card.deadline_days <= 7
                 )
 
-        total_found = len(eligible) + len(partial) + len(stretch)
-        fully_funded_count = sum(
-            1
-            for c in (*eligible, *partial, *stretch)
-            if (c.funding_type or "").lower() in {"full", "fully_funded", "gta_gra"}
-        )
-
-        visible_limit = total_found
-        locked: list[LockedScholarshipCard] = []
-        upgrade_prompt: UpgradePromptPayload | None = None
-        if not has_plan_at_least(user, "pro", "elite", "institution"):
-            visible_limit = _FREE_VISIBLE_LIMIT
-            kept, overflow = _split_after_limit(eligible, _FREE_VISIBLE_LIMIT)
-            eligible = kept
-            # Demote all partial + stretch + overflow eligible to locked rows.
-            for card in (*overflow, *partial, *stretch):
-                locked.append(
-                    LockedScholarshipCard(
-                        scholarship_id=card.scholarship_id,
-                        title=card.title,
-                        country_code=card.country_code,
-                        funding_type=card.funding_type,
-                        deadline_days=card.deadline_days,
-                    )
-                )
-            partial = []
-            stretch = []
-
-            price = get_price_for_currency(user.plan_currency)
-            locked_count = len(locked)
-            locked_fully_funded = sum(
-                1 for c in locked if (c.funding_type or "").lower() in {"full", "fully_funded", "gta_gra"}
-            )
-            if locked_count:
-                upgrade_prompt = UpgradePromptPayload(
-                    required_plan=["pro", "elite", "institution"],
-                    price=price,
-                    message=(
-                        f"{locked_count} more matches including {locked_fully_funded} "
-                        f"fully funded — unlock with Pro ({price})."
-                    ),
-                )
-
-        return ScholarshipMatchResponse(
-            eligible=eligible,
-            partially_eligible=partial,
-            stretch=stretch,
-            locked=locked,
-            total_found=total_found,
-            fully_funded_count=fully_funded_count,
-            visible_limit=visible_limit,
-            upgrade_prompt=upgrade_prompt,
-        )
+        return _InternalMatchBundle(eligible=eligible, partial=partial, stretch=stretch)
 
     # ------------------------------------------------------------------
     # Internals
@@ -189,10 +270,17 @@ class ScholarshipMatchService:
             nationality=(nationality or "").upper(),
         )
 
-    async def _fetch_published_scholarships(self) -> list[Scholarship]:
-        result = await self.db.execute(
-            select(Scholarship).where(Scholarship.record_state == RecordState.PUBLISHED)
+    async def _fetch_published_scholarships(
+        self, *, include_premium: bool = True
+    ) -> list[Scholarship]:
+        stmt = select(Scholarship).where(
+            Scholarship.record_state == RecordState.PUBLISHED
         )
+        if not include_premium:
+            # Filter out higher-tier rows at the SQL boundary so they never
+            # enter classification for callers who lack the upgraded plan.
+            stmt = stmt.where(Scholarship.tier == ScholarshipTier.STANDARD)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     def _classify(
@@ -218,15 +306,11 @@ class ScholarshipMatchService:
         # Funding requirement preference
         funding_pref = (criteria.funding_requirement or "").lower()
         scholarship_funding = (scholarship.funding_type or "").lower()
-        if funding_pref == "fully_funded_only" and scholarship_funding not in {
-            "full",
-            "fully_funded",
-            "gta_gra",
-        }:
-            # Demote to stretch rather than exclude — students often relax funding pref.
-            funding_demotion = True
-        else:
-            funding_demotion = False
+        # Demote to stretch rather than exclude — students often relax funding pref.
+        funding_demotion = (
+            funding_pref == "fully_funded_only"
+            and not is_fully_funded(scholarship.funding_type)
+        )
 
         # CGPA hard floor with stretch tolerance
         min_cgpa = float(scholarship.min_gpa_value) if scholarship.min_gpa_value is not None else None
@@ -258,7 +342,7 @@ class ScholarshipMatchService:
         score = 50
         if criteria.fields and tags & set(criteria.fields):
             score += 15
-        if scholarship_funding in {"full", "fully_funded", "gta_gra"}:
+        if scholarship_funding in FULLY_FUNDED_TYPES:
             score += 20
         if min_cgpa is None or (criteria.cgpa is not None and criteria.cgpa >= (min_cgpa + 0.3)):
             score += 5
@@ -274,7 +358,7 @@ class ScholarshipMatchService:
             reason_bits.append("matches your fields")
         if min_cgpa is not None and criteria.cgpa is not None and criteria.cgpa >= min_cgpa:
             reason_bits.append(f"CGPA {criteria.cgpa:g} ≥ {min_cgpa:g}")
-        if scholarship_funding in {"full", "fully_funded", "gta_gra"}:
+        if scholarship_funding in FULLY_FUNDED_TYPES:
             reason_bits.append("fully funded")
         reason = "; ".join(reason_bits) or "Matches your profile."
 
@@ -359,3 +443,138 @@ def _split_after_limit(
     cards: list[ScholarshipMatchCard], limit: int
 ) -> tuple[list[ScholarshipMatchCard], list[ScholarshipMatchCard]]:
     return cards[:limit], cards[limit:]
+
+
+# ----------------------------------------------------------------------
+# Q1 retier (Task 7) — internal bundle + public projection helpers.
+#
+# The "bucket" tag is internal-only. It is paired with each card via a
+# plain tuple while building merged / per-plan pools, then dropped at
+# the serialisation boundary by ``_to_public`` so the public surface
+# stays neutral (no eligible/partial/stretch/bucket/tier vocabulary).
+# ----------------------------------------------------------------------
+
+
+@dataclass
+class _InternalMatchBundle:
+    """Internal-only classified result. Never serialise directly."""
+
+    eligible: list[ScholarshipMatchCard]
+    partial: list[ScholarshipMatchCard]
+    stretch: list[ScholarshipMatchCard]
+
+
+# Tagged pair: (internal bucket label, card). Used while merging /
+# splitting / blurring so the bucket info is available at the policy
+# layer without becoming a card attribute.
+_TaggedCard = tuple[str, ScholarshipMatchCard]
+
+
+def _flatten_buckets(bundle: _InternalMatchBundle) -> list[_TaggedCard]:
+    """Merge eligible → partial → stretch in that order, preserving the
+    per-bucket sort (each bucket is already sorted by ``_sort_key``)."""
+    merged: list[_TaggedCard] = []
+    for card in bundle.eligible:
+        merged.append(("eligible", card))
+    for card in bundle.partial:
+        merged.append(("partial", card))
+    for card in bundle.stretch:
+        merged.append(("stretch", card))
+    return merged
+
+
+def _split_back_into_buckets(merged: list[_TaggedCard]) -> _InternalMatchBundle:
+    """Inverse of ``_flatten_buckets`` — used after applying a global cap
+    so the per-plan policy still has bucket-level knowledge."""
+    eligible: list[ScholarshipMatchCard] = []
+    partial: list[ScholarshipMatchCard] = []
+    stretch: list[ScholarshipMatchCard] = []
+    for bucket, card in merged:
+        if bucket == "eligible":
+            eligible.append(card)
+        elif bucket == "partial":
+            partial.append(card)
+        else:
+            stretch.append(card)
+    return _InternalMatchBundle(eligible=eligible, partial=partial, stretch=stretch)
+
+
+def _format_funding_amount(card: ScholarshipMatchCard) -> str | None:
+    """Render the funding amount as a neutral display string, or None
+    when the card carries no numeric funding figures. Currency is not
+    inferred — the raw min/max is shown."""
+    lo = card.funding_amount_min
+    hi = card.funding_amount_max
+    if lo is None and hi is None:
+        return None
+    if lo is not None and hi is not None and lo != hi:
+        return f"{lo:,.0f} - {hi:,.0f}"
+    value = hi if hi is not None else lo
+    return f"{value:,.0f}"
+
+
+def _compatibility(card: ScholarshipMatchCard) -> float:
+    """Project the internal integer score onto the 0..1 surface used by
+    the public API. Internal scores are roughly in the 50..95 band; clamp
+    defensively so the schema validator never trips."""
+    raw = float(card.match_score) / 100.0
+    if raw < 0.0:
+        return 0.0
+    if raw > 1.0:
+        return 1.0
+    return raw
+
+
+def _to_public(card: ScholarshipMatchCard, *, locked: bool) -> ScholarshipMatchOut:
+    """Project an internal card to the neutral public row.
+
+    When ``locked=True`` the identifying fields are blanked (id, name,
+    provider, funding_amount, deadline) so the frontend can render an
+    upgrade placeholder; country_code and compatibility are kept so the
+    blurred row still hints at relevance without leaking specifics.
+    """
+    if locked:
+        return ScholarshipMatchOut(
+            id=None,
+            name=_LOCKED_PLACEHOLDER,
+            provider=_LOCKED_PLACEHOLDER,
+            country_code=card.country_code,
+            funding_amount=None,
+            deadline=None,
+            compatibility=_compatibility(card),
+            locked=True,
+        )
+    deadline_value: date | None = None
+    if card.deadline_at is not None:
+        deadline_value = card.deadline_at.date()
+    return ScholarshipMatchOut(
+        id=card.scholarship_id,
+        name=card.title,
+        provider=card.provider_name or "",
+        country_code=card.country_code,
+        funding_amount=_format_funding_amount(card),
+        deadline=deadline_value,
+        compatibility=_compatibility(card),
+        locked=False,
+    )
+
+
+def _apply_pro_blur(
+    pool: list[_TaggedCard],
+) -> tuple[list[ScholarshipMatchOut], int]:
+    """Pro tier projection.
+
+    Locks the first ``PRO_BLURRED_BEST_FIT_COUNT`` rows whose internal
+    bucket is ``eligible``; everything else (later eligible rows past the
+    blur cap, partial, stretch) renders unlocked. Returns the public
+    items list plus the count of blurred rows (so the caller can build
+    an UnlockOffer)."""
+    items: list[ScholarshipMatchOut] = []
+    blurred = 0
+    for bucket, card in pool:
+        if bucket == "eligible" and blurred < PRO_BLURRED_BEST_FIT_COUNT:
+            items.append(_to_public(card, locked=True))
+            blurred += 1
+        else:
+            items.append(_to_public(card, locked=False))
+    return items, blurred
