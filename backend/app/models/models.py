@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date as sa_Date,
     DateTime,
@@ -82,6 +83,11 @@ class InstitutionType(enum.StrEnum):
     UNIVERSITY = "university"
     HEC = "hec"
     OTHER = "other"
+
+
+class ScholarshipTier(str, enum.Enum):
+    STANDARD = "standard"
+    PREMIUM = "premium"
 
 
 class RecordState(enum.StrEnum):
@@ -209,6 +215,9 @@ class User(Base):
     plan_activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     billing_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    lifetime_sop_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     # Pakistan pivot — privacy / consent / soft-delete (Feature 9.5)
     data_consent_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -696,6 +705,17 @@ class Scholarship(Base):
         Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
         default=RecordState.RAW,
+    )
+    tier: Mapped[ScholarshipTier] = mapped_column(
+        Enum(
+            ScholarshipTier,
+            name="scholarship_tier",
+            values_callable=lambda x: [m.value for m in x],
+        ),
+        nullable=False,
+        server_default=ScholarshipTier.STANDARD.value,
+        default=ScholarshipTier.STANDARD,
+        index=True,
     )
     imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     provenance_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -1615,6 +1635,57 @@ class ReferralEnrollment(Base):
     enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     invoiced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SopMonthlyUsage(Base):
+    """Per-user monthly SOP count for Pro/Elite quota gating. Free uses User.lifetime_sop_count."""
+
+    __tablename__ = "sop_monthly_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), primary_key=True)
+    sop_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class UsageLedger(Base):
+    """Burn-cap accounting: LLM + WhatsApp cost per user per period, in PKR x 1e6 (BigInteger)."""
+
+    __tablename__ = "usage_ledger"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    output_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cost_pkr_micro: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
