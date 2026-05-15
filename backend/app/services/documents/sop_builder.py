@@ -12,13 +12,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from fastapi import HTTPException
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.plan_guard import (
-    assert_plan_or_raise,
-    get_price_for_currency,
+    LIFETIME_FREE_SOP,
+    MONTHLY_SOP_CAP,
     has_plan_at_least,
     raise_plan_required,
 )
@@ -28,6 +30,7 @@ from app.models import (
     DocumentRecord,
     DocumentType,
     Scholarship,
+    SopMonthlyUsage,
     User,
 )
 from app.schemas.sop import (
@@ -89,13 +92,96 @@ Return strict JSON:
 Do not include any prose outside of the JSON object."""
 
 
+def _sop_period() -> str:
+    now = datetime.now(timezone.utc)
+    return f"{now.year:04d}{now.month:02d}"
+
+
+async def _assert_sop_quota(db: AsyncSession, user: User) -> None:
+    """Raise 402 (upsell) for free, 429 (quota) for pro/elite when budget hit.
+
+    Shared canonical gate for both SOP draft generation and Elite line-by-line
+    feedback. Free plan: 1 lifetime SOP via ``User.lifetime_sop_count``. Pro/
+    Elite: per-month bucket in ``sop_monthly_usage`` keyed by yyyymm.
+    """
+    plan = (user.plan or "free").lower()
+    if plan == "free":
+        used = getattr(user, "lifetime_sop_count", 0) or 0
+        if used >= LIFETIME_FREE_SOP:
+            raise_plan_required(
+                user,
+                ["pro", "elite"],
+                message=(
+                    "Free plan includes 1 SOP. Upgrade for 5/month (Pro) or 10/month "
+                    "(Elite)."
+                ),
+            )
+        return
+
+    cap = MONTHLY_SOP_CAP.get(plan)
+    if cap is None or cap == 0:
+        return  # institution / unknown — handled separately
+
+    period = _sop_period()
+    row = (
+        await db.execute(
+            select(SopMonthlyUsage).where(
+                SopMonthlyUsage.user_id == user.id,
+                SopMonthlyUsage.period_yyyymm == period,
+            )
+        )
+    ).scalar_one_or_none()
+    used = row.sop_count if row else 0
+    if used >= cap:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "sop_quota_exhausted",
+                "plan": plan,
+                "used": used,
+                "cap": cap,
+                "upgrade_url": "/upgrade" if plan == "pro" else None,
+                "message": (
+                    f"{cap} SOP drafts used this month. Resets next month."
+                    + (" Upgrade to Elite for 10/month." if plan == "pro" else "")
+                ),
+            },
+        )
+
+
+async def _record_sop_use(db: AsyncSession, user: User) -> None:
+    """Increment the canonical SOP counter for the user's plan bucket."""
+    plan = (user.plan or "free").lower()
+    if plan == "free":
+        await db.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(lifetime_sop_count=(User.lifetime_sop_count + 1))
+        )
+        return
+
+    period = _sop_period()
+    stmt = (
+        pg_insert(SopMonthlyUsage)
+        .values(user_id=user.id, period_yyyymm=period, sop_count=1)
+        .on_conflict_do_update(
+            index_elements=["user_id", "period_yyyymm"],
+            set_={
+                "sop_count": SopMonthlyUsage.sop_count + 1,
+                "updated_at": func.now(),
+            },
+        )
+    )
+    await db.execute(stmt)
+
+
 class SOPBuilderService:
     def __init__(self, db: AsyncSession, llm: AnthropicClient | None = None) -> None:
         self.db = db
         self.llm = llm or AnthropicClient()
 
     async def draft(self, user: User, payload: SOPDraftRequest) -> SOPDraftResponse:
-        await self._enforce_free_tier_limit(user)
+        await _assert_sop_quota(self.db, user)
 
         scholarship_context = await self._scholarship_context(payload.scholarship_id)
         draft_text, used_llm, model_used = self._generate_draft(payload, scholarship_context)
@@ -136,6 +222,11 @@ class SOPBuilderService:
         if has_plan_at_least(user, "elite", "institution"):
             line_feedback = self._generate_line_feedback(draft_text, paragraphs)
 
+        # Canonical quota accounting — runs once per draft() call. Both the
+        # draft and the optional Elite line-feedback share this same bucket
+        # because they execute together as a single user action.
+        await _record_sop_use(self.db, user)
+
         return SOPDraftResponse(
             document_id=document.id,
             draft_content=draft_text,
@@ -151,30 +242,6 @@ class SOPBuilderService:
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
-
-    async def _enforce_free_tier_limit(self, user: User) -> None:
-        if has_plan_at_least(user, "pro", "elite", "institution"):
-            return
-        result = await self.db.execute(
-            select(func.count())
-            .select_from(DocumentRecord)
-            .where(
-                DocumentRecord.user_id == user.id,
-                DocumentRecord.document_type == DocumentType.SOP,
-            )
-        )
-        existing = int(result.scalar() or 0)
-        if existing >= 1:
-            price = get_price_for_currency(user.plan_currency)
-            raise_plan_required(
-                user,
-                ["pro", "elite", "institution"],
-                message=(
-                    f"Want to adapt this SOP for another university? Pro users generate"
-                    f" unlimited SOPs ({price}, less than one consultant draft)."
-                ),
-                extra={"error": "plan_limit_reached", "existing_sops": existing},
-            )
 
     async def _scholarship_context(self, scholarship_id: uuid.UUID | None) -> dict[str, Any] | None:
         if scholarship_id is None:
