@@ -1,8 +1,12 @@
 """Application tracker service (Feature 6, PRD §6).
 
-Free-tier cap: 3 items. Beyond that the create endpoint returns HTTP 402
-with the count of upcoming deadlines the student is *not* tracking, so the
-frontend's <UpgradeWall /> can render a specific, calibrated prompt.
+Per-plan tracker caps (Q1 retier): free=3 / pro=6 / elite=12 / institution=50.
+The constants live in ``app.core.plan_guard.TRACKER_CAP``; this service reads
+them at runtime so the cap is configured in one place.
+
+Hitting the cap returns HTTP 402 with the count of upcoming deadlines the
+student is *not* tracking, so the frontend's ``<UpgradeWall />`` can render a
+specific, calibrated prompt.
 """
 
 from __future__ import annotations
@@ -14,8 +18,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plan_guard import (
+    TRACKER_CAP,
     get_price_for_currency,
-    has_plan_at_least,
     raise_plan_required,
 )
 from app.models import (
@@ -33,7 +37,19 @@ from app.schemas.tracker import (
 )
 
 
-FREE_PLAN_ITEM_LIMIT = 3
+# Back-compat re-export: prior callers + tests imported ``FREE_PLAN_ITEM_LIMIT``
+# from this module. Source of truth is ``plan_guard.TRACKER_CAP["free"]``.
+FREE_PLAN_ITEM_LIMIT = TRACKER_CAP["free"]
+
+# Upgrade target ladder by current plan. Institution is at the top of the
+# ladder; its cap still fires, but there is no higher tier to upsell to, so we
+# point the user at the same plan list (frontend renders "contact sales").
+_UPGRADE_TARGETS: dict[str, list[str]] = {
+    "free": ["pro", "elite", "institution"],
+    "pro": ["elite", "institution"],
+    "elite": ["institution"],
+    "institution": ["institution"],
+}
 
 
 class TrackerService:
@@ -62,25 +78,38 @@ class TrackerService:
         user: User,
         payload: TrackerItemCreateRequest,
     ) -> ApplicationTrackerItem:
-        if not has_plan_at_least(user, "pro", "elite", "institution"):
-            current = await self.count_for_user(user.id)
-            if current >= FREE_PLAN_ITEM_LIMIT:
-                untracked = await self._count_untracked_upcoming_deadlines(user.id)
-                price = get_price_for_currency(user.plan_currency)
-                raise_plan_required(
-                    user,
-                    ["pro", "elite", "institution"],
-                    message=(
-                        f"You have {untracked} upcoming scholarship deadlines you are "
-                        f"not tracking. Unlimited tracking with Pro ({price})."
-                    ),
-                    extra={
-                        "error": "plan_limit_reached",
-                        "current_items": current,
-                        "free_limit": FREE_PLAN_ITEM_LIMIT,
-                        "untracked_count": untracked,
-                    },
+        plan = (user.plan or "free").lower()
+        cap = TRACKER_CAP.get(plan, TRACKER_CAP["free"])
+        current = await self.count_for_user(user.id)
+        if current >= cap:
+            untracked = await self._count_untracked_upcoming_deadlines(user.id)
+            price = get_price_for_currency(user.plan_currency)
+            upgrade_targets = _UPGRADE_TARGETS.get(plan, _UPGRADE_TARGETS["free"])
+            if plan == "free":
+                message = (
+                    f"You have {untracked} upcoming scholarship deadlines you are "
+                    f"not tracking. Track up to {TRACKER_CAP['pro']} with Pro "
+                    f"({price})."
                 )
+            else:
+                message = (
+                    f"Tracker limit reached ({cap} items on {plan}). "
+                    f"Upgrade for more capacity ({price})."
+                )
+            raise_plan_required(
+                user,
+                upgrade_targets,
+                message=message,
+                extra={
+                    "error": "plan_limit_reached",
+                    "current_items": current,
+                    "cap": cap,
+                    # Kept for backwards-compat with earlier UpgradeWall payloads
+                    # that read ``free_limit``; mirrors ``cap`` post-retier.
+                    "free_limit": cap,
+                    "untracked_count": untracked,
+                },
+            )
 
         item = ApplicationTrackerItem(
             user_id=user.id,
