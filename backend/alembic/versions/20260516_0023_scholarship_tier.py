@@ -18,9 +18,9 @@ def upgrade() -> None:
     op.create_index("ix_scholarships_tier", "scholarships", ["tier"])
     op.execute(
         "UPDATE scholarships SET tier = 'premium' "
-        "WHERE LOWER(name) ~ "
+        "WHERE LOWER(title) ~ "
         "'(chevening|fulbright|daad|commonwealth|hec overseas|rhodes|gates|schwarzman|erasmus mundus)' "
-        "OR LOWER(provider) ~ "
+        "OR LOWER(provider_name) ~ "
         "'(chevening|fulbright|daad|commonwealth|hec|rhodes|gates foundation|schwarzman|erasmus)'"
     )
 
