@@ -2,24 +2,27 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.dependencies import CurrentUser
-from app.models import RecordState, Scholarship, ScholarshipRequirement
+from app.core.dependencies import CurrentUser, get_current_user
+from app.core.plan_guard import can_see_premium, raise_plan_required
+from app.models import RecordState, Scholarship, ScholarshipRequirement, ScholarshipTier, User
 from app.schemas import (
     ScholarshipAppliedFilters,
     ScholarshipDetailResponse,
     ScholarshipListItem,
     ScholarshipListResponse,
+    ScholarshipProvenanceResponse,
 )
 from app.schemas.scholarships_match import (
     ScholarshipMatchRequest,
     ScholarshipMatchResponse,
 )
+from app.services.ingestion import IngestionService
 from app.services.recommendations.eligibility import scholarship_in_scope
 from app.services.scholarships import ScholarshipMatchService
 from app.services.students import StudentService
@@ -27,9 +30,36 @@ from app.services.students import StudentService
 router = APIRouter()
 
 
+async def get_optional_user(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User | None:
+    """Return the authenticated user when a valid bearer token is present.
+
+    Anonymous callers receive ``None`` so public endpoints can downgrade to
+    standard-tier-only views without forcing auth.  Any failure to decode the
+    token (missing header, malformed, expired) is swallowed — callers should
+    treat ``None`` as "anonymous", not "auth failed".
+    """
+    authorization = request.headers.get("Authorization") or request.headers.get("authorization")
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    try:
+        return await get_current_user(token=token, db=db)
+    except Exception:  # noqa: BLE001 — anon path swallows every auth failure
+        return None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 @router.get("", response_model=ScholarshipListResponse)
 async def list_scholarships(
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: OptionalUser,
     query: str | None = Query(default=None, min_length=2, max_length=120),
     country_code: str | None = Query(default=None, min_length=2, max_length=2),
     field_tag: str | None = Query(default=None, min_length=2, max_length=64),
@@ -72,6 +102,8 @@ async def list_scholarships(
     statement = select(Scholarship).where(
         Scholarship.record_state == RecordState.PUBLISHED
     )
+    if current_user is None or not can_see_premium(current_user):
+        statement = statement.where(Scholarship.tier == ScholarshipTier.STANDARD)
     if country_code:
         statement = statement.where(Scholarship.country_code == country_code.upper())
 
@@ -168,6 +200,7 @@ async def match_scholarships(
 async def get_scholarship(
     scholarship_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: OptionalUser,
 ) -> ScholarshipDetailResponse:
     result = await db.execute(
         select(Scholarship)
@@ -183,6 +216,7 @@ async def get_scholarship(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Published scholarship not found",
         )
+    _guard_premium_tier(scholarship, current_user)
 
     return ScholarshipDetailResponse(
         **_serialize_list_item(scholarship).model_dump(),
@@ -207,6 +241,73 @@ async def get_scholarship(
         last_validated_at=scholarship.validated_at,
         published_at=scholarship.published_at,
         publication_hint=build_publication_hint(scholarship),
+    )
+
+
+@router.get(
+    "/{scholarship_id}/provenance",
+    response_model=ScholarshipProvenanceResponse,
+)
+async def get_scholarship_provenance(
+    scholarship_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: OptionalUser,
+) -> ScholarshipProvenanceResponse:
+    """Trace a published scholarship back to its ingestion source + run.
+
+    Published-only — non-published records return 404, preserving the
+    published-only contract of the public scholarships surface. Premium-tier
+    rows are paywalled the same way as the detail endpoint: anonymous → 401,
+    free → 402 with the standard upgrade payload.
+    """
+    scholarship = await db.execute(
+        select(Scholarship.tier).where(Scholarship.id == scholarship_id)
+    )
+    tier_row = scholarship.scalar_one_or_none()
+    if tier_row is not None:
+        # synthetic shim so _guard_premium_tier can read .tier
+        _guard_premium_tier(_TierOnly(tier_row), current_user)
+    return await IngestionService(db).trace_provenance(
+        scholarship_id, require_published=True
+    )
+
+
+class _TierOnly:
+    """Lightweight stand-in exposing only ``.tier`` for the premium guard."""
+
+    __slots__ = ("tier",)
+
+    def __init__(self, tier: ScholarshipTier) -> None:
+        self.tier = tier
+
+
+def _guard_premium_tier(scholarship: Scholarship | _TierOnly, current_user: User | None) -> None:
+    """Raise 402 (or 401 for anon) when a premium-tier row is being requested
+    by a caller whose plan cannot view premium scholarships.
+
+    Free / anonymous → blocked. Pro / Elite / Institution → allowed.
+    """
+    if scholarship.tier != ScholarshipTier.PREMIUM:
+        return
+    if current_user is None:
+        # Anonymous caller — no upgrade payload makes sense without a plan_currency,
+        # so surface a generic 402 that prompts sign-in + upgrade.
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "plan_required",
+                "required_plan": ["pro", "elite"],
+                "current_plan": None,
+                "upgrade_url": "/upgrade",
+                "message": "Sign in with a Pro or Elite plan to view this scholarship's full details.",
+            },
+        )
+    if can_see_premium(current_user):
+        return
+    raise_plan_required(
+        current_user,
+        ["pro", "elite"],
+        message="Upgrade to Pro to view this scholarship's full details.",
     )
 
 
