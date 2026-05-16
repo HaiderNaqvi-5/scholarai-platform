@@ -10,7 +10,20 @@ import {
 } from "recharts";
 import type { InterviewRubricDimension } from "@/lib/api";
 
-export function RubricRadar({ dimensions }: { dimensions: InterviewRubricDimension[] }) {
+type Scale = "0-5" | "0-10";
+
+/**
+ * Radar over rubric dimensions. Pass `scale` so the caller doesn't have to
+ * pre-divide visa-interview 0-10 scores before passing them in — the chart
+ * handles axis range + label formatting from one switch.
+ */
+export function RubricRadar({
+  dimensions,
+  scale = "0-5",
+}: {
+  dimensions: InterviewRubricDimension[];
+  scale?: Scale;
+}) {
   if (dimensions.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-ink-subtle">
@@ -18,6 +31,7 @@ export function RubricRadar({ dimensions }: { dimensions: InterviewRubricDimensi
       </p>
     );
   }
+  const max = scale === "0-10" ? 10 : 5;
   const data = dimensions.map((d) => ({ dimension: d.dimension, score: d.score }));
   return (
     <div className="h-72 w-full">
@@ -30,9 +44,9 @@ export function RubricRadar({ dimensions }: { dimensions: InterviewRubricDimensi
           />
           <PolarRadiusAxis
             angle={90}
-            domain={[0, 5]}
+            domain={[0, max]}
             tick={{ fill: "var(--color-ink-subtle)", fontSize: 10 }}
-            tickCount={6}
+            tickCount={max === 10 ? 6 : 6}
           />
           <Radar
             dataKey="score"

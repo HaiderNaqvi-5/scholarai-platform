@@ -153,7 +153,7 @@ function StatusIcon({ status }: { status: Status }) {
     return (
       <span
         className="inline-flex size-6 items-center justify-center rounded-full bg-validated-soft text-validated"
-        aria-label="Eligible"
+        aria-label="Match"
       >
         <Check className="size-3.5" strokeWidth={2.5} />
       </span>
@@ -163,7 +163,7 @@ function StatusIcon({ status }: { status: Status }) {
     return (
       <span
         className="inline-flex size-6 items-center justify-center rounded-full bg-danger-soft text-danger"
-        aria-label="Not eligible"
+        aria-label="No match"
       >
         <X className="size-3.5" strokeWidth={2.5} />
       </span>

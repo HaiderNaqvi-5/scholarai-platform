@@ -13,6 +13,9 @@ export type Role =
   | "internal_user"
   | "university";
 
+export type Plan = "free" | "pro" | "elite" | "institution";
+export type Currency = "PKR" | "GBP" | "EUR" | "AED" | "USD";
+
 export type User = {
   id: string;
   email: string;
@@ -20,6 +23,10 @@ export type User = {
   role: Role;
   institution?: string | null;
   created_at?: string;
+  /** Plan tier — backend exposes on /auth/me. Drives frontend gating. */
+  plan: Plan;
+  plan_currency: Currency;
+  billing_country?: string | null;
 };
 
 export type TokenResponse = {
@@ -215,4 +222,346 @@ export type PlatformAnalytics = {
   interview_sessions_count: number;
   ingestion_runs_recent: { status: IngestionRunStatus; count: number }[];
   kpi_trends: Record<string, { points: { at: string; value: number }[] }>;
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+// Pakistan pivot — Frontend Pass. Hand-synced to backend Pydantic schemas:
+//   tracker.py · scholarships_match.py · sop.py · professor_email.py
+//   visa_interview.py · waitlist.py · reports.py
+// ───────────────────────────────────────────────────────────────────────────
+
+/** HTTP 402 detail from core/plan_guard.py. `required_plan` is a list. */
+export type PlanRequiredDetail = {
+  error: string;
+  required_plan: string[];
+  current_plan: string;
+  upgrade_url: string;
+  price: string;
+  message: string;
+  partial_summary?: Record<string, unknown> | null;
+};
+
+// ── Application tracker (PRD §6) ───────────────────────────────────────────
+
+// Tracker stage + checklist live next to their display metadata in
+// `lib/tracker/`; re-export here so API consumers see one shape.
+export type { TrackerStage } from "@/lib/tracker/stages";
+export { TRACKER_STAGES, STAGE_META, stageLabel } from "@/lib/tracker/stages";
+export type {
+  TrackerChecklist,
+  TrackerChecklistKey,
+} from "@/lib/tracker/checklist";
+export {
+  CHECKLIST_LABELS,
+  CHECKLIST_KEYS,
+  checklistProgress,
+} from "@/lib/tracker/checklist";
+
+import type { TrackerStage } from "@/lib/tracker/stages";
+import type { TrackerChecklist } from "@/lib/tracker/checklist";
+
+export type TrackerItem = {
+  id: string;
+  user_id: string;
+  scholarship_id?: string | null;
+  university_id?: string | null;
+  program_name?: string | null;
+  university_name?: string | null;
+  country?: string | null;
+  stage: TrackerStage;
+  deadline?: string | null;
+  notes?: string | null;
+  document_checklist: TrackerChecklist;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TrackerListResponse = {
+  items: TrackerItem[];
+  total: number;
+  plan_limit?: number | null;
+  plan: Plan;
+};
+
+export type TrackerItemCreateRequest = {
+  scholarship_id?: string | null;
+  university_id?: string | null;
+  program_name?: string | null;
+  university_name?: string | null;
+  country?: string | null;
+  stage?: TrackerStage;
+  deadline?: string | null;
+  notes?: string | null;
+};
+
+// ── Scholarship match (PRD §5) ─────────────────────────────────────────────
+// Public shape mirrors backend `scholarships_match.py` (Task 7 retier).
+// Neutral fields only — no internal bucket vocabulary leaks here.
+
+export type ScholarshipMatchRequest = {
+  cgpa?: number | null;
+  degree_target?: string | null;
+  fields?: string[];
+  countries?: string[];
+  has_ielts?: boolean | null;
+  ielts_score?: number | null;
+  has_gre?: boolean | null;
+  funding_requirement?: string | null;
+  nationality?: string | null;
+};
+
+export interface ScholarshipMatchOut {
+  id: string | null; // UUID
+  name: string;
+  provider: string;
+  country_code: string | null;
+  funding_amount: string | null;
+  deadline: string | null; // ISO date
+  compatibility: number; // 0..1
+  locked: boolean;
+}
+
+export interface UnlockOffer {
+  to_plan: "pro" | "elite";
+  locked_count: number;
+  headline: string;
+  message: string;
+}
+
+export interface MatchResponse {
+  items: ScholarshipMatchOut[];
+  unlock_offer: UnlockOffer | null;
+}
+
+// Backwards-compatible alias used by existing callers.
+export type ScholarshipMatchResponse = MatchResponse;
+
+// ── SOP builder (PRD §7) ───────────────────────────────────────────────────
+
+export type SOPInputs = {
+  academic_background: string;
+  research_experience?: string | null;
+  professional_experience?: string | null;
+  why_this_program: string;
+  why_this_country?: string | null;
+  career_goals: string;
+  challenges_overcome?: string | null;
+  gap_explanation?: string | null;
+};
+
+export type SOPDraftRequest = {
+  scholarship_id?: string | null;
+  university_id?: string | null;
+  program_name?: string | null;
+  sop_inputs: SOPInputs;
+};
+
+export type SOPParagraphFeedback = {
+  index: number;
+  paragraph_label: string;
+  strength: string;
+  weakness: string;
+  suggestion: string;
+};
+
+export type SOPGroundedContext = {
+  validated_scholarship_facts: string[];
+  retrieved_writing_guidance: string[];
+  generated_guidance?: string | null;
+  limitations: string;
+};
+
+export type SOPDraftResponse = {
+  document_id: string;
+  document_type: string;
+  draft_content: string;
+  word_count: number;
+  paragraph_labels: string[];
+  grounded_context: SOPGroundedContext;
+  line_feedback?: SOPParagraphFeedback[] | null;
+  model_used: string;
+  used_llm: boolean;
+  created_at: string;
+};
+
+// ── Professor cold-email generator (PRD §0.6, Elite) ───────────────────────
+
+export type ProfessorEmailRequest = {
+  professor_name: string;
+  university: string;
+  research_area: string;
+  student_pitch: string;
+  position_type?: "phd" | "ra";
+};
+
+export type ProfessorEmailResponse = {
+  document_id: string;
+  document_type: string;
+  email_subject: string;
+  email_body: string;
+  word_count: number;
+  used_llm: boolean;
+  model_used: string;
+  limitations: string;
+  created_at: string;
+};
+
+// ── Visa interview simulator (PRD §8) ──────────────────────────────────────
+
+export type VisaCountry = "GB" | "US" | "CA" | "DE";
+export type VisaPracticeMode = "study" | "exam";
+
+export type VisaInterviewStartRequest = {
+  country: VisaCountry;
+  visa_type?: string | null;
+  practice_mode?: VisaPracticeMode;
+  scholarship_id?: string | null;
+};
+
+export type VisaInterviewQuestion = {
+  id: string;
+  country: string;
+  visa_type: string;
+  category: string;
+  question_text: string;
+  difficulty: string;
+};
+
+export type VisaInterviewStartResponse = {
+  session_id: string;
+  country: string;
+  visa_type: string;
+  practice_mode: string;
+  total_questions: number;
+  first_question?: VisaInterviewQuestion | null;
+  started_at: string;
+};
+
+export type VisaInterviewAnswerRequest = {
+  question_id: string;
+  answer_text: string;
+};
+
+export type VisaInterviewRubric = {
+  clarity_score: number;
+  confidence_score: number;
+  relevance_score: number;
+  overall_score: number;
+  red_flags: string[];
+  missing_elements: string[];
+  what_was_good: string;
+  ideal_answer_summary: string;
+  used_llm: boolean;
+};
+
+export type VisaInterviewProgress = {
+  answered: number;
+  total: number;
+};
+
+export type VisaInterviewAnswerResponse = {
+  evaluation: VisaInterviewRubric;
+  next_question?: VisaInterviewQuestion | null;
+  session_progress: VisaInterviewProgress;
+  partial_summary?: Record<string, unknown> | null;
+};
+
+export type VisaInterviewSessionSummary = {
+  session_id: string;
+  country: string;
+  visa_type: string;
+  answered: number;
+  total: number;
+  average_score: number;
+  score_breakdown: Record<string, number>;
+  red_flag_count: number;
+  areas_to_improve: string[];
+  transcript_document_id?: string | null;
+};
+
+// ── Upgrade / pricing / waitlist (PRD §0.5) ────────────────────────────────
+
+export type PricingTier = {
+  key: string;
+  label: string;
+  is_recommended: boolean;
+  monthly_price: string;
+  yearly_hint?: string | null;
+  feature_summary: string;
+  bullet_features: string[];
+};
+
+export type PricingResponse = {
+  currency: Currency;
+  tiers: PricingTier[];
+};
+
+export type WaitlistJoinRequest = {
+  email: string;
+  plan?: "pro" | "elite" | "institution";
+  currency?: Currency;
+  country?: string | null;
+};
+
+export type WaitlistJoinResponse = {
+  id: string;
+  email: string;
+  plan: string;
+  currency: string;
+  created_at: string;
+};
+
+// ── Application strategy report (PRD §0.6, Elite) ──────────────────────────
+
+export type StrategyReportRequest = {
+  notes?: string | null;
+};
+
+export type ReportProfileSummary = {
+  full_name?: string | null;
+  pakistani_university?: string | null;
+  cgpa_value?: number | null;
+  cgpa_us_equivalent?: number | null;
+  uk_degree_class?: string | null;
+  ielts_score?: number | null;
+  target_degree?: string | null;
+  target_countries: string[];
+  target_fields: string[];
+  funding_requirement?: string | null;
+};
+
+export type ReportUniversityMatch = {
+  university_id: string;
+  name: string;
+  country: string;
+  tier: "Safety" | "Target" | "Reach";
+  reason: string;
+};
+
+export type ReportScholarshipMatch = {
+  scholarship_id: string;
+  title: string;
+  country_code: string;
+  funding_type?: string | null;
+  deadline_days?: number | null;
+  match_reason: string;
+};
+
+export type ReportActionPlan = {
+  next_30_days: string[];
+  next_60_days: string[];
+  next_90_days: string[];
+};
+
+export type StrategyReportResponse = {
+  document_id: string;
+  document_type: string;
+  profile_summary: ReportProfileSummary;
+  universities: ReportUniversityMatch[];
+  scholarships: ReportScholarshipMatch[];
+  action_plan: ReportActionPlan;
+  generated_guidance: string;
+  limitations: string;
+  used_llm: boolean;
+  created_at: string;
 };

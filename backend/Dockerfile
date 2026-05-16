@@ -30,10 +30,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --default-timeout=600 --retries 10 \
     --find-links=/wheels -r requirements.txt
 
+# Install Chromium + its OS deps for the scraper Celery worker (Playwright).
+# Lives in a fixed path so the non-root appuser can read the binary after
+# the chown below; PLAYWRIGHT_BROWSERS_PATH is also exported to runtime so
+# Python's playwright SDK finds the same install.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN python -m playwright install --with-deps chromium
+
 COPY . .
 
-# Security: Run as non-root user
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
+# Security: Run as non-root user (chown the Playwright cache too so the
+# scraper worker can launch Chromium without permission errors).
+RUN adduser --disabled-password --gecos "" appuser \
+    && chown -R appuser /app /opt/playwright-browsers
 USER appuser
 
 EXPOSE 8000

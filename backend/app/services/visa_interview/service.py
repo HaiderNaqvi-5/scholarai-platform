@@ -146,7 +146,9 @@ class VisaInterviewService:
                     },
                 )
 
-        rubric_data = evaluate_answer(
+        rubric_data = await evaluate_answer(
+            db=self.db,
+            user=user,
             country=session.country or "GB",
             question_text=question.question_text,
             category=question.category,

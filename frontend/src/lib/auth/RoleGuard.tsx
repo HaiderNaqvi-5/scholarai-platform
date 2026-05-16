@@ -5,16 +5,21 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import type { Role } from "@/lib/api";
 
+// Trust boundary (PRD §0.6): the partner group does NOT include any student
+// role. Students cannot enter `(partners)` even if they know the URL. The
+// student group, in turn, does not include `university`.
 const STUDENT_ROLES: Role[] = ["enduser_student", "student", "internal_user", "dev", "admin", "owner"];
 const MENTOR_ROLES: Role[] = ["mentor", "admin", "owner"];
 const ADMIN_ROLES: Role[] = ["admin", "owner"];
 const OWNER_ROLES: Role[] = ["owner"];
+const PARTNER_ROLES: Role[] = ["university", "admin", "owner"];
 
 export const ROLE_GROUPS = {
   student: STUDENT_ROLES,
   mentor: MENTOR_ROLES,
   admin: ADMIN_ROLES,
   owner: OWNER_ROLES,
+  partner: PARTNER_ROLES,
 } as const;
 
 export type RoleGroup = keyof typeof ROLE_GROUPS;

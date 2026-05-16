@@ -21,6 +21,7 @@ from app.schemas import (
     IngestionRunRetryRequest,
     IngestionRunSnapshotResponse,
     IngestionRunStartRequest,
+    SourceHealthListResponse,
 )
 from app.services.curation import CurationService
 from app.services.ingestion import IngestionService
@@ -89,7 +90,8 @@ async def start_ingestion_run(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> IngestionRunDetail:
     service = IngestionService(db)
-    if payload.execution_mode == "inline":
+    effective_mode = service._resolve_execution_mode(payload)
+    if effective_mode == "inline":
         detail = await service.start_run(payload, current_user)
         await db.commit()
         return _with_run_diagnostics(detail)
@@ -142,6 +144,11 @@ async def list_ingestion_runs(
     status: str | None = Query(default=None),
     source_key: str | None = Query(default=None),
     dispatch_status: str | None = Query(default=None),
+    parser_diagnostic: str | None = Query(
+        default=None,
+        description="Filter to runs whose parser diagnostics flag this key as truthy "
+        "(e.g. fallback_used, microdata_candidates).",
+    ),
 ) -> IngestionRunListResponse:
     effective_page_size = limit if limit is not None else page_size
     service = IngestionService(db)
@@ -152,6 +159,7 @@ async def list_ingestion_runs(
         status_filter=status,
         source_key=source_key,
         dispatch_status=dispatch_status,
+        parser_diagnostic=parser_diagnostic,
     )
 
 
@@ -264,6 +272,20 @@ async def clear_ingestion_run_snapshot(
     response = await service.clear_run_snapshot(run_id, actor_user=current_user)
     await db.commit()
     return response
+
+
+@router.get("/source-health", response_model=SourceHealthListResponse)
+async def list_source_health(
+    current_user: CurationQueueUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SourceHealthListResponse:
+    """Per-source ingestion health (success/failure heartbeat).
+
+    Surfaces a row per ``source_registry`` entry with the latest health_status,
+    consecutive_failures, and last_success / last_failure timestamps so curators
+    can spot sources that are silently rotting.
+    """
+    return await IngestionService(db).list_source_health(current_user)
 
 
 @router.post("/imports", response_model=CurationRecordDetail)

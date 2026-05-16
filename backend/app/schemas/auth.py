@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -46,6 +47,12 @@ class UserCreate(BaseModel):
     marketing_consent: bool = False
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
 
+    # Air University exhibition cohort capture (Q2-2026 trial launch).
+    invite_code: str | None = Field(default=None, min_length=4, max_length=32)
+    air_uni_uni: str | None = Field(default=None, max_length=64)
+    air_uni_dept: str | None = Field(default=None, max_length=32)
+    air_uni_batch: int | None = Field(default=None, ge=2010, le=2035)
+
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: str) -> str:
@@ -88,6 +95,14 @@ class UserResponse(BaseModel):
         ),
     )
     is_active: bool = Field(..., description="Whether the account is enabled")
+    plan: str = Field("free", description="Plan tier: free | pro | elite | institution")
+    plan_currency: str = Field("PKR", description="Billing currency: PKR | GBP | EUR | AED | USD")
+    plan_expires_at: datetime | None = Field(None, description="Trial expiry timestamp (null for non-trial plans)")
+    billing_country: str | None = Field(None, description="ISO country code detected on signup")
+    air_uni_uni: str | None = Field(None, description="University name captured at signup (optional)")
+    air_uni_dept: str | None = Field(None, description="Department captured at signup (optional)")
+    air_uni_batch: int | None = Field(None, description="Batch / intake year captured at signup (optional)")
+    redeemed_invite_code: str | None = Field(None, description="Invite code consumed at signup, if any")
 
 
 class TokenResponse(BaseModel):

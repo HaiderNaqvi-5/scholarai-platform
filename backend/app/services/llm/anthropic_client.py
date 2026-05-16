@@ -22,6 +22,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.burn_cap import (
+    assert_within_burn_cap,
+    llm_cost_pkr,
+    record_llm,
+)
 from app.core.config import settings
 
 
@@ -87,13 +92,12 @@ class AnthropicClient:
     ) -> str:
         if not self.available:
             raise LLMUnavailableError("Anthropic API key missing.")
-        client = self._ensure_client()
-        message = client.messages.create(
-            model=model or self._default_model,
+        message = self._raw_call(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model,
             max_tokens=max_tokens,
             temperature=temperature,
-            system=[_CachedSystemBlock(system_prompt).to_block()],
-            messages=[{"role": "user", "content": user_prompt}],
         )
         return _join_text_blocks(message)
 
@@ -115,10 +119,121 @@ class AnthropicClient:
         )
         return _extract_json_object(raw)
 
+    # ------------------------------------------------------------------
+    # Burn-cap-aware wrapper (Task 11)
+    # ------------------------------------------------------------------
+
+    def _raw_call(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        max_tokens: int = 1500,
+        temperature: float = 0.4,
+    ):
+        """Underlying SDK call. Returns the raw ``Message`` object so callers
+        that need ``.usage.input_tokens`` / ``.usage.output_tokens`` for cost
+        accounting can read them directly."""
+        client = self._ensure_client()
+        return client.messages.create(
+            model=model or self._default_model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=[_CachedSystemBlock(system_prompt).to_block()],
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+    async def complete_with_accounting(
+        self,
+        *,
+        db,
+        user,
+        endpoint: str,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        max_tokens: int = 1500,
+        temperature: float = 0.4,
+        json_mode: bool = False,
+    ):
+        """Burn-cap-aware wrapper around the existing call_text / call_json
+        helpers.
+
+        Pre-flight ``assert_within_burn_cap`` raises HTTP 429 when the
+        projected PKR cost would breach the user's monthly budget. Post-call
+        ``record_llm`` writes a ``usage_ledger`` row with the real usage
+        tokens returned by the SDK.
+
+        When ``ANTHROPIC_API_KEY`` is unset (deterministic-template path),
+        the helper still returns the deterministic-friendly empty payload
+        AND records a zero-cost ledger row keyed off the input estimate so
+        the audit trail remains complete in offline / CI runs.
+
+        Returns:
+            ``dict`` when ``json_mode=True`` (parsed JSON, possibly empty),
+            otherwise ``str`` (the joined text blocks).
+        """
+        resolved_model = model or self._default_model
+        kind = "llm_sonnet" if "sonnet" in (resolved_model or "").lower() else "llm_haiku"
+        estimated_input = _estimate_input_tokens(system_prompt, user_prompt)
+        projected = llm_cost_pkr(kind, estimated_input, max_tokens)
+        await assert_within_burn_cap(db, user, projected)
+
+        if not self.available:
+            # Deterministic-template path: record a synthetic ledger row so
+            # the burn-cap audit trail is consistent across online / offline
+            # runs, then raise so callers fall back to their template.
+            await record_llm(
+                db,
+                user.id,
+                kind,
+                estimated_input,
+                0,
+                endpoint,
+            )
+            raise LLMUnavailableError("Anthropic API key missing.")
+
+        try:
+            message = self._raw_call(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                model=resolved_model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+        except LLMUnavailableError:
+            await record_llm(db, user.id, kind, estimated_input, 0, endpoint)
+            raise
+
+        usage = getattr(message, "usage", None)
+        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        await record_llm(db, user.id, kind, input_tokens, output_tokens, endpoint)
+
+        text = _join_text_blocks(message)
+        if json_mode:
+            return _extract_json_object(text)
+        return text
+
 
 # ----------------------------------------------------------------------
 # Parsing helpers
 # ----------------------------------------------------------------------
+
+
+def _estimate_input_tokens(system_prompt: str, user_prompt: str) -> int:
+    """Cheap upper-bound estimate: ~4 chars per token.
+
+    Used pre-flight to decide whether the call would breach the burn cap.
+    Intentionally conservative — under-estimating here lets a call slip
+    through, then the post-call ``record_llm`` writes the real usage.
+    """
+    blob = json.dumps(
+        {"system": system_prompt or "", "user": user_prompt or ""},
+        default=str,
+    )
+    return max(1, len(blob) // 4)
 
 
 def _join_text_blocks(message) -> str:  # pragma: no cover - SDK-dependent

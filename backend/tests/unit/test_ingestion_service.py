@@ -6,7 +6,7 @@ import pytest
 import httpx
 from fastapi import HTTPException
 
-from app.models import IngestionRun, IngestionRunStatus, SourceRegistry, UserRole
+from app.models import IngestionRun, IngestionRunStatus, RecordState, SourceRegistry, UserRole
 from app.schemas.curation import (
     IngestionRunDetail,
     IngestionRunBulkRetryRequest,
@@ -1148,3 +1148,462 @@ async def test_discover_urls_filters_off_host(monkeypatch):
 
     assert "https://example.gov/scholarships/x" in urls
     assert "https://other.com/scholarships/leak" not in urls
+
+
+def _source(source_key: str, display_name: str, base_url: str) -> SourceRegistry:
+    source = SourceRegistry(
+        source_key=source_key,
+        display_name=display_name,
+        base_url=base_url,
+        source_type="official",
+        is_active=True,
+    )
+    source.id = uuid4()
+    source.created_at = datetime.now(timezone.utc)
+    source.updated_at = datetime.now(timezone.utc)
+    return source
+
+
+# --- Phase 1: Pakistan-first parser geo flip -------------------------------
+
+
+async def test_infer_country_code_defaults_to_pakistan():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = _source(
+        "hec-overseas",
+        "HEC Overseas Scholarship Programme",
+        "https://www.hec.gov.pk/scholarships",
+    )
+    assert service._infer_country_code(source, "https://www.hec.gov.pk/scholarships/x") == "PK"
+
+
+async def test_infer_country_code_detects_destination_countries():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    cases = [
+        (_source("chevening", "Chevening Scholarships", "https://www.chevening.org"),
+         "https://www.chevening.org/scholarship", "GB"),
+        (_source("ukri-studentships", "UKRI", "https://www.ukri.org"),
+         "https://www.bristol.ac.uk/funding/award", "GB"),
+        (_source("fulbright-foreign", "Fulbright Foreign Student", "https://foreign.fulbrightonline.org"),
+         "https://foreign.fulbrightonline.org/apply", "US"),
+        (_source("daad-scholarships", "DAAD", "https://www.daad.de"),
+         "https://www.daad.de/en/study/scholarship", "DE"),
+        (_source("acu-commonwealth", "Commonwealth Scholarships", "https://cscuk.fcdo.gov.uk"),
+         "https://study.unimelb.edu.au/scholarship", "AU"),
+    ]
+    for source, url, expected in cases:
+        assert service._infer_country_code(source, url) == expected, (source.source_key, url)
+
+
+async def test_infer_field_tags_covers_pakistan_breadth():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    assert "engineering" in service._infer_field_tags("Master of Science in Civil Engineering")
+    assert "business" in service._infer_field_tags("Fully funded MBA business administration award")
+    assert "medicine" in service._infer_field_tags("MPhil public health and medicine scholarship")
+    assert "law" in service._infer_field_tags("LLM in international law fellowship")
+    assert "social sciences" in service._infer_field_tags("MA in sociology and social sciences")
+    assert "computer science" in service._infer_field_tags("MS computer science grant")
+    assert "agriculture" in service._infer_field_tags("MSc agriculture and agronomy bursary")
+    assert "education" in service._infer_field_tags("Master of Education teaching scholarship")
+    # existing entries still match
+    assert "data science" in service._infer_field_tags("MS in data science")
+
+
+async def test_candidate_in_scope_pakistan_sources_without_fulbright():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    chevening = _source("chevening", "Chevening Scholarships", "https://www.chevening.org")
+    assert service._candidate_text_in_scope(
+        chevening, "Chevening Scholarship 2026 fully funded award for masters study"
+    ) is True
+    hec = _source("hec-overseas", "HEC Overseas", "https://www.hec.gov.pk")
+    # non-scholarship page on a Pakistani source is still rejected
+    assert service._candidate_text_in_scope(hec, "About us and contact information") is False
+
+
+# --- Phase 2: Richer parser extraction -------------------------------------
+
+
+async def test_parse_candidates_extracts_microdata():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = make_source()
+    html = """
+    <html><body>
+      <div itemscope itemtype="https://schema.org/Scholarship">
+        <span itemprop="name">Data Science Excellence Scholarship</span>
+        <a itemprop="url" href="/awards/data-science-excellence">apply</a>
+        <span itemprop="description">Fully funded data science scholarship for masters students</span>
+        <span itemprop="applicationDeadline">2026-11-30</span>
+      </div>
+    </body></html>
+    """
+    capture = make_capture(html)
+    result = service._parse_candidates(source, capture)
+    micro = [c for c in result.candidates if c.provenance_payload.get("parse_origin") == "microdata"]
+    assert len(micro) == 1
+    assert result.diagnostics["microdata_candidates"] == 1
+    assert micro[0].title == "Data Science Excellence Scholarship"
+    assert str(micro[0].source_url).endswith("/awards/data-science-excellence")
+
+
+async def test_build_candidate_extracts_structured_deadline():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = make_source()
+    capture = make_capture("<html></html>")
+    c1 = service._build_candidate(
+        source=source,
+        capture=capture,
+        resolved_url="https://uwaterloo.ca/awards/x",
+        title="Data Science Scholarship",
+        combined_text="Data Science Scholarship fully funded",
+        context_text="Data Science Scholarship",
+        parse_origin="jsonld",
+        structured_hints={"applicationDeadline": "2026-11-30"},
+    )
+    assert c1 is not None and c1.deadline_at is not None
+    assert (c1.deadline_at.year, c1.deadline_at.month, c1.deadline_at.day) == (2026, 11, 30)
+    assert c1.to_import_request().deadline_at == c1.deadline_at
+    c2 = service._build_candidate(
+        source=source,
+        capture=capture,
+        resolved_url="https://uwaterloo.ca/awards/y",
+        title="Data Science Scholarship",
+        combined_text="Data Science Scholarship. Application deadline: 1 December 2026.",
+        context_text="Data Science Scholarship",
+        parse_origin="anchor",
+    )
+    assert c2 is not None and c2.deadline_at is not None
+    assert (c2.deadline_at.year, c2.deadline_at.month, c2.deadline_at.day) == (2026, 12, 1)
+
+
+async def test_extract_funding_structured_amount():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    pkr = service._extract_funding_structured("Award covers PKR 1,500,000 per year plus tuition")
+    assert pkr == {"amount_min": 1500000.0, "amount_max": 1500000.0, "currency": "PKR"}
+    gbp = service._extract_funding_structured("£18,000 stipend annually")
+    assert gbp is not None and gbp["currency"] == "GBP" and gbp["amount_min"] == 18000.0
+    assert service._extract_funding_structured("Funding available for all students") is None
+    cand = service._build_candidate(
+        source=make_source(),
+        capture=make_capture("<html></html>"),
+        resolved_url="https://uwaterloo.ca/awards/z",
+        title="Data Science Scholarship",
+        combined_text="Data Science Scholarship covering PKR 1,500,000 per year",
+        context_text="Data Science Scholarship",
+        parse_origin="anchor",
+    )
+    assert cand is not None
+    assert cand.provenance_payload.get("funding_structured", {}).get("currency") == "PKR"
+
+
+# --- Phase 3: dedup, drift, pagination -------------------------------------
+
+
+def _parsed(title: str, url: str, **overrides) -> "object":
+    from app.services.ingestion.service import ParsedScholarshipCandidate
+
+    data = dict(
+        source_key="pk-aggregator",
+        source_display_name="PK Scholarship Aggregator",
+        source_base_url="https://aggregator.pk/",
+        source_type="official",
+        title=title,
+        provider_name="Chevening",
+        country_code="GB",
+        source_url=url,
+    )
+    data.update(overrides)
+    return ParsedScholarshipCandidate(**data)
+
+
+async def test_normalize_title_drops_year_and_punctuation():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    assert service._normalize_title("Chevening Scholarship 2026!") == "chevening scholarship"
+    assert service._normalize_title("  HEC   Overseas - Phase II  ") == "hec overseas phase ii"
+
+
+async def test_select_fuzzy_match_finds_near_identical_title():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    candidate = _parsed("Chevening Scholarship 2026", "https://aggregator.pk/new")
+    pool = [
+        SimpleNamespace(id=uuid4(), title="Commonwealth Split-Site Award",
+                        source_url="https://aggregator.pk/b",
+                        source_document_ref=None, content_hash=None),
+        SimpleNamespace(id=uuid4(), title="Chevening Scholarships 2025",
+                        source_url="https://aggregator.pk/c",
+                        source_document_ref=None, content_hash=None),
+    ]
+    match = service._select_fuzzy_match(candidate, pool)
+    assert match is not None and match.title == "Chevening Scholarships 2025"
+    # no near match -> None
+    assert service._select_fuzzy_match(candidate, pool[:1]) is None
+
+
+async def test_precheck_routes_fuzzy_duplicates_to_review(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    candidate = _parsed("Chevening Scholarship 2026", "https://aggregator.pk/new")
+    existing = SimpleNamespace(id=uuid4(), title="Chevening Scholarships 2026",
+                               source_url="https://aggregator.pk/old",
+                               source_document_ref=None, content_hash="h-old")
+
+    async def fake_exact(where_clause):
+        return None
+
+    async def fake_fuzzy(cand):
+        return existing
+
+    monkeypatch.setattr(service, "_find_existing_scholarship", fake_exact)
+    monkeypatch.setattr(service, "_find_fuzzy_duplicate", fake_fuzzy)
+    result = await service._precheck_existing_candidates([candidate])
+
+    assert "https://aggregator.pk/new" not in result["skip_matches"]
+    advisory = next(a for a in result["advisories"] if a.get("match_type") == "fuzzy_title")
+    assert advisory["review_recommended"] is True
+    assert result["diagnostics"]["fuzzy_title_matches"] == 1
+
+
+async def test_snapshot_signature_changes_with_content():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    a = service._snapshot_signature("<html><body>Award A</body></html>")
+    b = service._snapshot_signature("<html><body>Award B totally different</body></html>")
+    same_whitespace = service._snapshot_signature("<html>  <body>Award A</body>   </html>")
+    assert a != b
+    assert a == same_whitespace
+
+
+async def test_detect_snapshot_drift_flags_changed_published_source(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = make_source()
+    run = SimpleNamespace(source_registry=source, source_registry_id=source.id, id=uuid4())
+    capture = make_capture("<html><body>NEW funding details changed materially</body></html>")
+
+    async def fake_prior(source_id):
+        return "<html><body>OLD funding details</body></html>"
+
+    async def fake_flag(source_id, run_obj):
+        return [{"record_id": "r1"}]
+
+    monkeypatch.setattr(service, "_load_prior_snapshot_html", fake_prior)
+    monkeypatch.setattr(service, "_flag_source_records_for_revalidation", fake_flag)
+    drift = await service._detect_snapshot_drift(run, capture)
+    assert drift is not None and drift["detected"] is True
+    assert drift["affected_records"] == [{"record_id": "r1"}]
+
+    async def fake_none(source_id):
+        return None
+
+    monkeypatch.setattr(service, "_load_prior_snapshot_html", fake_none)
+    assert await service._detect_snapshot_drift(run, capture) is None
+
+
+async def test_pagination_follows_numbered_pages(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    pages = {
+        "https://x.org/list": '<html><body><a href="?page=2">2</a></body></html>',
+        "https://x.org/list?page=2": '<html><body><a href="?page=3">3</a></body></html>',
+        "https://x.org/list?page=3": "<html><body>end</body></html>",
+    }
+
+    async def fake_capture(url):
+        return CaptureResult(html=pages[url], final_url=url, title="t",
+                             capture_mode="httpx_fallback", metadata={})
+
+    monkeypatch.setattr(service, "_capture_source", fake_capture)
+    results = await service._capture_source_with_pagination("https://x.org/list", max_pages=3)
+    assert [r.final_url for r in results] == [
+        "https://x.org/list", "https://x.org/list?page=2", "https://x.org/list?page=3",
+    ]
+
+
+async def test_pagination_follows_load_more(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    pages = {
+        "https://x.org/list": '<html><body><button class="load-more" data-url="/list?p=2">Load more</button></body></html>',
+        "https://x.org/list?p=2": "<html><body>done</body></html>",
+    }
+
+    async def fake_capture(url):
+        return CaptureResult(html=pages[url], final_url=url, title="t",
+                             capture_mode="httpx_fallback", metadata={})
+
+    monkeypatch.setattr(service, "_capture_source", fake_capture)
+    results = await service._capture_source_with_pagination("https://x.org/list", max_pages=3)
+    assert [r.final_url for r in results] == ["https://x.org/list", "https://x.org/list?p=2"]
+
+
+# --- Phase 4: diagnostics filter + provenance trace ------------------------
+
+
+async def test_list_runs_filters_by_parser_diagnostic():
+    session = FakeSession()
+    service = IngestionService(session)
+    source_one = make_source()
+    source_two = make_source()
+    source_two.source_key = "fulbright-foreign-student"
+
+    run_a = IngestionRun(
+        id=uuid4(), source_registry=source_one, source_registry_id=source_one.id,
+        triggered_by_user_id=uuid4(), institution_id=None,
+        status=IngestionRunStatus.PARTIAL, fetch_url=str(source_one.base_url),
+        created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+        run_metadata={"parser": {"fallback_used": True}},
+    )
+    run_b = IngestionRun(
+        id=uuid4(), source_registry=source_two, source_registry_id=source_two.id,
+        triggered_by_user_id=uuid4(), institution_id=None,
+        status=IngestionRunStatus.COMPLETED, fetch_url=str(source_two.base_url),
+        created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+        run_metadata={"parser": {"fallback_used": False, "microdata_candidates": 2}},
+    )
+
+    class ListResult:
+        def __init__(self, runs):
+            self._runs = runs
+
+        def scalars(self):
+            return SimpleNamespace(all=lambda: self._runs)
+
+    async def fake_execute(_query):
+        return ListResult([run_a, run_b])
+
+    session.execute = fake_execute
+
+    filtered = await service.list_runs(
+        actor_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None),
+        parser_diagnostic="fallback_used",
+    )
+    assert filtered.total == 1
+    assert filtered.items[0].source_key == source_one.source_key
+
+    micro = await service.list_runs(
+        actor_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None),
+        parser_diagnostic="microdata_candidates",
+    )
+    assert micro.total == 1
+    assert micro.items[0].source_key == "fulbright-foreign-student"
+
+
+async def test_trace_provenance_returns_lineage(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = make_source()
+    scholarship = SimpleNamespace(
+        id=uuid4(), record_state=RecordState.PUBLISHED,
+        source_url="https://uwaterloo.ca/awards/x", content_hash="hash-1",
+        source_document_ref="x", imported_at=None,
+        provenance_payload={"parse_origin": "microdata"},
+        source_registry=source, source_registry_id=source.id,
+    )
+    run = SimpleNamespace(id=uuid4(), capture_mode="playwright")
+
+    async def fake_load(sid):
+        return scholarship
+
+    async def fake_run(sch):
+        return run
+
+    monkeypatch.setattr(service, "_load_scholarship_for_provenance", fake_load)
+    monkeypatch.setattr(service, "_find_originating_run", fake_run)
+
+    resp = await service.trace_provenance(scholarship.id)
+    assert resp.source_key == source.source_key
+    assert resp.originating_run_id == str(run.id)
+    assert resp.capture_mode == "playwright"
+    assert resp.record_state == "published"
+    assert resp.provenance_payload == {"parse_origin": "microdata"}
+
+
+async def test_trace_provenance_404_for_unpublished_or_missing(monkeypatch):
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    raw = SimpleNamespace(
+        id=uuid4(), record_state=RecordState.RAW,
+        source_url="https://uwaterloo.ca/awards/y", content_hash=None,
+        source_document_ref=None, imported_at=None, provenance_payload=None,
+        source_registry=None, source_registry_id=None,
+    )
+
+    async def fake_load_raw(sid):
+        return raw
+
+    monkeypatch.setattr(service, "_load_scholarship_for_provenance", fake_load_raw)
+    with pytest.raises(HTTPException) as exc:
+        await service.trace_provenance(raw.id)
+    assert exc.value.status_code == 404
+
+    async def fake_load_none(sid):
+        return None
+
+    monkeypatch.setattr(service, "_load_scholarship_for_provenance", fake_load_none)
+    with pytest.raises(HTTPException) as exc2:
+        await service.trace_provenance(uuid4())
+    assert exc2.value.status_code == 404
+
+
+# --- Phase 5: infra hardening (async / source-health) ----------------------
+
+
+async def test_resolve_execution_mode_routes_large_auto_jobs_to_worker():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    big = IngestionRunStartRequest(source_key="hec-overseas", max_records=20, execution_mode="auto")
+    small = IngestionRunStartRequest(source_key="hec-overseas", max_records=5, execution_mode="auto")
+    assert service._resolve_execution_mode(big) == "worker"
+    assert service._resolve_execution_mode(small) == "inline"
+    assert service._resolve_execution_mode(
+        IngestionRunStartRequest(source_key="hec-overseas", max_records=20, execution_mode="inline")
+    ) == "inline"
+    assert service._resolve_execution_mode(
+        IngestionRunStartRequest(source_key="hec-overseas", max_records=2, execution_mode="worker")
+    ) == "worker"
+
+
+async def test_classify_source_health_thresholds():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    assert service._classify_source_health(0) == "healthy"
+    assert service._classify_source_health(2) == "healthy"
+    assert service._classify_source_health(3) == "degraded"
+    assert service._classify_source_health(5) == "degraded"
+    assert service._classify_source_health(6) == "down"
+
+
+async def test_record_source_health_updates_counters():
+    service = IngestionService(FakeSession())  # type: ignore[arg-type]
+    source = make_source()
+    for _ in range(3):
+        service._record_source_health(source, success=False)
+    assert source.consecutive_failures == 3
+    assert source.health_status == "degraded"
+    assert source.last_failure_at is not None
+
+    service._record_source_health(source, success=True)
+    assert source.consecutive_failures == 0
+    assert source.health_status == "healthy"
+    assert source.last_success_at is not None
+
+
+async def test_list_source_health_returns_per_source_rows():
+    session = FakeSession()
+    service = IngestionService(session)
+    source_a = make_source()
+    source_a.health_status = "healthy"
+    source_a.consecutive_failures = 0
+    source_b = make_source()
+    source_b.source_key = "chevening"
+    source_b.health_status = "down"
+    source_b.consecutive_failures = 7
+
+    class ListResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def scalars(self):
+            return SimpleNamespace(all=lambda: self._rows)
+
+    async def fake_execute(_query):
+        return ListResult([source_a, source_b])
+
+    session.execute = fake_execute
+    response = await service.list_source_health(
+        actor_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+    )
+    assert response.total == 2
+    by_key = {item.source_key: item for item in response.items}
+    assert by_key["chevening"].health_status == "down"
+    assert by_key["chevening"].consecutive_failures == 7

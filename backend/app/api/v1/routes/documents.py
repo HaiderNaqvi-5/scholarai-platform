@@ -12,8 +12,10 @@ from app.schemas import (
     DocumentListResponse,
     DocumentSubmissionResponse,
 )
+from app.schemas.professor_email import ProfessorEmailRequest, ProfessorEmailResponse
 from app.schemas.sop import SOPDraftRequest, SOPDraftResponse
 from app.services.documents import DocumentService
+from app.services.documents.professor_email import ProfessorEmailService
 from app.services.documents.sop_builder import SOPBuilderService
 
 router = APIRouter()
@@ -53,6 +55,25 @@ async def generate_sop_draft(
     """
     service = SOPBuilderService(db)
     return await service.draft(current_user, payload)
+
+
+@router.post(
+    "/professor-email",
+    response_model=ProfessorEmailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_professor_email(
+    payload: ProfessorEmailRequest,
+    current_user: DocumentCreateUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ProfessorEmailResponse:
+    """Elite professor cold-email generator (PRD §0.6).
+
+    Gated to elite + institution plans — returns HTTP 402 otherwise. Persists
+    the generated email as a DocumentRecord so it shows up in GET /documents.
+    """
+    service = ProfessorEmailService(db)
+    return await service.generate(current_user, payload)
 
 
 @router.post("", response_model=DocumentSubmissionResponse, status_code=status.HTTP_201_CREATED)

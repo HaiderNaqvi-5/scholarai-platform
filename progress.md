@@ -1,56 +1,82 @@
-# Progress — 2026-05-14 (session: PR #84 CI repair + test gap-fill)
+# progress.md — Air University Exhibition Backend Sprint
 
-**Branch:** `chore/document-smoke-flag-removal` (off `main` @ `7259c8b`; PR #86 open)
+**Date:** 2026-05-16
+**Branch:** `feat/pakistan-frontend-pass`
+**Goal:** Land backend prerequisites for the May-19 Air University exhibition trial launch (Pro plan via shared invite code `AIRU2026`, 100 redemptions, 30-day per-user trial). Front-end work is queued separately in `Front-upgrade.md` §16.
 
-## Tasks completed this session
+## This session — backend bundle (post Q1 retier)
 
-### 1. Pakistan PRD test audit + gap-fill (earlier in session)
-- Audited `SCHOLARAI_PAKISTAN_PRD.md` (§0, §0.5, §0.6, §1–§10) against the backend test surface. Coverage already extensive; mapped every acceptance bullet to an existing suite.
-- Added `backend/tests/unit/test_b2b_trust_boundary.py` — AST-walks `app/services/recommendations` + `app/services/scholarships`, fails if they reference `Institution` / `InstitutionStudent` / `ReferralEnrollment` / `UniversityLead` or those table names. Enforces PRD §0.6 trust boundary in CI.
-- Added `backend/tests/unit/test_demo_seed_pakistan.py` — source-level pin on `scripts/demo_seed_pakistan.py` (zara persona, plan=elite, 2099 expiry, 5 consents, ≥10 scholarships / ≥30 unis / ≥70 visa Q). Runs offline, no DB.
-- Extended `_profile()` fixture in `tests/unit/test_privacy_and_b2b.py` with the migration-0019 B2B snapshot fields so the snapshot test is resilient to field additions.
-- Full backend suite green: **306 passed** (`pytest tests/unit tests/integration`).
-- This work shipped via PR #85 (`feat/phase-c-and-scraper-wip` → `main`, merged).
+Q1 retier (Tasks 1–17) already shipped earlier today; see prior `progress.md` rev in git history for the SHA table. This session layers the trial-launch-specific work on top.
 
-### 2. PR #84 CI repair — all 4 failing checks fixed (merged)
-PR #84 (`feat/pakistan-pivot-merge` → `main`) had 4 red checks. Root causes + fixes:
-- **frontend-sanity + browser-smoke + Vercel** — CI used `actions/setup-node@v4` with `cache: npm` + `cache-dependency-path: frontend/package-lock.json`, but the greenfield rebuild migrated to Bun (`frontend/bun.lock`, no `package-lock.json`). Cache step aborted both jobs. Fix: `.github/workflows/ci.yml` migrated frontend jobs to `oven-sh/setup-bun@v2` + `bun install --frozen-lockfile` + `bun run lint/typecheck/build` + `bun run start`. Added missing `"typecheck": "tsc --noEmit"` script to `frontend/package.json`.
-- **docs-governance** — `scripts/docs_governance_check.py` flagged 3 broken local links in `docs/scholarai/PUBLIC_LIVE_HARDENING_PLAN.md` pointing at pre-rebuild frontend paths. Re-pointed: `auth-provider.tsx` → `lib/auth/AuthProvider.tsx`, `lib/api.ts` → `lib/api/client.ts`, `marketing-shell.tsx` → inlined-in-`app/page.tsx` note.
-- **Latent typecheck failure** — `bun run typecheck` (newly wired) surfaced 19 errors in `frontend/src/components/scholarship/EligibilityMatrix.tsx` reading pre-Pakistan-pivot `StudentProfile` fields. Re-pointed to canonical shape: `citizenship` → `citizenship_country_code`, `degree_level` → `target_degree_level`, `gpa` → `gpa_value`, `field_tags[]` → `target_field`, `language_scores[]` → `language_test_type` + `language_test_score`.
-- **browser-smoke still red after the above** — stale `data-testid` selectors from the greenfield rebuild (not real regressions). Added `continue-on-error: true` to the smoke step per the `AGENTS.md`/`CLAUDE.md` "smoke relaxed until S10 / Frontend Pass" doctrine.
-- Result: all 7 checks green. PR #84 **merged**.
-- Note: PR #84's branch was auto-deleted on merge; an accidental push recreated it as an orphan — deleted again (local + remote). Local safety tag `safety/c096dc8` left in place (harmless, local-only).
+### Items completed
 
-### 3. Document the temp CI flag (PR #86 — this branch)
-- `continue-on-error: true` on `browser-smoke` had no written removal trigger — risk of rotting into a permanent silent false-green.
-- `CLAUDE.md` edits:
-  - Stack line: notes CI `frontend-sanity` + `browser-smoke` run on Bun, no `package-lock.json`.
-  - Push gate section: documents the flag, warns a green `browser-smoke` job ≠ smoke passed, states the flag must be removed at S10 / Frontend Pass.
-  - Open work / Frontend Pass line: appends "remove `continue-on-error` from the `browser-smoke` step" to the existing "re-point smoke selectors" task.
-- CLAUDE.md at 118 lines (under 200 cap).
+| # | Work | Files |
+|---|---|---|
+| R1 | Migration `0026` invite_codes + Air U cols + redeemed_invite_code (UUID FK style; reuses existing `User.marketing_consent` rather than duplicating it) | `backend/alembic/versions/20260516_0026_invite_codes_and_trial.py` |
+| R2 | `InviteCode` ORM + 4 new `User` columns (`air_uni_uni`, `air_uni_dept`, `air_uni_batch`, `redeemed_invite_code`) + export | `backend/app/models/models.py`, `backend/app/models/__init__.py` |
+| R3 | (verified — already in HEAD from prior session) `_redeem_invite_code` + Air U capture + Pro grant + `plan_expires_at = now + trial_days` in `AuthService.register`, plus `UserCreate` / `UserResponse` schema extensions | `backend/app/services/auth/service.py`, `backend/app/schemas/auth.py`, `backend/tests/unit/test_auth_service.py` (15 PASS) |
+| R4 | Daily 02:00 UTC `expire_trial_plans` Celery beat task — UPDATE users SET plan='free', plan_expires_at=NULL WHERE plan_expires_at < now AND plan != 'free' | `backend/app/tasks/trial_tasks.py`, `backend/app/tasks/celery_app.py` (beat schedule + include), `backend/tests/unit/test_trial_tasks.py` (4 PASS) |
+| R5 | Mailgun `send_email` with httpx POST; graceful log-only fallback when MAILGUN_API_KEY / MAILGUN_DOMAIN unset. Optional `subject` kwarg preserves the existing `(user, message)` caller signature | `backend/app/services/notifications/channels.py`, `backend/app/core/config.py` (MAILGUN_*, BRAND_DISPLAY_NAME, EMAIL_FROM_LOCALPART) |
+| R9 | Dockerfile bakes Chromium for the scraper worker via `playwright install --with-deps chromium`, with `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers` chowned to appuser | `backend/Dockerfile` |
+| R10 | Three CLI scripts: seed `AIRU2026` (100 uses, May 19 09:00 → May 26 23:59 PKT), bump max_uses on-spot, and generate 900×900 QR PNG of `https://aidwiseai.com/signup?invite=AIRU2026` | `backend/scripts/seed_invite_codes.py`, `backend/scripts/grant_invite_uses.py`, `backend/scripts/generate_qr_flyers.py` |
+| deps | Added `anthropic==0.39.0`, `qrcode[pil]==7.4.2`, `sentry-sdk[fastapi]==2.18.0` to `requirements.txt` | `backend/requirements.txt` |
 
-## Files touched this session
-- `backend/tests/unit/test_b2b_trust_boundary.py` — new (PR #85).
-- `backend/tests/unit/test_demo_seed_pakistan.py` — new (PR #85).
-- `backend/tests/unit/test_privacy_and_b2b.py` — fixture extension (PR #85).
-- `.github/workflows/ci.yml` — Bun migration + `continue-on-error` on smoke (PR #84).
-- `frontend/package.json` — added `typecheck` script (PR #84).
-- `docs/scholarai/PUBLIC_LIVE_HARDENING_PLAN.md` — 3 broken links re-pointed (PR #84).
-- `frontend/src/components/scholarship/EligibilityMatrix.tsx` — canonical `StudentProfile` fields (PR #84).
-- `CLAUDE.md` — Bun-CI note + S10 flag-removal note (PR #86, this branch).
-- `progress.md` — this file.
+### Push gate
 
-## In-progress / next
-- PR #86 open: `chore/document-smoke-flag-removal` → `main`. CLAUDE.md + progress.md only. Awaiting review/merge.
-- **S10 / Frontend Pass** must: re-point all smoke `data-testid` selectors AND remove `continue-on-error: true` from the `browser-smoke` step in `.github/workflows/ci.yml`.
-- Pre-existing low-priority items carried from prior sessions: `/admin/sources` UI for `DiscoveryService` results; apply migration `20260514_0020_ingestion_caching` to live dev DB; `broker_connection_retry_on_startup` deprecation in `app/tasks/celery_app.py`.
+- `python -m compileall app tests` — OK
+- `pytest tests/unit tests/integration -q` — **454 passed, 1 xpassed, 8 warnings, 90 s**
+- Migration `0026` applied locally; `alembic current` → `20260516_0026`
+- Scripts: `seed_invite_codes.py` and `grant_invite_uses.py` both round-tripped against local DB; `generate_qr_flyers.py` produced 900×900 PNG
 
-## Open bugs / blockers
-- None. PR #84 merged green; PR #86 is docs-only.
+### Pending (sequenced)
 
-## Commands to resume
-- Backend tests: `cd backend && python -m pytest tests/unit tests/integration -q`
-- Frontend gate: `cd frontend && bun install --frozen-lockfile && bun run lint && bun run typecheck && bun run build`
-- Docs gate: `python scripts/docs_governance_check.py`
-- API: `cd backend && python -m uvicorn app.main:app --reload`
-- Frontend dev: `cd frontend && bun dev`
+| When | Owner | Work |
+|---|---|---|
+| May 17 | Ops | Apply 0026 + seed AIRU2026 + deploy DigitalOcean App Platform (3 services: web Basic S, worker Basic S with Chromium, beat Basic XXS), Cloudflare DNS for `api.aidwiseai.com`, Mailgun DKIM+SPF, Sentry backend init, Anthropic Tier-2 prepay ($40) |
+| May 18 | Frontend | All of `Front-upgrade.md` §16 Tasks 16.1–16.11 (gold token, brand hotpatch ×5 files, ComingSoon, signup invite + consent, TrialBanner, PaymentMethods, Sentry/LogRocket/Statsig/Crisp wiring, pre-deploy gate, Vercel deploy with `aidwiseai.com`) |
+| May 19 | Founder | Dry run, print 100 flyers (Canva Pro template), exhibition booth open 09:00 PKT |
+
+### Files touched
+
+```
+backend/Dockerfile
+backend/alembic/versions/20260516_0026_invite_codes_and_trial.py          (NEW)
+backend/app/core/config.py
+backend/app/models/__init__.py
+backend/app/models/models.py
+backend/app/services/notifications/channels.py
+backend/app/tasks/celery_app.py
+backend/app/tasks/trial_tasks.py                                          (NEW)
+backend/requirements.txt
+backend/scripts/generate_qr_flyers.py                                     (NEW)
+backend/scripts/grant_invite_uses.py                                      (NEW)
+backend/scripts/seed_invite_codes.py                                      (NEW)
+backend/tests/unit/test_trial_tasks.py                                    (NEW)
+```
+
+### Commands to resume
+
+```bash
+# Local
+cd backend && alembic current                          # expect 20260516_0026
+python -m pytest tests/unit tests/integration -q       # expect 454+ PASS
+python scripts/seed_invite_codes.py                    # idempotent
+python scripts/generate_qr_flyers.py                   # outputs out/exhibition/
+
+# Supabase production
+DATABASE_URL='postgresql+asyncpg://postgres:<pw>@db.<ref>.supabase.co:5432/postgres?sslmode=require' \
+    alembic upgrade head
+DATABASE_URL='...' python scripts/seed_invite_codes.py
+
+# Smoke deployed backend
+curl https://api.aidwiseai.com/livez
+curl https://api.aidwiseai.com/api/v1/upgrade/pricing?currency=PKR
+```
+
+### Notes / decisions
+
+- `users.marketing_consent` (already shipped) covers the marketing-opt-in toggle. Migration 0026 was revised mid-flight to drop a duplicate `marketing_opt_in` column.
+- Auth service `_redeem_invite_code` uses `with_for_update()` so two concurrent signups racing the last slot can't both succeed.
+- Trial expiry cron writes via a single UPDATE — idempotent, safe to re-run within the same UTC day.
+- Mailgun send_email returns True on log-only fallback so callers stay deterministic when MAILGUN_API_KEY / MAILGUN_DOMAIN are absent in dev / CI.
+- Dockerfile keeps `--no-install-recommends apt` lean except for the Playwright `--with-deps` install which is necessary for headless Chromium. Final image ~1.2 GB; fits Basic S (1 GB RAM dedicated) on DO App Platform.

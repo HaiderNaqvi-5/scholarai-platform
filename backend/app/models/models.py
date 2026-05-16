@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date as sa_Date,
     DateTime,
@@ -84,6 +85,11 @@ class InstitutionType(enum.StrEnum):
     OTHER = "other"
 
 
+class ScholarshipTier(str, enum.Enum):
+    STANDARD = "standard"
+    PREMIUM = "premium"
+
+
 class RecordState(enum.StrEnum):
     RAW = "raw"
     VALIDATED = "validated"
@@ -120,6 +126,9 @@ class DocumentType(enum.StrEnum):
     SOP = "sop"
     ESSAY = "essay"
     CV = "cv"
+    PROFESSOR_EMAIL = "professor_email"  # Elite cold-email generator (PRD §0.6)
+    STRATEGY_REPORT = "strategy_report"  # Elite application strategy report (PRD §0.6)
+    INTERVIEW_TRANSCRIPT = "interview_transcript"  # Elite visa-interview transcript (PRD §0.6)
 
 
 class DocumentInputMethod(enum.StrEnum):
@@ -209,6 +218,19 @@ class User(Base):
     plan_activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     billing_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    lifetime_sop_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Air University exhibition cohort capture (Q2-2026 trial launch).
+    # Optional free-text so non-AU signups (later cohorts, other unis) work
+    # without schema churn. Indexed on redeemed_invite_code for cohort filtering.
+    air_uni_uni: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    air_uni_dept: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    air_uni_batch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    redeemed_invite_code: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, index=True
+    )
 
     # Pakistan pivot — privacy / consent / soft-delete (Feature 9.5)
     data_consent_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -528,6 +550,27 @@ class SourceRegistry(Base):
         server_default=text("true"),
         default=True,
     )
+    # Source-health monitoring (migration 20260514_0021)
+    last_success_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_failure_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    consecutive_failures: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    health_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'unknown'"),
+        default="unknown",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -696,6 +739,17 @@ class Scholarship(Base):
         Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
         default=RecordState.RAW,
+    )
+    tier: Mapped[ScholarshipTier] = mapped_column(
+        Enum(
+            ScholarshipTier,
+            name="scholarship_tier",
+            values_callable=lambda x: [m.value for m in x],
+        ),
+        nullable=False,
+        server_default=ScholarshipTier.STANDARD.value,
+        default=ScholarshipTier.STANDARD,
+        index=True,
     )
     imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     provenance_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -1615,6 +1669,94 @@ class ReferralEnrollment(Base):
     enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     invoiced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SopMonthlyUsage(Base):
+    """Per-user monthly SOP count for Pro/Elite quota gating. Free uses User.lifetime_sop_count."""
+
+    __tablename__ = "sop_monthly_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), primary_key=True)
+    sop_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class UsageLedger(Base):
+    """Burn-cap accounting: LLM + WhatsApp cost per user per period, in PKR x 1e6 (BigInteger)."""
+
+    __tablename__ = "usage_ledger"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    output_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cost_pkr_micro: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class InviteCode(Base):
+    """Shared invite code for cohort trial grants.
+
+    A single code (e.g. ``AIRU2026``) is redeemable up to ``max_uses`` times
+    inside the ``[valid_from, valid_until]`` window. Each redemption grants
+    the consuming user ``grants_plan`` for ``trial_days`` days from the
+    redemption moment (set by the auth service via ``user.plan_expires_at``).
+    The ``cohort`` column lets us bulk-issue more than one code per audience
+    later (e.g. ``NUST2026``, ``COMSATS2026``) without schema churn.
+    """
+
+    __tablename__ = "invite_codes"
+
+    code: Mapped[str] = mapped_column(String(32), primary_key=True)
+    cohort: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    grants_plan: Mapped[str] = mapped_column(String(16), nullable=False)
+    trial_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=30, server_default="30"
+    )
+    max_uses: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+    uses: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

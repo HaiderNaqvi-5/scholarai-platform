@@ -226,3 +226,36 @@ class IngestionRunListResponse(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     has_more: bool = False
+
+
+class ScholarshipProvenanceResponse(BaseModel):
+    """Lineage of a published scholarship back to its ingestion origin."""
+
+    scholarship_id: str
+    record_state: str
+    source_key: str | None = None
+    source_display_name: str | None = None
+    source_url: str
+    content_hash: str | None = None
+    source_document_ref: str | None = None
+    imported_at: datetime | None = None
+    provenance_payload: dict | None = None
+    originating_run_id: str | None = None
+    capture_mode: str | None = None
+
+
+class SourceHealthSummary(BaseModel):
+    """Per-source ingestion health heartbeat."""
+
+    source_key: str
+    display_name: str
+    is_active: bool
+    health_status: str
+    consecutive_failures: int = Field(ge=0)
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+
+
+class SourceHealthListResponse(BaseModel):
+    items: list[SourceHealthSummary]
+    total: int = Field(ge=0)

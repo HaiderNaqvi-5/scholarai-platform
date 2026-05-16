@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from fastapi import HTTPException
 
+from app.core.plan_guard import TRACKER_CAP
 from app.models import default_document_checklist
 from app.schemas.tracker import (
     TrackerChecklistPatchRequest,
@@ -106,15 +107,78 @@ async def test_create_rejected_when_free_limit_reached():
     assert err.detail["error"] == "plan_limit_reached"
     assert err.detail["untracked_count"] == 7
     assert err.detail["current_items"] == FREE_PLAN_ITEM_LIMIT
+    assert err.detail["cap"] == FREE_PLAN_ITEM_LIMIT
 
 
 @pytest.mark.asyncio
-async def test_pro_user_bypasses_limit():
+async def test_pro_user_succeeds_when_under_cap():
+    """Pro tier still has a cap (6) but should accept items below it."""
     user = _user("pro")
-    db = _FakeDB()
+    db = _FakeDB(results=[_FakeResult(scalar=0)])
     svc = TrackerService(db)
     item = await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
     assert item.user_id == user.id
+
+
+@pytest.mark.parametrize(
+    "plan,cap",
+    [
+        ("free", TRACKER_CAP["free"]),
+        ("pro", TRACKER_CAP["pro"]),
+        ("elite", TRACKER_CAP["elite"]),
+    ],
+)
+@pytest.mark.asyncio
+async def test_tracker_cap_per_plan_blocks_over_cap(plan, cap):
+    """At-cap creates raise 402 plan_required for every paid tier below institution."""
+    user = _user(plan)
+    # First execute() inside create() returns the count; second returns the
+    # untracked-upcoming-deadlines count used to enrich the upgrade prompt.
+    db = _FakeDB(results=[_FakeResult(scalar=cap), _FakeResult(scalar=4)])
+    svc = TrackerService(db)
+    with pytest.raises(HTTPException) as excinfo:
+        await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    err = excinfo.value
+    assert err.status_code == 402
+    assert err.detail["error"] == "plan_limit_reached"
+    assert err.detail["cap"] == cap
+    assert err.detail["current_items"] == cap
+
+
+@pytest.mark.parametrize(
+    "plan,cap",
+    [
+        ("free", TRACKER_CAP["free"]),
+        ("pro", TRACKER_CAP["pro"]),
+        ("elite", TRACKER_CAP["elite"]),
+    ],
+)
+@pytest.mark.asyncio
+async def test_tracker_cap_per_plan_allows_under_cap(plan, cap):
+    """Just-below-cap creates succeed for every paid tier."""
+    user = _user(plan)
+    db = _FakeDB(results=[_FakeResult(scalar=cap - 1)])
+    svc = TrackerService(db)
+    item = await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    assert item.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_institution_cap_blocks_at_fifty():
+    """Institution sits at the top of the ladder but the gate still fires."""
+    user = _user("institution")
+    db = _FakeDB(
+        results=[
+            _FakeResult(scalar=TRACKER_CAP["institution"]),
+            _FakeResult(scalar=0),
+        ]
+    )
+    svc = TrackerService(db)
+    with pytest.raises(HTTPException) as excinfo:
+        await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    err = excinfo.value
+    assert err.status_code == 402
+    assert err.detail["cap"] == TRACKER_CAP["institution"]
 
 
 def test_stage_update_request_rejects_unknown_stage():

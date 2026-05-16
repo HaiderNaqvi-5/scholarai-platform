@@ -27,6 +27,44 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Shape of the `detail` payload on an HTTP 402 from `core/plan_guard.py`.
+ * `required_plan` is a list. `partial_summary` is present on the visa-interview
+ * Q3 cut-off only — see VisaInterviewSessionSummary (partial subset).
+ */
+export type PlanRequiredPartialSummary = {
+  answered?: number;
+  total?: number;
+  average_score?: number;
+  red_flag_count?: number;
+  score_breakdown?: Record<string, number>;
+  areas_to_improve?: string[];
+};
+
+export type PlanRequiredDetail = {
+  error: string;
+  required_plan: string[];
+  current_plan: string;
+  upgrade_url: string;
+  price: string;
+  message: string;
+  partial_summary?: PlanRequiredPartialSummary | null;
+};
+
+/** Narrow an unknown error to a 402 plan-gate so callers can show <UpgradeWall />. */
+export function isPlanRequiredError(
+  err: unknown,
+): err is ApiError & { detail: PlanRequiredDetail } {
+  if (!(err instanceof ApiError) || err.status !== 402) return false;
+  const d = err.detail;
+  return (
+    typeof d === "object" &&
+    d !== null &&
+    Array.isArray((d as PlanRequiredDetail).required_plan) &&
+    typeof (d as PlanRequiredDetail).price === "string"
+  );
+}
+
 type Tokens = {
   access: string;
   refresh: string;

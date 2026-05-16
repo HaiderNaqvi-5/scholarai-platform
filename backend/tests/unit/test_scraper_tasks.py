@@ -279,3 +279,48 @@ def test_run_nightly_ingestion_uses_reserved_system_identity(monkeypatch):
     assert captured["execute"]["max_records"] == 20
     assert result["run_id"] == created_run_id
     assert session.commits == 1
+
+
+# --- Phase 5: nightly automation hardening ---------------------------------
+
+
+def test_nightly_run_is_stale():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 5, 14, 12, 0, tzinfo=timezone.utc)
+    fresh = now - timedelta(hours=3)
+    stale = now - timedelta(hours=30)
+    assert scraper_tasks._nightly_run_is_stale(None, now=now) is True
+    assert scraper_tasks._nightly_run_is_stale(fresh, now=now) is False
+    assert scraper_tasks._nightly_run_is_stale(stale, now=now) is True
+
+
+def test_should_run_nightly_skips_when_recent(monkeypatch):
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    recent = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    async def fake_last(_session):
+        return recent
+
+    monkeypatch.setattr(scraper_tasks, "_load_last_nightly_completion", fake_last)
+    assert asyncio.run(scraper_tasks._should_run_nightly(object())) is False
+
+
+def test_should_run_nightly_runs_when_stale_or_never(monkeypatch):
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    stale = datetime.now(timezone.utc) - timedelta(hours=40)
+
+    async def fake_stale(_session):
+        return stale
+
+    async def fake_never(_session):
+        return None
+
+    monkeypatch.setattr(scraper_tasks, "_load_last_nightly_completion", fake_stale)
+    assert asyncio.run(scraper_tasks._should_run_nightly(object())) is True
+    monkeypatch.setattr(scraper_tasks, "_load_last_nightly_completion", fake_never)
+    assert asyncio.run(scraper_tasks._should_run_nightly(object())) is True

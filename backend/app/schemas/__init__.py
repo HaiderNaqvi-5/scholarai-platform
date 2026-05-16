@@ -22,6 +22,9 @@ from app.schemas.curation import (
     CurationRecordListResponse,
     CurationRecordSummary,
     CurationRecordUpdateRequest,
+    ScholarshipProvenanceResponse,
+    SourceHealthListResponse,
+    SourceHealthSummary,
 )
 from app.schemas.documents import (
     DocumentDetailResponse,
@@ -98,6 +101,9 @@ __all__ = [
     "CurationRecordListResponse",
     "CurationRecordSummary",
     "CurationRecordUpdateRequest",
+    "ScholarshipProvenanceResponse",
+    "SourceHealthListResponse",
+    "SourceHealthSummary",
     "ErrorEnvelope",
     "ErrorDetail",
     "HealthResponse",
