@@ -15,7 +15,9 @@ import {
   Users,
   ScrollText,
   GaugeCircle,
+  KanbanSquare,
   ListChecks,
+  Plane,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,6 +45,7 @@ const sections: Section[] = [
       { href: "/feed", label: "For you", icon: Home, shortcut: "G F" },
       { href: "/discover", label: "Discover", icon: Compass, shortcut: "G D" },
       { href: "/saved", label: "Saved", icon: Bookmark, shortcut: "G S" },
+      { href: "/tracker", label: "Tracker", icon: KanbanSquare, shortcut: "G T" },
     ],
   },
   {
@@ -51,6 +54,7 @@ const sections: Section[] = [
     items: [
       { href: "/documents", label: "Documents", icon: FileText },
       { href: "/interviews", label: "Interviews", icon: Mic },
+      { href: "/interviews/visa", label: "Visa practice", icon: Plane },
     ],
   },
   {

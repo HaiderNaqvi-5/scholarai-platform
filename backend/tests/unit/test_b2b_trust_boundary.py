@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 import app.services.recommendations as rec_pkg
+import app.services.reports as reports_pkg
 import app.services.scholarships as scholarship_pkg
 
 
@@ -49,7 +50,9 @@ def _source_for(module_name: str) -> str:
 
 
 @pytest.mark.parametrize(
-    "package", [rec_pkg, scholarship_pkg], ids=["recommendations", "scholarships"]
+    "package",
+    [rec_pkg, scholarship_pkg, reports_pkg],
+    ids=["recommendations", "scholarships", "reports"],
 )
 def test_matching_pipeline_does_not_import_b2b_models(package) -> None:
     """Static check: forbidden ORM model names never appear in matching code."""
@@ -76,7 +79,9 @@ def test_matching_pipeline_does_not_import_b2b_models(package) -> None:
 
 
 @pytest.mark.parametrize(
-    "package", [rec_pkg, scholarship_pkg], ids=["recommendations", "scholarships"]
+    "package",
+    [rec_pkg, scholarship_pkg, reports_pkg],
+    ids=["recommendations", "scholarships", "reports"],
 )
 def test_matching_pipeline_does_not_reference_b2b_tables(package) -> None:
     """Static check: forbidden table names never appear as raw strings either."""

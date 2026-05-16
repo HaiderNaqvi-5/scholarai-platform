@@ -1,10 +1,65 @@
 import asyncio
+import logging
 import uuid
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import select
 
 from app.core.database import async_session_factory
+from app.models import IngestionRun, IngestionRunStatus, SourceRegistry
 from app.services.ingestion import IngestionService
 from app.schemas.curation import IngestionRunStartRequest
 from app.tasks.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
+
+# A nightly run is considered stale if more than this many hours have passed
+# since the last completion — gives the 02:00 UTC beat ~1h slack before a
+# catch-up fires.
+NIGHTLY_MAX_AGE_HOURS = 25
+NIGHTLY_SOURCE_KEY = "nightly_sync_main"
+
+
+def _nightly_run_is_stale(
+    last_completed_at: datetime | None,
+    *,
+    now: datetime | None = None,
+    max_age_hours: int = NIGHTLY_MAX_AGE_HOURS,
+) -> bool:
+    """True when the most recent nightly completion is missing or too old."""
+    if last_completed_at is None:
+        return True
+    reference = now or datetime.now(timezone.utc)
+    if last_completed_at.tzinfo is None:
+        last_completed_at = last_completed_at.replace(tzinfo=timezone.utc)
+    return (reference - last_completed_at) > timedelta(hours=max_age_hours)
+
+
+async def _load_last_nightly_completion(session) -> datetime | None:
+    """Most recent ``completed_at`` for the nightly-sync source, if any."""
+    try:
+        result = await session.execute(
+            select(IngestionRun.completed_at)
+            .join(SourceRegistry)
+            .where(
+                SourceRegistry.source_key == NIGHTLY_SOURCE_KEY,
+                IngestionRun.status.in_(
+                    (IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)
+                ),
+                IngestionRun.completed_at.is_not(None),
+            )
+            .order_by(IngestionRun.completed_at.desc())
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+    except Exception:  # pragma: no cover - defensive
+        return None
+    return row if isinstance(row, datetime) else None
+
+
+async def _should_run_nightly(session) -> bool:
+    last_completed = await _load_last_nightly_completion(session)
+    return _nightly_run_is_stale(last_completed)
 
 
 def _extract_run_diagnostics(run_metadata: dict | None) -> dict[str, str | None]:
@@ -119,20 +174,29 @@ async def _run_source_ingestion_async(
 
 @celery_app.task(name="tasks.run_nightly_ingestion")
 def run_nightly_ingestion() -> dict:
-    """
-    Automated nightly sync for major scholarship sources.
+    """Automated nightly sync for major scholarship sources.
+
+    Skips when a recent (≤ ``NIGHTLY_MAX_AGE_HOURS``) successful nightly run
+    already exists, so an hourly catch-up beat can call this task without
+    re-running mid-day if the 02:00 UTC slot succeeded.
     """
     # System Reserved UUID
     SYSTEM_ADMIN_ID = "00000000-0000-0000-0000-000000000000"
-    
-    return asyncio.run(
-        _run_source_ingestion_async(
-            run_id=None,
-            source_key="nightly_sync_main",
-            actor_user_id=SYSTEM_ADMIN_ID,
-            source_display_name="Auto Nightly Ingestion",
-            source_base_url=None,
-            source_type="official",
-            max_records=20,
-        )
+
+    return asyncio.run(_run_nightly_ingestion_async(SYSTEM_ADMIN_ID))
+
+
+async def _run_nightly_ingestion_async(system_actor_id: str) -> dict:
+    async with async_session_factory() as session:
+        if not await _should_run_nightly(session):
+            logger.info("nightly_ingestion_skip reason=recent_run_present")
+            return {"status": "skipped", "reason": "recent_run_present"}
+    return await _run_source_ingestion_async(
+        run_id=None,
+        source_key=NIGHTLY_SOURCE_KEY,
+        actor_user_id=system_actor_id,
+        source_display_name="Auto Nightly Ingestion",
+        source_base_url=None,
+        source_type="official",
+        max_records=20,
     )

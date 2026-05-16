@@ -1,4 +1,13 @@
-export { api, ApiError, API_BASE_URL, getTokens, setTokens, subscribeTokens } from "./client";
+export {
+  api,
+  ApiError,
+  API_BASE_URL,
+  getTokens,
+  setTokens,
+  subscribeTokens,
+  isPlanRequiredError,
+} from "./client";
+export type { PlanRequiredDetail, PlanRequiredPartialSummary } from "./client";
 export * from "./types";
 
 import { auth } from "./endpoints/auth";
@@ -12,6 +21,13 @@ import { curation } from "./endpoints/curation";
 import { mentors } from "./endpoints/mentors";
 import { accessControl } from "./endpoints/access-control";
 import { analytics } from "./endpoints/analytics";
+import { tracker } from "./endpoints/tracker";
+import { scholarshipMatch } from "./endpoints/scholarshipMatch";
+import { sopBuilder } from "./endpoints/sopBuilder";
+import { professorEmail } from "./endpoints/professorEmail";
+import { visaInterview } from "./endpoints/visaInterview";
+import { upgrade } from "./endpoints/upgrade";
+import { reports } from "./endpoints/reports";
 
 export const endpoints = {
   auth,
@@ -25,4 +41,11 @@ export const endpoints = {
   mentors,
   accessControl,
   analytics,
+  tracker,
+  scholarshipMatch,
+  sopBuilder,
+  professorEmail,
+  visaInterview,
+  upgrade,
+  reports,
 };

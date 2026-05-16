@@ -10,6 +10,9 @@ celery_app = Celery(
         "app.tasks.recommendation_tasks",
         "app.tasks.scraper_tasks",
         "app.tasks.kpi_tasks",
+        "app.tasks.alert_tasks",
+        "app.tasks.reminder_tasks",
+        "app.tasks.trial_tasks",
     ],
 )
 
@@ -25,6 +28,22 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     "nightly-scholarship-ingestion": {
         "task": "tasks.run_nightly_ingestion",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    # PRD §0.6 — Elite priority scholarship alerts (deadlines within 7 days).
+    "priority-scholarship-alerts": {
+        "task": "tasks.run_priority_scholarship_alerts",
+        "schedule": crontab(hour=6, minute=7),
+    },
+    # PRD §0.6 / §0.5 — tracker deadline reminders with the free 30-day stop.
+    "deadline-reminders": {
+        "task": "tasks.run_deadline_reminders",
+        "schedule": crontab(hour=6, minute=30),
+    },
+    # Q2-2026 Air University trial launch — daily 02:00 UTC (07:00 PKT)
+    # downgrade of every user whose Pro trial has expired.
+    "expire-trial-plans": {
+        "task": "tasks.expire_trial_plans",
         "schedule": crontab(hour=2, minute=0),
     },
 }

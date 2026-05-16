@@ -10,6 +10,7 @@ from app.api.v1.routes import (
     interview,
     mentor,
     recommendations,
+    reports,
     saved_opportunities,
     scholarships,
     students,
@@ -35,6 +36,7 @@ router.include_router(
 )
 router.include_router(recommendations.router, prefix="/recommendations", tags=["Recommendations"])
 router.include_router(documents.router, prefix="/documents", tags=["Documents"])
+router.include_router(reports.router, prefix="/reports", tags=["Strategy Reports"])
 router.include_router(interview.router, prefix="/interviews", tags=["Interview Practice"])
 router.include_router(curation.router, prefix="/curation", tags=["Curation"])
 # Canonical mentor route used by the frontend.

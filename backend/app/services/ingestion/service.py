@@ -10,6 +10,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from functools import wraps
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -22,7 +23,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import IngestionRun, IngestionRunStatus, Scholarship, SourceRegistry, User, UserRole
+from app.models import (
+    IngestionRun,
+    IngestionRunStatus,
+    RecordState,
+    Scholarship,
+    SourceRegistry,
+    User,
+    UserRole,
+)
 from app.schemas.curation import (
     CurationRawImportRequest,
     IngestionRunBulkRetryItem,
@@ -35,6 +44,9 @@ from app.schemas.curation import (
     IngestionRunSnapshotResponse,
     IngestionRunStartRequest,
     IngestionRunSummary,
+    ScholarshipProvenanceResponse,
+    SourceHealthListResponse,
+    SourceHealthSummary,
 )
 from app.services.curation import CurationService
 
@@ -52,6 +64,38 @@ FIELD_KEYWORD_MAP = {
     "data science": ("data science", "data-science", "data scientist"),
     "artificial intelligence": ("artificial intelligence", "machine learning", " ai "),
     "analytics": ("analytics", "business analytics", "data analytics"),
+    "computer science": ("computer science", "computing", "software engineering", "informatics"),
+    "engineering": (
+        "engineering",
+        "engineer ",
+        "mechanical",
+        "electrical",
+        "civil engineering",
+        "chemical engineering",
+    ),
+    "business": ("business administration", "mba", " business ", "management studies", "finance"),
+    "medicine": (
+        "medicine",
+        "medical",
+        "public health",
+        "nursing",
+        "pharmacy",
+        "biomedical",
+        "health sciences",
+    ),
+    "law": (" law ", "llm", "legal studies", "jurisprudence"),
+    "social sciences": (
+        "social science",
+        "social sciences",
+        "sociology",
+        "political science",
+        "economics",
+        "psychology",
+        "anthropology",
+        "development studies",
+    ),
+    "agriculture": ("agriculture", "agronomy", "agricultural", "food science"),
+    "education": ("education", "teaching", "pedagogy", " m.ed", "med "),
 }
 DEGREE_KEYWORDS = (
     ("PhD", ("phd", "doctorate", "doctoral")),
@@ -72,6 +116,20 @@ GENERIC_LINK_TEXT = {
 }
 CONTEXT_CONTAINERS = ("li", "tr", "article", "section", "div", "td", "p")
 TITLE_CANDIDATE_TAGS = ("h1", "h2", "h3", "h4", "strong", "b", "th")
+MONTH_NAME_MAP = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+    "august": 8, "aug": 8, "september": 9, "sep": 9, "sept": 9, "october": 10,
+    "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+}
+# Currency code → regex prefix. AUD/EUR/GBP before USD so "A$"/"$" disambiguate.
+FUNDING_CURRENCY_PATTERNS = (
+    ("PKR", r"(?:PKR|Rs\.?)\s*"),
+    ("GBP", r"£\s*"),
+    ("EUR", r"€\s*"),
+    ("AUD", r"A\$\s*"),
+    ("USD", r"(?:US)?\$\s*"),
+)
 MAX_CONTEXT_TEXT_LENGTH = 1600
 MAX_SUMMARY_LENGTH = 350
 MAX_CAPTURE_ATTEMPTS = 2
@@ -143,6 +201,7 @@ class ParsedScholarshipCandidate(BaseModel):
     source_url: HttpUrl
     summary: str | None = Field(default=None, max_length=4000)
     funding_summary: str | None = Field(default=None, max_length=2000)
+    deadline_at: datetime | None = None
     field_tags: list[str] = Field(default_factory=list)
     degree_levels: list[str] = Field(default_factory=lambda: ["MS"])
     citizenship_rules: list[str] = Field(default_factory=list)
@@ -175,7 +234,7 @@ class ParsedScholarshipCandidate(BaseModel):
             degree_levels=self.degree_levels,
             citizenship_rules=self.citizenship_rules,
             min_gpa_value=None,
-            deadline_at=None,
+            deadline_at=self.deadline_at,
             imported_at=self.imported_at,
             source_last_seen_at=self.source_last_seen_at,
             review_notes=self.review_notes,
@@ -284,6 +343,7 @@ class IngestionService:
         status_filter: str | None = None,
         source_key: str | None = None,
         dispatch_status: str | None = None,
+        parser_diagnostic: str | None = None,
     ) -> IngestionRunListResponse:
         if actor_user is not None:
             self._assert_actor_scope(actor_user)
@@ -292,6 +352,11 @@ class IngestionService:
         normalized_dispatch = (
             dispatch_status.strip().lower()
             if isinstance(dispatch_status, str) and dispatch_status.strip()
+            else None
+        )
+        normalized_parser_diag = (
+            parser_diagnostic.strip()
+            if isinstance(parser_diagnostic, str) and parser_diagnostic.strip()
             else None
         )
 
@@ -313,11 +378,23 @@ class IngestionService:
                 func.lower(SourceRegistry.source_key) == normalized_source_key
             )
 
-        if normalized_dispatch is not None:
-            # dispatch_status lives inside JSON run_metadata — must filter in Python
+        if normalized_dispatch is not None or normalized_parser_diag is not None:
+            # dispatch_status + parser diagnostics live inside JSON run_metadata
+            # — must filter in Python.
             result = await self.db.execute(base_query)
             runs = self._result_items(result)
-            runs = [run for run in runs if self._read_dispatch_status(run.run_metadata) == normalized_dispatch]
+            if normalized_dispatch is not None:
+                runs = [
+                    run
+                    for run in runs
+                    if self._read_dispatch_status(run.run_metadata) == normalized_dispatch
+                ]
+            if normalized_parser_diag is not None:
+                runs = [
+                    run
+                    for run in runs
+                    if self._read_parser_diagnostic(run.run_metadata, normalized_parser_diag)
+                ]
             total = len(runs)
             page_runs = runs[offset : offset + page_size]
         else:
@@ -614,6 +691,7 @@ class IngestionService:
                             "cache_last_modified": cached.metadata.get("last_modified"),
                         },
                     )
+                    self._record_source_health(source, success=True)
                     await self.db.flush()
                     return self._build_detail(run)
 
@@ -747,6 +825,12 @@ class IngestionService:
                 failed_records=failed_records,
                 selected_candidate_count=len(selected_candidates),
             )
+            drift_info = await self._detect_snapshot_drift(run, capture)
+            if drift_info:
+                run.run_metadata = self._merge_run_metadata(
+                    run.run_metadata, {"drift": drift_info}
+                )
+            self._record_source_health(source, success=True)
             await self.db.flush()
             return self._build_detail(run)
         except Exception as exc:
@@ -768,6 +852,9 @@ class IngestionService:
                     "dedup": dedup_precheck.get("diagnostics"),
                     "failed_records": failed_records,
                 },
+            )
+            self._record_source_health(
+                getattr(run, "source_registry", None), success=False
             )
             await self.db.flush()
             raise
@@ -1233,9 +1320,12 @@ class IngestionService:
         url: str,
         max_pages: int = 3,
     ) -> list[CaptureResult]:
-        """Capture a listing URL plus up to (max_pages - 1) follow-on pages
-        discovered via <link rel='next'> or visible 'Next' anchors.
-        Stops on cycles or when no next link is found.
+        """Capture a listing URL plus up to (max_pages - 1) follow-on pages.
+
+        Next-page discovery, in priority order: ``<link rel='next'>`` / visible
+        'Next' anchors, then 'Load more' buttons (``data-url``/``href``), then
+        numbered pagination (``?page=N`` / ``/page/N``). Stops on cycles or when
+        no next page is found.
         """
         results: list[CaptureResult] = []
         seen: set[str] = set()
@@ -1248,16 +1338,46 @@ class IngestionService:
             capture = await self._capture_source(current)
             results.append(capture)
 
-            soup = BeautifulSoup(capture.html, "lxml")
-            next_link = soup.find("link", rel="next") or soup.find(
-                "a", string=lambda s: bool(s) and "next" in s.lower()
-            )
-            href = (next_link.get("href") if next_link else None) or None
-            if not href:
+            next_url = self._discover_next_page(capture)
+            if not next_url or next_url in seen:
                 break
-            current = urljoin(capture.final_url, href)
+            current = next_url
 
         return results
+
+    @staticmethod
+    def _page_number(url: str) -> int:
+        match = re.search(r"[?&]page=(\d+)", url) or re.search(r"/page/(\d+)", url)
+        return int(match.group(1)) if match else 1
+
+    def _discover_next_page(self, capture: CaptureResult) -> str | None:
+        soup = BeautifulSoup(capture.html, "lxml")
+
+        # 1. rel='next' link or a visible 'Next' anchor
+        next_link = soup.find("link", rel="next") or soup.find(
+            "a", string=lambda s: bool(s) and "next" in s.lower()
+        )
+        href = (next_link.get("href") if next_link else None) or None
+        if href:
+            return urljoin(capture.final_url, href)
+
+        # 2. 'Load more' / 'Show more' button or anchor
+        for node in soup.find_all(["a", "button"]):
+            text = (node.get_text(" ", strip=True) or "").lower()
+            classes = " ".join(node.get("class") or []).lower()
+            if "load more" in text or "show more" in text or "load-more" in classes:
+                target = node.get("data-url") or node.get("href")
+                if target:
+                    return urljoin(capture.final_url, str(target))
+
+        # 3. numbered pagination — the anchor pointing at current_page + 1
+        current_page = self._page_number(capture.final_url)
+        for anchor in soup.select("a[href]"):
+            resolved = urljoin(capture.final_url, anchor.get("href") or "")
+            if self._page_number(resolved) == current_page + 1:
+                return resolved
+
+        return None
 
     def _parse_candidates(
         self,
@@ -1276,9 +1396,43 @@ class IngestionService:
             "anchor_candidates": 0,
             "table_candidates": 0,
             "jsonld_candidates": 0,
+            "microdata_candidates": 0,
             "fallback_used": False,
             "same_host": base_host,
         }
+
+        # Structured passes run first — JSON-LD / microdata are higher-fidelity
+        # than scraped anchors/tables, so they claim a URL before the heuristic
+        # passes can produce a weaker duplicate of it.
+        for candidate in self._candidates_from_jsonld(
+            source=source,
+            capture=capture,
+            soup=soup,
+            page_summary=page_summary,
+            page_title=page_title,
+            base_host=base_host,
+        ):
+            candidate_url = str(candidate.source_url)
+            if candidate_url in seen_urls:
+                continue
+            seen_urls.add(candidate_url)
+            candidates.append(candidate)
+            diagnostics["jsonld_candidates"] += 1
+
+        for candidate in self._candidates_from_microdata(
+            source=source,
+            capture=capture,
+            soup=soup,
+            page_summary=page_summary,
+            page_title=page_title,
+            base_host=base_host,
+        ):
+            candidate_url = str(candidate.source_url)
+            if candidate_url in seen_urls:
+                continue
+            seen_urls.add(candidate_url)
+            candidates.append(candidate)
+            diagnostics["microdata_candidates"] += 1
 
         for anchor in soup.select("a[href]"):
             candidate = self._candidate_from_anchor(
@@ -1315,21 +1469,6 @@ class IngestionService:
             seen_urls.add(candidate_url)
             candidates.append(candidate)
             diagnostics["table_candidates"] += 1
-
-        for candidate in self._candidates_from_jsonld(
-            source=source,
-            capture=capture,
-            soup=soup,
-            page_summary=page_summary,
-            page_title=page_title,
-            base_host=base_host,
-        ):
-            candidate_url = str(candidate.source_url)
-            if candidate_url in seen_urls:
-                continue
-            seen_urls.add(candidate_url)
-            candidates.append(candidate)
-            diagnostics["jsonld_candidates"] += 1
 
         if not candidates and self._candidate_text_in_scope(source, f"{page_title} {page_summary or ''} {page_text}"):
             fallback_candidate = self._build_candidate(
@@ -1460,6 +1599,7 @@ class IngestionService:
             combined_text=combined_text,
             context_text=description_text or page_summary or page_title,
             parse_origin="jsonld",
+            structured_hints=item,
         )
 
     def _resolve_jsonld_url(
@@ -1485,6 +1625,103 @@ class IngestionService:
             return None
         return urljoin(capture.final_url, url_candidate.strip())
 
+    def _candidates_from_microdata(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        soup: BeautifulSoup,
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> list[ParsedScholarshipCandidate]:
+        candidates: list[ParsedScholarshipCandidate] = []
+        for scope in soup.select("[itemscope][itemtype]"):
+            itemtype = " ".join(scope.get("itemtype") or "").lower() if isinstance(
+                scope.get("itemtype"), list
+            ) else str(scope.get("itemtype", "")).lower()
+            if not any(
+                token in itemtype
+                for token in ("scholarship", "grant", "fellowship", "educationaloccupationalprogram")
+            ):
+                continue
+            candidate = self._candidate_from_microdata_item(
+                source=source,
+                capture=capture,
+                scope=scope,
+                page_summary=page_summary,
+                page_title=page_title,
+                base_host=base_host,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+        return candidates
+
+    def _microdata_prop_value(self, node: Tag) -> str:
+        if node.name in ("a", "link", "area"):
+            return str(node.get("href") or node.get_text(" ", strip=True))
+        if node.name in ("img", "audio", "source", "video", "embed", "iframe"):
+            return str(node.get("src") or "")
+        if node.has_attr("content"):
+            return str(node["content"])
+        if node.name == "time" and node.has_attr("datetime"):
+            return str(node["datetime"])
+        return node.get_text(" ", strip=True)
+
+    def _candidate_from_microdata_item(
+        self,
+        *,
+        source: SourceRegistry,
+        capture: CaptureResult,
+        scope: Tag,
+        page_summary: str | None,
+        page_title: str,
+        base_host: str,
+    ) -> ParsedScholarshipCandidate | None:
+        props: dict[str, str] = {}
+        for prop_node in scope.select("[itemprop]"):
+            # skip props that belong to a nested itemscope inside this one
+            parent_scope = prop_node.find_parent(attrs={"itemscope": True})
+            if parent_scope is not scope:
+                continue
+            names = prop_node.get("itemprop")
+            name_list = names if isinstance(names, list) else str(names).split()
+            value = self._clean_text(self._microdata_prop_value(prop_node))
+            for name in name_list:
+                if name and name not in props:
+                    props[name] = value
+
+        raw_title = props.get("name") or page_title
+        title = self._clean_text(str(raw_title))
+        if len(title) < 3:
+            return None
+
+        url_value = props.get("url") or props.get("mainEntityOfPage")
+        if not url_value:
+            return None
+        resolved_url = urljoin(capture.final_url, url_value.strip())
+        parsed_url = urlparse(resolved_url)
+        if parsed_url.scheme not in {"http", "https"}:
+            return None
+        if parsed_url.netloc and parsed_url.netloc != base_host:
+            return None
+
+        description_text = props.get("description", "")
+        combined_text = self._clean_text(f"{title} {description_text} {page_summary or ''}")
+        if not self._candidate_text_in_scope(source, combined_text):
+            return None
+
+        return self._build_candidate(
+            source=source,
+            capture=capture,
+            resolved_url=resolved_url,
+            title=title,
+            combined_text=combined_text,
+            context_text=description_text or page_summary or page_title,
+            parse_origin="microdata",
+            structured_hints=props,
+        )
+
     async def _precheck_existing_candidates(
         self,
         candidates: list[ParsedScholarshipCandidate],
@@ -1497,6 +1734,7 @@ class IngestionService:
             "content_hash_matches": 0,
             "source_document_ref_matches": 0,
             "duplicate_candidates_in_run": 0,
+            "fuzzy_title_matches": 0,
         }
         seen_content_hashes: dict[str, str] = {}
 
@@ -1553,6 +1791,22 @@ class IngestionService:
                         }
                     )
 
+            # Secondary fuzzy heuristic: near-identical title under the same
+            # provider. Not a hard skip — surfaced as a curator review advisory
+            # so a real-but-reworded duplicate is caught without dropping data.
+            fuzzy_match = await self._find_fuzzy_duplicate(candidate)
+            if fuzzy_match is not None:
+                diagnostics["fuzzy_title_matches"] += 1
+                advisories.append(
+                    {
+                        "title": candidate.title,
+                        "source_url": candidate_url,
+                        "match_type": "fuzzy_title",
+                        "review_recommended": True,
+                        "existing_record": self._snapshot_existing_record(fuzzy_match),
+                    }
+                )
+
         return {
             "skip_matches": skip_matches,
             "advisories": advisories,
@@ -1563,6 +1817,64 @@ class IngestionService:
         result = await self.db.execute(select(Scholarship).where(where_clause))
         record = result.scalar_one_or_none()
         return record if isinstance(record, Scholarship) else None
+
+    @staticmethod
+    def _normalize_title(title: str | None) -> str:
+        text = (title or "").lower()
+        text = re.sub(r"\b(19|20)\d{2}\b", " ", text)  # drop 4-digit years
+        text = re.sub(r"[^a-z0-9 ]+", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def _select_fuzzy_match(
+        self,
+        candidate: ParsedScholarshipCandidate,
+        pool: list[Any],
+        *,
+        threshold: float = 0.9,
+    ) -> Any | None:
+        """Return the closest title-similar record in ``pool``, or ``None``.
+
+        Skips any pool record sharing the candidate's exact source URL — that
+        case is already handled by the exact-match precheck.
+        """
+        normalized = self._normalize_title(candidate.title)
+        if not normalized:
+            return None
+        candidate_url = str(candidate.source_url)
+        for existing in pool:
+            if str(getattr(existing, "source_url", "")) == candidate_url:
+                continue
+            existing_norm = self._normalize_title(getattr(existing, "title", ""))
+            if not existing_norm:
+                continue
+            if existing_norm == normalized:
+                return existing
+            if SequenceMatcher(None, normalized, existing_norm).ratio() >= threshold:
+                return existing
+        return None
+
+    async def _find_fuzzy_duplicate(
+        self, candidate: ParsedScholarshipCandidate
+    ) -> Scholarship | None:
+        """Load same-provider/country records and return a fuzzy title match.
+
+        Defensive: any query error yields ``None`` (fuzzy dedup is advisory only
+        and must never break an ingestion run).
+        """
+        if not candidate.provider_name:
+            return None
+        try:
+            result = await self.db.execute(
+                select(Scholarship).where(
+                    Scholarship.provider_name == candidate.provider_name,
+                    Scholarship.country_code == candidate.country_code,
+                )
+            )
+            pool = list(result.scalars().all())
+        except Exception:  # pragma: no cover - defensive
+            return None
+        match = self._select_fuzzy_match(candidate, pool)
+        return match if isinstance(match, Scholarship) else None
 
     def _candidate_from_anchor(
         self,
@@ -1657,16 +1969,30 @@ class IngestionService:
         combined_text: str,
         context_text: str,
         parse_origin: str,
+        structured_hints: dict[str, Any] | None = None,
     ) -> ParsedScholarshipCandidate | None:
         cleaned_title = self._clean_text(title)
         if len(cleaned_title) < 3:
             return None
 
         field_tags = self._infer_field_tags(combined_text)
-        if not field_tags and not self._is_fulbright_source(f"{source.source_key} {source.display_name} {resolved_url}"):
+        if not field_tags and not self._is_known_program_source(
+            f"{source.source_key} {source.display_name} {resolved_url}"
+        ):
             return None
 
         timestamp = self._now()
+        deadline_at = self._extract_structured_deadline(combined_text, structured_hints)
+        funding_structured = self._extract_funding_structured(combined_text)
+        provenance_payload: dict[str, Any] = {
+            "ingested_via": "source_registry_run",
+            "capture_mode": capture.capture_mode,
+            "capture_title": capture.title,
+            "parse_origin": parse_origin,
+            "matched_text": combined_text[:MAX_CONTEXT_TEXT_LENGTH],
+        }
+        if funding_structured is not None:
+            provenance_payload["funding_structured"] = funding_structured
         return ParsedScholarshipCandidate(
             source_key=source.source_key,
             source_display_name=source.display_name,
@@ -1678,6 +2004,7 @@ class IngestionService:
             source_url=resolved_url,
             summary=self._build_candidate_summary(cleaned_title, context_text),
             funding_summary=self._extract_funding_summary(combined_text),
+            deadline_at=deadline_at,
             field_tags=field_tags,
             degree_levels=self._infer_degree_levels(combined_text),
             citizenship_rules=[],
@@ -1685,13 +2012,7 @@ class IngestionService:
             imported_at=timestamp,
             source_last_seen_at=timestamp,
             review_notes="Auto-imported from source registry page for curator review.",
-            provenance_payload={
-                "ingested_via": "source_registry_run",
-                "capture_mode": capture.capture_mode,
-                "capture_title": capture.title,
-                "parse_origin": parse_origin,
-                "matched_text": combined_text[:MAX_CONTEXT_TEXT_LENGTH],
-            },
+            provenance_payload=provenance_payload,
         )
 
     def _extract_context_text(self, node: Tag | None) -> str:
@@ -1729,11 +2050,28 @@ class IngestionService:
         normalized = f" {self._clean_text(text).lower()} "
         if not any(keyword in normalized for keyword in SCHOLARSHIP_KEYWORDS):
             return False
-        if self._is_fulbright_source(f"{source.source_key} {source.display_name} {normalized}"):
+        if self._is_known_program_source(f"{source.source_key} {source.display_name} {normalized}"):
             return True
         return bool(self._infer_field_tags(normalized))
 
+    # Major scholarship programmes whose listing pages are trusted as in-scope
+    # even when a candidate's text carries no recognised field tag.
+    KNOWN_PROGRAM_KEYWORDS = (
+        "fulbright",
+        "foreign.fulbright",
+        "chevening",
+        "daad",
+        "commonwealth",
+        "hec overseas",
+        "hec-overseas",
+    )
+
+    def _is_known_program_source(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(keyword in lowered for keyword in self.KNOWN_PROGRAM_KEYWORDS)
+
     def _is_fulbright_source(self, text: str) -> bool:
+        """Backwards-compatible alias — Fulbright is one known programme source."""
         lowered = text.lower()
         return "fulbright" in lowered or "foreign.fulbright" in lowered
 
@@ -1767,6 +2105,91 @@ class IngestionService:
         metadata = run_metadata if isinstance(run_metadata, dict) else {}
         snapshot = metadata.get("snapshot")
         return snapshot if isinstance(snapshot, dict) else {}
+
+    @staticmethod
+    def _snapshot_signature(html: str | None) -> str:
+        # Strip all whitespace — a content fingerprint stable against incidental
+        # reformatting / reindentation between captures.
+        normalized = re.sub(r"\s+", "", html or "")
+        return hashlib.sha256(normalized.encode("utf-8", errors="ignore")).hexdigest()
+
+    async def _load_prior_snapshot_html(self, source_registry_id: Any) -> str | None:
+        """Most recent stored capture HTML for a source, or ``None``.
+
+        Defensive: any query error yields ``None`` so drift detection can never
+        break an ingestion run.
+        """
+        try:
+            result = await self.db.execute(
+                select(IngestionRun)
+                .where(IngestionRun.source_registry_id == source_registry_id)
+                .order_by(IngestionRun.created_at.desc())
+            )
+            for run in result.scalars().all():
+                snapshot = self._read_snapshot_metadata(run.run_metadata)
+                html = snapshot.get("html_content")
+                if html:
+                    return str(html)
+        except Exception:  # pragma: no cover - defensive
+            return None
+        return None
+
+    async def _flag_source_records_for_revalidation(
+        self, source_registry_id: Any, run: Any
+    ) -> list[dict[str, Any]]:
+        """Mark published scholarships for a drifted source as needing review.
+
+        Defensive: query errors yield an empty list.
+        """
+        flagged: list[dict[str, Any]] = []
+        try:
+            result = await self.db.execute(
+                select(Scholarship).where(
+                    Scholarship.source_registry_id == source_registry_id,
+                    Scholarship.record_state == RecordState.PUBLISHED,
+                )
+            )
+            records = list(result.scalars().all())
+        except Exception:  # pragma: no cover - defensive
+            return flagged
+        timestamp = self._now().isoformat()
+        run_id = str(getattr(run, "id", "") or "")
+        for record in records:
+            payload = dict(record.provenance_payload or {})
+            payload["needs_revalidation"] = True
+            payload["drift_flagged_at"] = timestamp
+            payload["drift_run_id"] = run_id
+            record.provenance_payload = payload
+            flagged.append({"record_id": str(record.id), "title": record.title})
+        return flagged
+
+    async def _detect_snapshot_drift(
+        self, run: Any, capture: CaptureResult
+    ) -> dict[str, Any] | None:
+        """Compare the current capture against the source's last stored snapshot.
+
+        On a material change, flags published records for revalidation and
+        returns a drift descriptor; otherwise returns ``None``.
+        """
+        source_id = getattr(run, "source_registry_id", None)
+        if source_id is None:
+            return None
+        prior_html = await self._load_prior_snapshot_html(source_id)
+        if not prior_html:
+            return None
+        prior_sig = self._snapshot_signature(prior_html)
+        current_sig = self._snapshot_signature(capture.html or "")
+        if prior_sig == current_sig:
+            return None
+        affected = await self._flag_source_records_for_revalidation(source_id, run)
+        return {
+            "detected": True,
+            "detected_at": self._now().isoformat(),
+            "prior_signature": prior_sig,
+            "current_signature": current_sig,
+            "run_id": str(getattr(run, "id", "") or "") or None,
+            "affected_records": affected,
+        }
 
     def _build_skip_record(
         self,
@@ -1828,7 +2251,7 @@ class IngestionService:
                     "source_display_name": source.display_name,
                     "source_base_url": source.base_url,
                     "source_type": source.source_type,
-                    "scope_policy": "canada_first_fulbright_us_only",
+                    "scope_policy": "pakistan_first_destination_aware",
                 },
                 "request": {
                     "max_records": payload.max_records,
@@ -1940,6 +2363,162 @@ class IngestionService:
         dispatch = execution.get("dispatch_status")
         return dispatch.strip().lower() if isinstance(dispatch, str) and dispatch.strip() else ""
 
+    def _read_parser_diagnostic(self, run_metadata: dict[str, Any] | None, key: str) -> bool:
+        """Truthiness of a single parser-diagnostic key inside ``run_metadata``.
+
+        ``run_metadata["parser"]`` holds the parse diagnostics dict (anchor /
+        table / jsonld / microdata counts, ``fallback_used``, …).
+        """
+        parser = (run_metadata or {}).get("parser")
+        if not isinstance(parser, dict):
+            return False
+        return bool(parser.get(key))
+
+    async def _load_scholarship_for_provenance(
+        self, scholarship_id: uuid.UUID
+    ) -> Scholarship | None:
+        result = await self.db.execute(
+            select(Scholarship)
+            .where(Scholarship.id == scholarship_id)
+            .options(selectinload(Scholarship.source_registry))
+        )
+        record = result.scalar_one_or_none()
+        return record if isinstance(record, Scholarship) else None
+
+    async def _find_originating_run(self, scholarship: Scholarship) -> IngestionRun | None:
+        """Best-effort link from a scholarship back to the run that created it.
+
+        Matches on the run's ``created_records`` (source_url / record_id), falling
+        back to the most recent run for the source. Defensive: errors yield ``None``.
+        """
+        source_id = getattr(scholarship, "source_registry_id", None)
+        if source_id is None:
+            return None
+        try:
+            result = await self.db.execute(
+                select(IngestionRun)
+                .where(IngestionRun.source_registry_id == source_id)
+                .order_by(IngestionRun.created_at.desc())
+            )
+            runs = list(result.scalars().all())
+        except Exception:  # pragma: no cover - defensive
+            return None
+        target_url = str(scholarship.source_url)
+        target_id = str(scholarship.id)
+        for run in runs:
+            created = (run.run_metadata or {}).get("created_records") or []
+            for record in created:
+                if not isinstance(record, dict):
+                    continue
+                if record.get("source_url") == target_url or str(record.get("record_id")) == target_id:
+                    return run
+        return runs[0] if runs else None
+
+    # Jobs at or above this max_records run on the Celery worker under
+    # execution_mode="auto"; smaller jobs run inline for low-latency response.
+    AUTO_WORKER_RECORD_THRESHOLD = 10
+
+    def _resolve_execution_mode(self, payload: IngestionRunStartRequest) -> str:
+        """Resolve 'auto' execution mode to a concrete 'inline' / 'worker'.
+
+        Explicit 'inline' / 'worker' pass through unchanged.
+        """
+        mode = (payload.execution_mode or "inline").strip().lower()
+        if mode in {"inline", "worker"}:
+            return mode
+        return "worker" if payload.max_records > self.AUTO_WORKER_RECORD_THRESHOLD else "inline"
+
+    @staticmethod
+    def _classify_source_health(consecutive_failures: int) -> str:
+        if consecutive_failures < 3:
+            return "healthy"
+        if consecutive_failures < 6:
+            return "degraded"
+        return "down"
+
+    def _record_source_health(self, source: Any, *, success: bool) -> None:
+        """Update a source's heartbeat columns after a capture attempt."""
+        if source is None:
+            return
+        now = self._now()
+        if success:
+            source.last_success_at = now
+            source.consecutive_failures = 0
+        else:
+            source.last_failure_at = now
+            source.consecutive_failures = int(source.consecutive_failures or 0) + 1
+        previous = getattr(source, "health_status", None)
+        source.health_status = self._classify_source_health(
+            int(source.consecutive_failures or 0)
+        )
+        if source.health_status == "down" and previous != "down":
+            logger.warning(
+                "source_health_down source=%s consecutive_failures=%s",
+                getattr(source, "source_key", "<unknown>"),
+                source.consecutive_failures,
+            )
+
+    def _build_source_health_summary(self, source: SourceRegistry) -> SourceHealthSummary:
+        return SourceHealthSummary(
+            source_key=source.source_key,
+            display_name=source.display_name,
+            is_active=bool(source.is_active),
+            health_status=getattr(source, "health_status", None) or "unknown",
+            consecutive_failures=int(getattr(source, "consecutive_failures", 0) or 0),
+            last_success_at=getattr(source, "last_success_at", None),
+            last_failure_at=getattr(source, "last_failure_at", None),
+        )
+
+    async def list_source_health(
+        self, actor_user: User | None = None
+    ) -> SourceHealthListResponse:
+        """Per-source ingestion health rows, institution-scoped like list_runs."""
+        if actor_user is not None:
+            self._assert_actor_scope(actor_user)
+        query = select(SourceRegistry).order_by(SourceRegistry.source_key)
+        if actor_user is not None and actor_user.role == UserRole.UNIVERSITY:
+            query = query.where(SourceRegistry.institution_id == actor_user.institution_id)
+        result = await self.db.execute(query)
+        sources = list(result.scalars().all())
+        items = [self._build_source_health_summary(source) for source in sources]
+        return SourceHealthListResponse(items=items, total=len(items))
+
+    async def trace_provenance(
+        self,
+        scholarship_id: uuid.UUID,
+        *,
+        require_published: bool = True,
+    ) -> ScholarshipProvenanceResponse:
+        """Trace a scholarship back to its ingestion source + originating run.
+
+        Public callers pass ``require_published=True`` — non-published records
+        fail with 404 to preserve the published-only contract of ``/scholarships``.
+        """
+        scholarship = await self._load_scholarship_for_provenance(scholarship_id)
+        if scholarship is None or (
+            require_published and scholarship.record_state != RecordState.PUBLISHED
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Published scholarship not found",
+            )
+        run = await self._find_originating_run(scholarship)
+        source = getattr(scholarship, "source_registry", None)
+        record_state = scholarship.record_state
+        return ScholarshipProvenanceResponse(
+            scholarship_id=str(scholarship.id),
+            record_state=record_state.value if hasattr(record_state, "value") else str(record_state),
+            source_key=getattr(source, "source_key", None),
+            source_display_name=getattr(source, "display_name", None),
+            source_url=scholarship.source_url,
+            content_hash=scholarship.content_hash,
+            source_document_ref=scholarship.source_document_ref,
+            imported_at=scholarship.imported_at,
+            provenance_payload=scholarship.provenance_payload,
+            originating_run_id=str(run.id) if run is not None else None,
+            capture_mode=getattr(run, "capture_mode", None) if run is not None else None,
+        )
+
     def _normalize_status_filter(self, status_filter: str | None) -> IngestionRunStatus | None:
         if not status_filter:
             return None
@@ -1983,6 +2562,89 @@ class IngestionService:
                 )
         return None
 
+    def _extract_funding_structured(self, text: str) -> dict[str, Any] | None:
+        """Extract a structured funding amount + currency, or ``None`` if absent.
+
+        Conservative: a single amount yields ``amount_min == amount_max``. Text with
+        no currency-prefixed number returns ``None`` (curator fills the rest).
+        """
+        if not text:
+            return None
+        for code, prefix in FUNDING_CURRENCY_PATTERNS:
+            match = re.search(prefix + r"([\d,]+(?:\.\d+)?)", text)
+            if not match:
+                continue
+            try:
+                amount = float(match.group(1).replace(",", ""))
+            except ValueError:
+                continue
+            if amount <= 0:
+                continue
+            return {"amount_min": amount, "amount_max": amount, "currency": code}
+        return None
+
+    def _parse_date_string(self, value: str) -> datetime | None:
+        """Parse a date string conservatively. Returns ``None`` on ambiguity."""
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        # "1 December 2026" / "1 Dec 2026"
+        match = re.match(r"(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})$", text)
+        if match:
+            day, month_name, year = int(match.group(1)), match.group(2).lower(), int(match.group(3))
+            month = MONTH_NAME_MAP.get(month_name)
+            if month:
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    return None
+        # "December 1, 2026" / "Dec 1 2026"
+        match = re.match(r"([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$", text)
+        if match:
+            month_name, day, year = match.group(1).lower(), int(match.group(2)), int(match.group(3))
+            month = MONTH_NAME_MAP.get(month_name)
+            if month:
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    return None
+        return None
+
+    def _extract_structured_deadline(
+        self,
+        combined_text: str,
+        structured_hints: dict[str, Any] | None,
+    ) -> datetime | None:
+        """Extract an application deadline from structured hints or a cued date.
+
+        Structured hints (JSON-LD / microdata) win. Free-text dates are only read
+        when they directly follow a deadline cue word, to avoid grabbing unrelated
+        dates on the page.
+        """
+        if structured_hints:
+            for key in ("applicationDeadline", "applicationdeadline", "deadline", "endDate"):
+                raw = structured_hints.get(key)
+                if isinstance(raw, str) and raw.strip():
+                    parsed = self._parse_date_string(raw.strip())
+                    if parsed is not None:
+                        return parsed
+        if combined_text:
+            cue = re.search(
+                r"(?:deadline|closes?|closing date|apply by|due)\D{0,20}"
+                r"(\d{1,2}\s+[A-Za-z]+\.?\s+\d{4}"
+                r"|[A-Za-z]+\.?\s+\d{1,2},?\s+\d{4}"
+                r"|\d{4}-\d{2}-\d{2})",
+                combined_text,
+                flags=re.IGNORECASE,
+            )
+            if cue:
+                return self._parse_date_string(cue.group(1))
+        return None
+
     def _infer_field_tags(self, text: str) -> list[str]:
         lowered = f" {text.lower()} "
         matched = [
@@ -1998,10 +2660,26 @@ class IngestionService:
         return levels or ["MS"]
 
     def _infer_country_code(self, source: SourceRegistry, url: str) -> str:
-        lowered = f"{source.source_key} {source.display_name} {url}".lower()
-        if "fulbright" in lowered or "foreign.fulbright" in lowered:
-            return "US"
-        return "CA"
+        """Infer the study-destination country code.
+
+        Pakistan-first scope: sources are Pakistani aggregators, but a scholarship's
+        country_code is the *destination* country (where the student would study).
+        URL/source hints are checked specific-first; default is ``PK`` for
+        domestic Pakistani awards with no destination signal.
+        """
+        haystack = f"{source.source_key} {source.display_name} {url}".lower()
+        country_patterns = (
+            ("GB", ("chevening", "gov.uk", ".ac.uk", "ukri", "british council",
+                    "united kingdom", " uk ")),
+            ("US", ("fulbright", "foreign.fulbright", "usef", ".edu/", "united states")),
+            ("DE", ("daad", ".de/", "germany", "deutschland")),
+            ("AU", (".edu.au", "australia", "australian")),
+            ("CA", ("uwaterloo", ".ca/", "canada", "canadian")),
+        )
+        for code, patterns in country_patterns:
+            if any(pattern in haystack for pattern in patterns):
+                return code
+        return "PK"
 
     def _document_ref_from_url_or_title(self, resolved_url: str, title: str) -> str:
         path_segments = [segment for segment in urlparse(resolved_url).path.split("/") if segment]

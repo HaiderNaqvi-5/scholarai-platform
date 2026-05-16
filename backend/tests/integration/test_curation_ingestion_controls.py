@@ -106,6 +106,7 @@ def test_curation_ingestion_list_supports_filters(app, client):
             status_filter=None,
             source_key=None,
             dispatch_status=None,
+            parser_diagnostic=None,
         ):
             assert page == 1
             assert page_size == 8

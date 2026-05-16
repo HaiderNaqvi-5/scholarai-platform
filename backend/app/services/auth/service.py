@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -12,9 +13,12 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models import Capability, RoleCapability, User, UserCapability
+from app.models import Capability, InviteCode, RoleCapability, User, UserCapability
 from app.schemas import TokenResponse, UserCreate, UserLogin
 from scholarai_common.errors import ScholarAIException, ErrorCode
+
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -26,6 +30,15 @@ class AuthService:
         if existing.scalar_one_or_none():
             return None
 
+        # Redeem invite code BEFORE creating the user so an invalid / expired
+        # / exhausted code rejects the signup without leaving an orphan row.
+        # ``_redeem_invite_code`` raises ScholarAIException on failure; on
+        # success it returns the code row (with the redemption already
+        # accounted for) so we can grant the plan + expiry at user creation.
+        invite = await self._redeem_invite_code(
+            getattr(payload, "invite_code", None)
+        )
+
         user = User(
             email=payload.email.lower(),
             password_hash=hash_password(payload.password),
@@ -34,11 +47,86 @@ class AuthService:
         if payload.billing_country:
             user.billing_country = payload.billing_country
         user.marketing_consent = bool(getattr(payload, "marketing_consent", False))
+
+        # Optional Air University cohort capture — all three fields are
+        # independent and skipped silently when not provided.
+        if getattr(payload, "air_uni_uni", None):
+            user.air_uni_uni = payload.air_uni_uni
+        if getattr(payload, "air_uni_dept", None):
+            user.air_uni_dept = payload.air_uni_dept
+        if getattr(payload, "air_uni_batch", None):
+            user.air_uni_batch = payload.air_uni_batch
+
+        if invite is not None:
+            user.plan = invite.grants_plan
+            user.plan_activated_at = datetime.now(timezone.utc)
+            user.plan_expires_at = datetime.now(timezone.utc) + timedelta(
+                days=invite.trial_days
+            )
+            user.redeemed_invite_code = invite.code
+
         self.db.add(user)
         await self.db.flush()
         await self.db.refresh(user)
         await self._record_signup_consent(user, payload)
         return user
+
+    async def _redeem_invite_code(self, code: str | None) -> InviteCode | None:
+        """Validate + atomically increment the invite code's ``uses`` counter.
+
+        Returns ``None`` when no code was supplied. Raises ScholarAIException
+        with a 400 status code (and a stable ``ErrorCode.VALIDATION_ERROR``)
+        when the supplied code is invalid, inactive, outside its validity
+        window, or exhausted. The increment is gated by a row-level lock
+        (``with_for_update``) so two concurrent signups racing on the last
+        slot cannot both succeed.
+        """
+        if not code:
+            return None
+
+        normalised = code.strip().upper()
+        if not normalised:
+            return None
+
+        row_result = await self.db.execute(
+            select(InviteCode).where(InviteCode.code == normalised).with_for_update()
+        )
+        row = row_result.scalar_one_or_none()
+        if row is None:
+            raise ScholarAIException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Invite code is not recognised.",
+                status_code=400,
+            )
+        if not row.is_active:
+            raise ScholarAIException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Invite code is no longer active.",
+                status_code=400,
+            )
+
+        now = datetime.now(timezone.utc)
+        if now < row.valid_from or now > row.valid_until:
+            raise ScholarAIException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Invite code is outside its valid window.",
+                status_code=400,
+            )
+        if row.uses >= row.max_uses:
+            raise ScholarAIException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Invite code has reached its redemption limit.",
+                status_code=400,
+            )
+
+        await self.db.execute(
+            update(InviteCode)
+            .where(InviteCode.code == normalised)
+            .values(uses=InviteCode.uses + 1)
+        )
+        # Re-read so the returned row reflects the incremented counter.
+        await self.db.refresh(row)
+        return row
 
     async def _record_signup_consent(self, user: User, payload: UserCreate) -> None:
         """Persist initial terms + privacy consent if the signup payload carries

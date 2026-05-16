@@ -6,7 +6,7 @@ For backend / repo-wide context (architecture, RBAC matrix, recommendation pipel
 
 ## Identity
 
-User-facing brand: **GrantPath**. Internal/repo brand: ScholarAI.
+User-facing brand: **AidwiseAI**. Internal/repo brand: ScholarAI.
 
 This directory is the result of a greenfield rebuild on branch `feat/frontend-greenfield` (commit `f01bc08`). The previous frontend (single `lib/api.ts`, per-route `dashboard/document-feedback/interview/curation/admin/mentor/owner` pages, "GrantPath AI" metadata, npm + package-lock) was wiped. Only `lib/theme/tokens.ts` survived.
 
