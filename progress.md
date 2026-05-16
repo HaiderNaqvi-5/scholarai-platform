@@ -2,35 +2,33 @@
 
 **Date:** 2026-05-16
 **Branch:** `feat/pakistan-frontend-pass`
-**Range:** `23942f5..27a57f2` (21 commits, Tasks 1–17)
+**Range:** `23942f5..d20ab14` (21 commits, Tasks 1–17, chronological)
 
 ## Tasks completed this session
 
-The full Q1 retier landed across 21 commits on this branch:
-
-| # | SHA | Task / Commit subject |
-|---|-----|-----------------------|
-| 1 | `23942f5` | feat(db): add scholarship.tier with premium backfill |
-| 2 | `c7ce47e` | fix(db): correct scholarship backfill column names (title, provider_name) |
-| 3 | `ba89ed6` | chore(db): make 20260516_0023 downgrade idempotent + docstring |
-| 4 | `f307328` | feat(db): sop monthly usage + lifetime counter |
-| 5 | `76c8e18` | feat(db): usage_ledger for burn-cap accounting |
-| 6 | `b7bc088` | feat(models): scholarship tier + sop/usage ledger ORM |
-| 7 | `24b57a8` | feat(plan_guard): Q1 retier caps + reveal gates |
-| 8 | `de7f7b2` | feat(burn_cap): 60% per-tier accounting + LLM/WhatsApp cost helpers |
-| 9 | `760ca39` | feat(match): internal buckets, Pro blur, Elite reveal |
-| 10 | `b56ebd1` | feat(sop): per-plan monthly quota + free lifetime gate |
-| 10b | `b56bd1f` | test(sop): align legacy sop_builder tests with new quota gate |
-| 11 | `a510706` | feat(tracker): plan-aware cap (3/6/12) |
-| 12 | `d0aa3d9` | feat(notifications): WhatsApp-only premium, drop SMS |
-| 12b | `49495d9` | fix(reminders): adapt reminder_tasks to async fan_out_for_plan(db, user, message) |
-| 13 | `e5ffe88` | feat(llm): burn-cap ledger wrapper + caller migration |
-| 14 | `1d01c55` | feat(pricing): Q1 retier 2999/6000 + neutral bullets |
-| 15 | `c50ad53` | feat(scholarships): premium tier paywall on public catalog |
-| 16 | `f859091` | test(vocab): internal classification tokens must not leak |
-| 17a | `79f8a7b` | feat(frontend): MatchCard + CompatibilityMeter + neutral copy |
-| 17b | `27a57f2` | feat(upgrade): Q1 retier comparison rows |
-| 17  | (this commit) | chore(q1-retier): push-gate run + progress.md + CLAUDE.md |
+| Plan task | SHA | Commit subject |
+|-----------|-----|----------------|
+| 1   | `23942f5` | feat(db): add scholarship.tier with premium backfill |
+| 1b  | `c7ce47e` | fix(db): correct scholarship backfill column names (title, provider_name) |
+| 1c  | `ba89ed6` | chore(db): make 20260516_0023 downgrade idempotent + docstring |
+| 2   | `f307328` | feat(db): sop monthly usage + lifetime counter |
+| 3   | `76c8e18` | feat(db): usage_ledger for burn-cap accounting |
+| 4   | `b7bc088` | feat(models): scholarship tier + sop/usage ledger ORM |
+| 5   | `24b57a8` | feat(plan_guard): Q1 retier caps + reveal gates |
+| 6   | `de7f7b2` | feat(burn_cap): 60% per-tier accounting + LLM/WhatsApp cost helpers |
+| 7   | `760ca39` | feat(match): internal buckets, Pro blur, Elite reveal |
+| 8   | `b56ebd1` | feat(sop): per-plan monthly quota + free lifetime gate |
+| 8b  | `b56bd1f` | test(sop): align legacy sop_builder tests with new quota gate |
+| 9   | `a510706` | feat(tracker): plan-aware cap (3/6/12) |
+| 10  | `d0aa3d9` | feat(notifications): WhatsApp-only premium, drop SMS |
+| 10b | `49495d9` | fix(reminders): adapt reminder_tasks to async fan_out_for_plan(db, user, message) |
+| 11  | `e5ffe88` | feat(llm): burn-cap ledger wrapper + caller migration |
+| 12  | `1d01c55` | feat(pricing): Q1 retier 2999/6000 + neutral bullets |
+| 13  | `c50ad53` | feat(scholarships): premium tier paywall on public catalog |
+| 14  | `f859091` | test(vocab): internal classification tokens must not leak |
+| 15  | `79f8a7b` | feat(frontend): MatchCard + CompatibilityMeter + neutral copy |
+| 16  | `27a57f2` | feat(upgrade): Q1 retier comparison rows |
+| 17  | `d20ab14` | chore(q1-retier): push-gate run + progress.md + CLAUDE.md |
 
 ## Push-gate verification (Task 17)
 

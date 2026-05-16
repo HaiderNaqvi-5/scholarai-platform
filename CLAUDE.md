@@ -98,7 +98,7 @@ All must pass before push: backend unit+integration, KPI regression, frontend li
 - Update `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` to reflect Pakistan pivot.
 
 ## Q1 retier (2026-05-16, branch `feat/pakistan-frontend-pass`)
-Closed Tasks 1–17 across 21 commits `23942f5..27a57f2`. **444 backend tests pass + 1 xpass**, frontend lint/tsc/build green, docs governance 0 failures, vocab guard **6 pass + 1 xpass**.
+Closed Tasks 1–17 across 21 commits `23942f5..d20ab14`. **444 backend tests pass + 1 xpass**, frontend lint/tsc/build green, docs governance 0 failures, vocab guard **6 pass + 1 xpass**. Push-gate closeout commit: `d20ab14`. Live DB at `alembic head = 20260516_0025`; `scholarships` row mix = 6 premium / 20 standard.
 - **New tables:** `sop_monthly_usage` (per-plan SOP quota + lifetime counter, migration `20260516_0024`), `usage_ledger` (burn-cap accounting rows for LLM + WhatsApp cost, migration `20260516_0025`).
 - **New column:** `scholarships.tier` (`standard` | `premium`, migration `20260516_0023` with premium backfill on title/provider keywords; downgrade idempotent).
 - **New module:** `backend/app/core/burn_cap.py` — 60% per-tier monthly budget accounting, `assert_within_burn_cap` (HTTP 429 on breach), `record_llm` / `record_whatsapp` ledger writers, deterministic-template path emits zero-cost rows.
