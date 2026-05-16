@@ -8,7 +8,7 @@ ScholarAI — AI scholarship platform. **Pakistan-pivot in progress (PRD `D:/Dow
 **Source of truth hierarchy:** PRD → `.codex/AGENTS.md` → `AGENTS.md` → `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md` → `docs/scholarai/01..14*.md` → this file. Legacy `docs/*.md` transitional.
 
 ## Stack
-Next.js 16 + React 19 + TS + Tailwind 4 (frontend). FastAPI + SQLAlchemy 2 async + Alembic + Celery + Redis + pgvector on Postgres 16 (backend). Docker Compose. CI: `.github/workflows/ci.yml` (backend-sanity, kpi-regression, frontend-sanity, docs-governance, browser-smoke).
+Next.js 16 + React 19 + TS + Tailwind 4 (frontend). FastAPI + SQLAlchemy 2 async + Alembic + Celery + Redis + pgvector on Postgres 16 (backend). Docker Compose. CI: `.github/workflows/ci.yml` (backend-sanity, kpi-regression, frontend-sanity, docs-governance, browser-smoke). CI `frontend-sanity` + `browser-smoke` run on Bun (`oven-sh/setup-bun@v2`, `bun install --frozen-lockfile`); the project has no `package-lock.json`.
 
 LLM = Anthropic Claude (`anthropic` SDK). Haiku 4.5 default; Sonnet 4.6 for SOP deep pass + Elite feedback. Prompt caching `cache_control: ephemeral` on static system prompts. Deterministic-template fallback when `ANTHROPIC_API_KEY` absent — CI + tests stay green offline.
 
@@ -26,6 +26,8 @@ LLM = Anthropic Claude (`anthropic` SDK). Haiku 4.5 default; Sonnet 4.6 for SOP 
 
 ## Push gate (per AGENTS.md)
 All must pass before push: backend unit+integration, KPI regression, frontend lint/typecheck/build, docs governance, browser smoke. Smoke relaxed on greenfield branch until S10 / Frontend Pass.
+
+**CI temp flag (PR #84):** the `browser-smoke` step in `.github/workflows/ci.yml` carries `continue-on-error: true` because the greenfield rebuild left smoke `data-testid` selectors stale. The step still runs and logs, but a green `browser-smoke` job does NOT mean smoke passed — check the step log. **This flag must be removed during S10 / Frontend Pass, once smoke selectors are re-pointed to the rebuilt UI.**
 
 ## Demo accounts
 - student@example.com / strongpass1 (legacy seed)
@@ -94,7 +96,8 @@ All must pass before push: backend unit+integration, KPI regression, frontend li
 - **Brand rename 2026-05-15:** GrantPath → **AidwiseAI** in `Front-upgrade.md`, `Front-upgrade.html`, root `CLAUDE.md`, `frontend/CLAUDE.md`. Codebase still hardcodes "GrantPath" in `app/page.tsx` + `Sidebar.tsx`; rename happens in S1 + S3 sprints. Lowercase `grantpath.*` localStorage keys (`grantpath.access_token` / `grantpath.refresh_token` / `grantpath.access_expires_at` / `grantpath.onboarding_draft`) **kept** — they are code identifiers in `client.ts`, renaming them logs every user out. `frontend/CLAUDE.md:11` historical "GrantPath AI metadata" line left intact (factual record of the wiped old frontend). Brand-derived mailto updated: `partnerships@aidwiseai.pk`.
 
 ## Open work
-- ~~Frontend Pass~~ **landed 2026-05-15** on branch `feat/pakistan-frontend-pass`. Remaining: re-point Playwright smoke selectors to new routes and remove `continue-on-error` on the browser-smoke job; consent UI + cookie banner + settings privacy.
+- ~~Frontend Pass~~ **landed 2026-05-15** on branch `feat/pakistan-frontend-pass`. Remaining: re-point Playwright smoke selectors to new routes and remove `continue-on-error: true` from the `browser-smoke` step in `.github/workflows/ci.yml`; consent UI + cookie banner + settings privacy.
+- ~~Apply migrations 0014–0018 against live dev DB and run seed orchestrator before manual smoke.~~ **Done 2026-05-12**: alembic at head `20260511_0018`; `demo_seed_pakistan.py` ran (20 PK scholarships, 30 universities, 70 visa Q, 5 legal docs, demo `zara.khan@example.com`). Q1 retier (2026-05-16) advanced head to `20260516_0025`.
 - Update `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` to reflect Pakistan pivot.
 
 ## Q1 retier (2026-05-16, branch `feat/pakistan-frontend-pass`)
