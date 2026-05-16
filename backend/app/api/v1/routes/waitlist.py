@@ -20,15 +20,11 @@ router = APIRouter()
 
 
 _PRICING_BY_CURRENCY = {
-    "PKR": {
-        "pro": "PKR 2,499/month",
-        "elite": "PKR 7,999/month",
-        "institution": "Custom annual",
-    },
-    "GBP": {"pro": "£6.99/month", "elite": "£19.99/month", "institution": "Custom annual"},
-    "EUR": {"pro": "€7.99/month", "elite": "€22.99/month", "institution": "Custom annual"},
-    "AED": {"pro": "AED 29/month", "elite": "AED 89/month", "institution": "Custom annual"},
-    "USD": {"pro": "$8.99/month", "elite": "$24.99/month", "institution": "Custom annual"},
+    "PKR": {"pro": "PKR 2,999/month", "elite": "PKR 6,000/month", "institution": "Custom annual"},
+    "GBP": {"pro": "£8.49/month",     "elite": "£16.99/month",    "institution": "Custom annual"},
+    "EUR": {"pro": "€9.49/month",     "elite": "€18.99/month",    "institution": "Custom annual"},
+    "AED": {"pro": "AED 39/month",    "elite": "AED 79/month",    "institution": "Custom annual"},
+    "USD": {"pro": "$9.99/month",     "elite": "$19.99/month",    "institution": "Custom annual"},
 }
 
 
@@ -59,11 +55,12 @@ def _build_tiers(currency: str) -> list[PricingTier]:
             yearly_hint="Less than one consultant meeting.",
             feature_summary="Serious applicants in Pakistan.",
             bullet_features=[
-                "Unlimited scholarship and university matches",
-                "Unlimited SOP drafts across programs",
+                "5 SOP drafts per month",
+                "Full match list — 6 personalised scholarships",
+                "6 university matches",
                 "Full 10-question visa interview sessions",
-                "Unlimited application tracker",
-                "Always-on email deadline reminders",
+                "6-card application tracker",
+                "Email deadline reminders",
             ],
         ),
         PricingTier(
@@ -74,11 +71,14 @@ def _build_tiers(currency: str) -> list[PricingTier]:
             yearly_hint="Less than a coffee per week for diaspora families.",
             feature_summary="Diaspora and high-stakes applicants.",
             bullet_features=[
-                "Line-by-line AI feedback on every SOP",
+                "10 SOP drafts per month with line-by-line AI feedback",
+                "12 personalised scholarships — every match revealed",
+                "12 university matches",
+                "12-card application tracker",
                 "Downloadable visa interview transcripts",
                 "Professor cold-email generator",
                 "Application strategy PDF report",
-                "Priority scholarship alerts via SMS + WhatsApp",
+                "Priority WhatsApp deadline alerts",
             ],
         ),
         PricingTier(
@@ -101,6 +101,15 @@ def _build_tiers(currency: str) -> list[PricingTier]:
 @router.get("/upgrade/pricing", response_model=PricingResponse)
 async def get_pricing(
     currency: str = Query(default="PKR", min_length=3, max_length=3),
+    audience: str = Query(
+        default="student",
+        pattern="^(student|institution)$",
+        description=(
+            "Audience filter. PRD §0.6 trust boundary: the student-facing /upgrade"
+            " page must never show the Institution tier. Use audience=institution"
+            " only from /universities or the partners surface."
+        ),
+    ),
 ) -> PricingResponse:
     cur = currency.upper()
     if cur not in _PRICING_BY_CURRENCY:
@@ -108,7 +117,11 @@ async def get_pricing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="currency must be PKR / GBP / EUR / AED / USD",
         )
-    return PricingResponse(currency=cur, tiers=_build_tiers(cur))
+    tiers = _build_tiers(cur)
+    if audience == "student":
+        # Trust boundary: Institution tier never appears in the student UI.
+        tiers = [t for t in tiers if t.key != "institution"]
+    return PricingResponse(currency=cur, tiers=tiers)
 
 
 @router.post("/waitlist", response_model=WaitlistJoinResponse, status_code=status.HTTP_201_CREATED)
