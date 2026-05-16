@@ -87,6 +87,20 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: int = 30
     LLM_FALLBACK_DETERMINISTIC: bool = True
 
+    # --- Mailgun (transactional email) ---
+    # When both API key and domain are set, ``app.services.notifications.channels.send_email``
+    # POSTs to Mailgun. When either is absent the function falls back to log-only
+    # behaviour so CI + dev stay deterministic without external credentials.
+    MAILGUN_API_KEY: str | None = None
+    MAILGUN_DOMAIN: str | None = None
+    MAILGUN_BASE_URL: str = "https://api.mailgun.net/v3"
+    MAILGUN_TIMEOUT_SECONDS: float = 10.0
+
+    # Display brand for outgoing email "from" + signature. Internal repo brand
+    # stays ScholarAI per the source-of-truth hierarchy in CLAUDE.md.
+    BRAND_DISPLAY_NAME: str = "AidwiseAI"
+    EMAIL_FROM_LOCALPART: str = "noreply"
+
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
         if env_name not in {"production", "staging"}:

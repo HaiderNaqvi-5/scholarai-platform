@@ -16,11 +16,17 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+import httpx
+
 from app.core.burn_cap import record_whatsapp
+from app.core.config import settings
 from app.models import User
 
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_EMAIL_SUBJECT = "AidwiseAI notification"
 
 
 PLAN_CHANNELS: dict[str, tuple[str, ...]] = {
@@ -41,9 +47,72 @@ class NotificationResult:
         self.channels.append(channel)
 
 
-async def send_email(user: User, message: str) -> bool:
-    """Stub: log-only. Returns True so callers treat it as delivered."""
-    logger.info("notify.email to=%s len=%d", getattr(user, "email", None), len(message or ""))
+async def send_email(
+    user: User,
+    message: str,
+    *,
+    subject: str | None = None,
+    html: str | None = None,
+) -> bool:
+    """Send a transactional email via Mailgun when configured.
+
+    Falls back to log-only behaviour when ``MAILGUN_API_KEY`` or
+    ``MAILGUN_DOMAIN`` are absent — this keeps CI + offline dev deterministic
+    and means a Mailgun outage degrades to "alerts logged but not sent"
+    rather than 5xx-ing the calling task. Returns True iff Mailgun accepted
+    the request (or we successfully logged the stub message).
+
+    The ``subject`` arg is optional so existing callers (``alert_tasks``,
+    ``reminder_tasks``) that pass only ``(user, message)`` keep working;
+    when absent we use a generic ``_DEFAULT_EMAIL_SUBJECT`` so the inbox
+    never shows an empty subject line.
+    """
+
+    recipient = getattr(user, "email", None)
+    if not recipient:
+        logger.warning("notify.email skipped: user has no email")
+        return False
+
+    if not settings.MAILGUN_API_KEY or not settings.MAILGUN_DOMAIN:
+        logger.info(
+            "notify.email (log-only, mailgun unconfigured) to=%s len=%d",
+            recipient,
+            len(message or ""),
+        )
+        return True
+
+    effective_subject = subject or _DEFAULT_EMAIL_SUBJECT
+    sender = (
+        f"{settings.BRAND_DISPLAY_NAME} "
+        f"<{settings.EMAIL_FROM_LOCALPART}@{settings.MAILGUN_DOMAIN}>"
+    )
+    url = f"{settings.MAILGUN_BASE_URL.rstrip('/')}/{settings.MAILGUN_DOMAIN}/messages"
+    data = {
+        "from": sender,
+        "to": [recipient],
+        "subject": effective_subject,
+        "text": message,
+    }
+    if html:
+        data["html"] = html
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.MAILGUN_TIMEOUT_SECONDS) as client:
+            resp = await client.post(url, auth=("api", settings.MAILGUN_API_KEY), data=data)
+    except httpx.HTTPError as exc:
+        logger.warning("notify.email mailgun transport error to=%s err=%r", recipient, exc)
+        return False
+
+    if resp.status_code >= 400:
+        logger.warning(
+            "notify.email mailgun rejected to=%s status=%d body=%s",
+            recipient,
+            resp.status_code,
+            resp.text[:200],
+        )
+        return False
+
+    logger.info("notify.email mailgun accepted to=%s subject=%r", recipient, effective_subject)
     return True
 
 
