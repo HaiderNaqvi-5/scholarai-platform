@@ -285,19 +285,51 @@ type TierKey = "explorer" | "pro" | "elite" | "institution";
 const COMPARISON_ROWS: { label: string; values: Record<TierKey, string> }[] = [
   {
     label: "Scholarship matches",
-    values: { explorer: "Top 3", pro: "Unlimited", elite: "Unlimited + priority alerts", institution: "Bulk" },
+    values: {
+      explorer: "3 sample",
+      pro: "6 personalised",
+      elite: "12 with every match revealed",
+      institution: "Bulk",
+    },
   },
   {
-    label: "SOP drafts",
-    values: { explorer: "1 lifetime", pro: "Unlimited", elite: "Unlimited + line feedback", institution: "Unlimited" },
-  },
-  {
-    label: "Visa interview",
-    values: { explorer: "Q1–Q3", pro: "Full 10 questions", elite: "Full + transcript", institution: "Full" },
+    label: "University matches",
+    values: { explorer: "—", pro: "6", elite: "12", institution: "Unlimited" },
   },
   {
     label: "Application tracker",
-    values: { explorer: "3 items", pro: "Unlimited", elite: "Unlimited + SMS reminders", institution: "Unlimited" },
+    values: { explorer: "3 cards", pro: "6 cards", elite: "12 cards", institution: "Unlimited" },
+  },
+  {
+    label: "SOP drafts",
+    values: {
+      explorer: "1 lifetime",
+      pro: "5 / month",
+      elite: "10 / month",
+      institution: "50 / seat",
+    },
+  },
+  {
+    label: "SOP line-by-line AI",
+    values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" },
+  },
+  {
+    label: "Visa interview",
+    values: {
+      explorer: "Q1–Q3",
+      pro: "Full 10 questions",
+      elite: "Full + downloadable transcript",
+      institution: "Full",
+    },
+  },
+  {
+    label: "Deadline alerts",
+    values: {
+      explorer: "Email (30 days)",
+      pro: "Email always-on",
+      elite: "Email + WhatsApp",
+      institution: "Email + WhatsApp",
+    },
   },
   {
     label: "Professor email generator",
