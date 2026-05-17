@@ -86,7 +86,7 @@ export default function InterviewSessionPage({
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5" data-testid="interview-session-shell">
       <Link
         href="/interviews"
         className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"

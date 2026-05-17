@@ -194,7 +194,7 @@ function SetupCard({
   onStart: () => void;
 }) {
   return (
-    <Card>
+    <Card data-testid="visa-setup-form">
       <CardHeader>
         <CardTitle>Set up your session</CardTitle>
       </CardHeader>

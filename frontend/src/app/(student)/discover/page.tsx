@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScholarshipCard } from "@/components/scholarship/ScholarshipCard";
+import { Pagination } from "@/components/ui/pagination";
 import { endpoints } from "@/lib/api";
 import type { ScholarshipFilters } from "@/lib/api/endpoints/scholarships";
 import type { SavedOpportunity } from "@/lib/api";
@@ -148,11 +149,20 @@ function DiscoverInner() {
   const clearAll = () => router.replace("/discover");
   const hasFilters = sp.toString().length > 0;
 
+  const goPage = (next: number) => {
+    const params = new URLSearchParams(sp.toString());
+    if (next <= 1) params.delete("page");
+    else params.set("page", String(next));
+    router.replace(`/discover${params.toString() ? `?${params.toString()}` : ""}`);
+  };
+
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-[1024px]" data-testid="discover-grid">
       <header className="mb-4">
-        <h1 className="font-display text-3xl text-ink">Discover</h1>
-        <p className="mt-1 text-ink-muted">
+        <h1 className="font-display text-[32px] italic font-[450] leading-[1.1] tracking-[-0.02em] text-ink-deep">
+          Discover
+        </h1>
+        <p className="mt-1 text-[14px] text-ink-muted">
           {listQ.data ? `${listQ.data.total} published scholarships.` : "All published scholarships."}
         </p>
       </header>
@@ -233,20 +243,28 @@ function DiscoverInner() {
           action={hasFilters ? <Button variant="secondary" onClick={clearAll}>Clear filters</Button> : null}
         />
       ) : (
-        <ul className="space-y-3">
-          {listQ.data.items.map((s) => (
-            <li key={s.id}>
-              <ScholarshipCard
-                scholarship={s}
-                saved={savedSet.has(s.id)}
-                saving={toggleSave.isPending && toggleSave.variables?.id === s.id}
-                onToggleSave={() =>
-                  toggleSave.mutate({ id: s.id, currentlySaved: savedSet.has(s.id) })
-                }
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {listQ.data.items.map((s) => (
+              <li key={s.id}>
+                <ScholarshipCard
+                  scholarship={s}
+                  saved={savedSet.has(s.id)}
+                  saving={toggleSave.isPending && toggleSave.variables?.id === s.id}
+                  onToggleSave={() =>
+                    toggleSave.mutate({ id: s.id, currentlySaved: savedSet.has(s.id) })
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+          <Pagination
+            page={filters.page ?? 1}
+            pageSize={filters.page_size ?? 20}
+            total={listQ.data.total}
+            onChange={goPage}
+          />
+        </>
       )}
     </div>
   );

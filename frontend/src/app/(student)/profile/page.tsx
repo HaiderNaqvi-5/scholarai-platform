@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardBody, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
+import { StickySaveFooter } from "@/components/profile/StickySaveFooter";
 import { endpoints } from "@/lib/api";
 import type { StudentProfile } from "@/lib/api";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 
 const FIELD_TAGS = [
@@ -82,9 +83,15 @@ function toPayload(form: Form): Partial<StudentProfile> {
 
 export default function ProfilePage() {
   const qc = useQueryClient();
+  const auth = useAuth();
   const profileQ = useQuery({ queryKey: ["profile"], queryFn: endpoints.profile.get, retry: false });
   const [form, setForm] = useState<Form>(fromProfile(undefined));
   const [hydrated, setHydrated] = useState(false);
+  const initial = useMemo(() => fromProfile(profileQ.data), [profileQ.data]);
+  const dirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(initial),
+    [form, initial],
+  );
 
   useEffect(() => {
     if (profileQ.data && !hydrated) {
@@ -150,18 +157,35 @@ export default function ProfilePage() {
     update("target_field", next.join(", "));
   };
 
+  const userEmail = auth.status === "authed" ? auth.user.email : null;
+
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-2xl space-y-6">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Your profile</h1>
-        <p className="mt-1 text-ink-muted">
-          Eligibility runs on this. Changes feed straight into your matches.
-        </p>
-      </header>
+    <form
+      onSubmit={onSubmit}
+      data-testid="profile-form"
+      className="mx-auto max-w-[720px] space-y-6"
+    >
+      <PageHeader
+        title="Profile"
+        description="The data here drives your matches and your SOP context. Update it whenever your plan shifts."
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle>Citizenship and target</CardTitle>
+          <CardTitle>Contact</CardTitle>
+          <CardDescription>Your sign-in identity. Email changes need support.</CardDescription>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="contact-email">Email</Label>
+            <Input id="contact-email" value={userEmail ?? ""} readOnly disabled />
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your goal</CardTitle>
           <CardDescription>Required for eligibility filtering.</CardDescription>
         </CardHeader>
         <CardBody className="space-y-4">
@@ -203,7 +227,7 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Academic</CardTitle>
+          <CardTitle>Academic record</CardTitle>
           <CardDescription>GPA and target degree drive eligibility filters.</CardDescription>
         </CardHeader>
         <CardBody className="space-y-4">
@@ -262,7 +286,7 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Language test</CardTitle>
+          <CardTitle>Test scores</CardTitle>
           <CardDescription>Optional English-proficiency score.</CardDescription>
         </CardHeader>
         <CardBody className="space-y-3">
@@ -292,11 +316,12 @@ export default function ProfilePage() {
         </CardBody>
       </Card>
 
-      <div className="sticky bottom-4 flex items-center justify-end gap-3 rounded-[16px] border border-[var(--color-border)] bg-paper-white/95 p-3 backdrop-blur">
-        <Button type="submit" loading={mut.isPending} disabled={!valid}>
-          <Check className="size-4" strokeWidth={2} /> Save changes
-        </Button>
-      </div>
+      <StickySaveFooter
+        dirty={dirty}
+        saving={mut.isPending}
+        onSave={() => mut.mutate(toPayload(form))}
+        onReset={() => setForm(initial)}
+      />
     </form>
   );
 }

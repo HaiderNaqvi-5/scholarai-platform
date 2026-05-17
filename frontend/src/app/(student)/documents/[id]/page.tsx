@@ -84,9 +84,11 @@ export default function DocumentDetailPage({
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-ink">{doc.title}</h1>
-          <p className="mt-1 text-ink-muted">
-            {doc.document_type} · Submitted {new Date(doc.created_at).toLocaleString()}
+          <h1 className="font-display text-[24px] italic font-[450] leading-[1.2] tracking-[-0.02em] text-ink-deep">
+            {doc.title}
+          </h1>
+          <p className="mt-1 font-mono text-[12px] text-ink-muted">
+            {doc.document_type} · Updated {new Date(doc.updated_at ?? doc.created_at).toLocaleString()}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -146,9 +148,9 @@ export default function DocumentDetailPage({
 }
 
 function StatusBadge({ doc }: { doc: DocumentDetail }) {
-  if (doc.processing_status === "completed") return <Badge tone="validated">Feedback ready</Badge>;
-  if (doc.processing_status === "failed") return <Badge tone="danger">Failed</Badge>;
-  return <Badge tone="caution">Generating…</Badge>;
+  if (doc.processing_status === "completed") return <Badge tone="validated">Final</Badge>;
+  if (doc.processing_status === "failed") return <Badge tone="danger">Failed — retry</Badge>;
+  return <Badge tone="caution">Draft</Badge>;
 }
 
 function FeedbackPartitions({ fb }: { fb: DocumentFeedbackPartition }) {
@@ -259,11 +261,11 @@ function Partition({
 }) {
   const toneCls =
     tone === "validated"
-      ? "border-l-4 border-l-validated"
+      ? "validated-stripe"
       : tone === "generated"
-        ? "border-l-4 border-l-generated"
+        ? "generated-stripe"
         : tone === "caution"
-          ? "border-l-4 border-l-caution"
+          ? "caution-stripe"
           : "";
   return (
     <Card className={toneCls}>

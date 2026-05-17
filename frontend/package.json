@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "audit": "bun scripts/audit/runner.mjs",
+    "audit:emoji": "bun scripts/audit/emoji-grep.mjs",
+    "audit:public": "bun scripts/audit/runner.mjs --routes=public,system,legal",
+    "audit:self-test": "bun scripts/audit/runner.mjs --routes=public --states=loaded --viewports=1024 --self-test"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -35,11 +39,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "axe-core": "^4.10.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",

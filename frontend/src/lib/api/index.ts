@@ -28,6 +28,7 @@ import { professorEmail } from "./endpoints/professorEmail";
 import { visaInterview } from "./endpoints/visaInterview";
 import { upgrade } from "./endpoints/upgrade";
 import { reports } from "./endpoints/reports";
+import { legal, privacy } from "./endpoints/legal";
 
 export const endpoints = {
   auth,
@@ -48,4 +49,6 @@ export const endpoints = {
   visaInterview,
   upgrade,
   reports,
+  legal,
+  privacy,
 };

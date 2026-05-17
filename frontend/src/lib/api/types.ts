@@ -567,3 +567,62 @@ export type StrategyReportResponse = {
   used_llm: boolean;
   created_at: string;
 };
+
+// ── Legal documents + consent (Front-upgrade §6.4, backend privacy.py) ─────
+
+export type LegalDocument = {
+  slug: string;
+  version: string;
+  effective_at: string;
+  body_markdown: string;
+  sha256_hash: string;
+};
+
+export type ConsentType =
+  | "terms"
+  | "privacy"
+  | "marketing"
+  | "b2b_share"
+  | "cookies"
+  | "aup";
+
+export type ConsentRecord = {
+  consent_type: ConsentType;
+  version: string;
+  granted: boolean;
+  granted_at: string | null;
+};
+
+export type ConsentState = {
+  records: ConsentRecord[];
+  current_versions: Partial<Record<ConsentType, string>>;
+};
+
+export type ConsentGrantInput = {
+  consent_type: ConsentType;
+  version: string;
+  granted: boolean;
+};
+
+export type DataExportResponse = {
+  id: string;
+  status: string;
+  requested_at: string;
+  completed_at: string | null;
+  download_url: string | null;
+  expires_at: string | null;
+};
+
+export type DataDeletionRequestResponse = {
+  id: string;
+  status: string;
+  requested_at: string;
+  scheduled_for: string;
+  cancelled_at: string | null;
+  executed_at: string | null;
+};
+
+export type DataDeletionCreateInput = {
+  reason?: string | null;
+};
+
