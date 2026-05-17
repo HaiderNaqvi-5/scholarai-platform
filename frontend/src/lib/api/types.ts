@@ -38,17 +38,66 @@ export type TokenResponse = {
   expires_in: number;
 };
 
+/**
+ * StudentProfile — mirrors backend `StudentProfileResponse`
+ * (backend/app/schemas/students.py). Backend allowed values are enforced
+ * server-side; the literal unions here are documentation only — backend
+ * is the source of truth.
+ */
+export type TargetDegreeLevel = "MS" | "PHD" | "MBA" | "MENG" | "BS";
+export type HecDegreeLevel = "bachelor" | "master" | "mphil";
+export type CgpaScaleChoice = "4.0" | "4.0_hec";
+export type FundingRequirement = "fully_funded_only" | "partial_ok" | "self_funded_ok";
+export type IntakeTarget = "jan_2025" | "sep_2025" | "jan_2026" | "sep_2026" | "flexible";
+
 export type StudentProfile = {
   id: string;
   user_id: string;
+
+  // Core eligibility
   citizenship_country_code: string;
-  gpa_value?: number | null;
+  gpa_value: number | null;
   gpa_scale: number;
   target_field: string;
-  target_degree_level: "BS" | "MS" | "PHD";
+  target_degree_level: TargetDegreeLevel;
+
+  // Legacy single-country (kept for back-compat — derived from target_countries[0])
   target_country_code: string;
-  language_test_type?: string | null;
-  language_test_score?: number | null;
+
+  // Pakistan-pivot multi-select
+  target_countries: string[];
+  target_fields: string[];
+
+  // Language test
+  language_test_type: string | null;
+  language_test_score: number | null;
+
+  // Pakistani academic context
+  hec_degree_level: HecDegreeLevel | null;
+  pakistani_university: string | null;
+  cgpa_scale_choice: CgpaScaleChoice | null;
+  degree_subject: string | null;
+  graduation_year: number | null;
+
+  // Test scores
+  ielts_score: number | null;
+  toefl_score: number | null;
+  gre_quant: number | null;
+  gre_verbal: number | null;
+
+  // Research
+  has_research_publications: boolean | null;
+  research_publication_count: number | null;
+
+  // Goals
+  funding_requirement: FundingRequirement | null;
+  intake_target: IntakeTarget | null;
+  city_of_origin: string | null;
+
+  // Financial context
+  can_afford_application_fees: boolean | null;
+  needs_gre_waiver: boolean | null;
+  family_has_funds_for_bank_statement: boolean | null;
 };
 
 export type Scholarship = {

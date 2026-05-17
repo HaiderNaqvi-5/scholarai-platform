@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 
 type EvalResult = Awaited<ReturnType<typeof endpoints.recommendations.evaluateBenchmark>>;
@@ -34,9 +35,12 @@ export default function RecEvalPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Recommendation evaluation</h1>
-        <p className="mt-1 text-ink-muted">
+      <PageHeader
+        title="Recommendation evaluation"
+        description="Benchmark datasets — precision@k, recall@k, nDCG@k, MRR@k. Per-case breakdown plus aggregate trends."
+      />
+      <header className="sr-only">
+        <p>
           Benchmark datasets · precision@k, recall@k, nDCG@k, MRR@k. Per-case breakdown plus
           aggregate.
         </p>

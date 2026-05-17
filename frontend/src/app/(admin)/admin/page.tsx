@@ -5,6 +5,7 @@ import { Activity, AlertTriangle, FileText, GraduationCap, Library, MessageSquar
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 
 export default function AdminOverviewPage() {
@@ -19,14 +20,14 @@ export default function AdminOverviewPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Admin overview</h1>
-        <p className="mt-1 text-ink-muted">Platform health, KPI alerts, and roll-up counts.</p>
-      </header>
+    <div data-testid="admin-overview" className="mx-auto max-w-6xl space-y-5">
+      <PageHeader
+        title="Admin overview"
+        description="Platform health, KPI alerts, and roll-up counts."
+      />
 
       {healthQ.data && healthQ.data.kpi_alerts.length > 0 ? (
-        <Card className="border-l-4 border-l-caution">
+        <Card className="caution-stripe">
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertTriangle className="size-4 text-caution" strokeWidth={2} />
@@ -139,9 +140,11 @@ function Stat({
       <CardBody>
         <div className="flex items-center gap-2 text-ink-subtle">
           {icon}
-          <span className="text-xs uppercase tracking-wider">{label}</span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.06em]">{label}</span>
         </div>
-        <p className="mt-2 font-display text-3xl text-ink">{value.toLocaleString()}</p>
+        <p className="mt-2 font-mono text-[28px] font-semibold tabular-nums text-ink-deep">
+          {value.toLocaleString()}
+        </p>
       </CardBody>
     </Card>
   );

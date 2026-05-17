@@ -7,18 +7,16 @@
  */
 
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/section-header";
 import { partnershipsMailto, PARTNERSHIPS_EMAIL } from "@/lib/brand";
 
 export default function PartnerUniversitiesPage() {
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Universities</h1>
-        <p className="mt-1 text-ink-muted">
-          Foreign universities receiving Pakistani applicant snapshots via your
-          DPA-signed partner account.
-        </p>
-      </header>
+    <div data-testid="partners-universities" className="space-y-6">
+      <PageHeader
+        title="Universities"
+        description="Foreign universities receiving Pakistani applicant snapshots via your DPA-signed partner account."
+      />
 
       <Card>
         <CardHeader>

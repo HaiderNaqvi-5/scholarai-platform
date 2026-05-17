@@ -102,7 +102,7 @@ export default function MentorDocumentPage({
       </Link>
 
       <header>
-        <h1 className="font-display text-3xl text-ink">{doc.title}</h1>
+        <h1 className="font-display text-[24px] italic font-[450] leading-[1.2] tracking-[-0.02em] text-ink-deep">{doc.title}</h1>
         <p className="mt-1 text-ink-muted">
           {doc.document_type} · Submitted {new Date(doc.created_at).toLocaleString()}
         </p>

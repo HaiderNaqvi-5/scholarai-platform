@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +30,10 @@ export default function AdminAuditPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Role-change audit</h1>
-        <p className="mt-1 text-ink-muted">Every role mutation. Owners can revert with a reason.</p>
-      </header>
+      <PageHeader
+        title="Role-change audit"
+        description="Every role mutation. Owners can revert with a reason."
+      />
 
       {auditsQ.isLoading ? (
         <Skeleton className="h-64 w-full" />

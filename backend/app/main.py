@@ -21,7 +21,39 @@ from app.services.kpi_snapshot_service import KPISnapshotService
 from scholarai_common.errors import ScholarAIException
 
 
+def _init_sentry() -> None:
+    """Initialise Sentry only when SENTRY_DSN is set.
+
+    Bundled in requirements.txt for the Air-Uni booth; opt-in via env so
+    local dev + CI boot clean. Failure to import is fatal (the package is
+    a hard dependency); failure to init is logged and ignored so an
+    invalid DSN never blocks app boot.
+    """
+    dsn = getattr(settings, "SENTRY_DSN", None) or None
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=getattr(settings, "SENTRY_ENVIRONMENT", "development"),
+            traces_sample_rate=float(getattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 0.0) or 0.0),
+            profiles_sample_rate=float(getattr(settings, "SENTRY_PROFILES_SAMPLE_RATE", 0.0) or 0.0),
+            integrations=[FastApiIntegration(), StarletteIntegration()],
+            send_default_pii=False,
+        )
+    except Exception as err:  # pragma: no cover — defensive only
+        import logging
+
+        logging.getLogger(__name__).warning("Sentry init failed: %s", err)
+
+
 def create_app() -> FastAPI:
+    _init_sentry()
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await seed_demo_data_if_enabled()
