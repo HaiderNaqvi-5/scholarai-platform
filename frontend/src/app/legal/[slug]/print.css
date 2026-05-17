@@ -1,0 +1,29 @@
+/* Print stylesheet — hide app chrome on legal pages. */
+
+@media print {
+  header.app-shell-topbar,
+  nav.app-shell-sidebar,
+  [data-print-hide],
+  [role="region"][aria-label="Consent action"],
+  [role="region"][aria-label="Cookie consent"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  a {
+    color: black !important;
+    text-decoration: underline;
+  }
+}

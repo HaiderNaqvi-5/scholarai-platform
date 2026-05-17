@@ -1,57 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { stageLabel } from "@/lib/tracker/stages";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, GripVertical, Trash2 } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { endpoints } from "@/lib/api";
-import type { SavedOpportunity, SavedStatus } from "@/lib/api";
-import { formatDeadline } from "@/lib/utils";
+import { EmptyState, ErrorState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/section-header";
+import { SavedRow } from "@/components/saved/SavedRow";
+import { SortDropdown, type SavedSort } from "@/components/saved/SortDropdown";
+import { endpoints, isPlanRequiredError } from "@/lib/api";
+import type { SavedOpportunity } from "@/lib/api/types";
 
-const COLUMNS: { status: SavedStatus; label: string; tone: "neutral" | "validated" | "caution" | "danger" }[] = [
-  { status: "saved", label: "Saved", tone: "neutral" },
-  { status: "in_progress", label: "In progress", tone: "validated" },
-  { status: "applied", label: "Applied", tone: "validated" },
-  { status: "closed", label: "Closed", tone: "caution" },
-];
-
+/**
+ * /saved — Front-upgrade §6.11.
+ *
+ * Single ordered list with sort (Recently saved | Deadline). No Kanban —
+ * status workflow lives on /tracker. Inline Promote (POST /tracker) +
+ * Remove (DELETE /saved-opportunities/{id}) with optimistic updates and
+ * rollback toasts.
+ */
 export default function SavedPage() {
   const qc = useQueryClient();
+  const [sort, setSort] = useState<SavedSort>("recent");
+
   const savedQ = useQuery({
     queryKey: ["saved"],
     queryFn: endpoints.saved.list,
   });
 
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [overCol, setOverCol] = useState<SavedStatus | null>(null);
-
-  const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: SavedStatus }) =>
-      endpoints.saved.setStatus(id, status),
-    onMutate: async ({ id, status }) => {
+  const promote = useMutation({
+    mutationFn: async (item: SavedOpportunity) => {
+      await endpoints.tracker.create({
+        scholarship_id: item.scholarship_id,
+        program_name: item.scholarship.title,
+        university_name: item.scholarship.provider,
+        deadline: item.scholarship.deadline ?? null,
+        stage: "researching",
+      });
+      await endpoints.saved.remove(item.scholarship_id);
+      return item;
+    },
+    onMutate: async (item) => {
       await qc.cancelQueries({ queryKey: ["saved"] });
       const prev = qc.getQueryData<{ items: SavedOpportunity[] }>(["saved"]);
       qc.setQueryData<{ items: SavedOpportunity[] } | undefined>(["saved"], (old) =>
-        old
-          ? {
-              items: old.items.map((s) =>
-                s.scholarship_id === id
-                  ? { ...s, status, status_changed_at: new Date().toISOString() }
-                  : s,
-              ),
-            }
-          : old,
+        old ? { items: old.items.filter((s) => s.scholarship_id !== item.scholarship_id) } : old,
       );
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (err, _v, ctx) => {
       qc.setQueryData(["saved"], ctx?.prev);
-      toast.error("Couldn't update status. Reverted.");
+      if (isPlanRequiredError(err)) {
+        toast.error(err.detail.message);
+      } else {
+        toast.error("Couldn't move to tracker. Restored.");
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Moved to ${stageLabel("researching")} in tracker.`);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["saved"] }),
   });
@@ -68,169 +78,78 @@ export default function SavedPage() {
     },
     onError: (_e, _v, ctx) => {
       qc.setQueryData(["saved"], ctx?.prev);
-      toast.error("Couldn't remove.");
+      toast.error("Couldn't remove. Restored.");
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["saved"] }),
   });
 
-  function onDrop(status: SavedStatus) {
-    if (!draggingId) return;
-    const item = savedQ.data?.items.find((s) => s.scholarship_id === draggingId);
-    if (item && item.status !== status) {
-      setStatus.mutate({ id: draggingId, status });
+  const items = useMemo(() => savedQ.data?.items ?? [], [savedQ.data]);
+  const sorted = useMemo(() => {
+    const arr = [...items];
+    if (sort === "deadline") {
+      arr.sort((a, b) => {
+        const ad = a.scholarship.deadline ? new Date(a.scholarship.deadline).getTime() : Infinity;
+        const bd = b.scholarship.deadline ? new Date(b.scholarship.deadline).getTime() : Infinity;
+        return ad - bd;
+      });
+    } else {
+      arr.sort((a, b) => new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime());
     }
-    setDraggingId(null);
-    setOverCol(null);
-  }
-
-  if (savedQ.isLoading) {
-    return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {COLUMNS.map((c) => (
-          <Skeleton key={c.status} className="h-96 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  const items = savedQ.data?.items ?? [];
+    return arr;
+  }, [items, sort]);
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <header className="mb-5">
-        <h1 className="font-display text-3xl text-ink">Saved</h1>
-        <p className="mt-1 text-ink-muted">
-          Drag a card between columns to update status. {items.length} saved.
-        </p>
-      </header>
+    <div className="mx-auto max-w-[1024px]">
+      <PageHeader
+        title="Saved"
+        description={
+          items.length > 0
+            ? `${items.length} scholarship${items.length === 1 ? "" : "s"} bookmarked.`
+            : undefined
+        }
+        actions={items.length > 0 ? <SortDropdown value={sort} onChange={setSort} /> : undefined}
+      />
 
-      {items.length === 0 ? (
-        <div className="rounded-[20px] border border-[var(--color-border)] bg-paper-white p-10 text-center">
-          <h2 className="font-display text-xl text-ink">Nothing saved yet</h2>
-          <p className="mt-2 text-ink-muted">
-            Save a scholarship from your feed or discover to track it here.
-          </p>
-          <div className="mt-5">
-            <Button asChild>
-              <Link href="/discover">
-                Browse all <ArrowRight className="size-4" strokeWidth={2} />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {COLUMNS.map((col) => {
-            const colItems = items.filter((s) => s.status === col.status);
-            return (
-              <div
-                key={col.status}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setOverCol(col.status);
-                }}
-                onDragLeave={() => setOverCol((c) => (c === col.status ? null : c))}
-                onDrop={() => onDrop(col.status)}
-                className={`rounded-[16px] border border-[var(--color-border)] bg-paper-warm/40 p-3 transition-colors duration-150 ${
-                  overCol === col.status ? "ring-2 ring-[var(--color-ring)] bg-paper-warm" : ""
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between gap-2 px-1">
-                  <h2 className="font-display text-sm uppercase tracking-wider text-ink-muted">
-                    {col.label}
-                  </h2>
-                  <Badge tone={col.tone}>{colItems.length}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {colItems.map((s) => (
-                    <KanbanCard
-                      key={s.scholarship_id}
-                      saved={s}
-                      dragging={draggingId === s.scholarship_id}
-                      onDragStart={() => setDraggingId(s.scholarship_id)}
-                      onDragEnd={() => {
-                        setDraggingId(null);
-                        setOverCol(null);
-                      }}
-                      onRemove={() => remove.mutate(s.scholarship_id)}
-                    />
-                  ))}
-                  {colItems.length === 0 ? (
-                    <p className="px-2 py-4 text-center text-xs text-ink-subtle">Empty</p>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function KanbanCard({
-  saved,
-  dragging,
-  onDragStart,
-  onDragEnd,
-  onRemove,
-}: {
-  saved: SavedOpportunity;
-  dragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onRemove: () => void;
-}) {
-  const s = saved.scholarship;
-  const dl = s.deadline ? formatDeadline(s.deadline) : null;
-  return (
-    <Card
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={`cursor-grab active:cursor-grabbing ${
-        dragging ? "opacity-50 ring-2 ring-[var(--color-ring)]" : ""
-      }`}
-    >
-      <CardBody className="p-3">
-        <div className="flex items-start gap-2">
-          <GripVertical
-            className="mt-1 size-4 shrink-0 text-ink-subtle"
-            strokeWidth={2}
-            aria-hidden
+      <section className="mt-6">
+        {savedQ.isLoading ? (
+          <ul className="space-y-3" aria-busy>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <li key={i}>
+                <Skeleton className="h-[112px] w-full rounded-[18px]" />
+              </li>
+            ))}
+          </ul>
+        ) : savedQ.isError ? (
+          <ErrorState
+            title="Couldn't load your saved list."
+            description="Check your connection, then retry."
+            action={<Button onClick={() => savedQ.refetch()}>Retry</Button>}
           />
-          <div className="flex-1 min-w-0 space-y-2">
-            <Link
-              href={`/scholarships/${s.id}`}
-              className="block font-display text-sm text-ink hover:underline underline-offset-4 line-clamp-2"
-            >
-              {s.title}
-            </Link>
-            <p className="truncate text-xs text-ink-muted">{s.provider}</p>
-            {dl ? (
-              <Badge
-                tone={
-                  dl.tone === "urgent"
-                    ? "caution"
-                    : dl.tone === "passed"
-                      ? "danger"
-                      : "neutral"
-                }
-              >
-                {dl.label}
-              </Badge>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label="Remove"
-            className="rounded p-1 text-ink-subtle hover:bg-paper-warm hover:text-danger"
-          >
-            <Trash2 className="size-3.5" strokeWidth={2} />
-          </button>
-        </div>
-      </CardBody>
-    </Card>
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            icon={<Bookmark className="size-8" strokeWidth={1.5} />}
+            title="Nothing saved yet."
+            description="Use the save icon on any scholarship to bookmark it for later."
+            action={
+              <Button asChild>
+                <Link href="/discover">Browse scholarships</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <ul data-testid="saved-list" className="space-y-3">
+            {sorted.map((s) => (
+              <SavedRow
+                key={s.scholarship_id}
+                saved={s}
+                onPromote={() => promote.mutate(s)}
+                onRemove={() => remove.mutate(s.scholarship_id)}
+                promoting={promote.isPending && promote.variables?.scholarship_id === s.scholarship_id}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }

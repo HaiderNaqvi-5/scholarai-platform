@@ -5,6 +5,8 @@ import { Toaster } from "sonner";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { CookieBanner } from "@/components/consent/CookieBanner";
+import { ConsentBar } from "@/components/consent/ConsentBar";
+import { OfflineBanner } from "@/components/system/OfflineBanner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -27,7 +29,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <AuthProvider>{children}</AuthProvider>
+      <OfflineBanner />
       <CookieBanner />
+      <ConsentBar />
       <Toaster
         position="bottom-right"
         toastOptions={{

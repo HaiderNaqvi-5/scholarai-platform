@@ -44,7 +44,7 @@ export default function ScholarshipsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8" data-testid="scholarships-list">
       <PageHeader
         onRefresh={() => refresh.mutate()}
         refreshing={refresh.isPending || matchQ.isFetching}
