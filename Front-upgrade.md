@@ -1,1915 +1,2646 @@
-# Front-upgrade — AidwiseAI Frontend Design Specification (v3)
+# Front-upgrade — AidwiseAI Frontend Design Specification
 
-> Prototype-ready spec for every screen, component, copy string, and interaction.
-> Target user: Pakistani MS / PhD / MBA applicant chasing fully-funded programs abroad.
-> Competitor to beat: GoScholar.ai.
-> **Public display brand: AidwiseAI.** Internal / repo brand: ScholarAI. Use **AidwiseAI** in all
-> user-facing copy, logos, and metadata. (This reconciles `frontend/CLAUDE.md`,
-> which is authoritative on brand, against the older `DESIGN_SPEC.md` "rename to ScholarAI" note.)
-
-This document supersedes `DESIGN_SPEC.md`. It is reconciled against the **actual codebase**:
-`frontend/src/app/globals.css` tokens, `components/ui/*` primitives, `components/UpgradeWall`,
-`components/shell/Sidebar`, the `lib/api/endpoints/*` modules, and the backend `StudentProfile`
-contract. Every screen section ends with a **Code map** line: the file that owns it today and
-whether the work is *new*, *rewrite*, or *extend*.
+> Purpose-built design spec. Every screen designed from intent, every state declared, every word audited.
+> Audience: a frontend engineer building AidwiseAI from cold, with no prior context.
+> Brand (public): **AidwiseAI**. Repo/internal: ScholarAI.
+> Date of authorship: 2026-05-17. Version: v4 (purpose-built rewrite).
 
 ---
 
-## Table of Contents
+## §0 Document Purpose & How to Read
 
-1. [Design System](#1-design-system)
-2. [Global Shell & Navigation](#2-global-shell--navigation)
-3. [Landing Page](#3-landing-page)
-4. [Signup & Login](#4-signup--login)
-5. [Onboarding (5 Steps)](#5-onboarding-5-steps)
-6. [Dashboard (Home)](#6-dashboard-home)
-7. [Scholarship Finder](#7-scholarship-finder)
-8. [Application Tracker (Kanban)](#8-application-tracker-kanban)
-9. [SOP Builder](#9-sop-builder)
-10. [Visa Interview Simulator](#10-visa-interview-simulator)
-11. [Upgrade Page](#11-upgrade-page)
-12. [Privacy & Consent UI](#12-privacy--consent-ui)
-13. [Shared Components](#13-shared-components)
-14. [Screen Inventory](#14-screen-inventory)
-15. [Key Copy Strings](#15-key-copy-strings)
+This document is the single source of frontend truth. It supersedes all prior frontend planning notes. It does **not** describe what currently exists in the codebase — it describes what the product **must be**. Where the spec and the code disagree, the code is wrong.
 
----
+**Reading order.**
+1. §1 (voice) and §2 (foundations) are mandatory pre-reading. Every other section assumes them.
+2. §3 (IA) gives the route map. Pick a route, jump to its §6 entry.
+3. §4 (components) is the parts list — read on-demand.
+4. §5 (flows) ties screens together. Read before building any cross-screen feature.
+5. §6 is the bulk. Each screen entry uses the same template (Purpose → Users → Backend → Anatomy → States → Interactions → Motion → Anti-slop → Copy → A11y → Responsive → Telemetry).
+6. §7–§11 are quality gates: copy register, motion spec, a11y, perf, delivery checklist.
 
-## 1. Design System
-
-The design system is **already implemented** in `frontend/src/app/globals.css` as a Tailwind 4
-`@theme` block plus three `@utility` helpers. This section documents the tokens that exist and
-flags the two gaps the Pakistan pivot needs.
-
-### 1.1 Color Palette — as defined in `globals.css @theme`
-
-```
--- Backgrounds --
---color-paper:        #F7F5F0   primary background, warm off-white   (also --color-background)
---color-paper-warm:   #F1EDE4   hover states, section fills, chips
---color-paper-dim:    #E7E1D5   dividers, progress-track, skeleton base
---color-paper-white:  #FFFDF9   card + input backgrounds
-
--- Ink (text) --
---color-ink:          #0C1117   primary text, primary button fill    (also --color-foreground)
---color-ink-strong:   #1B2633   headings, primary button hover
---color-ink-muted:    #334155   body text, secondary text
---color-ink-subtle:   #64748B   labels, captions, placeholders
-
--- Semantic --
---color-validated:      #426B5A   verified facts, eligibility confirmed, success
---color-validated-soft: #DDE9E2   validated background tint
---color-caution:        #B7791F   warnings, partial eligibility, amber
---color-caution-soft:   #F4E7CF   caution background tint
---color-danger:         #B94A48   errors, red flags, deadlines < 14 days
---color-danger-soft:    #F4D8D6   danger background tint
---color-generated:      #2E5B9A   AI-generated content, links, info
---color-generated-soft: #DCE6F4   generated background tint
-
--- Borders & Rings --
---color-border:  rgba(12,17,23,0.08)    every card / input / divider border
---color-ring:    rgba(46,91,154,0.32)   focus ring (also :focus-visible uses solid --color-generated)
-```
-
-**Gap 1 — no `gold` token.** The Pakistan pivot (Premium / Elite tier, demo banner, pricing
-emphasis) needs a gold accent. Add to `@theme`, do **not** invent it inline per-component:
-
-```
---color-gold:      #8B6914   Premium / Elite tier, demo banner, pricing emphasis
---color-gold-soft: #F5EDD6   gold background tint
-```
-
-Color discipline (per `impeccable` / `design-taste-frontend`): the palette is **Restrained** —
-tinted warm neutrals plus semantic accents used only for meaning. Gold is the one identity accent
-and must stay under ~10% of any surface. Never `#000` / `#fff`; the neutrals are already tinted
-warm. No purple, no neon, no gradient text.
-
-### 1.2 Typography
-
-```
-Display font:  Sora            weights 500 / 600 / 700   (--font-display) — all h1–h4
-Body font:     IBM Plex Sans   weights 400 / 500 / 600   (--font-sans, var --font-ui) — body, UI
-Mono font:     IBM Plex Mono   weights 400 / 500         (--font-mono) — data, route labels, kbd, step labels
-
-Loaded via next/font in app/layout.tsx. globals.css sets:
-  body            -> --font-sans, line-height 1.6, font-feature-settings "ss01" "cv11"
-  h1,h2,h3,h4     -> --font-display, letter-spacing -0.01em
-
-Type scale (Tailwind utilities in use across the codebase):
-  text-xs    12px    captions, kbd, step eyebrows, badge text
-  text-sm    14px    secondary body, helper text, nav items
-  text-[15px] 15px   default body / input text (md button, inputs)
-  text-base  16px    lead paragraphs
-  text-lg    18px    CardTitle, section sub-heads
-  text-xl    20px    UpgradeWall headline, question text
-  text-3xl   30px    page h1 (onboarding, dashboard)
-  text-[44px]/[64px] landing hero (responsive)
-```
-
-Hierarchy comes from **scale + weight contrast** (≥1.25 ratio between steps), never from a flat
-scale. Body line length capped at 65–75ch.
-
-### 1.3 Spacing & Radius
-
-```
-Spacing scale (Tailwind default 4px base): 4 8 12 16 20 24 32 40 48 64 80 96
-  Cards pad p-5 (20px). Panels / modals pad p-6–p-8. Page gutters px-5 mobile, px-6 desktop.
-
-Radius (globals.css @theme):
-  --radius-sm:    12px   buttons, inputs, chips, small controls, nav items
-  --radius-card:  16px   cards (ui/card.tsx uses rounded-[16px])
-  --radius-panel: 20px   panels, modals, large cards, UpgradeWall card
-  --radius-hero:  24px   hero card, large display surfaces
-```
-
-Vary padding for rhythm; do not apply identical padding to every block. Cards are not the default
-container — use `border-t` / `divide-y` / negative space to group data unless elevation is
-functionally needed. Never nest a card inside a card.
-
-### 1.4 Shadows
-
-```
---shadow-quiet: 0 12px 32px rgba(12,17,23,0.04)   resting cards, dropdowns
---shadow-soft:  0 20px 48px rgba(12,17,23,0.07)   hover cards, modals, active panels
-UpgradeWall card uses an inline 0 8px 30px rgba(12,17,23,0.07).
-```
-
-Shadows are wide and low-opacity, tinted toward the ink hue. No glows, no hard drop shadows.
-(Note: these differ from the old `DESIGN_SPEC.md` shadow values — `globals.css` is authoritative.)
-
-### 1.5 Buttons — `components/ui/button.tsx` (CVA, exists)
-
-```
-Component: <Button variant size asChild loading />   — rounded-[12px], tap-target (44x44 min),
-           focus-visible:ring-2 ring-[--color-ring], transition-colors 150ms, loading spinner slot.
-
-variant:
-  primary    (default)  bg-ink text-paper, hover bg-ink-strong, active bg-ink-strong
-  secondary             border + bg-paper-white text-ink, hover bg-paper-warm
-  ghost                 transparent text-ink, hover bg-paper-warm
-  danger                bg-danger text-paper-white, hover opacity-90
-  validated             bg-validated text-paper-white, hover opacity-90
-
-size:
-  sm    h-9  (36px)  px-3  text-sm
-  md    h-11 (44px)  px-4  text-[15px]   <- default
-  lg    h-12 (48px)  px-6  text-base
-  icon  size-11 (44x44)
-```
-
-**Gap 2 — no `gold` variant.** Pricing / upgrade CTAs need it. Add a `gold` variant
-(`bg-gold text-paper-white hover:opacity-90`) rather than hand-rolling gold buttons.
-The old spec's "52px hero button" maps to `size="lg"` (48px) — keep `lg`, do not add a 6th size.
-
-### 1.6 Form Inputs — `components/ui/input.tsx`, `ui/label.tsx`
-
-```
-Input:  h-11 (44px), bg-paper-white, border 1px --color-border, rounded-[12px], px-3, text-[15px],
-        placeholder text-ink-subtle. Focus: ring-2 --color-ring + border-generated.
-        Error: border-danger, helper text-danger below. Native <select> shares the same shell.
-Label:  Radix Label, sits ABOVE the input, gap-2 between label and control. Helper text-xs
-        text-ink-subtle directly under the label; error text-xs text-danger directly under input.
-```
-
-Always: label above, helper optional but present in markup, error below. Inputs ≥16px font on
-mobile to prevent iOS zoom (the `text-[15px]` is fine on desktop; bump to `text-base` < 768px).
-
-### 1.7 Cards — `components/ui/card.tsx`
-
-```
-<Card>            rounded-[16px], border 1px --color-border, bg-paper-white, transition-colors 150ms
-<CardHeader>      flex-col gap-1, p-5 pb-3
-<CardTitle>       font-display text-lg leading-tight text-ink   (renders <h3>)
-<CardDescription> text-sm text-ink-muted
-<CardBody>        p-5 pt-2
-<CardFooter>      flex items-center gap-2, p-5 pt-3
-
-Interactive card hover: shadow-soft, border-color rgba(12,17,23,0.14), translateY(-1px), 150ms.
-Apply hover ONLY to cards that navigate or expand. Static cards stay flat.
-```
-
-### 1.8 Badges & Chips — `components/ui/badge.tsx`
-
-```
-<Badge tone />   inline-flex, rounded-full, px-2.5 py-1, text-xs font-medium leading-none
-
-tone:
-  neutral   (default)  bg-paper-warm   text-ink-muted
-  validated            bg-validated-soft  text-validated
-  generated            bg-generated-soft  text-generated
-  caution              bg-caution-soft    text-caution
-  danger               bg-danger-soft     text-danger
-  ink                  bg-ink             text-paper
-```
-
-**Gap 3 — no `gold` tone.** Add `gold` (`bg-gold-soft text-gold`) for "Most popular", demo, and
-Elite-tier badges. Selectable chips (onboarding fields, finder filters) are a separate pattern:
-`h-10 rounded-full px-4`, active `bg-ink text-paper`, inactive `border + bg-paper-white`.
-
-### 1.9 Left-Border Stripes — `globals.css @utility` (exists, project-mandated)
-
-```
-.validated-stripe  border-left: 3px solid var(--color-validated)
-.generated-stripe  border-left: 3px solid var(--color-generated)
-.caution-stripe    border-left: 3px solid var(--color-caution)
-```
-
-These distinguish **validated facts** from **AI-generated content** and are a **PR-blocking
-requirement** in `frontend/CLAUDE.md` (design rule 1). They are a deliberate, semantic exception
-to the general "no side-stripe borders" guidance: paired with a full border + background tint,
-they carry meaning, not decoration. Usage:
-- `validated-stripe` + `validated-soft` bg + "Verified" badge + source link — for scholarship
-  facts (deadlines, amounts, eligibility).
-- `generated-stripe` + `generated-soft` bg + 14px Lucide `Sparkles` + one-line provenance — for
-  AI output (SOP draft, match reasons, interview feedback).
-- `caution-stripe` + `caution-soft` bg — for warnings (missing field, near deadline, AI disclaimer).
-Never mix validated and generated inside one paragraph.
-
-### 1.10 Icons — Lucide only
-
-Lucide React SVG icons exclusively. **No emoji as UI chrome** (PR-blocking). Emoji is permitted
-only inside *content* — country flags that arrive in scholarship data. Sizes: 16px inline, 18px
-nav, 20px buttons, 24px section headers. `strokeWidth` standardized at 1.75 (nav) / 2 (actions).
-
-Key icons in use: `Search` `GraduationCap` `Compass` `Bookmark` `FileText` `Mic` `MapPin`
-`Calendar` `CheckCircle` `Check` `AlertTriangle` `Lock` `Sparkles` `Trophy` `ArrowRight`
-`ChevronRight` `X` `Plus` `GripVertical` `LayoutDashboard` `Star` `User` `Settings` `LogOut`
-`ClipboardCheck` `GaugeCircle` `Database` `ListChecks` `Users` `ScrollText`.
-
-### 1.11 Motion
-
-Micro-interactions 150–300ms, ease-out (cubic-bezier(0.16,1,0.3,1)). Animate only `transform`
-and `opacity` — never layout properties. No bounce, no elastic. Onboarding step changes and
-feedback-panel reveals use a slide via `transform: translateX`. `prefers-reduced-motion` is
-respected globally in `globals.css` (durations forced to 0.01ms) — every animation must degrade
-to an instant state. No streaming-text theatre on REST data.
+**Conventions.**
+- Code identifiers are `inline`. Token names are `--like-this`. Routes are `/like/this`. Components are `PascalCase`.
+- Measurements without units are pixels.
+- "Locked" = freemium-paywalled. "Verified" = backend-validated structured data. "Generated" = AI-drafted prose.
+- All copy quoted in this doc is verbatim production copy unless prefixed `e.g.`.
 
 ---
 
-## 2. Global Shell & Navigation
+## §1 Brand Voice & Anti-Slop Charter
 
-### 2.1 AppShell — `components/shell/AppShell.tsx`
+### 1.1 Voice
 
+AidwiseAI speaks like a senior scholarship advisor in a university common room: **plain, grounded, specific, calm**. Never breathless. Never anthropomorphic about the model. Never apologetic. Names actions, not technologies.
+
+**Four voice principles.**
+
+1. **Specific over generic.** Replace adjectives with numbers and proper nouns. "47 fully-funded master's programs in the UK" beats "many scholarships". "Drafting your SOP — 4 paragraphs left" beats "AI is working its magic".
+2. **Name the action, not the technology.** "Generate matches" not "AI-powered match". "Draft your SOP" not "AI essay assistant". The user does not care which model runs.
+3. **No theatre.** No fake progress, no "thinking…", no shimmer-while-empty, no anthropomorphism ("I'm working on it"). Real progress or real silence.
+4. **Pakistan-grounded.** Use NUST, LUMS, FAST-NUCES, IBA, HEC, Chevening, Fulbright, DAAD, Commonwealth as default examples. Never Stanford / MIT / Harvard as filler.
+
+### 1.2 Tense, person, register
+
+- Second person (you / your) for user-facing copy. First-person plural (we) only in legal / explicitly editorial contexts.
+- Present tense for state ("Your trial ends in 4 days"). Imperative for actions ("Add a scholarship").
+- Sentence case for everything except brand names. Never Title Case For UI Strings.
+- Numbers as digits from 1 onward (1, 2, 7, 42, 1,500). Spell out "one" only when used as a pronoun ("only one left").
+
+### 1.3 Global ban ledger (every screen inherits)
+
+**Banned phrases.** `Unlock`, `Unleash`, `Magic`, `Magical`, `AI is thinking`, `AI is generating`, `Powered by AI`, `Revolutionary`, `Game-changing`, `Seamlessly`, `Leverage`, `Synergize`, `Next-generation`, `World-class`, `Cutting-edge`, `Reimagined`, `Reinvented`, `Smart` (as adjective for software), `Effortless`, `Just a moment`, `Hang tight`.
+
+**Banned visual.** Gradient mesh background, neon glow, animated gradient text, blob shapes, sparkle particles, hand-drawn arrows, sparkle iconography, "as seen on" logo wall without source link, 3D-render hero images, glassmorphism on the page background, blur over a busy background.
+
+**Banned motion.** Bounce on hover, scale-up on hover that shifts layout, parallax on scroll, marquee logo strips, auto-play carousels, fake typewriter on static text, particle backgrounds.
+
+**Banned components.** Emoji-as-icon (🚀 ✨ 🎉 🔥 ⚡), spinner-per-card, infinite-scroll without pagination fallback, modal-stacking more than 1 deep, full-page loaders on route change after first paint, toast-stacks more than 3 deep.
+
+**Banned copy patterns.** Passive voice on CTAs ("Your matches will be loaded" → use "Show my matches"). Apology-as-microcopy ("Sorry we couldn't…"). Anthropomorphism ("Our AI thinks…"). Generic empty states ("No data" → name what's missing).
+
+### 1.4 Allowed exemplars
+
+| Bad (banned)                                  | Good (replace with)                                                    |
+|-----------------------------------------------|------------------------------------------------------------------------|
+| "Unlock premium scholarships"                 | "See all 47 matches with Pro"                                          |
+| "AI is generating your SOP…"                  | "Drafting paragraph 2 of 5"                                            |
+| "Hang tight while we work our magic ✨"        | "Searching 30 universities. ~15 seconds."                              |
+| "Powered by AI"                               | (delete; the user does not care)                                       |
+| "Effortlessly track your applications"        | "Track 6 applications across 6 stages"                                 |
+| "Seamlessly integrate with…"                  | (delete; describe the integration instead)                             |
+| "No data"                                     | "No applications yet. Add your first."                                 |
+
+### 1.5 Per-screen ban-list discipline
+
+Every §6 entry adds **3–5 surface-specific bans** beyond the global ledger. The SOP builder bans `AI is writing`, `Generating brilliance`, spinner-per-paragraph. The Visa simulator bans `Interview Coach AI`, applause-emoji on scores, country-flag emoji. The Tracker bans `Smart pipeline`, animated trophy on accepted column.
+
+---
+
+## §2 Design Foundations
+
+### 2.1 Color System (Premium Cultural)
+
+The system reads as a heritage scholarship publication — ivory paper, ink-deep print, lapis serif accents, gold leaf for premium, sindoor for urgency. One accent per screen. Color carries semantic weight (validated, generated, caution, danger); it is never decoration.
+
+**Token table.**
+
+| Token              | Hex / value                            | Role                                                    |
+|--------------------|----------------------------------------|---------------------------------------------------------|
+| `--ivory`          | `#FBF7EE`                              | Page background                                         |
+| `--paper-warm`     | `#F3ECDC`                              | Section fills, hover surfaces                           |
+| `--paper-edge`     | `#E5DAC2`                              | Dividers, skeleton base                                 |
+| `--paper-white`    | `#FFFDF9`                              | Card + input surface                                    |
+| `--ink-deep`       | `#0E1A1F`                              | Primary heading, primary button background              |
+| `--ink`            | `#1B2630`                              | Body heading                                            |
+| `--ink-muted`      | `#4A5663`                              | Body text                                               |
+| `--ink-subtle`    | `#6E7984`                              | Captions, placeholder, helper                           |
+| `--lapis`          | `#1B3A6B`                              | Primary action accent, link, AI-generated content       |
+| `--lapis-soft`     | `#DCE3EE`                              | Lapis tint background                                   |
+| `--gold-leaf`      | `#B08A3E`                              | Premium / Elite tier, trial countdown                   |
+| `--gold-soft`      | `#F1E6CA`                              | Gold tint background                                    |
+| `--sindoor`        | `#B94A48`                              | Destructive, deadline <14 days, errors                  |
+| `--sindoor-soft`   | `#F2D9D5`                              | Sindoor tint background                                 |
+| `--validated`      | `#426B5A`                              | Verified eligibility, success, validated data stripe    |
+| `--validated-soft` | `#DDE9E2`                              | Validated tint background                               |
+| `--generated`      | `#2E5B9A`                              | AI-drafted content stripe                               |
+| `--generated-soft` | `#DCE6F4`                              | Generated tint background                               |
+| `--caution`        | `#B7791F`                              | Warnings, partial eligibility                           |
+| `--caution-soft`   | `#F4E7CF`                              | Caution tint background                                 |
+| `--border-hair`    | `rgba(14,26,31,0.10)`                  | Card / input / divider borders                          |
+| `--border-quiet`   | `rgba(14,26,31,0.06)`                  | Subtle dividers within cards                            |
+| `--focus-ring`     | `rgba(27,58,107,0.32)`                 | Focus outline                                           |
+| `--scrim`          | `rgba(14,26,31,0.48)`                  | Modal scrim                                             |
+
+**Semantic stripes.** Validated content carries a 3px left border in `--validated`. Generated content carries a 3px left border in `--generated`. Caution carries `--caution`. Danger carries `--sindoor`. Never combine two stripes on the same card.
+
+**Color contrast.** All body text vs background ≥ 4.5:1. All UI text on accent tints ≥ 4.5:1. Verified pairs: `--ink` on `--ivory` 13.9:1, `--ink-muted` on `--ivory` 7.2:1, `--ink-subtle` on `--paper-warm` 4.6:1, `--paper-white` on `--ink-deep` 17.2:1, `--paper-white` on `--lapis` 8.1:1, `--paper-white` on `--gold-leaf` 4.6:1 (use only on chips, never body text).
+
+**Dark mode.** Out of scope for v1. Foundation reserved: `--ink-deep` becomes background, `--paper-white` becomes text. Do not ship dark mode without rerunning contrast pass on every token.
+
+### 2.2 Typography
+
+**Families.**
+- **Display:** Fraunces (variable: opsz 9..144, wght 300..700, SOFT 0..100). Italic enabled by default on display h1. Variant settings: `opsz auto` via CSS `font-optical-sizing: auto`, `SOFT 30`.
+- **Body:** Inter (variable: wght 100..900). Stylistic sets `ss01` (single-storey a) and `cv11` (tabular dotted zero in data) enabled globally on body.
+- **Data / mono:** JetBrains Mono (wght 400 / 500). Used for codes, deadlines, currencies, IDs, keyboard shortcuts, file paths in admin.
+
+**Scale.**
+
+| Token         | Size px | Line height | Use                                                     |
+|---------------|---------|-------------|---------------------------------------------------------|
+| `text-3xs`    | 11      | 1.4         | Microlabels, table headers (uppercase + 0.06em tracking) |
+| `text-2xs`    | 12      | 1.45        | Captions                                                |
+| `text-xs`     | 13      | 1.5         | Helper, badge text                                      |
+| `text-sm`     | 14      | 1.55        | Card descriptions, dense UI                             |
+| `text-base`   | 15      | 1.65        | Body                                                    |
+| `text-md`     | 17      | 1.55        | Card title, sub-heads                                   |
+| `text-lg`     | 20      | 1.4         | Section heads                                           |
+| `text-xl`     | 24      | 1.3         | Pricing tier titles                                     |
+| `text-2xl`    | 32      | 1.2         | Page h1 (interior pages)                                |
+| `text-3xl`    | 44      | 1.1         | Marketing h1                                            |
+| `text-4xl`    | 56      | 1.05        | Marketing hero only                                     |
+
+**Tracking.** Display sizes (24+) tracking `-0.02em`. Body `-0.005em`. Microlabels `+0.06em`. Mono `0`.
+
+**Pairings.**
+- Marketing h1: Fraunces 56 italic 400 + Inter 17 400 lede.
+- Interior h1: Fraunces 32 roman 500 + Inter 15 400.
+- Card title: Inter 17 600 (Fraunces reserved for editorial moments only; do not use as card title default).
+- Data / numerals: JetBrains Mono 14, tabular figures on (`font-variant-numeric: tabular-nums`).
+
+**Italics policy.** Fraunces italic carries editorial weight. Use it for hero h1, blockquotes from policy docs, scholarship-name headers on detail page. Never use italic for inline emphasis (use weight 600 instead).
+
+### 2.3 Spacing, Radius, Shadow, Border
+
+**Spacing scale.** 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48 / 64 / 96. Page gutters: 20 mobile, 24 tablet, 32 desktop. Card padding: 20. Panel padding: 24–32. Section vertical rhythm: 48 mobile, 64 tablet, 96 desktop.
+
+**Radius.**
+- Input / chip / pill: 10
+- Button: 12
+- Card: 18
+- Panel: 22
+- Hero card / Marketing surface: 28
+- Modal: 22
+
+Never mix radii on adjacent surfaces. A button inside a card is 12 inside 18 — that is the only nesting rule.
+
+**Shadow.**
+- `--shadow-hairline`: `inset 0 0 0 1px var(--border-hair)`. Default on all surfaces.
+- `--shadow-lift`: `0 1px 2px rgba(14,26,31,0.04), 0 8px 24px -12px rgba(14,26,31,0.10)`. On hover for cards.
+- `--shadow-raised`: `0 12px 32px -16px rgba(14,26,31,0.18)`. On popovers, modal, command-K palette.
+
+**No glow.** No coloured shadow. No `box-shadow: 0 0 40px var(--accent)`. Shadow only adds vertical depth in neutral.
+
+**Border.**
+- Default border on cards / inputs: 1px solid `--border-hair`.
+- Divider within a card: 1px solid `--border-quiet`.
+- Validated stripe: 3px solid `--validated` on left edge only.
+- Generated stripe: 3px solid `--generated` on left edge only.
+- Focus: 2px solid `--focus-ring`, offset 2px, never coloured by component.
+
+### 2.4 Motion Principles
+
+Motion exists to clarify state, not to entertain. Three durations, two easings, one principle.
+
+**Durations.**
+- `--motion-micro` 90ms — hover color/opacity only.
+- `--motion-enter` 180ms — element enters viewport, modal opens, popover appears.
+- `--motion-exit` 140ms — element leaves, modal closes.
+- `--motion-layout` 220ms — list reorder, Kanban move, accordion expand.
+
+**Easings.**
+- `--ease-out`: `cubic-bezier(0.22, 1, 0.36, 1)`. Default for enter, layout.
+- `--ease-in`: `cubic-bezier(0.32, 0, 0.67, 0)`. Default for exit.
+
+**Principle.** Animate `transform` and `opacity`. Never animate `width`, `height`, `top`, `left`, `margin`. Layout shifts during animation are banned.
+
+**Reduced motion.** `@media (prefers-reduced-motion: reduce)` collapses every duration > 120ms to opacity-only crossfade at 100ms. Layout reordering becomes instant. No exceptions.
+
+### 2.5 Iconography & Imagery
+
+**Icons.** Lucide-react only, stroke 1.5, sizes 16 / 20 / 24. Never filled glyphs. Never icon fonts. Never emoji as a UI element. Brand logos (NUST, LUMS, HEC, university crests) are SVG, color-tokenized to `--ink-muted` at rest and `--ink-deep` on hover.
+
+**Imagery.** Editorial photography only. Specifically: Pakistani campus exteriors, students at desks with books, hands writing in margins, university interiors (libraries, lecture halls), passport/visa documents (sanitized — no real names). Forbidden: 3D-rendered hero, gradient blob, mesh background, sparkle particle layer, AI-generated illustration, stock-image people pointing at laptops.
+
+**Image treatment.** All images grayscale-then-warmth-tinted (CSS filter `grayscale(0.15) sepia(0.05)`) to match paper warmth. Never full-color saturated photography.
+
+**Charts.** Recharts. Default palette: `--lapis`, `--gold-leaf`, `--validated`, `--sindoor`, `--ink-muted`. Never rainbow. Always include accessible tabular fallback.
+
+### 2.6 Density & Responsive Breakpoints
+
+**Breakpoints.**
+- `xs` 0–374 (small phones — keep functional but not pixel-perfect).
+- `sm` 375–767 (default mobile).
+- `md` 768–1023 (tablet portrait, sidebar drawer).
+- `lg` 1024–1279 (laptop, sidebar always visible).
+- `xl` 1280–1535 (desktop).
+- `2xl` 1536+ (max content width 1440, no wider).
+
+**Container widths.** Marketing: max 1200 with 64 side padding at xl+. Interior app: max 1280 with 32 side padding at xl+. Reading-heavy surfaces (legal viewer, SOP preview): max 720.
+
+**Density.** Default density is comfortable (44px row min). A user-toggleable compact mode (36px row) lives in `/settings` and applies to tracker tables and admin tables only — never to student core flows.
+
+### 2.7 Accessibility Floor (WCAG 2.2 AA, PDPB)
+
+Non-negotiable.
+- All interactive elements have a min hit area of 44×44.
+- All text contrasts ≥ 4.5:1 (3:1 for text ≥ 24px).
+- Focus is always visible and 2px wide.
+- Tab order matches DOM order matches visual order.
+- All form inputs have a `<label for>` (never placeholder-as-label).
+- Icon-only buttons carry `aria-label`.
+- Async status changes announce via `role="status"` live regions.
+- All images have `alt`; decorative images use `alt=""`.
+- Color is never the only signal — every color change pairs with text or icon.
+- PDPB: explicit consent before collecting marketing, behavioral analytics, or B2B sharing.
+
+---
+
+## §3 Information Architecture
+
+### 3.1 Route map (preserved)
+
+```
+Public
+  /                                  Landing
+  /booth/air-university              Booth-specific landing
+  /upgrade                           Pricing
+  /legal/[slug]                      Terms / Privacy / DPA / Cookie / Refund
+
+Auth
+  /signup                            Registration (invite-code variant via ?invite=)
+  /login                             Sign-in
+
+Onboarding
+  /onboarding                        5-step Pakistan profile
+
+Student core
+  /feed                              Dashboard home
+  /discover                          Browse all scholarships
+  /scholarships/[id]                 Scholarship detail
+  /saved                             Saved opportunities
+  /dashboard/scholarships/match      Match results (eligible/partial/stretch)
+  /tracker                           Kanban application tracker
+  /documents                         Documents list (SOPs, emails, reports)
+  /documents/[id]                    Document detail
+  /documents/sop                     SOP builder
+  /documents/professor-email         Professor inquiry email
+  /interviews                        Interviews list
+  /interviews/[id]                   Generic adaptive interview
+  /interviews/visa                   Visa interview simulator
+  /profile                           Profile editor (6 cards)
+  /settings                          Account, privacy, density, notifications
+
+Admin
+  /admin                             KPI overview
+  /admin/ingestion                   Source list
+  /admin/ingestion/[id]              Run detail
+  /admin/curation                    Record list
+  /admin/curation/[id]               Record edit
+  /admin/users                       Role + plan management
+  /admin/audit                       Audit trail
+  /admin/rec-eval                    Recommendation benchmarks
+
+Mentor
+  /mentor/queue                      Pending feedback queue
+  /mentor/documents/[id]             Mentor review form
+
+Partners
+  /partners                          Institution overview
+  /partners/universities             University list
+
+System
+  404, 500, /offline, /denied, /maintenance
+```
+
+### 3.2 Nav topology
+
+**Public pages.** `LandingNav` — horizontal: logo left, links (How it works / Scholarships / Pricing / Sign in) center-right, primary CTA (Get started) far right. Sticky after 80px scroll, then becomes 56-tall with hairline bottom border.
+
+**App shell (student / mentor / admin / partner).** `AppShell` = persistent left `Sidebar` (240 wide on lg+, drawer on md and below) + `TopBar` (60 tall, page title left, search center on lg+, avatar menu right).
+
+**Student sidebar (top → bottom).** Dashboard, Matches, Tracker, Documents, Interviews, Discover, Saved, Profile, Settings. Footer cluster: TrialBanner (if applicable), DemoBanner (if demo session), Upgrade button.
+
+**Mobile (sm).** Sidebar becomes drawer behind hamburger. Bottom tab bar replaces sidebar for primary nav: Dashboard / Matches / Tracker / Documents / More. Bottom bar is 64 tall, icons 24, labels 11.
+
+### 3.3 Role-based surfaces
+
+| Role        | Sidebar                                                       | TopBar specifics              |
+|-------------|---------------------------------------------------------------|-------------------------------|
+| student     | Dashboard, Matches, Tracker, Documents, Interviews, Discover, Saved, Profile, Settings | Plan chip (Explorer/Pro/Elite/Demo) |
+| mentor      | Queue, Profile, Settings                                       | Queue count badge             |
+| admin       | Overview, Users, Ingestion, Curation, Audit, Rec-Eval, Settings | KPI status dot                |
+| partner     | Partners, Universities, Settings                              | Institution name              |
+
+Cross-role nav is forbidden. A student never sees admin links, even if cookied as multi-role. Role mismatch returns to `/feed` with a toast.
+
+---
+
+## §4 Shared Component Inventory
+
+### 4.1 Atomic
+
+- **Button** — variants `primary` (ink-deep bg, paper-white text), `secondary` (paper-white bg, ink-deep text, 1px border), `ghost` (transparent, ink-muted text, hover paper-warm bg), `danger` (sindoor bg). Sizes `sm 36` / `md 44` / `lg 52`. Loading state replaces label with 18px spinner; button disabled. Min hit 44×44.
+- **IconButton** — square, 44×44, transparent → paper-warm hover. Carries `aria-label`.
+- **Input** — h44, 1px border, 12px radius, 15px text, placeholder `--ink-subtle`. Focus: ring 2px `--focus-ring`, no border color change.
+- **Textarea** — same as Input, auto-grows 4–16 rows, monospace optional for code/data.
+- **Select** — Radix Select; chevron 16, options list radius 18, max 320 wide, hairline shadow.
+- **Checkbox / Radio** — 20×20, 6px radius, validated check.
+- **Switch** — 36×20 track, 16 thumb. Off=paper-edge, on=lapis.
+- **Chip** — h28, 10 radius, 12px text, sm 12 / 12 padding. Variants `neutral`, `validated`, `generated`, `caution`, `gold`, `sindoor`.
+- **Badge** — h20, 999 radius, 11px text uppercase tracking 0.06em.
+- **Avatar** — circle, sizes 24 / 32 / 40 / 56. Initials when no image. Background `--paper-warm`, text `--ink-deep`.
+- **Tag** — like chip but rectangular; for taxonomy.
+- **Spinner** — 18px line-circle, lapis stroke 2, never coloured by container.
+- **Skeleton** — paper-edge fill, no shimmer animation (banned theatre); subtle 1.2s opacity pulse 0.6→1 only.
+
+### 4.2 Molecular
+
+- **Card / CardHeader / CardTitle / CardBody / CardFooter** — 18 radius, 1px border, 20 pad. Hover: lift shadow + border-hair → ink-muted (only on clickable cards).
+- **Dialog / Modal** — 22 radius, max-w 560 default, 720 wide variant. Scrim 48% ink-deep. Close button top-right 44×44. Esc closes. Focus trap.
+- **Tabs** — underline variant default, 2px lapis indicator, 16 padding y, 220ms layout transition on indicator.
+- **Accordion** — 1px divider between rows, chevron right, expand collapse 220ms.
+- **Tooltip** — 8 radius, paper-white bg, hairline border, 12px text, 8 pad. Delay 400ms.
+- **Popover** — like tooltip but interactive, raised shadow, 16 pad, max-w 320.
+- **Toast (Sonner)** — bottom-right desktop, top mobile. Stack max 3. Auto-dismiss 5s, hover pauses. Variants `info`, `validated`, `caution`, `sindoor`. Each has icon + title + optional action button.
+- **Toolbar** — horizontal cluster, 1px border, 12 radius, 8 pad, used in editors (SOP).
+- **Pagination** — prev / pages / next, 36×36 squares, 1px border. Current page bg `--ink-deep`, text paper-white.
+- **EmptyState** — icon 32, title 17/600, description 14/400 ink-muted, primary CTA. Never use illustration.
+- **ErrorState** — sindoor icon 32, title 17/600 ink-deep, description 14/400 ink-muted, primary retry CTA. Inline within card or full-screen.
+- **SkeletonRow / SkeletonCard / SkeletonText** — for list, card grid, paragraph respectively.
+
+### 4.3 Organism
+
+- **AppShell** — sidebar + topbar + main. Main scrolls; sidebar and topbar do not.
+- **Sidebar** — collapsible to 64 wide (icons only) on lg between 1024–1199.
+- **TopBar** — sticky, paper-white, hairline bottom border. Page title left, search center, avatar menu right.
+- **MobileBottomTabBar** — fixed bottom, 64 tall, paper-white, hairline top border, 5 slots, current tab has 2px ink-deep top indicator.
+- **LandingNav** — public-page header.
+- **MatchCard** — scholarship match tile: provider logo 32 + title 17/600 + bucket chip + deadline mono + funding mono + footer (CTA + save).
+- **CompactScholarshipCard** — dashboard recent-matches mini variant (h96, title 15/600, deadline only).
+- **ScholarshipDetailHeader** — provider logo 56, scholarship name in Fraunces 32 italic, validated stripe, deadline + funding chips, primary CTA.
+- **CompatibilityMeter** — 5-segment horizontal bar, segments fill lapis from left, 1px gap between segments, percent label right.
+- **EligibilityMatrix** — table of requirement vs. user-state with check/cross/dash. ARIA labelled.
+- **TrackerCard** — kanban tile: 20 pad, 18 radius, scholarship title + deadline chip + checklist progress + grab handle (4-dot lucide GripVertical).
+- **TrackerBoard** — 6 columns, horizontal scroll on tablet down, native HTML5 DnD.
+- **ChecklistPanel** — collapsible 14-item list with checkbox + label + optional info icon (hover tooltip).
+- **AddApplicationDialog** — modal with scholarship picker (autocomplete from match results) + stage select + deadline date.
+- **PricingCard** — tier name (Fraunces 24 italic on Pro+, roman on Explorer), price mono 32 + period, feature list 8 max, CTA.
+- **CurrencySwitcher** — select with 5 ISO codes; persists to localStorage `aidwise.currency`.
+- **WaitlistForm** — accordion within pricing card: email + selected plan → POST.
+- **PaymentMethods** — block listing JazzCash, Easypaisa, IBAN, mailto. Each method = label + value + copy-to-clipboard button.
+- **UpgradeWall** — overlay or inline; consumes 402 `detail.message` verbatim. Two variants: `full` (blocks the surface) and `inline` (replaces an item slot with locked placeholder).
+- **CookieBanner** — bottom sheet on first visit, 3 buttons (Accept all / Reject non-essential / Customize). Persists choice.
+- **ConsentBar** — sticky bottom on `/legal/[slug]` when version mismatch; "I agree, version 1.0" button.
+- **TrialBanner** — sidebar footer card, gold-soft bg, gold-leaf text, mono countdown.
+- **TrialExpiredBanner** — full-width sticky banner inside AppShell main, gold-leaf bg, ink-deep text, primary "See pricing" CTA.
+- **DemoBanner** — sidebar footer when `session.demo === true`, ink-deep bg, paper-white text, mono "DEMO" tag.
+- **ComingSoon** — pill badge: amber=Q2, sky=Q3, violet=Q4, stone=TBD (use validated/lapis/caution/ink-muted soft tints in this palette).
+- **QuestionCard** — visa interview Q&A: question text 17, mic + text input toggle, submit + skip footer.
+- **FeedbackPanel** — rubric scores (5 categories), each row = label + 5-segment bar + numeric score 0–10 mono.
+- **SummaryRadar** — Recharts radar with 5 axes, single series, ink color, no fill (1px outline only).
+- **SessionSummary** — interview close-out: transcript preview + download CTA + share CTA (Elite only).
+- **SetupScreen** — country tile grid (4 across desktop, 2 mobile), tile = flag-free, country name 17, university count mono 13, hover paper-warm.
+- **RoleGuard** — server-side gate; on mismatch redirects to `/feed` (student) or `/denied`.
+
+### 4.4 Behavior contracts (cross-component rules)
+
+- Lists never spinner-per-item. One skeleton on first load, optimistic updates after.
+- Mutations are optimistic where reversible (toggle save, change tracker stage, check checklist item). On error, rollback + toast.
+- Modals never stack >1 deep. Confirmation inside a modal uses inline state, not a second modal.
+- Toasts never replace inline error. Inline error is primary; toast is supplemental.
+- 402 plan-required is the only error that renders as a feature-blocking overlay. All other errors render inline.
+
+---
+
+## §5 User Flows
+
+### 5.1 Booth walk-by → first match (≤3 minutes)
+
+Goal: a student scans the QR at the Air University booth and lands on `/signup?invite=AIRU2026`, gets to one validated match in ≤3 minutes.
+
+```
+QR scan → /booth/air-university (10s glance)
+  → "Get my matches" CTA
+  → /signup?invite=AIRU2026 (60s)
+    pre-filled invite code chip, PDPB consent checkbox required
+  → /onboarding (90s, 5 steps, defaults filled aggressively)
+  → /dashboard/scholarships/match (1s)
+    skeleton 600ms → 1 eligible + 1 partial + 1 stretch
+```
+
+**Friction audit.**
+- Step 1: invite chip visible above email field — no extra typing.
+- Step 2: GPA scale auto-detects (4.0 / 5.0 / first-class / percentage) from a single number.
+- Step 3: target country defaults to the most-requested in the cohort (UK).
+- Step 4: degree subject is a free-text with autocomplete from a 200-term list, not a select with 2,000 options.
+- Step 5: financial context is one slider (0–PKR 5M/year budget), not a form.
+- Result page renders eligible match first, partial second. No tabs on first paint — they appear after first scroll.
+
+### 5.2 Returning student → tracker → SOP draft
+
+Goal: a user with an existing match adds a scholarship to tracker and drafts an SOP in one session.
+
+```
+/feed → recent matches block → click match card
+  → /scholarships/[id] (detail)
+  → "Add to tracker" → AddApplicationDialog
+    auto-fills scholarship, prompts stage (default Wishlist), deadline pre-filled
+  → /tracker (tile appears in Wishlist column, optimistic)
+  → click tile → drawer opens with checklist
+  → "Draft SOP" link in checklist → /documents/sop?scholarship=[id]
+  → SOP builder pre-fills program + provider + deadline
+  → draft generates in 3–8s (progress: "Drafting paragraph N of 5")
+  → preview opens right panel
+  → save → /documents (toast: "SOP saved as draft")
+```
+
+**Friction audit.** No copy-paste between screens. Deep links carry scholarship context. Drawer-based checklist means no full-page navigation interruption.
+
+### 5.3 Freemium gate → upgrade decision
+
+Goal: a free user hits a 402 plan-required at match #4 and either upgrades or chooses to wait.
+
+```
+/dashboard/scholarships/match (showing 3 unlocked + N locked placeholders)
+  → click locked item → UpgradeWall (inline) renders 402 `detail.message`
+    "See all 47 matches with Pro (PKR 2,999/mo)"
+  → "See pricing" → /upgrade
+    4 tiers, comparison table, currency switcher
+  → "Start Pro trial" (no payment yet)
+    → POST /waitlist with plan=pro → confirmation toast
+    → return path: /dashboard/scholarships/match
+```
+
+**Friction audit.** UpgradeWall copy is backend-driven and specific. No interstitial. Pricing currency persists. Waitlist is a single email — no payment in v1.
+
+### 5.4 Privacy + consent
+
+Goal: a user reviews policy, grants consent, opts in/out of marketing.
+
+```
+First visit → CookieBanner bottom sheet
+  → "Customize" → CookiePreferences modal (4 toggles: essential always on)
+  → save → banner dismisses
+
+/signup → PDPB consent checkbox (v1.0 doc hash logged)
+/legal/privacy → ConsentBar appears if version mismatch
+  → "I agree, version 1.0" → POST /privacy/consent → bar dismisses
+
+/settings → Privacy panel
+  → Marketing emails toggle
+  → B2B share consent toggle (Pro+)
+  → "Export my data" → POST /privacy/data-export → status card
+  → "Delete account" → typed-confirm dialog → POST /privacy/account-deletion
+```
+
+### 5.5 Trial countdown → expiry → recovery
+
+```
+Signup with AIRU2026 → plan=pro + plan_expires_at=now+30d
+  → TrialBanner in sidebar footer: "Pro trial — 30 days left"
+  → daily countdown, color-shift at <7 days (gold-leaf bg)
+  → at day 0: trial expires (Celery beat flips to free)
+  → on next login: TrialExpiredBanner sticky in AppShell
+    "Your Pro trial ended. See pricing to keep Pro features."
+  → "See pricing" → /upgrade
+  → "Keep using free" → banner dismisses for 7 days, returns
+```
+
+### 5.6 Visa interview practice → summary → share
+
+```
+/interviews/visa → SetupScreen (country tile grid)
+  → pick UK → POST /interviews/visa/start (session created)
+  → QuestionCard renders Q1; user answers (text or mic)
+  → submit → POST /interviews/visa/{id}/answer
+  → FeedbackPanel slides in right (study mode) OR
+    next question loads immediately (exam mode)
+  → after Q3 free / Q15 elite: SessionSummary
+    SummaryRadar + transcript download + share (Elite)
+  → "Practice again" returns to SetupScreen with last country pre-selected
+```
+
+---
+
+## §6 Screen Specifications
+
+### 6.1 `/` — Landing
+
+**Purpose.** Convert a Pakistani student visiting AidwiseAI for the first time into a signup within 90 seconds.
+
+**Users + Entry.** First-time visitor (organic, referral, paid). Entry: external link, search, friend referral. Next: `/signup` (primary) or `/booth/air-university` if QR-routed.
+
+**Backend contract.** No auth. `GET /api/v1/scholarships?tier=standard&limit=6` for featured scholarships block. Public.
+
+**Anatomy.**
+```
++-------------------------------------------------------+
+| LandingNav (sticky after 80px)                        |
++-------------------------------------------------------+
+| Hero: Fraunces h1 italic 56 / Inter lede 17 / 2 CTAs  |
+|       3 stat chips below CTAs (mono)                  |
++-------------------------------------------------------+
+| Problem section: 3-card grid (Visa / Funding / SOP)   |
++-------------------------------------------------------+
+| How it works: 4 numbered steps, horizontal            |
++-------------------------------------------------------+
+| Featured scholarships: 6 CompactScholarshipCards      |
++-------------------------------------------------------+
+| Visa interview callout: split, image left, copy right |
++-------------------------------------------------------+
+| Pricing teaser: 3 PricingCards (Explorer/Pro/Elite)   |
++-------------------------------------------------------+
+| Footer: 4 columns + legal links + brand mark          |
++-------------------------------------------------------+
+```
+
+**States.**
+- Empty: never (page is static + 6 scholarships always available; if API fails, show fallback editorial copy).
+- Loading: SSR — no client-side loading. Featured scholarships block uses skeleton on hydration if revalidated.
+- Loaded: golden path.
+- Processing: not applicable.
+- Error: if `/scholarships` 5xx, featured block renders 6 editorial placeholders with provider names (Chevening / Fulbright / DAAD / Commonwealth / HEC Overseas / Erasmus Mundus) and "Browse all" CTA to `/discover` (post-signup).
+- Success: not applicable.
+- Locked: not applicable.
+
+**Interactions.** Nav links smooth-scroll to in-page anchors on `/`. Primary CTA "Get started" → `/signup`. Secondary "See scholarships" → `/discover` (gated; redirects to signup with `?next=/discover`).
+
+**Motion.** Hero h1 fades in 220ms on load (no slide). Stat chips count up from 0 once (180ms ease-out, single play). Featured cards fade in stagger 60ms apart on viewport intersection. No parallax.
+
+**Anti-slop check.**
+- Banned: hero gradient blob bg; "Revolutionary scholarship platform"; sparkle icon next to "AI-powered"; auto-scroll carousel of testimonials.
+- Allowed: "Find your funded master's in 7 minutes."; "47 universities. 20 active scholarships. 70 visa questions."; named provider logos with source links.
+
+**Copy strings.**
+- H1: "Funded master's degrees, found for you."
+- Lede: "AidwiseAI matches Pakistani students with fully-funded scholarships in the UK, US, Canada, Germany, and Australia."
+- Primary CTA: "Get started — free"
+- Secondary CTA: "See how it works"
+- Stat chips: "47 universities", "20 scholarships live", "70 visa questions"
+- Problem h2: "Three things between you and a funded place."
+- How-it-works h2: "How AidwiseAI works."
+- Featured h2: "Live scholarships."
+- Pricing teaser h2: "Start free. Upgrade when you're ready."
+- Footer brand line: "AidwiseAI — built for Pakistani applicants."
+
+**Accessibility.** Hero h1 is the single `<h1>`. Section headings `<h2>`. Stat chips are decorative — same data appears as text inside the problem section. CTAs have descriptive labels (not "click here"). Featured card list uses `<ul role="list">` with `<li>` per scholarship.
+
+**Responsive.**
+- 375: hero h1 32, single column, stat chips wrap to 3 rows.
+- 768: hero h1 44, two-column problem section.
+- 1024: hero h1 56, full grid layout.
+- 1440: container caps at 1200.
+
+**Telemetry.** `landing.view`, `landing.cta_primary_click`, `landing.cta_secondary_click`, `landing.featured_card_click {scholarship_id}`, `landing.scroll_depth {25|50|75|100}`.
+
+---
+
+### 6.2 `/booth/air-university` — Booth Landing
+
+**Purpose.** Convert a QR-scanning student standing at the AidwiseAI booth into a signup with invite code pre-applied, in under 90 seconds.
+
+**Users + Entry.** Student physically present at Air University. Entry: QR scan of `https://aidwiseai.com/signup?invite=AIRU2026` (or direct link). Often distracted, on mobile, in a hurry.
+
+**Backend contract.** No auth. `GET /api/v1/upgrade/pricing?currency=PKR` for trial value statement.
+
+**Anatomy.**
+```
++----------------------------------------------+
+| Brand mark + "Air University" co-mark        |
++----------------------------------------------+
+| H1: "30 days of Pro, free for Air U."        |
+| Sub: invite chip "AIRU2026" + counter        |
++----------------------------------------------+
+| 3 value bullets (mono numerals)              |
++----------------------------------------------+
+| Single CTA: "Start now — 60 seconds"         |
++----------------------------------------------+
+| Trust footer: PDPB, deadline of trial window |
++----------------------------------------------+
+```
+
+**States.**
+- Empty: not applicable.
+- Loading: SSR.
+- Loaded: golden path.
+- Processing: not applicable.
+- Error: if `/upgrade/pricing` fails, render static value bullets (no live counter).
+- Success: not applicable on this page (success state is on the next page).
+- Locked: trial-window-expired — if current time > AIRU2026 `valid_until` (May 26 23:59 PKT), page replaces value statement with "Air University trial window has ended. You can still sign up for Explorer (free forever)." CTA changes to "Sign up free".
+
+**Interactions.** Single CTA. No nav. Tappable invite chip copies code to clipboard (toast: "AIRU2026 copied"). Back button warns "You'll lose the invite link — sure?" only on mobile browsers.
+
+**Motion.** None on entry. Counter chip updates once per second client-side once below 24 hours remaining; otherwise static.
+
+**Anti-slop check.**
+- Banned: animated "Limited time!" badge; countdown timer with milliseconds; balloon emoji; gradient on h1.
+- Allowed: "Trial closes May 26, 23:59 PKT — 3 days left."; single-color invite chip; named partner co-mark.
+
+**Copy strings.**
+- H1: "30 days of Pro, free for Air U."
+- Sub: "Use code AIRU2026 at signup. Closes May 26."
+- Bullets: "Match against 20 fully-funded scholarships.", "Build a Pakistan-context SOP in 5 minutes.", "Practice 70 visa questions for UK / US / CA / DE."
+- CTA: "Start now — 60 seconds"
+- Trust footer: "We follow PDPB. We never share your data without consent."
+
+**Accessibility.** Invite chip has `aria-label="Invite code AIRU2026, tap to copy"`. CTA destination announced in `aria-describedby`. Counter has `aria-live="polite"` only when <60 minutes remaining.
+
+**Responsive.**
+- 375: full-bleed single column, CTA full-width sticky bottom.
+- 768+: max-w 560 centered, CTA inline.
+
+**Telemetry.** `booth.view {invite_code}`, `booth.cta_click`, `booth.invite_copied`, `booth.expired_view`.
+
+---
+
+### 6.3 `/upgrade` — Pricing
+
+**Purpose.** Help a free or trial user choose between Explorer, Pro, Elite, or Institution and either start a waitlist or contact sales.
+
+**Users + Entry.** Free user, trial user, or curious visitor. Entry: sidebar Upgrade button, UpgradeWall CTA, landing pricing-teaser CTA, trial-expired banner. Next: waitlist form submission or `/feed`.
+
+**Backend contract.** `GET /api/v1/upgrade/pricing?currency={PKR|GBP|EUR|AED|USD}`. `POST /api/v1/waitlist` with `{plan, email}`. Institution → mailto.
+
+**Anatomy.**
 ```
 +--------------------------------------------------------+
-| TopBar  (h-16 / 64px, sticky, bg-paper-white,          |
-|          border-b 1px --color-border)                  |
-+----------+---------------------------------------------+
-| Sidebar  |  Main content area                          |
-| (w-60 /  |  bg-paper, px-6 py-8 desktop / px-4 py-6     |
-|  240px,  |  mobile. max-w content column ~960px,        |
-|  sticky, |  centered, varies per route.                 |
-|  md+)    |                                             |
-+----------+---------------------------------------------+
-
-Mobile (< 768px / md):
-  Sidebar hidden (it is md:flex). Replaced by bottom tab bar (section 2.4).
-  TopBar shows a hamburger -> full-screen overlay nav.
-  Main content px-4 py-6.
+| Page header: H1 "Pricing" + CurrencySwitcher right     |
++--------------------------------------------------------+
+| 4 PricingCards (Explorer / Pro / Elite / Institution)  |
+|   each: tier name / price / period / 6-8 features / CTA|
++--------------------------------------------------------+
+| Comparison table (collapsible on mobile)               |
+|   rows: feature, columns: tiers, cells: check / value  |
++--------------------------------------------------------+
+| FAQ accordion (6 items)                                |
++--------------------------------------------------------+
+| Footer: "Questions? partnerships@aidwiseai.pk"         |
++--------------------------------------------------------+
 ```
 
-### 2.2 Sidebar — `components/shell/Sidebar.tsx` *(rewrite — renamed Pakistan nav + 3 new items)*
+**States.**
+- Empty: not applicable.
+- Loading: skeleton — 4 card placeholders 280×420.
+- Loaded: golden path.
+- Processing: waitlist form submission spinner on button only.
+- Error: pricing fetch fails → render server-cached fallback (PKR fixed, switcher disabled, toast "Live currency rates unavailable").
+- Success: waitlist submitted — card flips to confirmation: "You're on the Pro waitlist. We'll email {email} when payment opens."
+- Locked: Institution card always available but CTA is mailto, never POST.
 
-Current sidebar code hardcodes the previous brand string — rename it to **AidwiseAI**. Current sections are generic
-("Apply / For you / Discover / Saved", "Prepare / Documents / Interviews"). The pivot relabels
-them and adds the three new student destinations.
+**Interactions.** CurrencySwitcher persists to `localStorage.aidwise.currency` and re-fetches pricing. Tier CTA opens WaitlistForm accordion within the card (not a modal). Comparison table is sticky-header on scroll. FAQ accordion: single-open.
 
-```
-Header:   AidwiseAI   (font-display text-lg tracking-tight text-ink, links to /feed)
+**Motion.** Card price re-renders crossfade 140ms on currency switch (no layout shift — width reserved with `min-w`). Accordion: 220ms ease-out height expand. Tier card hover: lift shadow only, no scale.
 
-EXPLORE                              showFor: student
-  [Home]            My Matches        -> /feed                       (G F)
-  [Search]          Find Scholarships -> /dashboard/scholarships/match
-  [Compass]         Browse All        -> /discover                   (G D)
-  [Bookmark]        Saved             -> /saved                      (G S)
+**Anti-slop check.**
+- Banned: "Most popular" badge with gradient ribbon; "Save 20%!" callout with strikethrough red; faux-3D card; "Best value" auto-highlight without explanation.
+- Allowed: "Recommended for serious applicants" (chip, neutral); strikethrough on annual price beside monthly; named features ("5 SOP drafts per month" not "Unlimited everything").
 
-APPLY                                showFor: student
-  [LayoutDashboard] Tracker           -> /dashboard/tracker
-  [FileText]        SOP Builder        -> /dashboard/documents/sop
-  [Mic]             Visa Practice      -> /dashboard/interview
+**Copy strings.**
+- H1: "Pricing"
+- Sub: "Pakistan-priced. Pay in PKR or your local currency."
+- Explorer tier: "Free — forever", CTA "Get started"
+- Pro tier: "PKR 2,999/month", CTA "Join Pro waitlist"
+- Elite tier: "PKR 6,000/month", CTA "Join Elite waitlist"
+- Institution tier: "Contact for pricing", CTA "Email partnerships"
+- Currency switcher label: "Show prices in"
+- Comparison table H2: "What you get at each tier"
+- Mailto: `partnerships@aidwiseai.pk?subject=Institution+plan+enquiry`
 
-ACCOUNT                              showFor: student
-  [User]            Profile            -> /profile
-  [Settings]        Settings           -> /settings
+**Accessibility.** Each PricingCard is a region with `aria-labelledby={tierTitleId}`. Comparison table has `<caption>`. Currency switcher is a `<select>` with `<label>`. Waitlist confirmation announces via `role="status"`.
 
-UPGRADE  (only when user.plan is free or pro)
-  [Star]            Go Elite           -> /upgrade        (text-gold, bg-gold-soft on active)
+**Responsive.**
+- 375: cards stack vertically, comparison table collapses to per-tier accordion.
+- 768: 2×2 card grid.
+- 1024+: 4 cards in a row.
 
-MENTOR    showFor: mentor   -> /mentor/queue (Review queue)
-ADMIN     showFor: admin    -> Overview / Ingestion / Curation / Rec eval / Users / Audit
-```
-
-States (unchanged mechanics): active `bg-paper-warm text-ink`; hover `bg-paper-warm text-ink`;
-default `text-ink-muted`. Each item `rounded-[12px] px-3 py-2 text-sm`, 18px icon strokeWidth
-1.75, optional `kbd` shortcut shown on hover. Keep the existing `hasRole(user, section.showFor)`
-filter and `usePathname` active logic.
-
-Sidebar footer *(new)*: avatar initials (32px) + name + email (text-xs ink-subtle), and a ghost
-"Sign out" button that turns danger-toned on hover.
-
-**Code map:** `components/shell/Sidebar.tsx` — rewrite (section labels, 3 new links, Upgrade
-group, footer). `AGENTS.md` note: read `node_modules/next/dist/docs/` before route work.
-
-### 2.3 TopBar — `components/shell/TopBar.tsx` *(extend)*
-
-```
-Left:    Search trigger — pill, h-9, bg-paper-warm, border 1px, 320px wide on desktop.
-         "Search scholarships..."  +  kbd "/"  hint.  Press / focuses it anywhere (rule 6).
-Center:  empty on student; page title on admin.
-Right:   [Bell] (admin only, alert badge)  [Avatar 32px initials]  Name  v  -> dropdown
-Dropdown: Name / email -- Profile / Settings -- Sign out.
-```
-
-### 2.4 Mobile Bottom Tab Bar *(new)*
-
-```
-[Home] My Matches   [Search] Find   [LayoutDashboard] Tracker   [Mic] Visa   [User] Profile
-
-h-15 (60px), bg-paper-white, border-t 1px --color-border, iOS safe-area padding-bottom.
-Active tab: text-ink + 2px top border-ink. Inactive: text-ink-subtle. Each tab >=44x44.
-```
-
-### 2.5 Demo Mode Banner *(new)*
-
-Shown when `user.plan === 'elite'` and the account is the seeded demo persona. Sticky directly
-below TopBar, dismissible (dismissal persisted to `localStorage` key
-`grantpath.demo_banner_dismissed`).
-
-```
-+---------------------------------------------------------------------+
-| [Star]  Demo mode — all Elite features unlocked.                    |
-|         In production: Pro PKR 2,499/mo  ·  Elite PKR 7,999/mo  [X]  |
-+---------------------------------------------------------------------+
-bg-gold-soft, border-b 1px rgba(139,105,20,0.2), text-gold text-sm font-medium, py-2.5 px-6.
-[X]: ghost icon button 32x32.
-```
-
-**Code map:** `components/shell/TopBar.tsx` extend; new `components/shell/BottomTabs.tsx`,
-`components/shell/DemoBanner.tsx`.
+**Telemetry.** `upgrade.view`, `upgrade.currency_switch {from, to}`, `upgrade.cta_click {tier}`, `upgrade.waitlist_submit {tier}`, `upgrade.institution_email_click`, `upgrade.faq_open {id}`.
 
 ---
 
-## 3. Landing Page
+### 6.4 `/legal/[slug]` — Legal Viewer
 
-**Route:** `/` — `frontend/src/app/page.tsx` *(rewrite)*. Full-width, no sidebar, sections
-centered at max-w ~1100px. **Goal:** convert a Pakistani student to signup with one CTA:
-"Find My Scholarships →". The page does **not** auto-redirect logged-in users.
+**Purpose.** Display a legal document (Terms, Privacy, DPA, Cookie Policy, Refund) and capture explicit consent on version mismatch.
 
-Current state: a generic three-pillar landing ("For grad school applicants", "Canada-first")
-that hardcodes the previous brand string in code; rename it to AidwiseAI and replace the body below.
+**Users + Entry.** Any user, often during signup or settings flow. Entry: footer links, signup form link, settings privacy panel, ConsentBar "Read full doc".
 
-### 3.1 Landing Nav
+**Backend contract.** `GET /api/v1/privacy/legal/{slug}` → `{slug, version, title, body_md, effective_at, body_sha256}`. `POST /api/v1/privacy/consent` with `{slug, version, body_sha256}`.
 
+**Anatomy.**
 ```
-+-------------------------------------------------------------------+
-| AidwiseAI        How it works   Features   Pricing                |
-|                                          [Sign in]  [Find My      |
-|                                                      Scholarships]|
-+-------------------------------------------------------------------+
-bg-paper-white/95 + backdrop-blur, border-b 1px, h-16, sticky.
-Logo: font-display weight 700 "AidwiseAI". Nav links text-sm ink-muted hover ink.
-Sign in: secondary, size sm. CTA: primary, size sm. Mobile: logo + hamburger overlay.
-```
-
-### 3.2 Hero — asymmetric split (text left 55%, preview card right 45%)
-
-Per `impeccable` / `design-taste-frontend`: **no centered hero.** Left-aligned content, right
-asset, generous asymmetric whitespace. `min-h` driven by content, not `h-screen`.
-
-```
-LEFT (55%)
-  Eyebrow badge:  [flag emoji] Built for Pakistani students
-                  badge tone=neutral (bg-paper-warm), text-sm
-  Headline (font-display, ~44px mobile / ~56px desktop, weight 700, leading-[1.1]):
-    "Find fully-funded programs abroad.
-     No consultant. No fees."
-  Subheadline (text-lg ink-muted, max-w ~440px):
-    "AidwiseAI matches Pakistani students to scholarships they actually qualify for,
-     based on CGPA, IELTS, field, and target country. Then helps them apply."
-  Speed promise (text-sm ink-subtle, mt-2):
-    "Get your matches in under 60 seconds."
-  CTA group (mt-8, gap-3):
-    [Find My Scholarships ->]   Button size lg (primary)
-    Already have an account? Sign in   (text-sm link, ink-subtle)
-  Social proof strip (mt-10, flex gap-6, text-sm):
-    [CheckCircle validated] Free forever, no consultant fees
-    [CheckCircle validated] Chevening, Fulbright, DAAD and more
-    [CheckCircle validated] Visa interview prep included
-
-RIGHT (45%) — static "Your AI Match Results" preview card (no JS, loads instantly):
-  Card: bg-paper-white, border 1px, rounded-[24px], p-6, shadow-soft, max-w ~400px.
-  Header row: "Your AI Match Results"  +  "3 of 12 ->"
-  3 result rows (bg-paper rounded-[12px] p-3.5):
-    [flag] Chevening Scholarship   UK · Fully Funded · Nov 2025      96% match (validated, right)
-           [Check validated] CGPA 3.7 qualifies  [Check] IELTS 7.0 meets requirement
-    [flag] Fulbright Fellowship    USA · Fully Funded · Feb 2026     91% match
-    [flag] DAAD Scholarship        Germany · Fully Funded           87% match
-  Lock row (bg-paper-warm, border 1px dashed):
-    [Lock] + 9 more matches, 2 closing in 47 days   [Unlock with Pro ->] (gold button, sm)
-  Footnote: "Profile: NUST · CS · CGPA 3.7 · IELTS 7.0"  (text-xs ink-subtle)
-
-Mobile (< 640px): single column, preview card hidden, CTA full-width.
++----------------------------------+
+| TopBar (if auth) or LandingNav   |
++----------------------------------+
+| Doc header: title (Fraunces 32)  |
+|   version chip + effective date  |
++----------------------------------+
+| Body: rendered markdown, max-w   |
+|   720, body 17/1.7, h2 24/1.3    |
++----------------------------------+
+| ConsentBar (sticky bottom,       |
+|   only if user must consent)     |
++----------------------------------+
 ```
 
-### 3.3 Stats Bar — full-width, `bg-ink`, py-15
+**States.**
+- Empty: not applicable (every legal slug must return a document).
+- Loading: skeleton — title bar + 12 paragraph placeholders.
+- Loaded: rendered markdown.
+- Processing: consent submission — bar disables, label "Recording consent…" for ≤500ms.
+- Error: 404 slug → "Document not found." with link to footer index. 5xx → error state inline with retry.
+- Success: consent recorded — ConsentBar morphs into validated chip "You agreed to v1.0 on {date}", then dismisses after 3s.
+- Locked: not applicable.
+- Stale: version mismatch — ConsentBar appears, footer chip "Version 1.0 → 1.1 — please re-read and agree".
 
-```
-   150,000+                62%                    0
-   Pakistani students      want to study abroad   dedicated AI platforms
-   studying abroad                                for Pakistani students (until now)
+**Interactions.** Table of contents (left sidebar on lg+, accordion top on mobile). Anchor links to h2 sections. ConsentBar button always within reach (sticky). Print stylesheet available.
 
-3-col grid, centered. Numbers: font-display ~48px weight 700, color paper-white.
-Labels: text-sm rgba(255,255,255,0.6), max-w ~160px. 1px rgba(255,255,255,0.1) dividers.
-```
+**Motion.** ConsentBar slides up 220ms on first render. Section anchors smooth-scroll 200ms.
 
-### 3.4 Problem Section — 2x2 grid (not a 3-card row)
+**Anti-slop check.**
+- Banned: "TL;DR" auto-summary above legal text; emoji checkmarks beside bullet lists; collapsing main body into "Read more" accordion.
+- Allowed: per-section anchor TOC; print button; "Last updated {date}" line below title.
 
-Heading: "The study abroad process is broken for Pakistani students".
-Sub: "Every year, talented students miss life-changing opportunities for the same four reasons."
+**Copy strings.**
+- ConsentBar label: "Version {version} of {title} is in effect. Please review and agree."
+- ConsentBar button: "I agree to version {version}"
+- Consent recorded chip: "Agreed to {title} v{version} on {YYYY-MM-DD}"
+- Not-found: "We couldn't find that document. View all policies in the footer."
 
-```
-Card 1  Too expensive        Consultants charge PKR 40,000–150,000+. Most give generic
-                             advice. One wrong decision costs months.
-Card 2  Information chaos     WhatsApp groups, random YouTube videos, outdated blogs.
-                             No single source of truth for Pakistani applicants.
-Card 3  Visa rejection fear   Pakistan has some of the world's highest student visa refusal
-                             rates, yet no platform helps you prepare.
-Card 4  Currency reality      With 1 USD = 278+ PKR, every wrong application fee, wrong
-                             consultant, and wasted test attempt is expensive.
+**Accessibility.** Skip-to-content link. Section h2 ids match TOC anchors. ConsentBar has `role="region"` and `aria-label="Consent action"`. Markdown lists render as `<ul>`. Long tables get `<caption>`.
 
-Card: bg-paper-white, border 1px, rounded-[16px], p-7. Icon 32px in caution-soft tile
-(rounded-[12px]). Heading text-base weight 600. Body text-sm ink-muted.
-```
+**Responsive.**
+- 375: TOC collapses, body 16/1.7, ConsentBar full-width fixed.
+- 1024+: TOC pinned left sidebar 240, body centered max-w 720.
 
-### 3.5 How It Works — 4 horizontal steps (vertical on mobile)
-
-Heading: "From profile to visa approval. One platform, every step."
-
-```
-01 Build your profile   02 Get matched         03 Track & apply        04 Ace the visa
-Fill CGPA, IELTS,       AI matches you to      Kanban board tracks     Practice UK, USA,
-target countries,       scholarships you       every application,      Canada, Germany
-and field. Under        actually qualify       Pakistan-specific       visa interviews with
-3 minutes.              for.                   checklist included.     AI feedback.
-[User]   -> LIVE        [GraduationCap] LIVE   [LayoutDashboard] LIVE  [Mic]   -> LIVE
-
-Step number: font-display "01"–"04" in ink-subtle. Dashed 1px connectors between steps.
-"LIVE" badge: tone=validated, text-xs.
-```
-
-### 3.6 Featured Scholarships — horizontal-scroll card row
-
-Heading: "Top scholarships Pakistani students win".
-Sub: "Fully funded. Real deadlines. Open to you."
-
-```
-5 fixed-width cards (w-[220px]), horizontal scroll on mobile:
-  Chevening (UK) · Fulbright (USA) · DAAD (Germany) · Commonwealth (UK) · HEC Overseas (global)
-
-Card: bg-paper-white, border 1px, rounded-[16px], p-6. Flag emoji 32px. Name text-[15px]
-weight 600. "FULLY FUNDED" badge tone=validated. Amount text-sm ink-muted. Deadline label
-text-xs ink-subtle / value text-sm (caution if < 60 days). "Min CGPA" text-xs. "Open to PK"
-badge tone=validated. [View Details] ghost link, text-sm, generated color.
-```
-
-### 3.7 Visa Interview Callout — full-width, `bg-generated-soft`
-
-```
-[Mic 40px generated]
-"Practice your visa interview before the real one."   font-display ~28px weight 700
-"GoScholar lists visa prep as Coming Soon. We built it. UK, USA, Canada, Germany.
- AI feedback on every answer. Red-flag detection. Session summary."   text-[15px] ink-muted, max-w ~540px
-[Practice a Visa Interview, Free ->]   Button size lg (primary)
-border-y 1px rgba(46,91,154,0.15), content centered.
-```
-
-### 3.8 Pricing Teaser — 3-column card row
-
-Heading: "Free to start. Upgrade when you're ready."
-
-```
-Explorer (Free)  |  Pro (PKR 2,499/mo)  |  Elite (PKR 7,999/mo)
-Pro card highlighted: gold ring + "Most popular" badge (tone=gold).
-Under Pro:   "Less than one hour of a consultant's time per month."
-Under Elite: "For Pakistani families in the UK or UAE."
-[See full pricing ->]  link -> /upgrade
-```
-
-### 3.9 Footer — `bg-ink`
-
-```
-AidwiseAI
-Making study abroad accessible for Pakistani students.
-Student-only, we don't take money from universities.
-
-Product            Resources           Company
-Find Scholarships  Scholarship Guide   About
-Visa Practice      IELTS Tips          Contact
-SOP Builder        CGPA Converter      Privacy Policy
-Tracker            Test Prep           Terms of Service
-
------------------------------------------------------------
-Are you a university or school? Partner with us ->  (mailto:partnerships@aidwiseai.pk, text-gold)
-(c) 2026 AidwiseAI. All rights reserved.
-
-All text rgba(255,255,255,0.6); logo + name white; column headings rgba(255,255,255,0.4)
-text-xs uppercase tracking-[0.1em]; links hover rgba(255,255,255,0.9).
-```
-
-**Code map:** `frontend/src/app/page.tsx` — rewrite. New section components live alongside in
-`app/(marketing)/_components/` or `components/landing/`. LCP < 1.8s: CSS gradient + SVG only,
-no hero raster image. CTA routes to `/signup` when logged out, `/feed` when logged in.
+**Telemetry.** `legal.view {slug, version}`, `legal.consent_submitted {slug, version}`, `legal.anchor_click {anchor_id}`, `legal.print_click`.
 
 ---
 
-## 4. Signup & Login
+### 6.5 `/signup` — Registration
 
-Both pages **exist and work** (`app/signup/page.tsx`, `app/login/page.tsx`). The pivot is a
-visual pass plus copy alignment, not a rebuild.
+**Purpose.** Create an account in under 60 seconds, capturing the minimum required (email, password, PDPB consent) plus invite-code variants (cohort + B2B fields) when present.
 
-### 4.1 Signup — `/signup` *(extend)*
+**Users + Entry.** First-time user. Entry: landing CTA, booth landing CTA, /upgrade waitlist refer, organic. Next: `/onboarding`.
 
-Centered card, max-w ~420px, vertically centered, page bg-paper.
+**Backend contract.** `POST /api/v1/auth/register` with `{email, password, marketing_opt_in, consent_v, invite_code?, air_uni_uni?, air_uni_dept?, air_uni_batch?}`. Returns `{access_token, refresh_token, user}`.
 
+**Anatomy.**
 ```
-Card: bg-paper-white, border 1px, rounded-[20px], p-10, shadow-soft.
-  [AidwiseAI logo mark]   centered
-  "Create your account"           font-display text-2xl weight 700
-  "Find fully-funded programs that match your profile."   text-sm ink-muted
-
-  Full name   Input, placeholder "Zara Khan"
-  Email       Input, placeholder "zara@example.com", error "Enter a valid email address."
-  Password    Input type=password, placeholder "Min. 12 characters",
-              helper "At least 12 characters" (text-xs ink-subtle),
-              eye / eye-off visibility toggle.
-              NOTE: backend Pydantic requires >= 12 chars. Helper + client check must say 12.
-  [Create account ->]   Button primary, full-width, size lg
-
-  -------- or --------
-  [Google icon] Sign up with Google   secondary, full-width, size md
-              (placeholder, "Coming soon" tooltip on hover)
-
-  "Already have an account? Sign in ->"   text-sm centered link -> /login
-  Legal: "By creating an account, you agree to our Terms of Service and Privacy Policy."
-         text-xs ink-subtle, max-w ~300px.
++----------------------------------+
+| LandingNav (mini, no nav links)  |
++----------------------------------+
+| Left column (md+): editorial copy|
+|   "Two minutes. Then matches."  |
+|                                  |
+| Right column: form                |
+|   Invite chip (if ?invite=)      |
+|   Email                          |
+|   Password (12+ char meter)      |
+|   Air U: uni + dept + batch      |
+|     (only if invite=AIRU2026)    |
+|   PDPB consent checkbox required |
+|   Marketing opt-in checkbox      |
+|   Primary CTA                    |
+|   Sign-in link                   |
++----------------------------------+
 ```
 
-On success: route to `/onboarding`.
+**States.**
+- Empty: form pristine, CTA disabled until email + password + PDPB consent valid.
+- Loading: not applicable (server-rendered form).
+- Loaded: golden path.
+- Processing: CTA replaces label with spinner; all inputs disable; form caption "Creating your account…".
+- Error: inline per-field (email taken, password too short). Network 5xx → toast "Couldn't reach AidwiseAI. Try again." with retry.
+- Success: redirect to `/onboarding` (no celebration screen — onboarding starts immediately).
+- Locked: invite-code expired → invite chip becomes sindoor "Code AIRU2026 expired May 26. You can still sign up for Explorer." Air U fields hide.
 
-### 4.2 Login — `/login` *(extend)*
+**Interactions.** Password meter (12+ char hard minimum, +12pt for 16+, +12pt for mixed case + digit). Show/hide password toggle. Invite chip removable on click. Enter submits.
 
-Same card shell. "Welcome back" / "Sign in to your AidwiseAI account."
+**Motion.** Password meter bar fills 90ms linear. Error messages slide in 180ms from below their input. No success animation — navigation is the success signal.
 
-```
-  Email      Input
-  Password   Input type=password; row: "Password" label left, "Forgot password?" link right
-  [Sign in ->]   Button primary, full-width, size lg
-  Error (below button): caution/danger-soft block, "Invalid email or password. Try again."
-  Demo-fill buttons (keep existing): [Student demo] [Admin demo] — prefill the seeded creds.
-  "Don't have an account? Sign up ->"  -> /signup
-```
+**Anti-slop check.**
+- Banned: confetti on submit success; password strength rated "Excellent! 🔥"; faux-social signup buttons that don't work; "By signing up, you agree to..." buried in 11px gray.
+- Allowed: explicit consent checkbox with link to /legal/privacy; password meter labelled "Weak / OK / Strong"; mono "12 character minimum" helper text.
 
-Demo creds (seeded): `student@example.com` / `strongpass1`, `admin@example.com` / `strongpass1`,
-and the Pakistan persona `zara.khan@example.com` / `ScholarAI-Demo-2026!` (plan=elite).
-On success: route to `?next=` param or `/feed`.
+**Copy strings.**
+- H1 (left col): "Two minutes. Then matches."
+- Sub: "Set up your AidwiseAI account. We match you against live scholarships immediately after onboarding."
+- Email label: "Email"
+- Password label: "Password (12 characters minimum)"
+- Air U cohort: "University", "Department", "Batch year"
+- PDPB checkbox: "I have read and agree to the Privacy Notice (v1.0)."
+- Marketing checkbox: "Email me when scholarships matching my profile open (you can unsubscribe anytime)."
+- CTA: "Create account"
+- Sign-in link: "Already have an account? Sign in"
 
-**Code map:** `app/signup/page.tsx`, `app/login/page.tsx` — extend (visual + 12-char copy).
+**Accessibility.** Each field has `<label for>`. Password meter has `aria-live="polite"`. Consent checkbox is required and reads "Required, you must agree to the Privacy Notice." Errors are `<p role="alert">` beneath each input.
 
----
+**Responsive.**
+- 375: single column, editorial copy hides, form full-width.
+- 1024+: split 5/7, editorial copy 5 / form 7.
 
-## 5. Onboarding (5 Steps)
-
-**Route:** `/onboarding` — `app/onboarding/page.tsx` *(rewrite — 4 generic steps → 5 Pakistan steps)*.
-Centered card, max-w ~600px, no sidebar. **Goal:** a Pakistan-specific profile in under 3 minutes.
-
-Current state: a 4-step generic wizard (`["You","Academic","Citizenship & language","Goal"]`),
-draft autosaved to `localStorage` key `grantpath.onboarding_draft` (debounced 200ms), submitting
-to `endpoints.profile.upsert`. The rewrite keeps the autosave mechanism, the `localStorage` key,
-the `Field` / `Chip` / `ProgressDots` helpers, and the `profile.upsert` call shape — it extends
-the field set and step count.
-
-### 5.1 Backend contract — `StudentProfile` (authoritative, `extra="forbid"`)
-
-Every field below must map to a real `StudentProfile` column. The Pydantic schema **forbids
-extra keys**, so the form may not invent `full_name`, `field_tags[]`, or `language_scores[]`.
-Known canonical fields (from root `CLAUDE.md`):
-
-```
-citizenship_country_code   gpa_value          gpa_scale            target_field (single string)
-target_degree_level        target_country_code  language_test_type   language_test_score
-target_countries[]         city_of_origin     intake_target        funding_requirement
-hec_degree_level           research_publication_count  has_research_publications  degree_subject
-```
-
-`full_name` is read from / written to the `User`, not the profile. Before building, confirm the
-exact column set against `backend/app/schemas` and `lib/api/types.ts` (hand-synced mirror).
-Pakistan-only fields that have **no column** must not be collected (PDPB: no religion / politics
-/ biometric — by design).
-
-### 5.2 Progress bar (persistent across steps)
-
-```
-TOP OF PAGE (outside card):
-  "Step 1 of 5 — About You"                          "~3 min left"  (text-xs ink-subtle, right)
-  ProgressDots: 5 dots, active = wide ink pill, done = ink-muted, future = paper-dim
-  (reuse the existing ProgressDots helper; extend count 4 -> 5)
-```
-
-### 5.3 Card wrapper (all steps)
-
-```
-Card: bg-paper-white, border 1px, rounded-[20px], p-10, shadow-soft, max-w ~600px.
-  Step eyebrow: "STEP 1 OF 5"  font-mono text-xs uppercase tracking-[0.16em] ink-subtle
-  Step title:   font-display text-3xl ink
-  Step description: text-[15px] ink-muted, max-w ~440px
-  "Draft saved" indicator top-right, text-xs ink-subtle, appears ~2s after a field change.
-Footer: [<- Back] ghost (hidden/disabled on Step 1)        [Continue ->] primary
-  Continue is always enabled except where a required field is missing (Step 4 only).
-  Step 5 Continue label becomes "Find My Scholarships ->".
-Step transitions slide via translateX; respects prefers-reduced-motion.
-```
-
-### 5.4 Step 1 — About You
-
-"Tell us about yourself" / "We'll use this to personalise your scholarship matches."
-
-```
-1. Full name *           Input "Zara Khan"  (writes to User.full_name) — required
-2. City of origin        Select: Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Peshawar,
-                         Quetta, Multan, Sialkot, Hyderabad, Other  -> city_of_origin
-3. Pakistani university  Searchable dropdown, 25 pre-loaded: NUST, LUMS, FAST-NUCES, UET Lahore,
-                         IBA Karachi, QAU, COMSATS, UCP, NED, UMT, BNU, Air University, GIKI,
-                         PIEAS, FCCU, University of Karachi, University of the Punjab, SZABIST,
-                         ... + "Other" (free text). Stored on the profile's university field.
-4. Degree subject        Input free text "e.g. Computer Science, Electrical Engineering"
-                         helper "Your undergraduate major"  -> degree_subject
-5. Graduation year       Select 2018..2025 (expected)
-```
-
-### 5.5 Step 2 — Academic Record
-
-"Your academic record" / "We check this against scholarship requirements."
-
-```
-1. CGPA          two inline controls:  [number 0.0–4.0]  out of  [select scale]
-                 scale options: 4.0 (Standard) | 4.0 HEC | 5.0 | 10.0 | 100   -> gpa_value, gpa_scale
-                 LIVE CONVERSION (validated-stripe, appears ~300ms debounced after input):
-                   [Check] "Your 3.7 CGPA is approximately a 3.7 US GPA."
-                           "Equivalent to First Class Honours (UK)."
-                 (uses backend utils/cgpa_converter.py logic, surfaced via API or mirrored constants)
-2. HEC degree level   radio cards (horizontal): Bachelor's (BS/BE) | Master's (MS/MBA) | MPhil
-                      -> hec_degree_level. Default Bachelor's.
-3. Research publications   toggle "I have research publications" (off default).
-                           ON -> number input "How many peer-reviewed publications?"
-                           -> research_publication_count; has_research_publications auto-derives.
-```
-
-### 5.6 Step 3 — Test Scores
-
-"Test scores" / "All optional. Add what you have, skip what you don't."
-
-```
-1. IELTS Overall   number 0.0–9.0 step 0.5, helper "Leave blank if not taken yet"
-                   on fill -> validated-stripe: "7.0 meets the requirement for most UK / Germany /
-                   Canada scholarships in our database."
-2. TOEFL iBT       number 0–120, helper "Leave blank if not taken yet"
-3. GRE             GRE Quant (130–170), GRE Verbal (130–170)
-4. GRE waiver      toggle "I need programs that don't require GRE"; ON shows note
-                   "We'll filter out GRE-required programs in your matches."
-language_test_type / language_test_score carry whichever English test the student reports.
-Skip hint: "Not sure about your scores? Update these later from your Profile."
-```
-
-### 5.7 Step 4 — Your Goal *(only step with required gates)*
-
-"What's your goal?" / "This is what we rank scholarships against."
-
-```
-1. Target degree *      radio cards: MS (Masters) | PhD (Doctorate) | MBA (Business)
-                        -> target_degree_level. Required.
-2. Target countries *   large flag cards, 4/row desktop / 2/row mobile, multi-select:
-                        UK · USA · Canada · Germany · Australia · Ireland · Netherlands
-                        -> target_countries[] (and target_country_code = first selected, for the
-                        legacy single-value column). Selected: bg-ink/20, 2px ink border, check
-                        overlay. Validation: "Select at least one country to continue."
-3. Target field(s)      multi-select chips: Computer Science, AI/ML, Data Science / Analytics,
-                        Electrical Eng., Business, Engineering, Medicine, Other.
-                        -> target_field (joined string, matching current upsert behaviour).
-4. Funding requirement  radio cards: Fully funded only | Partial funding OK  -> funding_requirement
-5. Target intake        select: Jan 2025, Sep 2025, Jan 2026, Sep 2026, Flexible -> intake_target
-Continue disabled until target_degree set AND >=1 target country selected.
-```
-
-### 5.8 Step 5 — Financial Context
-
-"A few quick questions" / "This helps us surface relevant support options. All optional."
-
-```
-3 toggle rows (full-width, bg-paper-white, border 1px, rounded-[12px], p-4):
-  1. "Can you afford application fees?"   sub "Most universities charge $50–150 per application."
-  2. "Does your family have savings for a bank statement?"
-                                          sub "Required for UK / USA / Canada visa applications."
-  3. "Do you need a GRE fee waiver?"      sub "Some universities offer waivers on request."
-Toggle: right-aligned 44x24 pill switch. Label text-[15px] weight 500; sub text-sm ink-subtle.
-"Skip this step ->" ghost button in the footer. Bottom note: "You can update any of these later
-from your Profile." CTA: "Find My Scholarships ->" (Button size lg, full-width).
-```
-
-On submit: call `endpoints.profile.upsert(...)`, clear `grantpath.onboarding_draft`, toast
-"Profile saved.", `router.replace("/feed")` — mirrors the current submit flow.
-
-**Code map:** `app/onboarding/page.tsx` — rewrite. Keep `STORAGE_KEY`, autosave effect, `Field` /
-`Chip` / `ProgressDots`. Extend `Draft` type + `STEPS` to 5. New: searchable university combobox
-(`components/ui/combobox.tsx`), flag-card multi-select, CGPA live-conversion call.
+**Telemetry.** `signup.view {invite_code?}`, `signup.field_blur {field}`, `signup.submit_attempt`, `signup.submit_success`, `signup.submit_error {error_code}`, `signup.password_meter_max`.
 
 ---
 
-## 6. Dashboard (Home)
+### 6.6 `/login` — Sign in
 
-**Route:** `/feed` — `app/(student)/feed/page.tsx` *(extend)*. Role: student. Currently a
-recommendations list (`POST /recommendations`, `RecommendationCard`, optimistic save). The pivot
-makes it **feature-forward**: an action grid first, recommendations demoted to a secondary block.
+**Purpose.** Authenticate a returning user in under 15 seconds.
 
-### 6.1 Page header
+**Users + Entry.** Returning user. Entry: landing nav, signup "already have an account" link, expired-session redirect. Next: `/feed` or `?next=` original destination.
 
+**Backend contract.** `POST /api/v1/auth/login` with `{email, password}`. Returns tokens + user. Refresh on 401 via stored refresh token.
+
+**Anatomy.**
 ```
-"Hi, Zara."                                       font-display text-3xl weight 700
-"You have 3 deadlines in the next 60 days."        text-base ink-muted
-```
-
-### 6.2 Action Grid — primary UI, 2x2
-
-```
-+-----------------------------+  +-----------------------------+
-| [GraduationCap]             |  | [Mic]                       |
-| Find Scholarships           |  | Practice Visa Interview     |
-| Get matched to programmes   |  | UK, USA, Canada, Germany.   |
-| you actually qualify for.   |  | AI feedback on every answer.|
-|                  [ArrowRight]| |                  [ArrowRight]|
-+-----------------------------+  +-----------------------------+
-+-----------------------------+  +-----------------------------+
-| [FileText]                  |  | [LayoutDashboard]           |
-| Write Your SOP              |  | Application Tracker         |
-| AI-assisted, Pakistani      |  | Track deadlines and         |
-| context, Chevening-ready.   |  | document checklists.        |
-|                  [ArrowRight]| |                  [ArrowRight]|
-+-----------------------------+  +-----------------------------+
-
-Card: bg-paper-white, border 1px, rounded-[16px], p-6, min-h ~160px. Hover: shadow-soft,
-translateY(-2px), 150ms. Icon 24px in paper-warm tile (rounded-[12px], p-2.5). Title text-base
-weight 600 mt-3. Description text-sm ink-muted. ArrowRight 18px ink-subtle, bottom-right.
-Routes: -> /dashboard/scholarships/match · /dashboard/interview · /dashboard/documents/sop ·
-/dashboard/tracker.  Mobile: 1 column.
++----------------------------------+
+| LandingNav (mini)                |
++----------------------------------+
+| Centered form 380w               |
+|   H1 "Sign in"                   |
+|   Email                          |
+|   Password                       |
+|   Forgot password link           |
+|   Primary CTA                    |
+|   "Demo: student / admin" chips  |
+|     (dev / staging only)         |
+|   Signup link                    |
++----------------------------------+
 ```
 
-### 6.3 Incomplete Profile Nudge
+**States.**
+- Empty: pristine.
+- Loading: not applicable.
+- Loaded: golden path.
+- Processing: CTA spinner.
+- Error: 401 → inline "Email or password is incorrect."; 429 → "Too many attempts. Try again in 60 seconds." with countdown.
+- Success: redirect to `?next=` or `/feed`.
+- Locked: account-locked → "This account is under review. Email support@aidwiseai.pk."
 
-Shown only when the profile is missing `target_countries` or `gpa_value`. Rendered **above** the
-action grid.
+**Interactions.** Demo chips (visible only when `NODE_ENV !== 'production'`): tap to fill student@example.com / admin@example.com with `strongpass1`. Enter submits.
 
-```
-[AlertTriangle caution]  Complete your profile to get accurate matches
-"You're missing IELTS score and target countries."        [Complete profile ->]
-bg-caution-soft, border 1px rgba(183,121,31,0.2), rounded-[12px], p-4, text-caution.
-```
+**Motion.** Error inline message slide-in 180ms. No transition on success — navigation handles it.
 
-### 6.4 Recent Matches — secondary block
+**Anti-slop check.**
+- Banned: social login buttons that don't work; "Welcome back!" hero illustration; biometric prompt mock.
+- Allowed: dev-only demo chips; rate-limit countdown in mono; password show/hide.
 
-"Your top matches" (text-lg weight 600). Top 3 from `POST /recommendations` rendered as compact
-cards (section 13.2). Below: "See all matches ->" link to `/dashboard/scholarships/match`.
+**Copy strings.**
+- H1: "Sign in"
+- Email label: "Email"
+- Password label: "Password"
+- Forgot: "Forgot password?"
+- CTA: "Sign in"
+- Demo dev chips: "Demo: student", "Demo: admin"
+- Signup link: "New here? Create an account"
 
-### 6.5 Tracker Summary Widget
+**Accessibility.** Autocomplete `email` and `current-password`. CapsLock warning announced on password focus.
 
-Shown only when the user has tracker items; otherwise an empty-state CTA.
+**Responsive.** Single centered column at all sizes. Form scales 380 → 100% at 375.
 
-```
-"Applications in progress" (text-base weight 600)
-Stage strip: Researching (2) | Preparing (1) | Applied (0) | Decision (0)   text-sm ink-muted
-Near-deadline rows (deadline <= 30 days), danger-toned:
-  [AlertTriangle] Chevening (UK)   deadline in 12 days   3 documents missing   [Go to tracker ->]
-Empty state: "No applications tracked yet." + "Add scholarships from your matches to start
-tracking deadlines." + [Add from matches ->] -> /dashboard/scholarships/match.
-```
-
-**Code map:** `app/(student)/feed/page.tsx` — extend (action grid, nudge, tracker widget;
-recommendations move down). Action grid renders instant (static), recommendations stream below.
+**Telemetry.** `login.view`, `login.submit_attempt`, `login.submit_success`, `login.submit_error {error_code}`, `login.demo_chip_click {role}`.
 
 ---
 
-## 7. Scholarship Finder
+### 6.7 `/onboarding` — 5-step Pakistan Profile
 
-**Route:** `/dashboard/scholarships/match` — *(new page)*. Uses the **existing**
-`endpoints.scholarshipMatch.match()` module. Auto-runs the match on load from the saved profile;
-the student does not fill a form.
+**Purpose.** Capture the minimum profile to produce a useful match list, in under 3 minutes.
 
-### 7.1 Page header
+**Users + Entry.** Brand-new user post-signup. Entry: redirect from `/signup`. Next: `/dashboard/scholarships/match` (auto-generates first match).
 
+**Backend contract.** `PATCH /api/v1/profile/me` after each step (save-as-you-go). On completion `POST /api/v1/scholarships/match` triggers and result page is preloaded.
+
+**Anatomy.**
 ```
-"Scholarships matched to your profile"        font-display text-2xl weight 700
-"Based on: NUST · CS · CGPA 3.7 · IELTS 7.0 · UK, Germany · Fully funded"   text-sm ink-subtle
-  [Edit profile] ghost link -> /profile
-
-Summary bar (bg-gold-soft, border 1px rgba(139,105,20,0.2), rounded-[12px], p-4, text-gold):
-  "4 fully funded scholarships match your profile. 9 more available with Pro, including 2
-   closing in 47 days."                                          [Upgrade to Pro ->] gold btn sm
-```
-
-### 7.2 Tabs — `components/ui/tabs.tsx` (Radix, exists)
-
-```
-[ Eligible (4) ]  [ Partially Eligible (3) ]  [ Stretch (5) ]
-Active: text-ink, 2px border-bottom ink, weight 600. Inactive: text-ink-subtle. Counts inline.
-The backend match returns eligible / partial / stretch buckets (PRD §5).
++----------------------------------+
+| Progress: 5 segments, current    |
+|   filled lapis                   |
++----------------------------------+
+| Step header: "Step 2 of 5"       |
+|   H1 (Fraunces 32 italic)        |
++----------------------------------+
+| Form fields (1–4 per step)       |
++----------------------------------+
+| Footer: Back / Skip / Continue   |
++----------------------------------+
 ```
 
-### 7.3 Match card (Eligible tab)
+**5 steps.**
+1. **About you** — citizenship country code (PK default), current university (autocomplete from 25 PK unis), degree level (BS/MS/PhD/MBA select).
+2. **Academic record** — GPA value + scale auto-detect (4.0 / 5.0 / first-class / percentage), expected graduation date (month picker).
+3. **Test scores** — language test (IELTS / TOEFL / PTE / Duolingo) + score (or "haven't taken"), GRE/GMAT/SAT optional.
+4. **Your goal** — target country (multi-select from UK/US/CA/DE/AU), target degree (BS/MS/PhD/MBA), target field (autocomplete 200-term), preferred intake (Fall/Spring 2027).
+5. **Financial context** — funding requirement (single slider 0–PKR 5M/year), household income band (5 options), willing to relocate Y/N.
 
-```
-+---------------------------------------------------------------------+
-| [flag] Chevening Scholarship                       [FULLY FUNDED]   |
-|        UK Foreign, Commonwealth & Development Office                |
-| ------------------------------------------------------------------- |
-| [validated-stripe + validated-soft bg]                              |
-|   [Check] Your 3.7 CGPA from NUST is approximately a 3.7 US GPA.    |
-|           Qualifies for programs requiring min 3.0.                 |
-| [Calendar] Deadline in 47 days (Nov 2025)        GBP 18,000 / year  |
-| [CheckCircle] IELTS 7.0  [CheckCircle] Min CGPA 3.0  [GraduationCap] Masters |
-| Match reason (generated-stripe + Sparkles):                         |
-|   "Matches your CGPA, IELTS score, CS focus, and UK target."        |
-| ------------------------------------------------------------------- |
-| [View Details] secondary sm           [+ Add to Tracker] primary sm |
-+---------------------------------------------------------------------+
-Card: bg-paper-white, border 1px, rounded-[16px], p-6.
-Deadline urgency: > 60d ink-muted · 31–60d caution · <= 30d danger + danger left treatment ·
-                  <= 14d danger border + danger-soft card tint.
-"+ Add to Tracker": optimistic mutation -> button becomes "[Check] Added" (validated, disabled),
-calls endpoints.tracker.add(...). Rollback toast on failure.
-```
+**States per step.**
+- Empty: pristine, Continue disabled until required fields valid.
+- Loading: not applicable (client-side).
+- Loaded: golden path.
+- Processing: Continue spinner during PATCH; if PATCH fails, retry inline.
+- Error: per-field validation inline. Network: toast retry.
+- Success: each step transitions forward 220ms layout. Final step submits and routes.
+- Locked: not applicable.
 
-### 7.4 Partially eligible card
+**Interactions.** "Skip" available on steps 3 and 5 only. Back never destroys data (saved on every PATCH). Browser back arrow respects step state. Pressing Enter on focused input advances.
 
-Same shape, **caution-stripe** instead of validated:
+**Motion.** Step transition: outgoing step fades 140ms exit → incoming step slides from 16px right + fades 180ms enter. Progress segment fills 220ms ease-out.
 
-```
-[caution-stripe + caution-soft bg]
-  [AlertTriangle] Missing: IELTS score. Add it to qualify fully.   [Update profile ->]
-```
+**Anti-slop check.**
+- Banned: "Almost there! 🚀"; floating mascot character; "AI is analyzing your profile" between steps; auto-skip on speed-fill.
+- Allowed: "Step 2 of 5"; specific helper text ("If your GPA is 3.4 / 4.0, type 3.4 and pick 4.0"); save chip "Saved" with checkmark after each PATCH.
 
-### 7.5 Freemium blur — results 4+ on free tier
+**Copy strings.**
+- Step 1 H1: "About you."
+- Step 2 H1: "Your academic record."
+- Step 3 H1: "Your test scores."
+- Step 4 H1: "Your goal."
+- Step 5 H1: "Your funding context."
+- Continue (steps 1–4): "Continue"
+- Continue (step 5): "Show my matches"
+- Skip: "Skip this step"
+- GPA helper: "We support 4.0, 5.0, first-class, and percentage scales."
+- Funding slider label: "Up to PKR {value} per year"
 
-Use the **existing** `UpgradeWall` overlay mode (`<UpgradeWall detail={...}>{lockedCard}</UpgradeWall>`).
-The component blurs `children` (`blur-sm opacity-50`, `pointer-events-none`) and centers the
-`WallCard`. `detail.message` and `detail.price` come verbatim from the backend 402
-`PlanRequiredDetail` — never write generic "Upgrade to unlock". Example backend message:
-"9 more scholarships match your profile, including 2 fully funded ones closing in 47 days."
-`featureName="Scholarship matches"`, `showElite={false}`.
+**Accessibility.** Each step is a `<form>` with `<fieldset>` and `<legend>`. Progress is a `<nav>` with `aria-label="Onboarding steps"`. Step transitions move focus to the new H1.
 
-### 7.6 Empty state
+**Responsive.**
+- 375: full-bleed, footer sticky bottom.
+- 768+: max-w 560 centered.
 
-"Complete your profile to see matches" + [Complete profile ->] -> `/onboarding`.
-
-**Code map:** new `app/(student)/dashboard/scholarships/match/page.tsx`. Endpoint
-`lib/api/endpoints/scholarshipMatch.ts` already exists. New `components/scholarship/MatchCard.tsx`.
-Reuse `ui/tabs`, `ui/badge`, `ui/button`, `UpgradeWall`. Add a `gold` button variant + badge tone.
+**Telemetry.** `onboarding.step_view {step}`, `onboarding.step_complete {step, duration_ms}`, `onboarding.skip {step}`, `onboarding.complete {duration_total_ms}`, `onboarding.abandon {step}`.
 
 ---
 
-## 8. Application Tracker (Kanban)
+### 6.8 `/feed` — Dashboard Home
 
-**Route:** `/dashboard/tracker` — *(new page)*. Uses the **existing** `endpoints.tracker` module
-(`list / add / patch stage / patch checklist / remove`; free cap = 3 items, PRD §6).
+**Purpose.** Give a returning student a 30-second status read (matches, deadlines, in-flight applications) and a one-click path into the most likely next action.
 
-### 8.1 Page header
+**Users + Entry.** Authenticated student. Entry: post-login redirect, sidebar logo click, bottom-tab Home. Next: any sidebar destination.
 
+**Backend contract.** `GET /api/v1/auth/me`, `POST /api/v1/recommendations` (top 3), `GET /api/v1/tracker?summary=true`, `GET /api/v1/profile/me` (completeness check).
+
+**Anatomy.**
 ```
-"Application Tracker"                              font-display text-2xl weight 700
-"Track every application. Never miss a deadline."  text-base ink-muted
-                                                   [+ Add Application] primary, top-right, Plus icon
-```
-
-### 8.2 Deadline alert banner
-
-Shown only when any item has deadline <= 30 days **and** checklist < 100%.
-
-```
-[AlertTriangle danger] Chevening deadline in 12 days, 3 documents still missing.
-                                                  [Go to card ->]  [X]
-bg-danger-soft, border 1px rgba(185,74,72,0.2), rounded-[12px], p-3.5, text-danger.
-[Go to card ->] smooth-scrolls + flashes the target card. [X] dismisses for the session.
-```
-
-### 8.3 Kanban board — 6 columns
-
-```
-1 Researching   2 Preparing Documents   3 Applied   4 Interview / Test   5 Decision   6 Accepted
-
-Column header: bg-paper-warm, rounded-[12px 12px 0 0], p-3, font 13px weight 700 uppercase
-  tracking-[0.05em] ink. Count: 20x20 circle, bg-ink text-paper text-xs.
-Column body: bg-paper, border 1px, border-top none, rounded-[0 0 12px 12px], p-3, min-h ~400px.
-  Column 6 (Accepted) header tinted validated-soft.
-Mobile: columns are 280px fixed width, horizontal scroll with momentum.
-Empty column: dashed border + "Drag cards here", never blank white.
++--------------------------------------------------+
+| TopBar                                           |
++--------------------------------------------------+
+| Page header: H1 + plan chip + currency badge     |
++--------------------------------------------------+
+| If profile <80% complete: ProfileCompleteCard    |
+|   1-row banner with completion bar + CTA         |
++--------------------------------------------------+
+| Action grid 2×2 (md+) / 1×4 (sm)                 |
+|   Find matches / Track applications / Draft SOP  |
+|   / Practice visa                                |
++--------------------------------------------------+
+| Recent matches: 3 CompactScholarshipCards        |
++--------------------------------------------------+
+| Tracker summary: progress bar + 6 stage counts   |
++--------------------------------------------------+
 ```
 
-### 8.4 Tracker card
+**States.**
+- Empty (no matches, no tracker): action grid + ProfileCompleteCard prominent. Recent matches block shows EmptyState "Run your first match. Takes 3 seconds." with CTA.
+- Loading: skeleton — header + 4 action tiles + 3 card placeholders + tracker summary bar.
+- Loaded: golden path.
+- Processing: tracker summary refresh inline (no spinner; just numeric crossfade).
+- Error: per-block ErrorState (tracker summary error doesn't break recent matches).
+- Success: not applicable (read-only screen).
+- Locked: not applicable (matches block respects free cap of 3).
 
-```
-+-----------------------------------------------+
-| [GripVertical drag handle, visible on hover]  |
-| [flag] MS Computer Science                    |
-|        University of Manchester               |
-| --------------------------------------------- |
-| [Calendar] 47 days              [Docs] 5 / 13 |
-| [progress bar 5/13 filled]                    |
-| [Expand checklist v]                          |
-+-----------------------------------------------+
-Card: bg-paper-white, border 1px, rounded-[12px], p-4, mb-2, cursor grab.
-Left treatment by urgency: <=30d danger · 31–60d caution · >60d none.
-University text-sm weight 600. Program text-sm ink-muted. Deadline text-xs (urgency colored).
-"X / 13 docs" text-xs: validated if 13/13, caution if < 7, danger if < 3.
-Progress bar: h-1, bg-paper-dim, fill validated.
-```
+**Interactions.** Action tile click → respective route. Recent match click → `/scholarships/[id]`. Tracker summary stage click → `/tracker?stage={stage}`.
 
-### 8.5 Checklist expansion
+**Motion.** Numeric counters in tracker summary tween from prev → next over 220ms ease-out. Cards fade-in 180ms on hydration.
 
-Clicking the card or "Expand checklist" slides down the document checklist:
+**Anti-slop check.**
+- Banned: "Good morning, Aisha! 👋"; rotating motivational quote; AI suggestion banner "Try this!"; trophy / streak counter.
+- Allowed: "Welcome back, Aisha."; named action tiles; specific tracker counts ("2 in Applied, 1 in Shortlisted").
 
-```
-DOCUMENT CHECKLIST (text-xs uppercase ink-subtle header)
-  [ ] Academic Transcripts        [ ] Degree Certificate     [ ] IELTS Certificate
-  [ ] GRE Score Report            [ ] SOP (Draft)            [ ] SOP (Final)
-  [ ] CV / Resume                 [ ] Letter of Recommendation 1 / 2 / 3
-  [ ] Bank Statement (proof of funds)
-  [highlighted row, caution-soft bg, rounded-[8px]]
-     HEC Degree Attestation  [info]   Required for UK and Germany applications
-  [ ] Passport Copy               [ ] Application Fee Paid
+**Copy strings.**
+- H1: "Welcome back, {first_name}."
+- Plan chip: "Explorer" / "Pro trial — 4 days" / "Pro" / "Elite" / "Demo"
+- ProfileCompleteCard: "Your profile is {pct}% complete. Finish for better matches."
+- Action tiles: "Find matches", "Track applications", "Draft SOP", "Practice visa"
+- Recent matches H2: "Recent matches"
+- See-all: "See all matches"
+- Tracker summary H2: "Your applications"
 
-Checkbox: Lucide Square / CheckSquare (validated when checked). Checked label: ink-subtle +
-strikethrough. [info] tooltip on the HEC row: "Many UK and German universities require HEC
-attestation of your degree before processing your application."
-Notes textarea (2 rows) below the checklist, autosaves on blur.
-Checklist toggles are optimistic; PATCH /tracker/{id}/checklist debounced 500ms.
-```
+**Accessibility.** Action tiles are `<a>` not `<button>`. Profile completion uses `<progress>` element with `max=100`. Numeric counter changes announce via `role="status"`.
 
-### 8.6 Add Application modal — `components/ui/dialog.tsx` (Radix, exists)
+**Responsive.**
+- 375: action grid 1 column, recent matches stack.
+- 768: 2×2 grid.
+- 1024+: 2×2 grid + side-by-side recent matches and tracker summary.
 
-```
-Add to tracker                                              [X]
-  Program name *        Input
-  University name *     Input
-  Country               Select (flag + name)
-  Application deadline  date input
-  Scholarship (optional) searchable, pulls from /scholarships
-  [Cancel]                                       [Add to Tracker ->]
-Modal: bg-paper-white, rounded-[20px], p-8, max-w ~480px, shadow-soft, backdrop rgba(12,17,23,0.3).
-Free tier on the 4th item: the modal is replaced by a standalone <UpgradeWall> with the backend
-402 message ("You have 4 upcoming deadlines you're not tracking."), featureName="Application tracker".
-```
-
-**Code map:** new `app/(student)/dashboard/tracker/page.tsx`. Endpoint `endpoints/tracker.ts`
-exists. New: `components/tracker/TrackerBoard.tsx`, `TrackerCard.tsx`, `ChecklistPanel.tsx`,
-`AddApplicationDialog.tsx`. New dep: `@hello-pangea/dnd` (React 19-compatible DnD;
-`DragDropContext` -> `Droppable` per column -> `Draggable` per card; PATCH stage on drop).
+**Telemetry.** `feed.view`, `feed.action_tile_click {action}`, `feed.recent_match_click {scholarship_id}`, `feed.tracker_summary_click {stage}`, `feed.profile_complete_card_click`.
 
 ---
 
-## 9. SOP Builder
+### 6.9 `/discover` — Browse all scholarships
 
-**Route:** `/dashboard/documents/sop` — *(new page)*. Uses the **existing**
-`endpoints.sopBuilder.draft()` module (free = 1 SOP lifetime, Elite = line-by-line feedback,
-PRD §7). The draft persists as a `DocumentRecord`, so it also appears in `/documents`.
+**Purpose.** Let a student browse the full live scholarship catalog with filters, independent of match buckets.
 
-### 9.1 Layout
+**Users + Entry.** Student exploring the catalog. Entry: sidebar Discover, landing "See scholarships". Next: `/scholarships/[id]`.
 
+**Backend contract.** `GET /api/v1/scholarships?country=&field=&funding=&deadline_before=&page=&page_size=`. Returns paginated list; premium tier rows are gated by tier for free/pro users.
+
+**Anatomy.**
 ```
-Desktop: two-panel split
-  +-------------------------------+-------------------------------------+
-  | INPUT PANEL (40%)             | PREVIEW PANEL (60%)                 |
-  | bg-paper, p-8                 | bg-paper-white, p-8 px-10            |
-  | form steps 1–4                | generated SOP draft                 |
-  +-------------------------------+-------------------------------------+
-  Divider: 1px vertical --color-border.
-Mobile: tab switcher [Form] [Preview], content stacked.
-```
-
-### 9.2 Input panel
-
-```
-"SOP Builder"                                               font-display text-xl weight 700
-"AI-assisted. Pakistani context. Built for Chevening, DAAD, and Fulbright."   text-sm ink-muted
-
-Scholarship selector (optional):
-  "Targeting a scholarship?"  searchable select; options = tracker items, then DB scholarships.
-  Selected -> shows scholarship value tags. Helper: "Selecting a scholarship tailors your SOP
-  narrative to its values."
-
-Step progress (inside panel): Academic Background o--o Research & Work o--o Why This Program
-  o--o Goals & Pakistan   (current highlighted, done with check)
-
-Step 1 Academic Background (pre-filled from profile):
-  University background (pre-filled) · Degree and field (pre-filled) · CGPA (pre-filled) ·
-  "Any academic achievements or awards?" textarea, placeholder "Dean's List, gold medal..."
-Step 2 Research & Work:
-  Research experience (textarea, 4 rows, "Leave blank if none, we'll frame coursework instead.")
-  Professional / work experience (textarea, 3 rows, "Include internships, freelance projects.")
-Step 3 Why This Program / Country:
-  "Why this specific program?" (3 rows) · "Why this country?" (3 rows)
-Step 4 Goals & Pakistan Context:
-  Career goals (3 rows, helper: "For Chevening / HEC, mention intention to return to Pakistan.")
-  Challenges overcome (optional, 2 rows) · Gap or weakness to explain (optional, 2 rows)
-
-Generate button (sticky, bottom of panel): [Generate SOP Draft ->] primary, full-width, size lg.
-  Loading: label -> "Writing your SOP...", progress bar with milestone labels
-  (Structuring -> Drafting -> Refining -> Done), est. 15–25s. NOT a spinner. Right panel shows
-  paragraph-block skeletons during generation.
++--------------------------------------------------+
+| Page header: H1 "Discover" + count "47 results"  |
++--------------------------------------------------+
+| Sticky filter bar: country / field / funding /   |
+|   deadline / search                              |
++--------------------------------------------------+
+| List: 12 cards per page, paginated               |
+|   each row: provider logo + title + meta chips + |
+|   funding mono + deadline mono + Save icon       |
++--------------------------------------------------+
+| Pagination: prev / 1 2 3 ... 4 / next            |
++--------------------------------------------------+
 ```
 
-### 9.3 Preview panel
+**States.**
+- Empty (after filter): "No scholarships match these filters." with "Clear filters" CTA.
+- Loading: 12 skeleton rows.
+- Loaded: golden path.
+- Processing: filter change → 200ms skeleton overlay on list area only.
+- Error: ErrorState card in place of list with retry.
+- Success: filter applied — header count updates inline.
+- Locked: premium rows render with gold-leaf chip "Pro" and click → UpgradeWall inline modal.
 
-```
-Empty (no draft yet):
-  [FileText 40px ink-subtle]
-  "Your SOP draft will appear here. Fill in the form and click Generate SOP Draft."
-  bullets: 600–800 words · 6 structured paragraphs · Pakistani academic context included
+**Interactions.** Filter inputs debounce 300ms. URL syncs filter state (shareable). Save toggles optimistically; rollback on error. Click row anywhere → detail.
 
-After generation:
-  Action bar: [Copy to clipboard] [Download .txt] [Regenerate] [<- Edit inputs]  (secondary, sm)
-  Word count: "743 words · 6 paragraphs" (text-xs ink-subtle, right)
-  Draft body: 6 labeled paragraphs. Label = font-mono text-xs uppercase tracking-[0.1em]
-    weight 700 ink-subtle, mt-6 mb-2: OPENING / ACADEMIC BACKGROUND / RESEARCH & EXPERIENCE /
-    MOTIVATION FOR THIS PROGRAM / CAREER GOALS / CLOSING.
-    Paragraph text: IBM Plex Sans 15px, leading-[1.7]. 1px --color-border divider between.
+**Motion.** Filter change: list opacity 0.4 for 200ms then crossfade to new results. Save icon ink-deep → validated 90ms.
 
-Elite line-by-line feedback (elite plan only): per-paragraph accordion "[+ Feedback v]":
-  validated-stripe  "What works well"     ...
-  caution-stripe    "What to improve"     ...
-  generated-stripe  "Suggested rewrite"   (+ Sparkles)  ...
+**Anti-slop check.**
+- Banned: "Smart filter" suggestions auto-checking themselves; "Hot scholarships" badge with flame icon; trending arrow on titles.
+- Allowed: "47 results"; "Closing soon (next 14 days)" filter chip; mono deadline "31 Oct 2027".
 
-Disclaimer (caution-stripe, bottom):
-  [AlertTriangle] "This draft is AI-generated from your inputs. Personalise it, admissions
-  committees can detect generic AI writing. Add specific details only you know."
+**Copy strings.**
+- H1: "Discover"
+- Filter labels: "Country", "Field", "Funding", "Deadline", "Search"
+- Save tooltip: "Save to your list"
+- Unsave tooltip: "Remove from your list"
+- Empty: "No scholarships match these filters."
+- Locked chip: "Pro"
+- UpgradeWall: backend `detail.message`
 
-Validated facts (when a scholarship is selected, validated-stripe + "Verified source" badge):
-  [Check] "Scholarship facts used in this SOP"
-  "Chevening requires 2 years of work experience. Deadline: November 5, 2025. Award: GBP 18,000."
-```
+**Accessibility.** Filter bar is a `<form>` with submit on change. Results list is `<ul role="list">`. Each card is a `<li>` containing an `<a>`. Pagination uses `<nav aria-label="Pagination">`.
 
-### 9.4 Freemium gate
+**Responsive.**
+- 375: filter bar collapses to "Filters" drawer button + sort chip; cards stack.
+- 1024+: filter bar inline at top, cards in single column with side meta.
 
-Free tier, second generation attempt: standalone `<UpgradeWall>` with the backend 402 message
-("Want to adapt this SOP for another university? Pro users generate unlimited SOPs."),
-`featureName="SOP Builder"`, `showElite={true}`.
-
-**Code map:** new `app/(student)/dashboard/documents/sop/page.tsx`. Endpoint
-`endpoints/sopBuilder.ts` exists. New: `components/sop/SopForm.tsx`, `SopPreview.tsx`,
-`SopFeedbackAccordion.tsx`, `GenerationProgress.tsx`. Pre-fill from `endpoints.profile.get()`.
+**Telemetry.** `discover.view`, `discover.filter_change {filter, value}`, `discover.result_click {scholarship_id}`, `discover.save_toggle {scholarship_id, saved}`, `discover.pagination {page}`.
 
 ---
 
-## 10. Visa Interview Simulator
+### 6.10 `/scholarships/[id]` — Scholarship Detail
 
-**Route:** `/dashboard/interview` — *(new page; the existing generic `interviews/` mock-interview
-flow stays separate)*. Uses the **existing** `endpoints.visaInterview` module
-(`start / answer / summary`; free cuts at Q3, Elite persists transcript as a `DocumentRecord`,
-PRD §8). This is the headline differentiator versus GoScholar.
+**Purpose.** Give a student everything needed to decide whether to apply: eligibility, deadlines, funding, requirements, provenance.
 
-### 10.1 Setup screen
+**Users + Entry.** Student researching a specific scholarship. Entry: `/discover` row click, `/feed` recent matches, `/dashboard/scholarships/match` card, deep link. Next: `/tracker` (after Add) or back.
 
+**Backend contract.** `GET /api/v1/scholarships/{id}`, `GET /api/v1/scholarships/{id}/provenance`. Premium tier may return 402 for non-premium.
+
+**Anatomy.**
 ```
-"Visa Interview Practice"                                  font-display text-2xl weight 700
-"Practice with an AI visa officer. Get feedback on every answer."   text-base ink-muted
-
-STEP 1 — "Which visa are you practising for?"
-  Country flag cards (4 across desktop / 2x2 mobile):
-    UK Student Visa (20 questions) · USA F-1 Visa (20) · Canada Study Permit (15) ·
-    Germany Student Visa (15)
-  Card: bg-paper-white, border 2px, rounded-[16px], p-6, w-[180px], centered. Flag 40px.
-  Selected: border-ink, bg-paper-warm, 20px check overlay top-right.
-
-STEP 2 — "How do you want to practise?"
-  Two mode cards:
-    Study Mode  [BookOpen]  full AI feedback after every answer, red-flag detection,
-                            ideal answer shown. Best for preparation.
-    Exam Mode   [Clock]     no feedback between questions, timer visible, builds endurance.
-                            Best for final practice.
-  Selected: border-ink 2px, bg-paper-warm.
-
-CTA: [Start Practice Session ->] primary size lg, disabled until country + mode chosen.
-Sub: "10 questions · about 15–20 minutes."
++--------------------------------------------------+
+| TopBar with breadcrumb: Discover / {title}       |
++--------------------------------------------------+
+| ScholarshipDetailHeader                          |
+|   provider logo 56 / name Fraunces 32 italic /   |
+|   validated stripe / 3 meta chips / CTA cluster  |
+|     Primary: "Add to tracker"                    |
+|     Secondary: "Save" / "Visit source"           |
++--------------------------------------------------+
+| Body 2-column (lg+): left content / right aside  |
+|   Left:                                          |
+|     About / Eligibility (EligibilityMatrix) /   |
+|     What's funded / How to apply / Documents     |
+|   Right (sticky, 320 wide):                      |
+|     Deadline countdown / Funding summary /       |
+|     CompatibilityMeter / Provenance card         |
++--------------------------------------------------+
 ```
 
-### 10.2 Interview screen (Q&A)
+**States.**
+- Empty: not applicable (an existing scholarship always has data).
+- Loading: skeleton header + 4 paragraph blocks + aside.
+- Loaded: golden path.
+- Processing: Add-to-tracker → spinner on CTA, optimistic toast on success.
+- Error: 404 → "This scholarship is no longer listed." with link to /discover. 5xx ErrorState page-level.
+- Success: Add → toast "Added to Wishlist. Open tracker." with action link.
+- Locked: premium for non-premium user → page renders header + UpgradeWall full overlay on body with `detail.message`.
 
-```
-Single column, max-w ~720px, no sidebar distraction.
-Top bar: [<- Exit] ghost left · "Question 3 of 10" centered · "05:42" timer (exam mode, font-mono, right)
-Progress bar below top bar: h-1.5, bg-paper-dim, fill ink, 30%.
+**Interactions.** Add-to-tracker opens AddApplicationDialog with stage pre-set to Wishlist. Save toggles optimistically. Visit source opens external in new tab with `rel="noopener noreferrer"`.
 
-Question card: bg-paper-white, border 1px, rounded-[20px], p-10.
-  Category badge (caution-soft, weight 600 12px): Motivation / Finances / Ties to Pakistan /
-    Program Knowledge / Future Plans.
-  Question text: font-display text-xl weight 600, leading-[1.4].
-  Context hint (study mode only, text-sm ink-subtle): "Visa officers want specific numbers and
-    confirmed funding sources. Vague answers raise red flags."
+**Motion.** Aside sticks at top: -32 offset, no animation. EligibilityMatrix row reveal stagger 60ms on load.
 
-Answer area:
-  Textarea, min-h ~160px, 15px, border 1px, rounded-[12px], focus border-generated + ring.
-    placeholder "Type your answer as you would speak it. Be natural, not rehearsed."
-  Character count "0 / no limit" text-xs ink-subtle, right.
-  [Submit Answer ->] primary, full-width, size lg, disabled when empty. Loading label
-    "Evaluating your answer..." (button text change, not a spinner).
-  [<- Previous question] ghost link (study mode, after Q1 only).
-```
+**Anti-slop check.**
+- Banned: animated checkmark on eligibility row; "Apply now! ⚡" gradient button; provenance hidden in a footnote; AI-summary block above factual data.
+- Allowed: validated stripe; "Source: chevening.org/apply/uk-{id}" mono link; "Last verified 2026-04-21" caption; explicit eligibility table.
 
-### 10.3 Feedback panel (study mode only)
+**Copy strings.**
+- Add CTA: "Add to tracker"
+- Save tooltip: "Save without tracking"
+- Visit source: "View on {provider}"
+- Sticky aside title: "At a glance"
+- Compatibility label: "Estimated Scholarship Fit Score" (never "Acceptance prediction")
+- Provenance footer: "Source: {url}. Verified {date}."
 
-Slides in below the question card after submit.
+**Accessibility.** EligibilityMatrix uses `<table>` with `<th scope>`. Compatibility meter has `role="meter"` with `aria-valuenow/min/max`. Sticky aside has `<aside>` with `aria-label="Scholarship summary"`.
 
-```
-Feedback card: bg-paper-white, border 1px, rounded-[16px], p-7, mt-4.
-Score meters (3, side by side / stacked mobile): Clarity / Confidence / Relevance.
-  Label text-sm weight 600 ink-muted · bar h-2 bg-paper-dim · score text-sm weight 700 right.
-  Fill: 4–5 validated · 3–3.9 caution · 1–2.9 danger.
-Red flag alerts (danger-stripe, only if red_flags non-empty):
-  [AlertTriangle] "Red flag detected" + explanation.
-What you did well (validated-stripe) · What to include next time (caution-stripe) ·
-  Strong answer includes (generated-stripe + Sparkles).
-CTA: [Next Question ->] primary, full-width. Sub: "Question 4 of 10 · Finances".
-```
+**Responsive.**
+- 375: aside becomes top card above body content.
+- 1024+: 2-column with sticky right aside.
 
-### 10.4 Freemium gate (free tier, after Q3)
-
-Replaces the feedback panel after question 3 with a standalone `<UpgradeWall>`. The backend
-attaches a `partial_summary` to the 402 detail — `UpgradeWall`'s `PartialSummary` already renders
-`answered` / `average_score` / `red_flag_count`. `featureName="Visa interview"`, `showElite={true}`.
-Backend message example: "You got 2 red flags in 3 answers. Questions 4–10 tell you exactly what to fix."
-
-### 10.5 Session summary screen
-
-```
-"Session Complete"                                font-display text-2xl weight 700
-"UK Student Visa · Study Mode · 10 questions"      text-sm ink-subtle
-
-Radar chart: 4 axes (Clarity · Confidence · Relevance · Red Flag Avoidance). Use a lightweight
-  SVG radar component, NOT Chart.js (180KB route budget). recharts is already a dependency and
-  is used by interview/RubricRadar — prefer reusing recharts' Radar over a Chart.js add.
-Overall score: "3.8 / 5.0" font-display ~36px weight 700 validated · "Good preparation level".
-
-Areas to improve (3 cards): rank + dimension + score + one-line guidance.
-Question-by-question table: #, Question, Clarity, Confidence, Relevance, Red Flags.
-  Score cells: validated (4–5) / caution (3–3.9) / danger (< 3). Red flag = danger badge w/ count.
-Actions: [Practice Again] secondary · [Download Summary] secondary (all plans) ·
-  [Download Full Transcript] gold button (Elite only). [<- Back to dashboard] ghost link.
-```
-
-**Code map:** new `app/(student)/dashboard/interview/page.tsx`. Endpoint `endpoints/visaInterview.ts`
-exists. New: `components/visa/SetupScreen.tsx`, `QuestionCard.tsx`, `FeedbackPanel.tsx`,
-`SummaryRadar.tsx` (recharts-based), `SessionSummary.tsx`. Reuse `UpgradeWall`. Sidebar label:
-"Visa Practice".
+**Telemetry.** `scholarship.view {scholarship_id}`, `scholarship.add_tracker_click`, `scholarship.save_toggle`, `scholarship.visit_source_click`, `scholarship.upgrade_wall_shown`.
 
 ---
 
-## 11. Upgrade Page
+### 6.11 `/saved` — Saved Opportunities
 
-**Route:** `/upgrade` — *(new page)*. Uses the **existing** `endpoints.upgrade.pricing()` module
-(`?currency=PKR|GBP|EUR|AED|USD`, PRD §0.5). No Stripe, no checkout — waitlist only. The
-`UpgradeWall` component already links here with `?plan=pro` / `?plan=elite` query params; the
-page reads `plan` to pre-open the matching waitlist accordion.
+**Purpose.** Let a student review the scholarships they bookmarked but have not yet tracked.
 
-### 11.1 Header
+**Users + Entry.** Student. Entry: sidebar Saved. Next: `/scholarships/[id]` or `/tracker`.
 
+**Backend contract.** `GET /api/v1/saved-opportunities`. `DELETE /api/v1/saved-opportunities/{id}`. `POST /api/v1/tracker` (promote to tracker).
+
+**Anatomy.**
 ```
-"Find the right plan for you"                     font-display ~36px weight 700, centered
-"Start free. Upgrade when you're serious."         text-base ink-muted, centered
-
-Currency switcher (centered): [PKR] [GBP] [EUR] [AED] [USD]
-  Active: bg-ink text-paper, rounded-[12px]. Inactive: bg-paper-warm text-ink-muted. h-9.
-  Default: PKR (or from billing_country). On click: all prices update instantly (no reload).
-```
-
-### 11.2 Pricing cards — 4 columns
-
-```
-Explorer (Free Forever) | Pro (PKR 2,499/mo, "Most popular") | Elite (PKR 7,999/mo,
-  "For serious applicants") | Institution (Contact us)
-
-Explorer: standard card. Pro: 2px gold ring + shadow-soft + "Most popular" badge (tone=gold).
-Elite: standard card + "For serious applicants" badge (tone=generated). Institution: bg-paper-warm,
-dashed border, no price.
-Feature rows: [Check validated] included · em dash (ink-subtle) not included.
-CTAs: Explorer [Start free] · Pro [Get Pro ->] · Elite [Get Elite ->] · Institution [Contact us ->].
-Anchor copy under Pro: "2 months of AidwiseAI Pro = less than 1 consultant meeting."
-Anchor copy under Elite: "For Pakistani families in the UK or UAE, less than a coffee per week."
-
-Currency-aware prices (JS swaps all):
-  PKR  Free | PKR 2,499/mo | PKR 7,999/mo | Custom
-  GBP  Free | GBP 6.99/mo  | GBP 19.99/mo | Custom
-  EUR  Free | EUR 7.99/mo  | EUR 22.99/mo | Custom
-  AED  Free | AED 29/mo    | AED 89/mo    | Custom
-  USD  Free | USD 8.99/mo  | USD 24.99/mo | Custom
++----------------------------------+
+| Page header: H1 + count          |
++----------------------------------+
+| Sort: Recently saved / Deadline  |
++----------------------------------+
+| List of saved scholarships       |
+|   each: card with title +        |
+|   deadline + Promote + Remove    |
++----------------------------------+
 ```
 
-### 11.3 Waitlist form (inline, Pro and Elite)
+**States.**
+- Empty: "Nothing saved yet. Use the save icon on any scholarship to bookmark it."
+- Loading: 6 skeleton rows.
+- Loaded: golden path.
+- Processing: Promote → optimistic remove from saved + toast.
+- Error: per-row error chip + retry.
+- Success: toast "Moved to Wishlist in tracker."
+- Locked: not applicable.
 
-Clicking "Get Pro ->" / "Get Elite ->" expands an accordion inside the card (no navigation):
+**Interactions.** Promote = `POST /api/v1/tracker` with stage=Wishlist + remove from saved on success. Remove = optimistic delete with undo toast (5s window).
 
-```
-Join the Pro waitlist
-"Payments launching soon. We'll email you first."
-Your email   Input "your@email.com"
-[Join Pro Waitlist ->]  gold button, full-width
-After submit: [Check] "You're on the list! We'll email you when Pro launches." (validated, animated check)
-Posts to POST /waitlist with the pre-selected plan.
-```
+**Motion.** Row remove: 220ms slide-up + fade out. Undo: row slides back in 180ms.
 
-### 11.4 Comparison table
+**Anti-slop check.**
+- Banned: "You saved this 3 weeks ago!" guilt prompt; expiring saved-item countdown; reminder badge.
+- Allowed: "Saved {date}" caption; sort by deadline; "Move to tracker" verb.
 
-```
-Heading "Compare all features". Columns: Feature | Explorer | Pro | Elite | Institution.
-Category rows (bg-paper-dim, uppercase, weight 700 ink-subtle):
-  SCHOLARSHIP DISCOVERY  matches Top 3 / All / All + priority / All  ...
-  SOP BUILDER            drafts 1 lifetime / Unlimited / Unlimited / Unlimited; line feedback — / — / Check / Check
-  VISA INTERVIEW         questions Q1–3 / Full 10 / Full 10 / Full 10; transcript — / — / Check / Check
-  TRACKER                tracked Max 3 / Unlimited; reminders 30 days / Email / Email+SMS+WhatsApp / Custom
-  ELITE EXCLUSIVE        professor email generator, application strategy PDF, 7-day priority alerts
-  B2B                    admin dashboard, bulk import, outcomes analytics  — — — Check
-Header row bg-paper-warm uppercase weight 600. Alternating row tints. Check = Lucide Check
-(validated); em dash (ink-subtle) = not included; Star (Lucide) = Elite only. Pro column gets a
-subtle gold tint. Institution tier appears ONLY here, never inside any student-facing UpgradeWall.
-```
+**Copy strings.**
+- H1: "Saved"
+- Sort: "Sort by"
+- Promote: "Move to tracker"
+- Remove: "Remove from saved"
+- Empty: "Nothing saved yet. Use the save icon on any scholarship to bookmark it."
 
-**Code map:** new `app/upgrade/page.tsx` (public route, outside the student group). Endpoint
-`endpoints/upgrade.ts` exists; add a `waitlist` endpoint module if `POST /waitlist` is not yet
-wired. New: `components/upgrade/PricingCard.tsx`, `CurrencySwitcher.tsx`, `WaitlistForm.tsx`,
-`ComparisonTable.tsx`.
+**Accessibility.** List `<ul role="list">`. Each row is `<li>` with two `<button>` actions. Undo toast has `aria-live="assertive"`.
+
+**Responsive.**
+- 375: card stack, actions move to overflow menu.
+- 1024+: row layout with inline actions.
+
+**Telemetry.** `saved.view`, `saved.promote {scholarship_id}`, `saved.remove {scholarship_id}`, `saved.sort_change {sort}`.
 
 ---
 
-## 12. Privacy & Consent UI
+### 6.12 `/dashboard/scholarships/match` — Match Results
 
-The backend exposes consent, legal, data-export, and account-deletion endpoints (PRD §0.6) with
-**no frontend surface yet**. This section is new versus the old `DESIGN_SPEC.md`.
+**Purpose.** Show a student the live match of their profile against the scholarship catalog, segmented into eligible / partial / stretch, respecting freemium caps.
 
-### 12.1 Cookie / consent banner
+**Users + Entry.** Student. Entry: end of onboarding, `/feed` "Find matches" tile, sidebar Matches. Next: `/scholarships/[id]`.
 
-Bottom-anchored bar on first visit, `bg-paper-white`, border-top 1px, `shadow-soft`.
+**Backend contract.** `POST /api/v1/scholarships/match` returns `{ items: [...], unlock_offer: { message, price, currency, plan } | null }`. Free cap = 3, Pro = 6, Elite = 12.
 
+**Anatomy.**
 ```
-"We use essential cookies to keep AidwiseAI working and analytics to improve it. You control
- the rest."     [Manage]  [Reject non-essential]  [Accept all]
-Choice persists to localStorage + POST /privacy/consent (logs IP, user-agent, sha256 of doc body).
-If the consent document version has changed since the last grant -> the banner re-appears; the
-backend returns HTTP 451 on version mismatch elsewhere.
-```
-
-### 12.2 Consent screen / legal viewer
-
-`GET /legal/{slug}` renders Terms, Privacy Policy, DPA, etc. as long-form content (max-w 65–75ch,
-clear h2 hierarchy). A sticky "I agree, version 1.0" action bar posts to `POST /privacy/consent`.
-Surfaces the Pakistan terms: liability cap PKR 1,000 or 6 months fees, LCIA arbitration,
-class-action waiver.
-
-### 12.3 Settings -> Privacy panel — extends `/settings`
-
-```
-Privacy & data
-  Consent status         per-document: granted version + date, [Review] link to the legal viewer.
-  Download my data       [Request export ->]  POST /privacy/data-export; status chip
-                         (requested / ready / expired). GET /privacy/data-export lists requests.
-  Delete my account      [Request deletion ->] opens a Radix Dialog confirmation. Copy states the
-                         30-day window. POST /privacy/account-deletion; DELETE cancels within window.
++--------------------------------------------------+
+| Page header: H1 + result count + Rerun button    |
++--------------------------------------------------+
+| Tabs: Eligible (N) / Partial (N) / Stretch (N)   |
++--------------------------------------------------+
+| Result grid: MatchCards 2-up (lg+), 1-up (sm)    |
+|   each: CompatibilityMeter + title + provider +  |
+|   deadline + funding + Save + Add CTA            |
++--------------------------------------------------+
+| If cap hit: locked placeholders below grid       |
+|   blurred preview + UpgradeWall inline           |
++--------------------------------------------------+
 ```
 
-Irreversible actions (account deletion) always use a typed-confirm dialog, never a one-click button.
+**States.**
+- Empty: "No matches yet. Update your profile to broaden your match." + link to /profile.
+- Loading: skeleton — 6 card placeholders.
+- Loaded: golden path.
+- Processing: Rerun → button spinner; grid fades to 0.4 opacity 200ms; on response crossfade 180ms.
+- Error: "Couldn't compute matches. Retry." inline card.
+- Success: result render.
+- Locked (cap): below the unlocked cards, render 3–6 blurred placeholder cards behind an UpgradeWall with `unlock_offer.message` verbatim.
 
-**Code map:** new `components/privacy/ConsentBanner.tsx`, `app/legal/[slug]/page.tsx`,
-and a Privacy panel inside `app/(student)/settings/page.tsx` (extend). New endpoint module
-`lib/api/endpoints/privacy.ts` if not already present.
+**Interactions.** Tab switch is instant (data already loaded). Card click → detail. Save / Add inline. Rerun re-POSTs match with current profile.
+
+**Motion.** Tab indicator slides 220ms. Card hover lift only. Locked placeholders pulse opacity 0.4→0.5→0.4 over 1800ms (single subtle indicator that they are blocked).
+
+**Anti-slop check.**
+- Banned: "Your acceptance odds are 82%!"; "Top match for you 🏆"; auto-rerun on every focus; suggestion banner "Try these too".
+- Allowed: "Estimated Scholarship Fit Score"; "3 eligible, 4 partial, 2 stretch"; "Rerun" not "Refresh AI".
+
+**Copy strings.**
+- H1: "Your matches"
+- Tabs: "Eligible ({n})", "Partial ({n})", "Stretch ({n})"
+- Rerun CTA: "Rerun match"
+- Empty: "No matches yet. Update your profile to broaden your match."
+- UpgradeWall: backend `unlock_offer.message`
+
+**Accessibility.** Tabs are Radix Tabs (`role="tablist"`). Each MatchCard has `aria-describedby` referencing the compatibility meter. Locked placeholders are `aria-hidden="true"` and the wall is announced via `role="region"`.
+
+**Responsive.**
+- 375: tabs scroll horizontal; cards 1-up.
+- 1024+: cards 2-up.
+
+**Telemetry.** `match.view`, `match.tab_change {bucket}`, `match.rerun_click`, `match.card_click {scholarship_id}`, `match.upgrade_wall_shown {bucket}`, `match.upgrade_cta_click`.
 
 ---
 
-## 13. Shared Components
+### 6.13 `/tracker` — Kanban Application Tracker
 
-### 13.1 UpgradeWall — `components/UpgradeWall/index.tsx` *(exists, do not rebuild)*
+**Purpose.** Let a student visualize their applications across 6 stages with a 14-key checklist per card and deadline urgency, respecting freemium caps.
 
+**Users + Entry.** Student. Entry: sidebar Tracker, `/feed` summary stage click. Next: tracker card drawer (in-page).
+
+**Backend contract.** `GET /api/v1/tracker`, `POST /api/v1/tracker`, `PATCH /api/v1/tracker/{id}/stage`, `PATCH /api/v1/tracker/{id}/checklist`, `DELETE /api/v1/tracker/{id}`. Free cap 3, Pro 6, Elite 12.
+
+**Anatomy.**
 ```
-Props (actual): {
-  detail: PlanRequiredDetail     // { message, price, partial_summary } — verbatim from backend 402
-  featureName?: string           // eyebrow label, e.g. "Application tracker"
-  showElite?: boolean            // secondary "Or get Elite" CTA (SOP + visa interview only)
-  children?: React.ReactNode     // the locked feature; rendered blurred behind the wall
-  className?: string
-}
-Two modes:
-  standalone (no children) — centered WallCard, for whole gated pages.
-  overlay (with children)  — children render blur-sm opacity-50 pointer-events-none, WallCard
-                             absolutely centered over them.
-WallCard: rounded-[20px], border 1px, bg-paper-white, p-6, inline shadow. Lock icon in
-  paper-warm circle; optional featureName eyebrow (font-mono uppercase); detail.message as the
-  font-display headline; PartialSummary grid (answered / avg score / red flags) when present;
-  primary CTA Link -> /upgrade?plan=pro labelled "Upgrade to Pro — {detail.price} ->";
-  optional secondary CTA -> /upgrade?plan=elite; footnote "No consultant. No hidden fees. Cancel anytime."
-Rule: NEVER pass a hand-written generic message. Always the API's detail.message.
-```
-
-### 13.2 Compact Scholarship Card
-
-```
-+---------------------------------------------------------------+
-| [flag] Chevening Scholarship                    96% match     |
-|        UK · Fully Funded · Nov 2025                           |
-|        [Check] CGPA 3.7 qualifies  [Check] IELTS 7.0          |
-|                                      [View]  [+ Tracker]      |
-+---------------------------------------------------------------+
-h ~88px, bg-paper-white, border 1px, rounded-[12px], p-3.5 px-5. Flag 20px. Name text-sm
-weight 600. Detail line text-xs ink-subtle. Checks 11px validated. Match % right, text-sm
-weight 700 validated. [View] ghost link text-xs generated. [+ Tracker] secondary, sm.
-Used in feed Recent Matches and the dashboard tracker widget.
++--------------------------------------------------+
+| Page header: H1 + count "{n} of {cap}" + Add CTA |
++--------------------------------------------------+
+| Deadline banner (if any deadline <14 days):      |
+|   sindoor-soft bg, "{N} deadlines within 14 days"|
++--------------------------------------------------+
+| Board: 6 columns horizontal scroll               |
+|   Wishlist / Applied / Shortlisted / Pending /   |
+|   Rejected / Accepted                            |
+|   Each column: header (count) + cards + empty    |
+|     dashed-border "Drag cards here" if empty     |
++--------------------------------------------------+
+| Card drawer (slide-in right): full checklist,    |
+|   deadline edit, stage select, delete            |
++--------------------------------------------------+
 ```
 
-### 13.3 Empty states
+**States.**
+- Empty (whole board): "No applications tracked yet. Add your first." center-screen.
+- Empty (single column): dashed-border placeholder "Drag cards here".
+- Loading: skeleton — 6 column headers + 3 card placeholders distributed.
+- Loaded: golden path.
+- Processing: card move → optimistic; on error rollback + toast.
+- Error: per-card error chip with retry; whole-board fetch error: ErrorState.
+- Success: stage change → silent (visual is the confirmation).
+- Locked (cap exhausted): Add CTA disabled with tooltip "{plan} plan allows {cap} applications. Upgrade for more."
+- Quota approaching: at cap-1, header count goes gold-leaf; tooltip "1 slot remaining."
 
-```
-[Icon 48px, paper-dim tile, ink-subtle, rounded-[14px], p-3.5]
-"No applications tracked yet."                              text-base weight 600, mt-4
-"Add scholarships from your matches to start tracking
- deadlines and documents."                                 text-sm ink-muted, max-w ~320px
-[Add from matches ->]                                       primary, size md, mt-6
-Never blank white space. Never bare "No data."
-```
+**Interactions.** Drag-and-drop between columns (HTML5 native DnD; touch fallback: long-press card → context menu "Move to…"). Click card → drawer slide-in 220ms. Checklist toggle is optimistic. Delete = typed-confirm dialog ("Type the scholarship name to confirm").
 
-### 13.4 Skeleton loading — `components/ui/skeleton.tsx` *(exists)*
+**Motion.** Card grabbed: scale 1.0 → 1.02 + lift shadow 180ms. Drop: 220ms layout-bezier into new column. Drawer: 220ms ease-out slide-in from right.
 
-Shimmer block, base `bg-paper-dim`, gradient sweep 1.5s. Radius matches the element replaced.
-**Shown once per route load** — never spinner-per-card; list re-fetches update in place.
+**Anti-slop check.**
+- Banned: trophy animation on move to Accepted; confetti on Accepted; "Hot streak" badge; AI-suggestion floating button.
+- Allowed: subtle validated-soft column tint on Accepted; mono deadline countdown; checklist count "8 of 14 done".
 
-### 13.5 Error state
+**Copy strings.**
+- H1: "Application tracker"
+- Count: "{n} of {cap}"
+- Add CTA: "Add application"
+- Deadline banner: "{n} deadline{s} within 14 days"
+- Stage labels: "Wishlist", "Applied", "Shortlisted", "Pending", "Rejected", "Accepted"
+- Empty per column: "Drag cards here"
+- Locked tooltip: "{plan} plan allows {cap} applications. Upgrade for more."
 
-```
-"Couldn't load your matches."
-[Retry]   secondary button
-Never "Network error" / "500" / stack traces. Always pair with an action: Retry / Reload / Back.
-```
+**Accessibility.** Each column is `<section role="region" aria-label="{stage}">`. Cards are `<article>` with drag handle as `<button>`. Keyboard alternative: focus card → Space picks up → Arrow keys move → Space drops. Drawer is a `<dialog>` with focus trap.
 
-### 13.6 Toasts — `sonner` *(exists)*
+**Responsive.**
+- 375: board scrolls horizontally; each column 280 wide; sticky column header.
+- 1024+: 6 columns visible, no horizontal scroll.
 
-Optimistic-mutation failures roll back and raise a `sonner` toast that says what to do next.
-Success toasts are short ("Profile saved.", "Added to tracker.").
+**Telemetry.** `tracker.view`, `tracker.add_click`, `tracker.stage_change {tracker_id, from, to}`, `tracker.card_open {tracker_id}`, `tracker.checklist_toggle {tracker_id, key, value}`, `tracker.delete {tracker_id}`, `tracker.cap_hit {plan}`.
 
 ---
 
-## 14. Screen Inventory
+### 6.14 Tracker → Add Application Dialog
 
-| Screen | Route | Owns today | Action | Auth |
-|--------|-------|-----------|--------|------|
-| Landing | `/` | `app/page.tsx` | rewrite | Public |
-| Signup | `/signup` | `app/signup/page.tsx` | extend | Public |
-| Login | `/login` | `app/login/page.tsx` | extend | Public |
-| Onboarding | `/onboarding` | `app/onboarding/page.tsx` | rewrite (4→5 steps) | Auth |
-| Dashboard | `/feed` | `app/(student)/feed/page.tsx` | extend (action grid) | Student |
-| Scholarship Finder | `/dashboard/scholarships/match` | — | new | Student |
-| Browse All | `/discover` | `app/(student)/discover/page.tsx` | keep | Student |
-| Scholarship Detail | `/scholarships/[id]` | `app/(student)/scholarships/[id]/page.tsx` | keep | Student |
-| Saved | `/saved` | `app/(student)/saved/page.tsx` | keep | Student |
-| Application Tracker | `/dashboard/tracker` | — | new | Student |
-| SOP Builder | `/dashboard/documents/sop` | — | new | Student |
-| Documents list/detail | `/documents`, `/documents/[id]` | exists | keep | Student |
-| Visa Interview | `/dashboard/interview` | — | new | Student |
-| Interviews (generic) | `/interviews`, `/interviews/[id]` | exists | keep | Student |
-| Profile | `/profile` | `app/(student)/profile/page.tsx` | keep (6-card B2B variant) | Student |
-| Settings | `/settings` | `app/(student)/settings/page.tsx` | extend (privacy panel) | Student |
-| Upgrade | `/upgrade` | — | new | Public |
-| Legal viewer | `/legal/[slug]` | — | new | Public |
-| Admin / Mentor | `/admin/*`, `/mentor/*` | exists (2 stubs) | keep / finish stubs | Admin / Mentor |
+**Purpose.** Add a new tracker item with scholarship + stage + deadline + initial checklist defaults.
 
-### Already built and reused (do not rebuild)
+**Users + Entry.** Student. Entry: "Add application" CTA on `/tracker`, "Add to tracker" CTA on `/scholarships/[id]`. Next: returns to `/tracker` with new card visible.
 
-`lib/api/client.ts`, all 17 `endpoints/*` modules (incl. `tracker`, `scholarshipMatch`,
-`sopBuilder`, `visaInterview`, `upgrade`, `reports`), `lib/api/index.ts` barrel,
-`components/UpgradeWall`, `lib/auth/AuthProvider` + `RoleGuard`, `ui/button|input|label|card|
-badge|skeleton|dialog|tabs|select`, `shell/AppShell|TopBar`, `scholarship/ScholarshipCard|
-RecommendationCard|EligibilityMatrix`, `interview/RubricRadar`.
+**Backend contract.** `POST /api/v1/tracker` with `{scholarship_id, stage, deadline_at}`.
+
+**Anatomy.**
+```
++----------------------------------+
+| Modal (max-w 560)                |
+|   Title: "Add application"       |
+|   Scholarship picker autocomplete|
+|     (from match results + saved) |
+|   Stage select (default Wishlist)|
+|   Deadline date picker           |
+|   Add CTA / Cancel               |
++----------------------------------+
+```
+
+**States.**
+- Empty: pristine; Add disabled until scholarship picked.
+- Loading: not applicable (autocomplete is local cached).
+- Loaded: golden path.
+- Processing: Add → spinner; on success modal closes + toast.
+- Error: 402 (cap exhausted) → modal body replaces with UpgradeWall inline + close.
+- Success: card appears in column optimistically.
+- Locked: see error 402 above.
+
+**Interactions.** Autocomplete with 200ms debounce. Date picker keyboard-navigable. Esc closes.
+
+**Motion.** Modal: scrim fade 180ms, modal scale 0.96→1.0 + opacity 0→1 180ms.
+
+**Anti-slop check.**
+- Banned: "Great choice! 🎯" on add; auto-suggesting scholarships you've not matched; "AI recommends Wishlist".
+- Allowed: pre-fill from deep link; "Tip: deadline within 14 days will appear in your dashboard banner."
+
+**Copy strings.**
+- Title: "Add application"
+- Scholarship label: "Scholarship"
+- Stage label: "Stage"
+- Deadline label: "Deadline"
+- Add CTA: "Add"
+
+**Accessibility.** Modal as `<dialog>` with `aria-labelledby`. First focus on scholarship picker. Esc closes; Enter submits when valid.
+
+**Responsive.** Modal stretches full-width on 375 with 16 side gutters.
+
+**Telemetry.** `tracker.dialog_open`, `tracker.dialog_submit`, `tracker.dialog_cancel`, `tracker.dialog_error {error_code}`.
 
 ---
 
-## 15. Key Copy Strings
+### 6.15 `/documents` — Documents List
 
-### Brand
-- Public display brand everywhere: **AidwiseAI** (exact casing). Never "ScholarAI", never
-  "Aidwise AI", never "AidwiseAI AI", never a model name. Internal/repo docs may still say ScholarAI.
-- The lowercase `grantpath.*` localStorage key namespace (`grantpath.access_token`,
-  `grantpath.onboarding_draft`, etc.) is a code identifier owned by `lib/api/client.ts`, not the
-  display brand. Leave it unchanged — renaming it logs every existing user out.
+**Purpose.** Show the student all generated documents (SOPs, professor emails, strategy reports, visa transcripts) with status and quick re-open.
 
-### Hero
-- Headline: "Find fully-funded programs abroad. No consultant. No fees."
-- Subheadline: "AidwiseAI matches Pakistani students to scholarships they actually qualify for,
-  based on CGPA, IELTS, field, and target country."
-- Speed promise: "Get your matches in under 60 seconds."
-- Primary CTA: "Find My Scholarships →" · Secondary: "Already have an account? Sign in"
+**Users + Entry.** Student. Entry: sidebar Documents. Next: `/documents/[id]` or `/documents/sop` to create new.
 
-### Onboarding CTAs
-- Steps 1–4: "Continue →" · Step 5: "Find My Scholarships →" · Back: "← Back" · "Skip this step →"
+**Backend contract.** `GET /api/v1/documents?type=&page=&page_size=`.
 
-### Dashboard CTAs
-- "Find Scholarships" → `/dashboard/scholarships/match`
-- "Practice Visa Interview" → `/dashboard/interview`
-- "Write Your SOP" → `/dashboard/documents/sop`
-- "Application Tracker" → `/dashboard/tracker`
+**Anatomy.**
+```
++----------------------------------+
+| Page header: H1 + Add CTA        |
+|   (dropdown: SOP / Prof email)   |
++----------------------------------+
+| Filter chips: All / SOP / Prof   |
+|   email / Strategy / Visa        |
++----------------------------------+
+| Table rows:                      |
+|   icon / title / type chip /     |
+|   updated / status / actions     |
++----------------------------------+
+```
 
-### Freemium copy (always from the API 402 `detail.message`, examples)
-- Finder: "9 more scholarships match your profile, including 2 fully funded ones closing in 47 days."
-- SOP: "Want to adapt this SOP for another university? Pro users generate unlimited SOPs."
-- Interview: "You got 2 red flags in 3 answers. Questions 4–10 tell you exactly what to fix."
-- Tracker: "You have 4 upcoming deadlines you're not tracking."
-- Banned generic fallback: "Upgrade to unlock this feature."
+**States.**
+- Empty: "No documents yet. Draft your first SOP." with primary CTA.
+- Loading: 8 skeleton rows.
+- Loaded: golden path.
+- Processing: not applicable.
+- Error: ErrorState in place of table.
+- Success: not applicable.
+- Locked: row-level lock chip for Elite documents (professor email, strategy report) on lower tiers.
 
-### Pricing anchors
-- Under Pro: "2 months of AidwiseAI Pro = less than 1 consultant meeting."
-- Under Elite: "For Pakistani families in the UK or UAE, less than a coffee per week."
-- Pakistan context: "Less than one hour of a consultant's time per month."
+**Interactions.** Row click → detail. Type chip click filters. Actions: open, duplicate, delete.
 
-### Trust signals
-- "Student-only, we don't take money from universities."
-- "No hidden fees. Cancel anytime." · "No consultant. No fees."
+**Motion.** Row hover: paper-warm bg 90ms.
 
-### Anti-AI-sluggish copy rules (from `frontend/CLAUDE.md`)
-- No model names, no "Powered by". No "AI" in nav copy (sidebar reads "SOP Builder", "Visa
-  Practice", "My Matches"). No floating chat bubble, no "Ask AI" button. Replace prompt boxes
-  with structured forms. One-line caveat per AI block, never long disclaimers. Specific progress
-  labels ("Ranking 247 scholarships") not "Thinking...".
+**Anti-slop check.**
+- Banned: "AI-generated" tag on every row; sparkle next to titles; "Last edited by AI" line.
+- Allowed: type chip with semantic color; "Updated 2026-05-12 14:22" mono; explicit "Draft" / "Final" status chip.
+
+**Copy strings.**
+- H1: "Documents"
+- Add dropdown: "Draft SOP", "Draft professor email"
+- Filter: "All", "SOPs", "Professor emails", "Strategy reports", "Visa transcripts"
+- Empty: "No documents yet. Draft your first SOP."
+- Status chips: "Draft", "Final"
+
+**Accessibility.** Table with `<th scope="col">`. Status uses chip + ARIA text. Filter chips are `<button role="tab">`.
+
+**Responsive.**
+- 375: table collapses to cards; each card shows title + type + updated.
+- 1024+: full table.
+
+**Telemetry.** `documents.view`, `documents.filter {type}`, `documents.row_click {document_id}`, `documents.add_click {type}`, `documents.delete {document_id}`.
 
 ---
 
-*End of AidwiseAI Frontend Design Specification v3. Reconciled against the live codebase on
-2026-05-15. Supersedes `DESIGN_SPEC.md`. Companion: `Front-upgrade.html` (sprint delta plan).*
+### 6.16 `/documents/[id]` — Document Detail
+
+**Purpose.** Show a generated document with its 4-partition feedback (mentor or rubric), allow edit, allow re-generation.
+
+**Users + Entry.** Student. Entry: documents list, deep link from tracker. Next: back to list or new draft.
+
+**Backend contract.** `GET /api/v1/documents/{id}`. Polls every 5s while `status=processing`. `PATCH /api/v1/documents/{id}` for edits. `POST /api/v1/documents/{id}/regenerate` for re-draft.
+
+**Anatomy.**
+```
++--------------------------------------------------+
+| TopBar with breadcrumb                            |
++--------------------------------------------------+
+| Document header: title (Fraunces 24) + meta      |
+|   type chip / version / Updated / Status         |
++--------------------------------------------------+
+| 2-column (lg+):                                  |
+|   Left: document body (rendered or editor)       |
+|     generated stripe                             |
+|   Right: feedback partitions (mentor or rubric)  |
+|     Strengths / Revision priorities /            |
+|     Caution notes / Summary                      |
++--------------------------------------------------+
+| Footer actions: Edit / Regenerate / Download     |
++--------------------------------------------------+
+```
+
+**States.**
+- Empty: not applicable.
+- Loading: skeleton body + 4 feedback placeholders.
+- Loaded: golden path.
+- Processing: status=processing → body shows progress "Drafting paragraph {n} of {N}" with progress bar; feedback panels show "Available after generation completes."
+- Error: status=failed → "Generation failed. {error_message}. Regenerate." CTA.
+- Success: status=completed → full render.
+- Locked (Elite feedback for non-Elite): feedback partitions render UpgradeWall inline with `detail.message`.
+
+**Interactions.** Edit toggles body to textarea with toolbar. Regenerate prompts "Replace current draft?" inline. Download = .docx export.
+
+**Motion.** Status transition processing → completed: progress bar fills last 220ms then fades.
+
+**Anti-slop check.**
+- Banned: "AI gave this an A!"; rotating motivational tip in feedback panel; "Try saying it like…" auto-suggestions.
+- Allowed: explicit partition titles; "Revision priority 1 of 4: tighten paragraph 2 opening."
+
+**Copy strings.**
+- Status chips: "Drafting", "Draft", "Final", "Failed"
+- Feedback partition titles: "Summary", "Strengths", "Revision priorities", "Caution notes"
+- Edit CTA: "Edit"
+- Regenerate CTA: "Regenerate"
+- Download CTA: "Download .docx"
+- Processing helper: "Drafting paragraph {n} of {N}"
+
+**Accessibility.** Body is `<article>` with `aria-busy="true"` while processing. Status announces via `role="status"`. Editor textarea has `<label>`.
+
+**Responsive.**
+- 375: feedback collapses into accordion below body.
+- 1024+: 2-column with sticky feedback aside.
+
+**Telemetry.** `document.view {document_id, type}`, `document.edit_open`, `document.save`, `document.regenerate`, `document.download`, `document.poll_complete {duration_ms}`.
 
 ---
 
-## 16. Air University Exhibition Sprint — Pre-Launch Frontend Bundle (2026-05-18)
+### 6.17 `/documents/sop` — SOP Builder
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Steps use checkbox (`- [ ]`) syntax.
+**Purpose.** Generate a Pakistan-context Statement of Purpose tailored to a target program in 30–60 seconds, with Elite line-by-line feedback if entitled.
 
-**Goal:** Ship the smallest frontend slice that lets a Pakistani Air University student scan a booth QR, redeem the `AIRU2026` invite code, sign up with PDPB-compliant consent + optional Air U cohort fields, see Pro-tier features, and find a `/upgrade` page with a manual payments block — all live on `https://aidwiseai.com` by 2026-05-19 09:00 PKT.
+**Users + Entry.** Student. Entry: sidebar Documents → Draft SOP, tracker card "Draft SOP" link (carries scholarship context), deep link from /scholarships/[id]. Next: `/documents/[id]` for the generated draft.
 
-**Architecture:** Six bounded edits to the live `frontend/src/` tree, plus three new components (`ComingSoon`, `TrialBanner`, `PaymentMethods`) and three observability wrappers (`sentry.ts`, `logrocket.ts`, `statsig.ts`). All adopt the Paper-and-Ink token system from §1, shadcn primitives from §1.5–1.8, and the no-emoji / Lucide-only / 44×44-tap rules from §1.10. Status: **all backend contracts already shipped** (see `Air-exhibition-preparations.md` §0.5). Frontend is the last critical path.
+**Backend contract.** `POST /api/v1/documents/sop/draft` with `{scholarship_id?, target_program, target_provider, motivation_seed, pakistan_context}`. Free=1 lifetime, Pro=5/month, Elite=10/month.
 
-**Tech stack:** Next.js 16 App Router · React 19 · Tailwind 4 (`@theme` tokens) · Bun · shadcn/Radix · Lucide · Statsig client SDK · LogRocket · Crisp Chat widget · `@sentry/nextjs`.
-
-### Sprint ordering rationale
-
-Frontend lands **last** — after backend R1–R5 + DigitalOcean + Cloudflare are live. Reasons:
-1. Frontend bundle needs the final backend URL (`api.aidwiseai.com`) baked into `NEXT_PUBLIC_API_BASE_URL` at Vercel build time — change after deploy = rebuild.
-2. Invite-code redemption depends on Migration 0026 + auth-service patch being live, otherwise the signup form 400s.
-3. Mailgun-from-channels.py must be wired before any signup hits the welcome-email path.
-4. Sentry frontend DSN + LogRocket + Crisp + Statsig keys are env vars that only exist after the Day-1 Pack claims.
-
-Net: frontend = Day 3 of the revised Air-exhibition timeline (2026-05-18 morning), with Day 4 reserved for dry-run + flyer print.
-
-### File structure
-
-**Create**
-- `frontend/src/components/ComingSoon.tsx` — roadmap grid (10 cards, ETA + status pills)
-- `frontend/src/components/TrialBanner.tsx` — 7-day countdown banner
-- `frontend/src/components/PaymentMethods.tsx` — manual JazzCash/Easypaisa QR + IBAN block
-- `frontend/src/lib/observability/sentry.ts` — Sentry init wrapper
-- `frontend/src/lib/observability/logrocket.ts` — LogRocket init wrapper
-- `frontend/src/lib/observability/statsig.ts` — Statsig client init + typed gate helpers
-
-**Modify**
-- `frontend/src/app/globals.css` — add `--color-gold` + `--color-gold-soft` to `@theme` (Gap 1 from §1.1)
-- `frontend/src/app/layout.tsx` — replace `GrantPath` metadata; mount Sentry, LogRocket, Crisp, Statsig providers; declare `metadataBase`
-- `frontend/src/app/signup/page.tsx` — replace `GrantPath` header link; add invite-code input (auto-fill from `?invite=`); add Air U dropdowns + consent checkbox + marketing-opt-in
-- `frontend/src/app/login/page.tsx` — replace `GrantPath` header link only
-- `frontend/src/components/shell/Sidebar.tsx` — replace `GrantPath` brand text; mount `<TrialBanner />` above nav
-- `frontend/src/app/(student)/settings/page.tsx` — replace `GrantPath` description copy
-- `frontend/src/app/page.tsx` — mount `<ComingSoon />` between hero and footer
-- `frontend/src/app/upgrade/page.tsx` — mount `<PaymentMethods />` between comparison table and institution mailto
-- `frontend/src/lib/api/types.ts` — extend `User` type with `air_uni_uni`/`air_uni_dept`/`air_uni_batch`/`marketing_opt_in`/`redeemed_invite_code` (sync to backend `0026` schema)
-
-**Do NOT touch (per `frontend/CLAUDE.md` lock)**
-- `frontend/src/lib/api/client.ts` — `grantpath.access_token` / `grantpath.refresh_token` / `grantpath.access_expires_at` / `grantpath.onboarding_draft` localStorage keys stay (renaming logs every user out)
-- `lib/api/endpoints/*` — backend `/auth/register` already accepts new fields per backend R3
-
-### Task 16.1 — Add `--color-gold` token
-
-**File:** Modify `frontend/src/app/globals.css`
-
-- [ ] **Step 1:** In the `@theme` block, append after the `--color-danger-soft` line:
-
-```css
---color-gold:      #8B6914;   /* Premium / Elite tier, demo banner, pricing emphasis */
---color-gold-soft: #F5EDD6;
+**Anatomy.**
+```
++--------------------------------------------------+
+| Page header: H1 + quota chip "1 of 5 this month" |
++--------------------------------------------------+
+| 2-panel layout                                   |
+|   Left 40%: inputs (program / provider / seed /  |
+|     context) + Generate CTA                      |
+|   Right 60%: live preview (generated stripe)     |
+|     while idle: editorial empty state            |
+|     while drafting: progress + paragraph render  |
+|     after complete: full SOP + Elite feedback    |
++--------------------------------------------------+
+| Footer: Save / Discard                           |
++--------------------------------------------------+
 ```
 
-- [ ] **Step 2:** Run `cd frontend && bun run build` — expect 0 errors. (Tailwind 4 `@theme` auto-generates `text-gold`, `bg-gold`, `bg-gold-soft`, `border-gold` utilities.)
-- [ ] **Step 3:** Commit: `git commit -am "feat(design): add --color-gold token for premium accents (Gap 1)"`
-
-### Task 16.2 — Brand hotpatch (5 user-facing files)
-
-**Files:** Modify per grep hits 2026-05-16. Skip localStorage keys and `client.ts` header comment per CLAUDE.md lock.
-
-- [ ] **Step 1:** Verify `frontend/src/lib/brand.ts` exists and exports `BRAND`. If absent, create:
-
-```ts
-export const BRAND = "AidwiseAI" as const;
-export const BRAND_TAGLINE = "Pakistan's AI scholarship co-pilot";
-export const PARTNERSHIPS_EMAIL = "partnerships@aidwiseai.com";
-export const PAYMENTS_EMAIL = "payments@aidwiseai.com";
-export const SUPPORT_EMAIL = "hello@aidwiseai.com";
-
-export const partnershipsMailto = (subject = "Institutional partnership") =>
-    `mailto:${PARTNERSHIPS_EMAIL}?subject=${encodeURIComponent(subject)}`;
-```
-
-- [ ] **Step 2:** In `frontend/src/app/layout.tsx:29-34`, replace metadata block:
-
-```tsx
-import { BRAND } from "@/lib/brand";
-
-export const metadata: Metadata = {
-  metadataBase: new URL("https://aidwiseai.com"),
-  title: { default: BRAND, template: `%s · ${BRAND}` },
-  description: "AI scholarship matching, SOP drafting, and visa-interview practice for Pakistani students.",
-  applicationName: BRAND,
-};
-```
-
-- [ ] **Step 3:** In `frontend/src/app/signup/page.tsx:45`, swap `GrantPath` text for `{BRAND}` + add import.
-- [ ] **Step 4:** Same in `frontend/src/app/login/page.tsx:55`.
-- [ ] **Step 5:** In `frontend/src/components/shell/Sidebar.tsx:96`, swap for `{BRAND}` + import.
-- [ ] **Step 6:** In `frontend/src/app/(student)/settings/page.tsx:70`, replace `"Sign out of GrantPath on this device."` with `` `Sign out of ${BRAND} on this device.` ``.
-- [ ] **Step 7:** Re-grep:
-
-```bash
-cd frontend && rg -n "GrantPath" src/ | grep -v "client.ts" | grep -v "grantpath\."
-# expect empty
-```
-
-- [ ] **Step 8:** `bun run lint && bunx --bun tsc --noEmit && bun run build` — expect 0 errors
-- [ ] **Step 9:** Commit: `git commit -am "feat(brand): hotpatch GrantPath -> AidwiseAI in 5 user-facing surfaces"`
-
-### Task 16.3 — `ComingSoon` roadmap component
-
-**Files:** Create `frontend/src/components/ComingSoon.tsx`. Modify `frontend/src/app/page.tsx`.
-
-Honors §1 tokens + §1.8 chip styling. ETA tone uses `gold` / `generated` / `validated` / `ink-subtle` semantic colors. 3-col desktop, 1-col mobile.
-
-- [ ] **Step 1:** Create the component (full code in `Air-exhibition-preparations.md` Task 3.6b — copy verbatim, replacing raw `bg-amber-*` / `bg-sky-*` / `bg-violet-*` / `bg-stone-*` classes with token-based equivalents per the `ETA_TONE` map below):
-
-```ts
-const ETA_TONE: Record<Eta, string> = {
-  "Jun 2026": "bg-gold-soft text-gold ring-gold/20",
-  "Q3 2026": "bg-generated-soft text-generated ring-generated/20",
-  "Q4 2026": "bg-validated-soft text-validated ring-validated/20",
-  "2027": "bg-paper-warm text-ink-subtle ring-border",
-};
-
-const STATUS_DOT: Record<Status, string> = {
-  "in-design": "bg-ink-subtle",
-  "in-dev": "bg-validated",
-  planned: "bg-paper-dim",
-};
-```
-
-Replace generic Tailwind colors (`text-stone-*`, `bg-stone-*`) with `text-ink`, `text-ink-muted`, `text-ink-subtle`, `bg-paper-white`, `bg-paper-warm` per §1.
-
-- [ ] **Step 2:** Mount in `frontend/src/app/page.tsx` after the pricing teaser (§3.8) and before `<Footer />`:
-
-```tsx
-import { ComingSoon } from "@/components/ComingSoon";
-// ...
-<ComingSoon />
-```
-
-- [ ] **Step 3:** Smoke `http://localhost:3000/#roadmap` — 10 cards, 3-col desktop, ETA badges color-coded.
-- [ ] **Step 4:** Lighthouse check — roadmap section adds <5 KB to bundle.
-- [ ] **Step 5:** Commit: `git commit -am "feat(landing): ComingSoon roadmap section (10 pipeline cards)"`
-
-### Task 16.4 — Signup invite-code + Air U + consent v1.0
-
-**File:** Modify `frontend/src/app/signup/page.tsx`
-
-Mandatory consent v1.0 checkbox; marketing-opt-in default off; invite-code input auto-fills from `?invite=` URL param and force-uppercases. Air U fields optional. Form posts to `POST /api/v1/auth/register` (backend R3 ships invite_code + air_uni_* + consent_v + marketing_opt_in support).
-
-- [ ] **Step 1:** Add at top of file:
-
-```tsx
-"use client";
-import { useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
-import { BRAND } from "@/lib/brand";
-```
-
-- [ ] **Step 2:** Inside component:
-
-```tsx
-const params = useSearchParams();
-const [inviteCode, setInviteCode] = useState("");
-const [airUniUni, setAirUniUni] = useState("");
-const [airUniDept, setAirUniDept] = useState("");
-const [airUniBatch, setAirUniBatch] = useState<number | "">("");
-const [consent, setConsent] = useState(false);
-const [marketing, setMarketing] = useState(false);
-
-useEffect(() => {
-  const q = params.get("invite");
-  if (q) setInviteCode(q.toUpperCase());
-}, [params]);
-```
-
-- [ ] **Step 3:** In submit handler:
-
-```tsx
-if (!consent) {
-  toast.error("Please accept the data processing terms to continue.");
-  return;
-}
-const payload = {
-  email,
-  password,
-  full_name: fullName,
-  invite_code: inviteCode || undefined,
-  air_uni_uni: airUniUni || undefined,
-  air_uni_dept: airUniDept || undefined,
-  air_uni_batch: airUniBatch || undefined,
-  consent_v: "v1.0",
-  marketing_opt_in: marketing,
-};
-await registerUser(payload);
-```
-
-- [ ] **Step 4:** Insert into JSX above submit button:
-
-```tsx
-<div className="space-y-1.5">
-  <Label htmlFor="invite-code">Invite code (optional)</Label>
-  <Input
-    id="invite-code"
-    value={inviteCode}
-    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-    placeholder="AIRU2026"
-    autoComplete="off"
-  />
-</div>
-
-<fieldset className="space-y-3 rounded-lg border border-border bg-paper-warm/40 p-4">
-  <legend className="px-2 text-xs uppercase tracking-wider text-ink-subtle">
-    About you (optional — helps us personalise)
-  </legend>
-  <Input placeholder="University (e.g. Air University)"
-         value={airUniUni} onChange={(e) => setAirUniUni(e.target.value)} />
-  <Input placeholder="Department (e.g. CS, EE, BBA)"
-         value={airUniDept} onChange={(e) => setAirUniDept(e.target.value)} />
-  <Input type="number" min={2018} max={2030}
-         placeholder="Batch year (e.g. 2023)"
-         value={airUniBatch}
-         onChange={(e) => setAirUniBatch(e.target.value ? Number(e.target.value) : "")} />
-</fieldset>
-
-<label className="flex gap-3 text-sm text-ink-muted">
-  <input type="checkbox" required checked={consent}
-         onChange={(e) => setConsent(e.target.checked)}
-         className="mt-0.5 h-4 w-4 accent-ink" />
-  <span>
-    I agree to {BRAND}&apos;s{" "}
-    <Link href="/legal/trial-tnc-v1.0" target="_blank" className="underline">
-      data processing &amp; trial terms (v1.0)
-    </Link>.
-  </span>
-</label>
-
-<label className="flex gap-3 text-sm text-ink-muted">
-  <input type="checkbox" checked={marketing}
-         onChange={(e) => setMarketing(e.target.checked)}
-         className="mt-0.5 h-4 w-4 accent-ink" />
-  <span>I&apos;m OK with {BRAND} quoting my anonymised feedback in marketing.</span>
-</label>
-```
-
-- [ ] **Step 5:** Tap-target audit: shadcn `Input` defaults to 44px height — confirm in DevTools.
-- [ ] **Step 6:** `bun run lint && bunx --bun tsc --noEmit && bun run build` — 0 errors
-- [ ] **Step 7:** Smoke `http://localhost:3000/signup?invite=AIRU2026` → field pre-filled, consent blocks submit, success returns Pro user.
-- [ ] **Step 8:** Commit: `git commit -am "feat(signup): invite code + Air U cohort + consent v1.0 + marketing opt-in"`
-
-### Task 16.5 — `TrialBanner` countdown in sidebar
-
-**Files:** Create `frontend/src/components/TrialBanner.tsx`. Modify `Sidebar.tsx`.
-
-Visible only when `plan_expires_at` is within 7 days. Uses `--color-gold-soft` per §1.1 Gap 1.
-
-- [ ] **Step 1:** Create the component:
-
-```tsx
-"use client";
-import Link from "next/link";
-import { differenceInDays, parseISO } from "date-fns";
-
-export function TrialBanner({ expiresAt }: { expiresAt: string | null }) {
-  if (!expiresAt) return null;
-  const days = differenceInDays(parseISO(expiresAt), new Date());
-  if (days < 0 || days > 7) return null;
-  return (
-    <div className="mx-3 mb-4 rounded-lg border border-gold/20 bg-gold-soft px-3 py-2.5 text-xs leading-relaxed text-ink">
-      <p className="font-medium">
-        Pro trial ends in <span className="text-gold">{days} {days === 1 ? "day" : "days"}</span>.
-      </p>
-      <Link href="/upgrade" className="mt-1 inline-block font-medium text-gold underline">
-        Upgrade to keep your matches →
-      </Link>
-    </div>
-  );
-}
-```
-
-- [ ] **Step 2:** In `Sidebar.tsx`, mount `<TrialBanner expiresAt={user?.plan_expires_at ?? null} />` above the primary nav `<ul>`. Pull `user` from existing `useAuth()` context.
-- [ ] **Step 3:** `bun run build` — 0 errors
-- [ ] **Step 4:** Smoke: Pro user with `plan_expires_at` 5 days out → banner visible with "5 days" + gold tint.
-- [ ] **Step 5:** Commit: `git commit -am "feat(sidebar): trial-expiry countdown banner (7-day window, gold)"`
-
-### Task 16.6 — `PaymentMethods` block on upgrade page
-
-**Files:** Create `frontend/src/components/PaymentMethods.tsx`. Modify `frontend/src/app/upgrade/page.tsx`.
-
-V1 manual payment block — mailto + JazzCash QR + Easypaisa QR + IBAN. Placeholders must be replaced before deploy (Task 16.10 Gate 2).
-
-- [ ] **Step 1:** Create the component:
-
-```tsx
-import { PAYMENTS_EMAIL } from "@/lib/brand";
-
-interface Props { userEmail?: string }
-
-export function PaymentMethods({ userEmail }: Props) {
-  const subject = encodeURIComponent(`Upgrade to Pro — ${userEmail ?? ""}`.trim());
-  const body = encodeURIComponent(
-    "Hi AidwiseAI team,\n\nI just transferred PKR 2,999. Reference attached.\n\nThanks."
-  );
-  return (
-    <section className="mt-10 rounded-xl border border-border bg-paper-white p-6">
-      <h3 className="font-display text-lg text-ink">Pay manually (Beta)</h3>
-      <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        One-click checkout via Safepay (JazzCash, Easypaisa, Visa, Mastercard, PayPak, RAAST)
-        arrives in June 2026. Until then, transfer the amount and email proof to{" "}
-        <a href={`mailto:${PAYMENTS_EMAIL}`} className="text-generated underline">{PAYMENTS_EMAIL}</a>.
-        We activate within 4 hours.
-      </p>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <article className="rounded-lg border border-border bg-paper-warm/50 p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-subtle">JazzCash</p>
-          <p className="mt-1 font-mono text-sm text-ink">0300-XXXXXXX</p>
-          <p className="mt-1 text-xs text-ink-subtle">Account title: <em>{"<your name>"}</em></p>
-        </article>
-        <article className="rounded-lg border border-border bg-paper-warm/50 p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-subtle">Easypaisa</p>
-          <p className="mt-1 font-mono text-sm text-ink">0345-XXXXXXX</p>
-        </article>
-        <article className="rounded-lg border border-border bg-paper-warm/50 p-4">
-          <p className="text-xs uppercase tracking-wider text-ink-subtle">Bank / RAAST</p>
-          <p className="mt-1 font-mono text-sm text-ink">PKxx XXXX XXXX XXXX XXXX</p>
-          <p className="mt-1 text-xs text-ink-subtle">Meezan / Alfalah / HBL</p>
-        </article>
-      </div>
-
-      <a
-        href={`mailto:${PAYMENTS_EMAIL}?subject=${subject}&body=${body}`}
-        className="mt-5 inline-flex h-11 items-center rounded-md bg-ink px-5 text-sm font-medium text-paper-white hover:bg-ink-strong"
-      >
-        Email payment proof
-      </a>
-    </section>
-  );
-}
-```
-
-- [ ] **Step 2:** Mount in `upgrade/page.tsx` after `COMPARISON_ROWS` and before institution mailto: `<PaymentMethods userEmail={user?.email} />`
-- [ ] **Step 3:** Add comment `// TODO(2026-05-18 pre-deploy): replace 0300-XXXXXXX, 0345-XXXXXXX, IBAN with real values` above the import.
-- [ ] **Step 4:** `bun run build` — 0 errors
-- [ ] **Step 5:** Commit: `git commit -am "feat(upgrade): manual payment block (JazzCash/Easypaisa/IBAN) — v1 pre-Safepay"`
-
-### Task 16.7 — Sentry frontend init
-
-**Files:** Create `frontend/src/lib/observability/sentry.ts`. Modify `layout.tsx`.
-
-- [ ] **Step 1:** `cd frontend && bun add @sentry/nextjs`
-- [ ] **Step 2:** Create wrapper:
-
-```ts
-import * as Sentry from "@sentry/nextjs";
-
-export function initSentry() {
-  if (typeof window === "undefined") return;
-  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    environment: process.env.NEXT_PUBLIC_SENTRY_ENV ?? "production",
-    tracesSampleRate: 0.1,
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 1.0,
-  });
-}
-```
-
-- [ ] **Step 3:** Call `initSentry()` once from a `<Providers />` client component imported in `layout.tsx`.
-- [ ] **Step 4:** Set `NEXT_PUBLIC_SENTRY_DSN` env in Vercel.
-- [ ] **Step 5:** Trigger a deliberate error and confirm Sentry receives it.
-- [ ] **Step 6:** Commit: `git commit -am "feat(observability): wire Sentry frontend SDK"`
-
-### Task 16.8 — Statsig client SDK
-
-**Files:** Create `frontend/src/lib/observability/statsig.ts`. Modify `layout.tsx`.
-
-- [ ] **Step 1:** `bun add statsig-react`
-- [ ] **Step 2:** Wrap providers tree with `<StatsigProvider sdkKey={process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY!} user={{ userID: user?.id ?? "anon" }} waitForInitialization>`
-- [ ] **Step 3:** Helper file:
-
-```ts
-import { useGate, useExperiment } from "statsig-react";
-
-export const useKimiModelGate = () => useGate("kimi_model_eval").value;
-export const useTrialBannerExperiment = () => useExperiment("trial_banner_copy_v2");
-export const useAirUCohort = () => useGate("cohort_au2026").value;
-```
-
-- [ ] **Step 4:** Create the three gates in Statsig dashboard, `enabled=false` default-off.
-- [ ] **Step 5:** Commit: `git commit -am "feat(observability): Statsig client SDK + 3 starter gates"`
-
-### Task 16.9 — LogRocket + Crisp widget
-
-**Files:** Create `frontend/src/lib/observability/logrocket.ts`. Modify `layout.tsx`.
-
-- [ ] **Step 1:** `bun add logrocket`
-- [ ] **Step 2:** Create wrapper:
-
-```ts
-import LogRocket from "logrocket";
-
-export function initLogRocket() {
-  if (typeof window === "undefined") return;
-  if (process.env.NODE_ENV !== "production") return;
-  if (!process.env.NEXT_PUBLIC_LOGROCKET_APP_ID) return;
-  LogRocket.init(process.env.NEXT_PUBLIC_LOGROCKET_APP_ID);
-}
-```
-
-- [ ] **Step 3:** Call `initLogRocket()` next to `initSentry()` in `<Providers>`.
-- [ ] **Step 4:** Mount Crisp `<Script>` in `layout.tsx` body after `<Providers>`:
-
-```tsx
-<Script id="crisp" strategy="afterInteractive">{`
-  window.$crisp=[];window.CRISP_WEBSITE_ID="${process.env.NEXT_PUBLIC_CRISP_ID}";
-  (function(){var d=document,s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();
-`}</Script>
-```
-
-- [ ] **Step 5:** Lighthouse — confirm LCP impact <100ms (Crisp loads after-interactive).
-- [ ] **Step 6:** Commit: `git commit -am "feat(observability): LogRocket session replay + Crisp chat widget"`
-
-### Task 16.10 — Pre-deploy gate
-
-Run in order. Every gate must pass before Vercel deploy.
-
-- [ ] **Gate 1:** `cd frontend && rg -n "GrantPath" src/ | grep -v "client.ts" | grep -v "grantpath\."` → **empty**
-- [ ] **Gate 2:** `rg -n "0300-XXXXXXX|0345-XXXXXXX|PKxx XXXX" src/components/PaymentMethods.tsx` → **empty** (real values substituted)
-- [ ] **Gate 3:** `bun run lint` → **0 warnings**
-- [ ] **Gate 4:** `bunx --bun tsc --noEmit` → **0 errors**
-- [ ] **Gate 5:** `bun run build` → **0 errors**; Lighthouse `--preset=desktop` shows JS ≤ 200 KB gzip on `/`
-- [ ] **Gate 6:** Local Vercel preview via `vercel dev` — manual smoke `/signup?invite=AIRU2026` → `/feed` → `/tracker` → `/documents/sop` → `/upgrade`. Invite pre-fills, consent required, Pro user created, all 4 routes render, payment block visible.
-- [ ] **Gate 7:** Sentry dashboard receives 1 test event from `vercel dev`.
-- [ ] **Gate 8:** Statsig dashboard shows new `userID` from logged-in preview session.
-- [ ] **Gate 9:** Commit: `git commit -am "chore(frontend): exhibition sprint complete, gates green"`
-
-### Task 16.11 — Vercel deploy
-
-- [ ] **Step 1:** Vercel → Import Project → repo → root `frontend`
-- [ ] **Step 2:** Framework Next.js. Build cmd `bun run build`. Install `bun install`.
-- [ ] **Step 3:** Env vars:
-
-```
-NEXT_PUBLIC_API_BASE_URL=https://api.aidwiseai.com/api/v1
-NEXT_PUBLIC_BRAND=AidwiseAI
-NEXT_PUBLIC_SENTRY_DSN=<frontend dsn from Pack claim>
-NEXT_PUBLIC_SENTRY_ENV=production
-NEXT_PUBLIC_STATSIG_CLIENT_KEY=<client key>
-NEXT_PUBLIC_LOGROCKET_APP_ID=<logrocket app id>
-NEXT_PUBLIC_CRISP_ID=<crisp website id>
-```
-
-- [ ] **Step 4:** Add custom domain `aidwiseai.com` + `www.aidwiseai.com` per `Air-exhibition-preparations.md` deploy section.
-- [ ] **Step 5:** Smoke `https://aidwiseai.com/signup?invite=AIRU2026` redeems against live `api.aidwiseai.com` → Pro user created.
-
-### Self-Review
-
-- [x] **Spec coverage** — Every frontend-touching locked decision from `Air-exhibition-preparations.md` §0 (brand, invite-UX, consent, trial banner, manual payment, Coming Soon, observability) has a numbered task.
-- [x] **Token discipline** — No inline hex; all colors via `--color-*` including the new `--color-gold` from Task 16.1.
-- [x] **shadcn over Radix** — Form controls reuse `components/ui/*` per §1.5–1.6.
-- [x] **Lucide-only icons** — No emoji-as-UI; ETA badges use shaped chips with colored dots.
-- [x] **Accessibility** — Consent is `required`; tap targets ≥44×44 via shadcn defaults; gold-on-paper contrast >7:1.
-- [x] **Performance budget** — LogRocket + Crisp after-interactive; Statsig waits init only on first render; ComingSoon is static markup.
-- [x] **No backend touch** — Endpoints already exist; frontend consumes existing `auth/register`, `/upgrade/pricing`, `/scholarships/match`.
+**States.**
+- Empty: preview shows "Your SOP will appear here as it generates." with example quote in muted ink.
+- Loading: not applicable on entry (form is local).
+- Loaded: golden path post-generation.
+- Processing: "Drafting paragraph {n} of 5" + per-paragraph fill (paragraph appears once complete, not character-by-character — banned theatre). Save and Discard disabled during processing.
+- Error: model error → "Couldn't generate. {detail}. Retry." Quota error → quota chip turns sindoor + "You've used your monthly SOP quota. Upgrade or wait until {date}."
+- Success: preview fully rendered + toast "Saved as draft."
+- Locked (quota exhausted): Generate CTA disabled with tooltip + inline UpgradeWall in preview area.
+
+**Interactions.** "Use my profile" link populates motivation_seed with profile summary. Generate kicks off POST. While processing, user can edit input fields (queued; next generate uses latest). Save = persist as DocumentRecord. Discard = clear preview after confirm.
+
+**Motion.** Paragraph reveal: each paragraph fades + slides 8px up 180ms ease-out once received. Progress bar fills smoothly. No typewriter.
+
+**Anti-slop check.**
+- Banned: typewriter character-by-character animation; "AI is writing your story… ✍️"; spinner-per-paragraph; "Generating brilliance"; floating mascot.
+- Allowed: "Drafting paragraph 3 of 5"; named paragraph headings ("Motivation", "Academic background", "Why this program", "Why this country", "Future plan"); explicit quota chip.
+
+**Copy strings.**
+- H1: "Draft your SOP"
+- Quota chip Free: "1 SOP, lifetime", Pro/Elite: "{used} of {cap} this month"
+- Program label: "Target program"
+- Provider label: "University or provider"
+- Seed label: "Why this program (1–2 sentences)"
+- Context label: "Pakistan context (optional — past internships, family, constraints)"
+- Generate CTA: "Generate SOP"
+- Processing: "Drafting paragraph {n} of 5"
+- Quota exhausted (free): "You've used your free SOP. Upgrade to Pro for 5 SOPs a month."
+
+**Accessibility.** Form fields each have `<label>`. Generate CTA disabled state announces via `aria-disabled`. Processing progress is `<progress>` with `aria-label="Generation progress"`. Preview is `<article aria-live="polite">`.
+
+**Responsive.**
+- 375: panels stack — inputs above, preview below.
+- 1024+: 40/60 split.
+
+**Telemetry.** `sop.view`, `sop.use_profile_click`, `sop.generate_attempt {scholarship_id?, target_program}`, `sop.generate_paragraph {n, duration_ms}`, `sop.generate_complete {duration_ms}`, `sop.generate_error {error_code}`, `sop.save`, `sop.discard`, `sop.quota_exhausted`.
 
 ---
 
-*End of §16. Companion: `Air-exhibition-preparations.md` (backend + ops). Sprint window: 2026-05-18 morning → 2026-05-19 09:00 PKT deadline. Frontend lands LAST after backend R1–R5 + DigitalOcean + Mailgun + Cloudflare are live.*
+### 6.18 `/documents/professor-email` — Professor Email
 
+**Purpose.** Draft a personalized inquiry email to a target professor in 15–30 seconds. Elite-tier only in v1.
+
+**Users + Entry.** Elite student. Entry: sidebar Documents → Draft professor email. Next: `/documents/[id]`.
+
+**Backend contract.** `POST /api/v1/documents/professor-email` with `{professor_name, professor_affiliation, target_program, research_interest_overlap, your_summary}`. 402 for non-Elite.
+
+**Anatomy.**
+```
++----------------------------------+
+| Page header + Elite chip         |
++----------------------------------+
+| 2-panel (same as SOP)            |
+|   Left: 5 inputs + Generate      |
+|   Right: preview                 |
++----------------------------------+
+| Tips footer (collapsible):       |
+|   "Email guidelines for          |
+|    professors in UK / US / DE"   |
++----------------------------------+
+```
+
+**States.**
+- Empty: preview "Your email will appear here." + 3-bullet tips ("Subject line stays specific", "Cite their work in 1 sentence", "Ask one clear question").
+- Loading: not applicable on entry.
+- Loaded: post-generation render.
+- Processing: "Drafting email…" single progress bar (email is short — no per-paragraph).
+- Error: same as SOP error patterns.
+- Success: toast "Saved as draft."
+- Locked: full-screen UpgradeWall with `detail.message` for non-Elite.
+
+**Interactions.** "Find researcher" link opens `/discover?type=researcher` (out of v1 scope; renders a "Coming Q3" badge). Copy-to-clipboard button on preview.
+
+**Motion.** Same as SOP processing pattern.
+
+**Anti-slop check.**
+- Banned: "Hi Professor [Name]!" boilerplate left in output; emoji greeting; "Looking forward to hearing from you!" canned closer.
+- Allowed: explicit subject line in mono; named professor; one specific paper cited.
+
+**Copy strings.**
+- H1: "Draft a professor email"
+- Elite chip: "Elite"
+- Inputs: "Professor name", "Affiliation", "Target program", "Research overlap (1–2 sentences)", "About you (1 sentence)"
+- Generate CTA: "Generate email"
+- Locked: backend `detail.message`
+
+**Accessibility.** Same as SOP. Elite chip is a `<span aria-label="Elite tier feature">`. Tips section is a `<details>`.
+
+**Responsive.** Same as SOP.
+
+**Telemetry.** `prof_email.view`, `prof_email.generate_attempt`, `prof_email.generate_complete`, `prof_email.locked_view`, `prof_email.copy_click`.
+
+---
+
+### 6.19 `/interviews` — Interviews List
+
+**Purpose.** Show the student all past interview sessions (visa + generic adaptive) with rubric trends.
+
+**Users + Entry.** Student. Entry: sidebar Interviews. Next: `/interviews/[id]` or `/interviews/visa`.
+
+**Backend contract.** `GET /api/v1/interviews?type=&page=`.
+
+**Anatomy.**
+```
++----------------------------------+
+| Page header + 2 CTAs:            |
+|   Practice visa / Practice generic|
++----------------------------------+
+| Trend strip: 5 rubric chips with |
+|   small sparklines (mono)        |
++----------------------------------+
+| Sessions table:                  |
+|   icon / type / country / date / |
+|   summary score / open           |
++----------------------------------+
+```
+
+**States.**
+- Empty: "No sessions yet. Practice your first visa interview." + Visa CTA.
+- Loading: skeleton trend strip + 6 rows.
+- Loaded: golden path.
+- Processing: not applicable.
+- Error: ErrorState in table area.
+- Success: not applicable.
+- Locked: not applicable (sessions are gated at start).
+
+**Interactions.** Row click → `/interviews/[id]` (generic) or `/interviews/visa?session={id}`.
+
+**Motion.** Sparklines render once on intersection, 600ms ease-out.
+
+**Anti-slop check.**
+- Banned: streak counter "5-day practice streak! 🔥"; level-up animation; "Coach of the day" widget.
+- Allowed: trend chips ("Confidence: 7.2 ↑ from 6.4"); mono date "2026-05-14 18:22".
+
+**Copy strings.**
+- H1: "Interviews"
+- CTAs: "Practice visa", "Practice generic"
+- Trend strip labels: "Motivation", "Finances", "Ties", "Communication", "Overall"
+- Empty: "No sessions yet. Practice your first visa interview."
+
+**Accessibility.** Trend chips render numbers and `<svg>` sparklines with `aria-hidden` (numeric value is the accessible name).
+
+**Responsive.**
+- 375: trend strip scrolls horizontally; table → cards.
+- 1024+: full table.
+
+**Telemetry.** `interviews.view`, `interviews.row_click {session_id}`, `interviews.cta_visa_click`, `interviews.cta_generic_click`.
+
+---
+
+### 6.20 `/interviews/[id]` — Generic Adaptive Interview
+
+**Purpose.** Practice generic interview Q&A (admissions, scholarship, fellowship) with adaptive difficulty and rubric feedback.
+
+**Users + Entry.** Student. Entry: row click from /interviews. Next: same screen continues until session ends.
+
+**Backend contract.** `GET /api/v1/interviews/{id}`, `POST /api/v1/interviews/{id}/answer`, `GET /api/v1/interviews/{id}/summary`.
+
+**Anatomy.** Same shape as visa simulator (§6.21) without country setup screen. Re-uses QuestionCard, FeedbackPanel, SummaryRadar, SessionSummary.
+
+**States.** Same template as §6.21.
+
+**Interactions.** Same as §6.21.
+
+**Motion.** Same as §6.21.
+
+**Anti-slop check.** Same as §6.21.
+
+**Copy strings.**
+- H1: "Practice interview — {topic}"
+
+**Accessibility.** Same as §6.21.
+
+**Responsive.** Same as §6.21.
+
+**Telemetry.** `interview_generic.*` events mirror visa events.
+
+---
+
+### 6.21 `/interviews/visa` — Visa Interview Simulator
+
+**Purpose.** Practice a country-specific visa interview: setup → Q&A loop → study-mode feedback → summary radar. Free cuts at Q3. Elite persists transcript.
+
+**Users + Entry.** Student. Entry: sidebar Interviews → Practice visa, `/feed` Practice visa tile, deep link. Next: `/interviews/[id]` for summary.
+
+**Backend contract.** `POST /api/v1/interviews/visa/start` with `{country_code, mode: "study"|"exam"}`. `POST /api/v1/interviews/visa/{id}/answer` with `{text}`. `GET /api/v1/interviews/visa/{id}/summary`. Elite: transcript persisted as DocumentRecord.
+
+**Anatomy (3 panes).**
+```
+[1] SetupScreen
++----------------------------------+
+| H1 "Practice visa interview"     |
++----------------------------------+
+| Country tile grid (4×1 lg, 2×2sm)|
+|   each: country name + Q count + |
+|   approval estimate chip         |
++----------------------------------+
+| Mode toggle: Study / Exam        |
++----------------------------------+
+| Start CTA                        |
++----------------------------------+
+
+[2] QuestionCard (one at a time)
++----------------------------------+
+| Progress: "Question {n} of {N}"  |
++----------------------------------+
+| Question text (Fraunces 24)      |
++----------------------------------+
+| Answer input (textarea + mic)    |
++----------------------------------+
+| Submit / Skip                    |
++----------------------------------+
+| (Study mode) FeedbackPanel       |
+|   slides in after submit         |
++----------------------------------+
+
+[3] SessionSummary
++----------------------------------+
+| H1 "Session summary"             |
++----------------------------------+
+| SummaryRadar (5 axes)            |
++----------------------------------+
+| Transcript preview (Elite)       |
++----------------------------------+
+| Practice again / Save transcript |
++----------------------------------+
+```
+
+**States.**
+- Empty: SetupScreen renders default.
+- Loading: setup — country tiles skeleton (4); Q&A — full panel skeleton; summary — radar placeholder.
+- Loaded: golden path.
+- Processing: Submit → button spinner; FeedbackPanel (study mode) loads in 180ms after answer; in exam mode, next question immediately.
+- Error: per-action inline; transcript save error → toast.
+- Success: each question advance is the success signal; summary appears at session end.
+- Locked: free hits Q3 cutoff → "Free practice ends here. Upgrade to Pro for full sessions." inline UpgradeWall. Elite-only transcript export shows lock on non-Elite.
+
+**Interactions.** Mic press-and-hold; release submits text via STT (out of v1 — render as "Coming Q3" badge in mic button tooltip). Text input always available. Skip increments to next question without submission. Esc returns to setup with confirm.
+
+**Motion.** Question transition: outgoing fade 140ms + 8px slide up; incoming fade 180ms + 8px slide from bottom. FeedbackPanel slide-in from right 220ms. SummaryRadar: axes draw 600ms ease-out once.
+
+**Anti-slop check.**
+- Banned: "Great answer! 🎉"; applause sound on submit; "AI Coach" persona; flag emoji on country tiles; live scrolling transcript like a chatbot; auto-replay confidence loops.
+- Allowed: "Question 3 of 10"; rubric scores "Motivation 7/10"; specific feedback "Your answer didn't address why this country specifically — try naming UK universities you applied to."
+
+**Copy strings.**
+- Setup H1: "Practice visa interview"
+- Mode toggle: "Study mode (feedback after each answer)", "Exam mode (feedback at end)"
+- Country tile: "{country_name}", "{n} questions", "Approval estimate: {pct} (educated estimate)"
+- Q&A submit: "Submit"
+- Skip: "Skip"
+- Free cutoff: "Free practice covers 3 questions. Upgrade to Pro for full sessions."
+- Summary H1: "Session summary"
+- Save transcript CTA (Elite): "Save transcript to documents"
+
+**Accessibility.** Mic button has `aria-label="Hold to record answer"` (and `aria-disabled` while coming-Q3). Progress is `<progress>`. SummaryRadar provides tabular fallback below the chart for screen readers.
+
+**Responsive.**
+- 375: Setup 2×2 tiles; Q&A panel single column; Summary radar 280 wide.
+- 1024+: setup 4×1; Q&A 720 max-w; FeedbackPanel right aside.
+
+**Telemetry.** `visa.setup_view`, `visa.session_start {country, mode}`, `visa.answer_submit {q_index, duration_ms}`, `visa.answer_skip {q_index}`, `visa.cutoff_hit {plan}`, `visa.summary_view`, `visa.transcript_save`, `visa.practice_again_click`.
+
+---
+
+### 6.22 `/profile` — Profile Editor (6 cards)
+
+**Purpose.** Let a student maintain the full profile that drives matches, B2B share snapshots, and SOP context.
+
+**Users + Entry.** Student. Entry: sidebar Profile, /feed ProfileCompleteCard CTA. Next: any in-app destination.
+
+**Backend contract.** `GET /api/v1/profile/me`, `PATCH /api/v1/profile/me`. `GET /api/v1/universities?country={code}` for shortlist picker.
+
+**Anatomy.**
+```
++--------------------------------------------------+
+| Page header: H1 + completion meter               |
++--------------------------------------------------+
+| 6 cards (stacked):                               |
+|   1. Contact (email locked, phone, whatsapp,     |
+|        city of origin)                           |
+|   2. Academic (current uni, degree, GPA, grad)   |
+|   3. Tests (language, GRE, GMAT, SAT)            |
+|   4. Goal (target countries[], fields[],         |
+|        degree level, intake, funding requirement)|
+|   5. Aspirations (target universities[],         |
+|        research interest, work experience)       |
+|   6. Background (household income band,          |
+|        referral source, B2B share consent)       |
++--------------------------------------------------+
+| Save / Discard (sticky footer when dirty)        |
++--------------------------------------------------+
+```
+
+**States.**
+- Empty: pristine fields with placeholders matching field semantics.
+- Loading: skeleton — 6 card placeholders.
+- Loaded: golden path.
+- Processing: Save → button spinner; on success "Saved" chip 2s.
+- Error: per-field error; whole-form error → toast with retry.
+- Success: dirty footer dismisses.
+- Locked: not applicable (profile is always editable). B2B share consent toggle has a separate Pro+ gate text below it.
+
+**Interactions.** Auto-save on field blur (debounced 800ms). Manual Save also available for assurance. Discard reverts to last server state.
+
+**Motion.** Sticky footer slide-up 220ms when dirty; slide-down 140ms when saved/discarded. Completion meter tweens 300ms.
+
+**Anti-slop check.**
+- Banned: "Profile strength: Excellent ⭐⭐⭐⭐⭐"; AI-prefilling fields from typing in another field; "Pro tip" banner inside card.
+- Allowed: completion meter "{pct}% complete"; field-level helper "Used for SOP context, not shared with universities."; B2B section explicit consent.
+
+**Copy strings.**
+- H1: "Profile"
+- Card titles: "Contact", "Academic record", "Test scores", "Your goal", "Aspirations", "Background"
+- Save: "Save changes"
+- Discard: "Discard"
+- B2B consent label: "Allow AidwiseAI to share an anonymized snapshot with partner universities you opt into."
+- B2B consent helper: "Pro+ feature. Snapshot captured at share time. You can revoke anytime."
+
+**Accessibility.** Each card is a `<section aria-labelledby>`. Sticky footer announces "Unsaved changes" via `role="status"` when first dirty.
+
+**Responsive.**
+- 375: cards full-width stack.
+- 1024+: cards 720 max-w centered.
+
+**Telemetry.** `profile.view`, `profile.field_save {field}`, `profile.save_all`, `profile.discard`, `profile.b2b_consent_toggle {value}`, `profile.completion_meter {pct}`.
+
+---
+
+### 6.23 `/settings` — Settings (incl. Privacy panel)
+
+**Purpose.** Let a student manage account, privacy, notifications, density, plan, and destructive actions (export, delete).
+
+**Users + Entry.** Student. Entry: sidebar Settings, TopBar avatar menu → Settings. Next: any in-app destination.
+
+**Backend contract.** `GET/PATCH /api/v1/auth/me` for account fields. `POST /api/v1/privacy/data-export`, `POST /api/v1/privacy/account-deletion`, `DELETE /api/v1/privacy/account-deletion`. `PATCH /api/v1/profile/me` for marketing/notifications opt-in.
+
+**Anatomy.**
+```
++--------------------------------------------------+
+| Page header: H1                                  |
++--------------------------------------------------+
+| Left rail (lg+) tabs: Account / Privacy /        |
+|   Notifications / Appearance / Plan / Danger     |
++--------------------------------------------------+
+| Right pane: tab content                          |
++--------------------------------------------------+
+```
+
+**Tab contents.**
+1. **Account** — display name, email (locked), password change (link), session list with revoke.
+2. **Privacy** — cookie preferences (4 toggles), marketing opt-in, B2B share consent (Pro+), data export request + history, consent history table.
+3. **Notifications** — email digest frequency (Daily / Weekly / Off), deadline reminders (On / Off), WhatsApp alerts (Elite only).
+4. **Appearance** — density (Comfortable / Compact), reduced motion (Auto / On / Off), language (English / اردو — Urdu out of v1 stub).
+5. **Plan** — current plan chip, billing country, currency, "See pricing" link, "Cancel renewal" (when applicable).
+6. **Danger** — Export my data (POST → status card), Delete my account (typed-confirm dialog → POST → 30-day window with cancel).
+
+**States.**
+- Empty per tab: not applicable.
+- Loading: per-tab skeleton.
+- Loaded: golden path.
+- Processing: Each toggle is optimistic with rollback toast.
+- Error: inline per-control.
+- Success: chip "Saved" 2s.
+- Locked: B2B share consent is disabled with helper "Available on Pro and Elite." WhatsApp alerts disabled with "Available on Elite."
+
+**Interactions (Danger).**
+- Export = single click → status card appears: "Export requested. We'll email you when it's ready (usually <1 hour)."
+- Delete = typed-confirm dialog requires user to type "DELETE MY ACCOUNT" verbatim. On success → 30-day window: full-screen takeover with mono countdown + Cancel deletion CTA.
+
+**Motion.** Tab change: pane fades 140ms exit + 180ms enter. Toggle: micro 90ms color/opacity. Danger dialog: scrim + scale-in same as standard modal.
+
+**Anti-slop check.**
+- Banned: "Are you sure you want to leave? 😢"; satisfaction survey on delete; "We'll miss you!" copy; auto-export without confirmation.
+- Allowed: explicit "DELETE MY ACCOUNT" typed-confirm; 30-day window countdown; consent history table.
+
+**Copy strings.**
+- H1: "Settings"
+- Tabs: "Account", "Privacy", "Notifications", "Appearance", "Plan", "Danger"
+- Privacy explainer: "We follow PDPB. Sensitive categories (religion, politics, biometric) are never collected."
+- Export CTA: "Export my data"
+- Export status: "Your export is being prepared. Estimated ready: {time}."
+- Delete CTA: "Delete my account"
+- Delete confirm helper: "Type DELETE MY ACCOUNT to confirm. You have 30 days to cancel."
+- 30-day banner: "Your account will be deleted on {date}. Cancel deletion."
+
+**Accessibility.** Tabs as Radix Tabs. Danger pane uses `role="region" aria-label="Danger zone"`. Typed-confirm input has `aria-describedby` referencing the helper.
+
+**Responsive.**
+- 375: tabs become horizontal scroll chips above pane.
+- 1024+: left rail tabs.
+
+**Telemetry.** `settings.view {tab}`, `settings.toggle {tab, key, value}`, `settings.export_request`, `settings.delete_request`, `settings.delete_cancel`, `settings.consent_history_view`.
+
+---
+
+### 6.24 `/admin` — Admin KPI Overview
+
+**Purpose.** Give an operator a 5-second read on platform health (ingestion, curation, matches, alerts) with polling.
+
+**Users + Entry.** Admin/owner. Entry: post-login (if admin). Next: any admin sub-route.
+
+**Backend contract.** `GET /api/v1/analytics?since=` (polls every 60s).
+
+**Anatomy.**
+```
++--------------------------------------------------+
+| Page header + Refresh button + Auto-refresh chip |
++--------------------------------------------------+
+| KPI grid 4 columns:                              |
+|   Ingestion (24h) / Curation backlog /           |
+|   Match volume (24h) / Alerts fired (24h)        |
+| Each: number mono 32 + trend chip + sparkline    |
++--------------------------------------------------+
+| Alerts table (last 10): time / severity /        |
+|   source / message / link                        |
++--------------------------------------------------+
+```
+
+**States.**
+- Empty: "No KPI data in the last 24 hours."
+- Loading: skeleton — 4 KPI cards + 10 alert rows.
+- Loaded: golden path.
+- Processing: polling refresh is silent (no overlay); on success crossfade 180ms on numbers only.
+- Error: ErrorState replaces grid; polling pauses with retry button.
+- Success: not applicable (read-only).
+- Locked: not applicable.
+
+**Interactions.** Refresh manual. Auto-refresh toggle.
+
+**Motion.** Number crossfade 180ms on poll update.
+
+**Anti-slop check.**
+- Banned: "All systems go ✅"; rainbow status indicator; "Health score: 99.9!"; auto-tweet of KPIs.
+- Allowed: explicit values; "Ingestion: 12 runs (8 success, 4 degraded)"; severity color chips.
+
+**Copy strings.**
+- H1: "Overview"
+- KPI titles: "Ingestion (24h)", "Curation backlog", "Match volume (24h)", "Alerts fired (24h)"
+- Auto-refresh chip: "Auto-refresh: 60s"
+
+**Accessibility.** Auto-refresh polling pauses when user focuses any control. Number changes announce only when changed by >10%.
+
+**Responsive.**
+- 375: KPI grid 1×4 stack.
+- 1024+: 4×1 row.
+
+**Telemetry.** `admin.overview_view`, `admin.refresh_click`, `admin.auto_refresh_toggle`, `admin.alert_click {alert_id}`.
+
+---
+
+### 6.25 `/admin/ingestion` + `/admin/ingestion/[id]` — Ingestion
+
+**Purpose.** Manage scraper sources and runs: start runs, view diagnostics, retry, audit source health.
+
+**Users + Entry.** Admin. Entry: sidebar Ingestion. Next: source detail, audit, curation.
+
+**Backend contract.** `GET /api/v1/curation/sources`, `POST /api/v1/curation/sources/{id}/run`, `GET /api/v1/curation/ingestion-runs?source_id=`, `GET /api/v1/curation/ingestion-runs/{id}` (with diagnostics + snapshot).
+
+**Anatomy (list).**
+```
++--------------------------------------------------+
+| Header + bulk actions (Start selected / Retry)   |
++--------------------------------------------------+
+| Filter: status (all/healthy/degraded/down) +     |
+|   country + last-run age                         |
++--------------------------------------------------+
+| Sources table: select / name / status chip /     |
+|   last run / failure count / next ETA / actions  |
++--------------------------------------------------+
+| Pagination                                       |
++--------------------------------------------------+
+```
+
+**Anatomy (detail).**
+```
++--------------------------------------------------+
+| Source header + status                           |
++--------------------------------------------------+
+| Run timeline: vertical list of runs              |
+|   each: status / start / duration / records /    |
+|   diagnostics expand                             |
++--------------------------------------------------+
+| Diagnostics panel: parser logs / HTTP traces /   |
+|   snapshot diff / errors                         |
++--------------------------------------------------+
+| Snapshot viewer (collapsible, 720 max-w mono)    |
++--------------------------------------------------+
+```
+
+**States.**
+- Empty (list): "No sources registered yet."
+- Empty (detail): "No runs for this source yet. Start one."
+- Loading: skeleton rows / timeline.
+- Loaded: golden path.
+- Processing: starting a run → row status chip transitions to "Running" with mono spinner.
+- Error: per-row error chip + retry; whole-page error ErrorState.
+- Success: silent (state chip is the signal).
+- Locked: not applicable.
+
+**Interactions.** Bulk select with shift-click range. Filter persists in URL. Diagnostics panel is `<details>`.
+
+**Motion.** Row status crossfade 180ms on poll update. Diagnostics expand 220ms.
+
+**Anti-slop check.**
+- Banned: "Healthy 💚"; flame emoji on degraded; auto-restart loop on every page focus.
+- Allowed: status chip ("Healthy / Degraded / Down"); mono "Last run: 2026-05-17 12:14"; explicit fail count.
+
+**Copy strings.**
+- H1: "Ingestion sources"
+- Source table cols: "Name", "Status", "Last run", "Failures", "Next ETA"
+- Detail H1: "{source name}"
+- Run row: "Run {id} — {status}", "Records: {count}", "Duration: {duration}"
+
+**Accessibility.** Bulk select uses `<input type="checkbox">` with `aria-label`. Run list is `<ol>` with semantic ordering. Diagnostics `<pre>` for logs.
+
+**Responsive.**
+- 375: table → cards; bulk select disabled (use detail).
+- 1024+: full table.
+
+**Telemetry.** `admin.ingestion_view`, `admin.ingestion_filter {filter}`, `admin.ingestion_start_run {source_id}`, `admin.ingestion_retry {source_id}`, `admin.ingestion_detail_view {source_id}`, `admin.ingestion_run_expand {run_id}`.
+
+---
+
+### 6.26 `/admin/curation` + `/admin/curation/[id]` — Curation
+
+**Purpose.** Move records from raw → validated → published, with audit trail.
+
+**Users + Entry.** Admin. Entry: sidebar Curation. Next: record detail.
+
+**Backend contract.** `GET /api/v1/curation/records?state=`, `PATCH /api/v1/curation/records/{id}`, audit on every change.
+
+**Anatomy (list).**
+```
++--------------------------------------------------+
+| Header + state filter (raw/validated/published)  |
++--------------------------------------------------+
+| Records table: title / source / state /          |
+|   confidence / updated / open                    |
++--------------------------------------------------+
+```
+
+**Anatomy (detail).**
+```
++--------------------------------------------------+
+| Header: title + state chip + confidence chip     |
++--------------------------------------------------+
+| 2-column: left edit form (title, provider,       |
+|   funding, deadline, country, field, tier,       |
+|   eligibility) / right preview (rendered card)   |
++--------------------------------------------------+
+| Audit trail (collapsible): 10 latest changes     |
++--------------------------------------------------+
+| Footer: Discard / Save / Promote                 |
++--------------------------------------------------+
+```
+
+**States.** Similar to other admin screens; processing on save; error inline; success crossfade preview.
+
+**Interactions.** Promote requires state-machine valid transition. Audit entries are read-only.
+
+**Motion.** Preview crossfade 180ms on field commit.
+
+**Anti-slop.**
+- Banned: AI auto-fill button labelled "Auto-curate ✨"; gold star on high-confidence; emoji status.
+- Allowed: confidence chip "0.87"; promote button labelled by next-state; audit row "Promoted to validated by {admin} at {time}".
+
+**Copy strings.** "Curation", "Raw", "Validated", "Published", "Promote to validated", "Promote to published", "Audit trail".
+
+**Accessibility.** Form fields fully labelled. State chip carries `aria-label="Current state: validated"`.
+
+**Responsive.** Detail collapses to single column on 375 with preview as accordion below.
+
+**Telemetry.** `admin.curation_view`, `admin.curation_filter`, `admin.curation_detail_view {id}`, `admin.curation_save {id}`, `admin.curation_promote {id, from, to}`.
+
+---
+
+### 6.27 `/admin/users` — Users
+
+**Purpose.** Search users, change plan, change role, force password reset.
+
+**Users + Entry.** Admin/owner. Entry: sidebar Users.
+
+**Backend contract.** `GET /api/v1/access-control/users?q=`, `PATCH /api/v1/access-control/users/{id}` (plan/role), `POST /api/v1/access-control/users/{id}/reset-password`.
+
+**Anatomy.**
+```
++----------------------------------+
+| Search + filter (role/plan)      |
++----------------------------------+
+| Users table: email / name / role |
+|   / plan / created / actions     |
++----------------------------------+
+| Pagination                       |
++----------------------------------+
+```
+
+**States.** Standard admin patterns.
+
+**Interactions.** Role mutation opens dialog with select + reason field + confirm. Password reset → confirm dialog → POST → toast.
+
+**Motion.** Row update crossfade 180ms.
+
+**Anti-slop.**
+- Banned: "Make admin 👑"; role chip with crown emoji.
+- Allowed: text role chip; explicit "Reason for role change" field; audit-log "Role changed by {admin} at {time}".
+
+**Copy.** "Users", "Search by email or name", role chips, "Change role", "Reset password".
+
+**Accessibility.** Mutation dialog focus-trapped. Reason field required and `aria-required`.
+
+**Responsive.** Table → cards on 375.
+
+**Telemetry.** `admin.users_view`, `admin.users_search {q}`, `admin.users_role_change {user_id, from, to}`, `admin.users_password_reset {user_id}`.
+
+---
+
+### 6.28 `/admin/audit` — Audit
+
+**Purpose.** Searchable audit log of admin actions for compliance.
+
+**Users + Entry.** Admin/owner. Entry: sidebar Audit.
+
+**Backend contract.** `GET /api/v1/access-control/audit?actor=&action=&since=`.
+
+**Anatomy.**
+```
++----------------------------------+
+| Filters: actor / action / range  |
++----------------------------------+
+| Audit table: time / actor /      |
+|   action / target / diff         |
++----------------------------------+
+```
+
+**States.** Standard. Empty: "No audit entries match these filters." Loading: 20 skeleton rows. Error: ErrorState.
+
+**Interactions.** Diff expand inline. Revert action (if applicable) opens typed-confirm dialog.
+
+**Motion.** Row diff expand 220ms.
+
+**Anti-slop.**
+- Banned: "View as story" timeline ribbon; emoji severity badges.
+- Allowed: mono timestamps; structured diff blocks.
+
+**Copy.** "Audit", "Actor", "Action", "Target", "Revert".
+
+**Accessibility.** Diff `<pre>` with `aria-label`. Revert button confirms via typed-confirm.
+
+**Responsive.** Table → stacked cards on 375.
+
+**Telemetry.** `admin.audit_view`, `admin.audit_filter`, `admin.audit_revert {entry_id}`.
+
+---
+
+### 6.29 `/admin/rec-eval` — Recommendation Benchmarks
+
+**Purpose.** Show recommendation quality metrics across benchmark cases.
+
+**Users + Entry.** Admin/owner.
+
+**Backend contract.** `GET /api/v1/recommendations/benchmarks`.
+
+**Anatomy.**
+```
++----------------------------------+
+| Aggregate chart (recall, prec)   |
++----------------------------------+
+| Per-case table                   |
++----------------------------------+
+```
+
+**States.** Standard.
+
+**Interactions.** Click per-case → diff modal showing expected vs actual.
+
+**Motion.** Chart axes draw once 600ms.
+
+**Anti-slop.**
+- Banned: leaderboard-style ranking; "AI improved by 12% 🚀"; trophy on best case.
+- Allowed: explicit metric definitions; mono percentages.
+
+**Copy.** "Recommendation evaluation", "Recall", "Precision", "Per-case results".
+
+**Accessibility.** Chart provides tabular fallback.
+
+**Responsive.** Chart full-width on 375 with horizontal table scroll.
+
+**Telemetry.** `admin.rec_eval_view`, `admin.rec_eval_case_click {case_id}`.
+
+---
+
+### 6.30 `/mentor/queue` + `/mentor/documents/[id]` — Mentor
+
+**Purpose.** Let a mentor review student SOPs and submit structured feedback (summary, strengths, revision priorities, caution notes).
+
+**Users + Entry.** Mentor. Entry: post-login (mentor role) → /mentor/queue.
+
+**Backend contract.** `GET /api/v1/mentor/queue`, `GET /api/v1/mentor/documents/{id}`, `POST /api/v1/mentor/documents/{id}/review`.
+
+**Anatomy (queue).**
+```
++----------------------------------+
+| Header: H1 + count               |
++----------------------------------+
+| Filter: type / urgency           |
++----------------------------------+
+| Queue list: student email /      |
+|   type / submitted / take CTA    |
++----------------------------------+
+```
+
+**Anatomy (review).**
+```
++----------------------------------+
+| 2-column                         |
+| Left: document body (read-only)  |
+| Right: review form               |
+|   Summary / Strengths /          |
+|   Revision priorities (ordered)/ |
+|   Caution notes / Submit         |
++----------------------------------+
+```
+
+**States.**
+- Empty (queue): "Queue is empty."
+- Loading: skeleton.
+- Loaded: golden path.
+- Processing: Submit spinner; on success → return to queue + toast.
+- Error: inline per-field.
+- Success: queue row removed; next item highlighted.
+- Locked: not applicable.
+
+**Interactions.** Revision priorities are an ordered drag-reorder list (1-N). Caution notes optional. Submit confirms count of priorities.
+
+**Motion.** List reorder 220ms.
+
+**Anti-slop.**
+- Banned: AI-suggested feedback templates; "Mentor of the month" badge; auto-grade slider.
+- Allowed: explicit field labels; "Submit review to {student_email}"; structured priorities.
+
+**Copy.**
+- Queue H1: "Mentor queue"
+- Review H1: "Review for {student_email}"
+- Submit: "Submit review"
+- Caution helper: "Optional. Use for tone or eligibility concerns."
+
+**Accessibility.** Drag-reorder has keyboard fallback (Up/Down arrows when focused).
+
+**Responsive.**
+- 375: document body collapses to "View document" link, form full-width.
+- 1024+: 2-column.
+
+**Telemetry.** `mentor.queue_view`, `mentor.take_doc {doc_id}`, `mentor.review_save {doc_id}`, `mentor.review_priority_reorder`.
+
+---
+
+### 6.31 `/partners` + `/partners/universities` — Partners
+
+**Purpose.** Let a partner (university admin) view their institution dashboard and manage university listings.
+
+**Users + Entry.** Partner role. Entry: post-login. Next: /partners/universities.
+
+**Backend contract.** `GET /api/v1/b2b/institution`, `GET /api/v1/universities?institution_id=`, `PATCH /api/v1/universities/{id}`.
+
+**Anatomy.** Mirror admin patterns: header + filter + table + detail editor.
+
+**States.** Standard.
+
+**Interactions.** Institution-scoped — partner cannot see other institutions' data.
+
+**Motion.** Standard.
+
+**Anti-slop.**
+- Banned: "Recruit students 🎓"; engagement leaderboard with emoji ranks.
+- Allowed: explicit metrics (DPA signed at, snapshot count); structured edit form.
+
+**Copy.** "Partners", "Universities", "DPA signed: {date}", "Snapshots received: {count}".
+
+**Accessibility.** Standard.
+
+**Responsive.** Standard.
+
+**Telemetry.** `partners.view`, `partners.universities_view`, `partners.university_edit {id}`.
+
+---
+
+### 6.32 `404` Not Found
+
+**Purpose.** Tell a user the URL doesn't exist and route them somewhere useful.
+
+**Anatomy.**
+```
++----------------------------------+
+| H1 "Page not found."             |
+| Description                      |
+| 2 CTAs: Go home / See pricing    |
++----------------------------------+
+```
+
+**States.** Single state.
+
+**Copy.**
+- H1: "We couldn't find that page."
+- Description: "The link may be broken or the page may have moved."
+- CTAs: "Go to dashboard" (auth) / "Go to AidwiseAI" (public), "See pricing"
+
+**Anti-slop.** Banned: "Lost in space 🚀", broken-robot illustration. Allowed: text-only, useful CTAs.
+
+**Accessibility.** Single H1.
+
+**Telemetry.** `system.404 {path}`.
+
+---
+
+### 6.33 `500` Server Error
+
+**Purpose.** Tell a user something went wrong on our side and let them retry or report.
+
+**Anatomy.** Similar to 404.
+
+**Copy.**
+- H1: "Something went wrong on our side."
+- Description: "We've logged the error. Try again, or email support@aidwiseai.pk."
+- CTAs: "Try again", "Email support"
+
+**Anti-slop.** Banned: hand-drawn frown face, "Oopsy daisy". Allowed: explicit, useful.
+
+**Accessibility.** Includes incident ID mono for support reference (`<code>{request_id}</code>`).
+
+**Telemetry.** `system.500 {path, request_id}`.
+
+---
+
+### 6.34 `/offline` Offline / Network Failure
+
+**Purpose.** Detect offline state and pause polling, queue mutations, inform the user.
+
+**Anatomy.** Persistent top banner: "You're offline. Changes will sync when you reconnect."
+
+**States.**
+- Offline: banner sticky top + each form has "Will save when online" helper.
+- Reconnecting: banner morphs "Reconnecting…" 90ms color shift.
+- Online: banner dismisses 140ms; toast "Back online. Synced N changes."
+
+**Copy.**
+- Banner: "You're offline. Changes will sync when you reconnect."
+- Toast: "Back online. {n} change{s} synced."
+
+**Anti-slop.** Banned: "No internet 😢", retry counter. Allowed: explicit state, sync counter.
+
+**Telemetry.** `system.offline`, `system.reconnect {queued_count}`.
+
+---
+
+### 6.35 `/denied` RBAC Denied
+
+**Purpose.** Tell a user they don't have access to the requested resource.
+
+**Copy.**
+- H1: "You don't have access to that."
+- Description: "If you think this is wrong, email support@aidwiseai.pk."
+- CTAs: "Go to dashboard", "Email support"
+
+**Anti-slop.** Banned: lock-with-key animation, "Naughty naughty!" Allowed: plain.
+
+**Telemetry.** `system.denied {path, role}`.
+
+---
+
+### 6.36 `/maintenance` Maintenance Window
+
+**Purpose.** Take the app down with grace during a scheduled maintenance window.
+
+**Copy.**
+- H1: "AidwiseAI is down for scheduled maintenance."
+- Description: "We expect to be back by {end_time_pkt}. Thanks for your patience."
+
+**Anti-slop.** Banned: "Working hard! 💪" illustration, fake-progress bar. Allowed: explicit end time, status link.
+
+**Telemetry.** `system.maintenance_view`.
+
+---
+
+## §7 Copy System
+
+### 7.1 Brand strings
+
+- Display brand: **AidwiseAI** (exact casing). Never "Aidwise AI" or "AidwiseAI AI".
+- Tagline: "Funded master's degrees, found for you."
+- Short pitch: "AidwiseAI matches Pakistani students with fully-funded scholarships in the UK, US, Canada, Germany, and Australia."
+- Mailto: `partnerships@aidwiseai.pk`, `support@aidwiseai.pk`.
+- Domain: `aidwiseai.com` (production), `aidwiseai.pk` (alternate).
+
+### 7.2 CTA verb library
+
+Allowed: Add, Generate, Draft, Save, Submit, Practice, Continue, Get started, Sign in, Show, Run, Rerun, See, Open, View, Edit, Delete, Cancel, Confirm, Promote, Move, Skip, Try again, Retry, Download, Copy, Email, Visit, Match, Track, Discover.
+
+Banned: Unlock, Unleash, Boost, Supercharge, Hack, Crush, Dominate, Master, Maximize, Optimize (as user-facing verb).
+
+### 7.3 Empty-state copy register
+
+Empty state = (icon) + (specific reason) + (immediate next action). Never "No data".
+
+- Matches: "No matches yet. Update your profile to broaden your match." + "Edit profile"
+- Tracker: "No applications tracked yet. Add your first." + "Add application"
+- Saved: "Nothing saved yet. Use the save icon on any scholarship to bookmark it." + (no CTA, instruction is enough)
+- Documents: "No documents yet. Draft your first SOP." + "Draft SOP"
+- Interviews: "No sessions yet. Practice your first visa interview." + "Practice visa"
+- Audit: "No audit entries match these filters." + "Clear filters"
+
+### 7.4 Error message register
+
+Pattern: (what failed) + (why, if knowable) + (what to do).
+
+- 400 validation: "Email or password is incorrect."
+- 402 plan-required: backend `detail.message` verbatim.
+- 404: "We couldn't find that page."
+- 429: "Too many attempts. Try again in {n} seconds."
+- 451 consent: "Please re-read the latest Privacy Notice and agree to continue."
+- 500: "Something went wrong on our side. We've logged it. Try again, or email support."
+- Network: "Couldn't reach AidwiseAI. Check your connection."
+
+### 7.5 Banned phrase ledger
+
+`Unlock`, `Unleash`, `Magic`, `Magical`, `AI is thinking`, `AI is generating`, `Powered by AI`, `Revolutionary`, `Game-changing`, `Seamlessly`, `Leverage`, `Synergize`, `Next-generation`, `World-class`, `Cutting-edge`, `Reimagined`, `Reinvented`, `Smart` (adjective for software), `Effortless`, `Just a moment`, `Hang tight`, `Almost there`, `Hold tight`, `Awesome`, `Oopsy`, `Whoops`, `Uh-oh`, `Naughty`, `Lost in space`.
+
+Verification command: `grep -iE "unlock|magic|powered by AI|seamlessly|leverage|synergize|game-changing|world-class|cutting-edge|reimagined|effortless" Front-upgrade.md` should return only this charter section's lines (which name and ban them).
+
+---
+
+## §8 Motion Spec
+
+### 8.1 Tokens
+
+```
+--motion-micro:   90ms  linear
+--motion-enter:   180ms cubic-bezier(0.22, 1, 0.36, 1)
+--motion-exit:    140ms cubic-bezier(0.32, 0, 0.67, 0)
+--motion-layout:  220ms cubic-bezier(0.22, 1, 0.36, 1)
+```
+
+### 8.2 Per-interaction durations
+
+| Interaction              | Token             |
+|--------------------------|-------------------|
+| Hover color/opacity      | micro             |
+| Button press             | micro             |
+| Toast enter              | enter             |
+| Toast exit               | exit              |
+| Modal scrim              | enter             |
+| Modal scale-in           | enter             |
+| Tab indicator slide      | layout            |
+| Kanban card move         | layout            |
+| Accordion expand         | layout            |
+| List row insert          | enter (+ layout)  |
+| List row remove          | exit (+ layout)   |
+| Drawer slide-in          | layout            |
+| Page transition (route)  | (none; instant)   |
+
+### 8.3 Reduced motion
+
+`@media (prefers-reduced-motion: reduce)` collapses every duration > 120ms to opacity-only crossfade at 100ms. Layout reorder becomes instant. Slide / scale animations become fade-only.
+
+### 8.4 Animation discipline
+
+- Animate only `opacity` and `transform`. Never `width`, `height`, `top`, `left`, `margin`, `padding`, `box-shadow` color.
+- A single screen renders at most 1 background-running animation (e.g. trial banner color pulse). No persistent motion otherwise.
+- Numeric counters tween 220ms ease-out on real value change. Skip tween if delta >50% (jump cut feels more honest).
+
+---
+
+## §9 Accessibility Spec
+
+### 9.1 Floor (all surfaces inherit)
+
+- WCAG 2.2 AA contrast: ≥4.5:1 body, ≥3:1 ≥24px.
+- All interactive elements ≥44×44.
+- Focus visible 2px ring, never coloured by component.
+- Tab order = DOM order = visual order.
+- All form inputs have `<label for>` (never placeholder-as-label).
+- All icon-only buttons have `aria-label`.
+- All async status changes announce via `role="status"` polite, or `role="alert"` for errors.
+- All images have `alt`; decorative `alt=""`.
+- Color is never the only signal.
+
+### 9.2 Per-surface audit grid
+
+| Screen                            | Has H1 | Tab order | Focus trap (modal) | Color-not-only | Live region |
+|-----------------------------------|--------|-----------|--------------------|----------------|-------------|
+| /                                 | Y      | Y         | n/a                | Y              | n/a         |
+| /booth/air-university             | Y      | Y         | n/a                | Y              | Y           |
+| /upgrade                          | Y      | Y         | n/a                | Y              | Y (status)  |
+| /legal/[slug]                     | Y      | Y         | n/a                | Y              | Y (status)  |
+| /signup                           | Y      | Y         | n/a                | Y              | Y (alert)   |
+| /login                            | Y      | Y         | n/a                | Y              | Y (alert)   |
+| /onboarding                       | Y      | Y         | n/a                | Y              | Y (status)  |
+| /feed                             | Y      | Y         | n/a                | Y              | Y (status)  |
+| /discover                         | Y      | Y         | n/a                | Y              | n/a         |
+| /scholarships/[id]                | Y      | Y         | n/a                | Y              | Y (status)  |
+| /saved                            | Y      | Y         | n/a                | Y              | Y (status)  |
+| /dashboard/scholarships/match     | Y      | Y         | n/a                | Y              | Y (status)  |
+| /tracker                          | Y      | Y         | Y (drawer)         | Y              | Y (status)  |
+| /documents                        | Y      | Y         | n/a                | Y              | n/a         |
+| /documents/[id]                   | Y      | Y         | n/a                | Y              | Y (status)  |
+| /documents/sop                    | Y      | Y         | n/a                | Y              | Y (status)  |
+| /documents/professor-email        | Y      | Y         | n/a                | Y              | Y (status)  |
+| /interviews                       | Y      | Y         | n/a                | Y              | n/a         |
+| /interviews/[id]                  | Y      | Y         | n/a                | Y              | Y (status)  |
+| /interviews/visa                  | Y      | Y         | n/a                | Y              | Y (status)  |
+| /profile                          | Y      | Y         | n/a                | Y              | Y (status)  |
+| /settings                         | Y      | Y         | Y (typed-confirm)  | Y              | Y (status)  |
+| /admin/*                          | Y      | Y         | Y (dialogs)        | Y              | Y (status)  |
+| /mentor/*                         | Y      | Y         | n/a                | Y              | Y (status)  |
+| /partners/*                       | Y      | Y         | n/a                | Y              | n/a         |
+| 404/500/offline/denied/maintenance| Y      | Y         | n/a                | Y              | n/a         |
+
+### 9.3 Screen reader contract
+
+- Route changes announce new page title via `<title>` update.
+- Optimistic mutations announce success ("Added to Wishlist") and rollback ("Couldn't move card — restored").
+- Long-running operations announce start ("Generating SOP") and completion ("SOP ready").
+- Locked content announces "Locked — Pro required".
+
+---
+
+## §10 Performance Budgets
+
+### 10.1 Hard ceilings
+
+| Metric                          | Budget                                    |
+|---------------------------------|-------------------------------------------|
+| Largest Contentful Paint (LCP)  | < 1.8s on /feed at p75 4G                 |
+| Interaction to Next Paint (INP) | < 200ms p75 across all surfaces           |
+| Initial JS bundle (gzipped)     | ≤ 180 KB                                  |
+| Per-route JS (gzipped)          | ≤ 60 KB                                   |
+| Image weight per page           | ≤ 240 KB total above the fold             |
+| Web font weight                 | ≤ 80 KB total (3 families subset Latin + Latin-ext) |
+| Time to Interactive (TTI)       | < 3s on /feed at p75 4G                   |
+| Cumulative Layout Shift (CLS)   | < 0.05 on every page                      |
+
+### 10.2 Tactics
+
+- SSR / SSG marketing pages. Hydration partial where possible.
+- `next/font` for Fraunces, Inter, JetBrains Mono — subset Latin + Latin-ext, weights 400/500/600.
+- Images via `next/image` with explicit width/height. WebP + AVIF.
+- Above-the-fold images `priority`. Below-the-fold `loading="lazy"`.
+- Skeleton screens, not spinners, on first paint.
+- Code-split heavy admin charts (Recharts) — load only on chart pages.
+- React Query: 30s default stale, no retry on 4xx, optimistic for mutations.
+
+### 10.3 Anti-pattern enforcement
+
+- No client-side framework on marketing pages beyond minimal interactivity.
+- No third-party analytics that block first paint.
+- No CSS-in-JS runtime (Tailwind 4 atomic CSS only).
+- No icon font (SVG only).
+- No video autoplay above the fold.
+
+---
+
+## §11 Self-Review Checklist (delivery gate)
+
+A frontend engineer reviewing their own PR runs this checklist before requesting review.
+
+### 11.1 Voice & Copy
+- [ ] Zero banned phrases (`grep -iE` against §7.5 ledger returns no hits).
+- [ ] Every CTA uses a verb from §7.2 allowed list.
+- [ ] Every empty state matches §7.3 register (reason + next action).
+- [ ] Every error matches §7.4 pattern.
+- [ ] Brand is exactly "AidwiseAI" everywhere user-facing.
+
+### 11.2 Tokens
+- [ ] No raw hex colors in component code — only `var(--token)`.
+- [ ] No `#F7F5F0` leftovers from prior spec.
+- [ ] All radii match §2.3 scale.
+- [ ] All shadows from §2.3 (hairline / lift / raised) — no glow, no coloured shadow.
+
+### 11.3 States coverage
+- [ ] Every screen documents empty / loading / loaded / processing / error / success / locked (where applicable).
+- [ ] Skeleton renders once per route load (never per item).
+- [ ] Optimistic mutations carry rollback toasts.
+- [ ] 402 renders UpgradeWall with backend `detail.message`.
+
+### 11.4 Motion
+- [ ] All animated properties are `opacity` or `transform`.
+- [ ] All durations from §8.1 token table.
+- [ ] `prefers-reduced-motion: reduce` collapses non-essential motion.
+
+### 11.5 Accessibility
+- [ ] Single H1 per screen.
+- [ ] All inputs have `<label for>`.
+- [ ] All icon-only buttons have `aria-label`.
+- [ ] Tab order matches visual order.
+- [ ] Focus ring visible 2px on every interactive.
+- [ ] Color is never the only signal.
+- [ ] Async status announces via live region.
+
+### 11.6 Anti-slop visuals
+- [ ] No emoji in any UI string (`grep -E "[🚀✨🎉🔥⚡👋🎯💪]" frontend/src` returns 0).
+- [ ] No gradient mesh / blob background.
+- [ ] No sparkle / glow / neon.
+- [ ] No marquee / auto-carousel.
+- [ ] No bouncy hover, no scale-up that shifts layout.
+
+### 11.7 Performance
+- [ ] Initial JS ≤ 180 KB gzipped.
+- [ ] LCP < 1.8s on /feed at p75 4G.
+- [ ] CLS < 0.05 on the changed route.
+
+### 11.8 Data + RBAC
+- [ ] Backend `detail.message` consumed verbatim on 402.
+- [ ] Public surfaces return only published scholarships.
+- [ ] No B2B leakage into student-facing recommendations (CI trust-boundary test green).
+- [ ] PDPB consent captured at signup; version-mismatch flow honoured.
+
+### 11.9 Telemetry
+- [ ] All events from per-screen Telemetry sections fire as specified.
+- [ ] Event payloads contain only documented fields.
+
+### 11.10 Final sign-off
+
+- [ ] Spec read in full by reviewer (this doc).
+- [ ] Each screen in scope of the PR has its §6 entry referenced in the PR description.
+- [ ] Self-review run twice: once on desktop, once on mobile.
+
+---
+
+*End of specification. Version v4 — purpose-built rewrite, authored 2026-05-17. Supersedes all prior frontend planning documents. The prior version is retained at `Front-upgrade.legacy.md` for sprint-history reference only.*

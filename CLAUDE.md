@@ -91,9 +91,10 @@ All must pass before push: backend unit+integration, KPI regression, frontend li
 2. Write `progress.md` before `/clear` or session end. Overwrite each time.
 3. Trace requirements → code → e2e before declaring feature done. Evidence > assertion.
 
-## Front-upgrade planning docs (2026-05-15)
-- `Front-upgrade.md` (fresh AidwiseAI design spec, 15 sections) + `Front-upgrade.html` (9-sprint delta plan, ~21 dev-days) at repo root. Reconciled against live `frontend/src` — supersede `DESIGN_SPEC.md` / `FRONTEND_ENHANCEMENT_PLAN.html`. Key finding: Pakistan API layer + `UpgradeWall` already built; gap is the student-facing pages. `globals.css` lacks `--color-gold` token — add in S3.
-- **Brand rename 2026-05-15:** GrantPath → **AidwiseAI** in `Front-upgrade.md`, `Front-upgrade.html`, root `CLAUDE.md`, `frontend/CLAUDE.md`. Codebase still hardcodes "GrantPath" in `app/page.tsx` + `Sidebar.tsx`; rename happens in S1 + S3 sprints. Lowercase `grantpath.*` localStorage keys (`grantpath.access_token` / `grantpath.refresh_token` / `grantpath.access_expires_at` / `grantpath.onboarding_draft`) **kept** — they are code identifiers in `client.ts`, renaming them logs every user out. `frontend/CLAUDE.md:11` historical "GrantPath AI metadata" line left intact (factual record of the wiped old frontend). Brand-derived mailto updated: `partnerships@aidwiseai.pk`.
+## Front-upgrade planning docs
+- **v4 spec authored 2026-05-17** (`Front-upgrade.md`, 2646 lines, 11 sections / 36 screen specs). Premium Cultural: ivory `#FBF7EE` + ink-deep `#0E1A1F` + lapis `#1B3A6B` + gold-leaf `#B08A3E` + sindoor `#B94A48`; Fraunces italic display + Inter body + JetBrains Mono data. Every screen: states + backend contract + anti-slop ban list + verbatim copy + a11y + telemetry. Banned-phrase grep in §7.5. Prior v3 at `Front-upgrade.legacy.md`.
+- **S88 Premium Cultural rebuild landed 2026-05-17** — foundations + 9 routes + cookie banner + visual audit. See `frontend/CLAUDE.md` "S88" section. Lint + typecheck + build all clean. 21/24 audit routes 200 (only `/legal/privacy` missing — future task). Playwright audit runner at `frontend/scripts/visual-audit.mjs`; screenshots at `frontend/audit-out/`.
+- **Brand rename 2026-05-15:** GrantPath → **AidwiseAI**. `grantpath.*` localStorage keys kept (renaming logs users out).
 
 ## Open work
 - ~~Frontend Pass~~ **landed 2026-05-15** on branch `feat/pakistan-frontend-pass`. Remaining: re-point Playwright smoke selectors to new routes and remove `continue-on-error: true` from the `browser-smoke` step in `.github/workflows/ci.yml`; consent UI + cookie banner + settings privacy.

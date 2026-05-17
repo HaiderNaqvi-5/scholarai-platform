@@ -65,3 +65,6 @@ backend/runtime/
 
 # graphify tool output
 graphify-out/
+
+# frontend visual-audit screenshots (regenerated per run via scripts/visual-audit.mjs)
+frontend/audit-out/

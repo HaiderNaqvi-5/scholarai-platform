@@ -27,6 +27,8 @@ export type User = {
   plan: Plan;
   plan_currency: Currency;
   billing_country?: string | null;
+  /** Trial expiry timestamp (null for non-trial plans). */
+  plan_expires_at?: string | null;
 };
 
 export type TokenResponse = {
