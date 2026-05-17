@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 import type { IngestionRun, IngestionRunStatus } from "@/lib/api";
 
@@ -82,10 +83,10 @@ function IngestionInner() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Ingestion runs</h1>
-        <p className="mt-1 text-ink-muted">Source registry runs, capture, retries, and snapshots.</p>
-      </header>
+      <PageHeader
+        title="Ingestion runs"
+        description="Source registry runs, capture, retries, and snapshots."
+      />
 
       <Card>
         <CardHeader>

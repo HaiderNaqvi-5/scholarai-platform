@@ -93,8 +93,12 @@ export default function CurationDetailPage({
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-ink">{r.title}</h1>
-          <p className="mt-1 font-mono text-xs text-ink-subtle">{r.record_id}</p>
+          <h1 className="font-display text-[24px] italic font-[450] leading-[1.2] tracking-[-0.02em] text-ink-deep">
+            {r.title}
+          </h1>
+          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
+            {r.record_id}
+          </p>
         </div>
         <Badge tone={TONE[r.state]}>{r.state}</Badge>
       </header>

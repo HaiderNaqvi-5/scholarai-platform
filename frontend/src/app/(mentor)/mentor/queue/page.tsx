@@ -6,6 +6,7 @@ import { ArrowRight, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 
 export default function MentorQueuePage() {
@@ -15,15 +16,16 @@ export default function MentorQueuePage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl text-ink">Pending reviews</h1>
-        <p className="mt-1 text-ink-muted">
-          {queueQ.data
+    <div data-testid="mentor-queue" className="mx-auto max-w-4xl">
+      <PageHeader
+        title="Pending reviews"
+        description={
+          queueQ.data
             ? `${queueQ.data.total} document${queueQ.data.total === 1 ? "" : "s"} waiting.`
-            : "Documents waiting for human review."}
-        </p>
-      </header>
+            : "Documents waiting for human review."
+        }
+        className="mb-6"
+      />
 
       {queueQ.isLoading ? (
         <div className="space-y-3">

@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     BRAND_DISPLAY_NAME: str = "AidwiseAI"
     EMAIL_FROM_LOCALPART: str = "noreply"
 
+    # --- Sentry (opt-in; unset DSN = no init, app boots clean) ---
+    # sentry-sdk is bundled in requirements.txt for the Air-Uni booth.
+    # main._init_sentry() reads these on app startup. Failure to init is
+    # logged and ignored so an invalid DSN never blocks boot.
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.10
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.10
+    SENTRY_ENVIRONMENT: str = "development"
+
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
         if env_name not in {"production", "staging"}:

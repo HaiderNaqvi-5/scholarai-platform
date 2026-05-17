@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import {
   Dialog,
   DialogContent,
@@ -40,9 +41,12 @@ export default function AdminUsersPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Users</h1>
-        <p className="mt-1 text-ink-muted">
+      <PageHeader
+        title="Users"
+        description="Roster and current role. Owners can mutate role with a reason."
+      />
+      <header className="sr-only">
+        <p>
           Roster and current role. Owners can mutate role with a reason.
         </p>
       </header>

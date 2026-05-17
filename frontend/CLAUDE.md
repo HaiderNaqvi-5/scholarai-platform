@@ -130,6 +130,8 @@ src/
 | S9 | Admin overview (KPI alerts polled 60s + stats grid), Users (role mutation Dialog w/ reason), Audit (revert Dialog), Rec-eval (benchmarks + per-case + aggregate) | **Done** |
 | S10 | Polish: data-testid added (login-form, app-shell, name attrs); auth smoke re-pointed to /feed. **Remaining**: axe-core gate, responsive matrix at 375/768/1024/1440, full smoke selector re-point for documents/recs/curation/interview/curation, RBAC matrix Playwright spec | Partial |
 | S88 | **Premium Cultural rebuild** (2026-05-17): tokens swap (ivory/ink-deep/lapis/gold-leaf/sindoor); fonts swap (Fraunces/Inter/JBM); UI primitives repainted (Button + lapis/gold/sindoor variants, Card + asPanel, Badge + Chip atoms, IconButton, EmptyState/ErrorState, SectionHeader/PageHeader, StatChip, Skeleton with opacity-pulse). 9 routes rebuilt: `/`, `/booth/air-university` (NEW), `/upgrade`, `/signup` (+invite chip + Air U fields), `/login` (CapsLock + rate-limit countdown), `/onboarding`, `/feed`. CookieBanner + CookiePreferences modal wired in `providers.tsx`. AidwiseAI metadata. Sidebar + TopBar repainted: lapis active nav, gold trial banner, ink-deep avatar pip, `/` keyboard shortcut. Visual audit script at `scripts/visual-audit.mjs` (Playwright headless, 375/1024/1440 viewports, console-error capture); screenshots to `audit-out/`. | **Done** |
+| S89.1 | **S89 cleanup pass** (2026-05-18, branch `feat/s89-premium-cultural`): match-route alias at `/dashboard/scholarships/match` re-exports `/scholarships` (unblocks sidebar 404 + onboarding redirect + feed links). `StudentProfile` type sync 10→28 fields mirroring backend `students.py`. `/profile` expanded 3→6 cards per §6.22: Contact / Academic record / Test scores / Your goal (multi-select chips for `target_countries` + `target_fields` via new `components/profile/MultiChip.tsx`) / Aspirations (research pubs) / Background (3 boolean financial-context flags). Admin (8 routes) + mentor (2 routes) + partners (2 routes) headers swapped to `PageHeader` primitive; KPI numbers in admin/overview reshaped from Fraunces 3xl → JBM mono 28/tabular-nums; `caution-stripe` utility on KPI alert card; testids added (`admin-overview`, `mentor-queue`, `partners-overview`, `partners-universities`). Backend gap quick wins: Mailgun + Sentry keys appended to `backend/.env.example` and `app/core/config.py`; `app/main.py:_init_sentry()` gated by `SENTRY_DSN` (no-op when unset, fail-soft on init error). | **Done** |
+| S89 | **Premium Cultural pass + audit harness + missing routes** (2026-05-17 → 2026-05-18, branch `feat/s89-premium-cultural`): state-matrix runner under `scripts/audit/` (`@axe-core/playwright` a11y, copy-grep banned-phrase ledger, emoji-grep over `src/`, `page.route()` 402/500/empty/loading mocks, REPORT.md per route × viewport × state). 6 missing routes added: `/not-found`, `/error` + `/global-error`, `/offline`, `/denied`, `/maintenance`, `/legal/[slug]` (server-rendered against `GET /privacy/legal/{slug}` with print stylesheet + version chip + ToC). `OfflineBanner` + `ConsentBar` mounted globally. /saved rewritten Kanban→list + sort dropdown + inline Promote-to-tracker (mutation pattern preserved). `/documents/new` deleted (not in IA §3.1). /documents repaint (Add dropdown, URL-stateful filter chips, table at lg+, status labels Draft/Final). /profile + /settings repaint (PageHeader, StickySaveFooter, 6-tab settings with TypedConfirm DELETE MY ACCOUNT pattern + privacy + data export + 30-day cancel deletion wiring). /interviews list TrendStrip + RubricSparkline. /scholarships/[id] sticky AsideAtAGlance ("Estimated Scholarship Fit Score" verbatim). /discover Pagination component. 11 data-testids backfilled. **Landing polish (2026-05-18):** hero 2-col at lg+ with right editorial preview card, 6-Q FAQ via native `<details>`, closing CTA before footer, lapis-lifted eyebrows. New primitives: `components/ui/pagination.tsx`, `consent/ConsentBar.tsx`, `legal/LegalViewer.tsx`, `interview/TrendStrip.tsx` + `RubricSparkline.tsx`, `scholarship/AsideAtAGlance.tsx`, `profile/StickySaveFooter.tsx`, `settings/TypedConfirm.tsx`, `system/OfflineBanner.tsx` + `SystemErrorLayout.tsx`, `saved/SavedRow.tsx` + `SortDropdown.tsx`. New endpoint module `lib/api/endpoints/legal.ts` (consent state + grant + data-export + account-deletion). Smoke selector re-point + `.github/workflows/ci.yml:198` `continue-on-error` removal deferred until 3 green local runs (plan mitigation #3). | **Done** |
 
 ## UI primitives (post-S88)
 
@@ -146,6 +148,9 @@ src/
 - `ui/tabs` (Radix Tabs wrapper).
 - `ui/select` (Radix Select wrapper). Forms still use native `<select>` where simpler — both acceptable.
 - `consent/CookieBanner` (bottom sheet + CookiePreferences modal, persists `aidwise.cookie_consent` localStorage).
+- `consent/ConsentBar` (post-S89, sticky bottom — polls `/privacy/consent` every 5min, surfaces on terms/privacy version mismatch, POSTs `/privacy/consent` on agree, persists agreed versions to `aidwise.consent_versions`).
+- `system/OfflineBanner` (post-S89, fixed top — `useSyncExternalStore` over `navigator.onLine`; sindoor-soft offline / validated-soft "back online"; hidden on `/offline`).
+- `ui/pagination` (post-S89, prev/numbered/next with ellipsis ≥5 pages, URL-stateful when wired with `router.replace`).
 
 ## Shared feature components
 
@@ -153,6 +158,12 @@ src/
 - `scholarship/RecommendationCard` — feed card with stage chips, factor lists, expandable EligibilityMatrix.
 - `scholarship/EligibilityMatrix` — 5-axis eligibility table comparing student profile vs scholarship rules.
 - `interview/RubricRadar` — recharts radar over `InterviewRubricDimension[]`.
+- `interview/TrendStrip` + `interview/RubricSparkline` — post-S89, /interviews list trend strip (5 rubric chips + mono sparkline).
+- `scholarship/AsideAtAGlance` — post-S89, sticky right aside on /scholarships/[id] (deadline / funding / Estimated Scholarship Fit Score / source).
+- `legal/LegalViewer` + `legal/markdown` — post-S89, server-rendered legal doc with version chip + ToC + minimal markdown→block parser (no runtime dep).
+- `profile/StickySaveFooter` — post-S89, reusable dirty-state footer for /profile + /settings.
+- `settings/TypedConfirm` — post-S89, typed-confirm dialog ("DELETE MY ACCOUNT" verbatim).
+- `saved/SavedRow` + `saved/SortDropdown` — post-S89, list-row + kebab menu replaces /saved Kanban.
 
 ## Verification before marking work complete
 
@@ -162,5 +173,6 @@ src/
 - For UI work: visual check at 375 / 768 / 1024 / 1440 widths
 - For mutations: confirm optimistic flow + rollback toast on simulated 4xx
 - For new endpoints: confirm `lib/api/types.ts` matches backend response shape (curl against running backend)
+- For audit harness: `bun run audit:emoji` (sub-second, source-only) + `bun run audit:public` (no auth) + `bun run audit` (full matrix, requires backend + zara persona)
 
 @AGENTS.md

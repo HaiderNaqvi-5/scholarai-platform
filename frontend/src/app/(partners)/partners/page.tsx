@@ -7,21 +7,16 @@
  */
 
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/section-header";
 
 export default function PartnersHome() {
   return (
-    <div className="space-y-6">
-      <header>
-        <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">
-          Institution
-        </p>
-        <h1 className="mt-1 font-display text-3xl text-ink">Partner overview</h1>
-        <p className="mt-1 text-ink-muted">
-          Visibility into AidwiseAI applicants who have opted in to share their
-          profile with your institution. Trust boundary: this surface is fully
-          isolated from the student recommendation engine.
-        </p>
-      </header>
+    <div data-testid="partners-overview" className="space-y-6">
+      <PageHeader
+        eyebrow="Institution"
+        title="Partner overview"
+        description="Visibility into AidwiseAI applicants who have opted in to share their profile with your institution. Trust boundary: this surface is fully isolated from the student recommendation engine."
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -29,7 +24,7 @@ export default function PartnersHome() {
             <CardTitle>Shared profiles</CardTitle>
           </CardHeader>
           <CardBody>
-            <p className="font-display text-3xl text-ink">—</p>
+            <p className="font-mono text-[28px] font-semibold tabular-nums text-ink-deep">—</p>
             <p className="mt-1 text-sm text-ink-muted">
               Students who opted in to B2B sharing with your DPA-signed
               institution.
@@ -41,7 +36,7 @@ export default function PartnersHome() {
             <CardTitle>Pending consent</CardTitle>
           </CardHeader>
           <CardBody>
-            <p className="font-display text-3xl text-ink">—</p>
+            <p className="font-mono text-[28px] font-semibold tabular-nums text-ink-deep">—</p>
             <p className="mt-1 text-sm text-ink-muted">
               Matches who have not yet granted B2B share consent.
             </p>
@@ -52,7 +47,7 @@ export default function PartnersHome() {
             <CardTitle>Enrolments</CardTitle>
           </CardHeader>
           <CardBody>
-            <p className="font-display text-3xl text-ink">—</p>
+            <p className="font-mono text-[28px] font-semibold tabular-nums text-ink-deep">—</p>
             <p className="mt-1 text-sm text-ink-muted">
               Referral enrolments confirmed by your registrar (post-FYP).
             </p>

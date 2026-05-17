@@ -8,6 +8,7 @@ import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 import type { CurationState } from "@/lib/api";
 
@@ -43,9 +44,12 @@ function CurationInner() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <header>
-        <h1 className="font-display text-3xl text-ink">Curation</h1>
-        <p className="mt-1 text-ink-muted">
+      <PageHeader
+        title="Curation"
+        description="State machine: raw → validated → published. Public discover shows published only."
+      />
+      <header className="sr-only">
+        <p>
           State machine: raw → validated → published. Public discover shows published only.
         </p>
       </header>
