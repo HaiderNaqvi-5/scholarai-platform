@@ -1,40 +1,89 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────
+   AidwiseAI — Premium Cultural design tokens (Front-upgrade.md §2)
+   Ivory paper, ink-deep print, lapis serif accents, gold leaf for
+   premium, sindoor for urgency. One accent per screen.
+   ───────────────────────────────────────────────────────────────── */
+
 @theme {
-  --color-ink: #0C1117;
-  --color-ink-strong: #1B2633;
-  --color-ink-muted: #334155;
-  --color-ink-subtle: #64748B;
-  --color-paper: #F7F5F0;
-  --color-paper-warm: #F1EDE4;
-  --color-paper-dim: #E7E1D5;
-  --color-paper-white: #FFFDF9;
-  --color-validated: #426B5A;
+  /* ─── Color (semantic) ─── */
+  --color-ivory:          #FBF7EE;
+  --color-paper-warm:     #F3ECDC;
+  --color-paper-edge:     #E5DAC2;
+  --color-paper-white:    #FFFDF9;
+
+  --color-ink-deep:       #0E1A1F;
+  --color-ink:            #1B2630;
+  --color-ink-muted:      #4A5663;
+  --color-ink-subtle:     #6E7984;
+
+  --color-lapis:          #1B3A6B;
+  --color-lapis-soft:     #DCE3EE;
+  --color-gold-leaf:      #B08A3E;
+  --color-gold-soft:      #F1E6CA;
+  --color-sindoor:        #B94A48;
+  --color-sindoor-soft:   #F2D9D5;
+
+  --color-validated:      #426B5A;
   --color-validated-soft: #DDE9E2;
-  --color-caution: #B7791F;
-  --color-caution-soft: #F4E7CF;
-  --color-danger: #B94A48;
-  --color-danger-soft: #F4D8D6;
-  --color-generated: #2E5B9A;
+  --color-generated:      #2E5B9A;
   --color-generated-soft: #DCE6F4;
+  --color-caution:        #B7791F;
+  --color-caution-soft:   #F4E7CF;
 
-  --color-background: var(--color-paper);
-  --color-foreground: var(--color-ink);
-  --color-border: rgba(12, 17, 23, 0.08);
-  --color-ring: rgba(46, 91, 154, 0.32);
+  /* ─── Color (functional aliases used by Tailwind) ─── */
+  --color-background:     var(--color-ivory);
+  --color-foreground:     var(--color-ink-deep);
+  --color-paper:          var(--color-ivory);   /* legacy alias for bg-paper */
+  --color-paper-dim:      var(--color-paper-edge);
+  --color-ink-strong:     var(--color-ink);     /* legacy alias */
+  --color-white:          var(--color-paper-white);
+  --color-danger:         var(--color-sindoor);
+  --color-danger-soft:    var(--color-sindoor-soft);
 
-  --radius-sm: 12px;
-  --radius-card: 16px;
-  --radius-panel: 20px;
-  --radius-hero: 24px;
+  /* ─── Borders + focus ─── */
+  --color-border:         rgba(14, 26, 31, 0.10);   /* hairline */
+  --color-border-quiet:   rgba(14, 26, 31, 0.06);
+  --color-ring:           rgba(27, 58, 107, 0.32); /* focus ring (lapis) */
+  --color-scrim:          rgba(14, 26, 31, 0.48);
 
-  --shadow-quiet: 0 12px 32px rgba(12, 17, 23, 0.04);
-  --shadow-soft: 0 20px 48px rgba(12, 17, 23, 0.07);
+  /* ─── Radius ─── */
+  --radius-input:  10px;
+  --radius-sm:     10px;
+  --radius-pill:   999px;
+  --radius-button: 12px;
+  --radius-card:   18px;
+  --radius-panel:  22px;
+  --radius-hero:   28px;
 
-  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono), ui-monospace, monospace;
+  /* ─── Shadow (neutral only, no glow) ─── */
+  --shadow-hairline: inset 0 0 0 1px var(--color-border);
+  --shadow-lift:     0 1px 2px rgba(14,26,31,0.04), 0 8px 24px -12px rgba(14,26,31,0.10);
+  --shadow-raised:   0 12px 32px -16px rgba(14,26,31,0.18);
+  --shadow-quiet:    0 1px 2px rgba(14,26,31,0.04);   /* legacy alias */
+  --shadow-soft:     var(--shadow-lift);              /* legacy alias */
+
+  /* ─── Motion ─── */
+  --motion-micro:  90ms;
+  --motion-enter:  180ms;
+  --motion-exit:   140ms;
+  --motion-layout: 220ms;
+  --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in:       cubic-bezier(0.32, 0, 0.67, 0);
+
+  /* ─── Typography ─── */
+  /* Fraunces (display, variable opsz + SOFT, italic enabled on h1) */
+  --font-display: var(--font-display), ui-serif, Georgia, "Times New Roman", serif;
+  /* Inter (body, ss01 single-storey a + cv11 tabular zero) */
+  --font-sans:    var(--font-ui), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* JetBrains Mono (data, codes, deadlines, currencies) */
+  --font-mono:    var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Base layer
+   ───────────────────────────────────────────────────────────────── */
 
 @layer base {
   *,
@@ -42,45 +91,100 @@
   ::after {
     border-color: var(--color-border);
   }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   body {
     background: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
-    line-height: 1.6;
+    font-feature-settings: "ss01", "cv11";  /* single-storey a, tabular zero */
+    font-size: 15px;
+    line-height: 1.65;
+    letter-spacing: -0.005em;
   }
-  h1, h2, h3, h4 {
+
+  /* Display headings — Fraunces. Italic on display h1 only (per §1.2 + §2.2). */
+  h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    font-optical-sizing: auto;
+    font-variation-settings: "SOFT" 30;
+    letter-spacing: -0.02em;
+    color: var(--color-ink-deep);
   }
+
+  /* Numerals throughout body get tabular figures for vertical alignment. */
+  body, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Mono carries data — codes, deadlines, IDs, prices. */
+  code, kbd, samp, .font-mono {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+
   ::selection {
-    background: var(--color-validated-soft);
-    color: var(--color-ink);
+    background: var(--color-lapis-soft);
+    color: var(--color-ink-deep);
   }
+
   :focus-visible {
-    outline: 2px solid var(--color-generated);
+    outline: 2px solid var(--color-ring);
     outline-offset: 2px;
     border-radius: 4px;
   }
+
+  /* Skip-to-content for screen readers (revealed on focus). */
+  .skip-to-content {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .skip-to-content:focus {
+    position: fixed;
+    left: 16px;
+    top: 16px;
+    width: auto;
+    height: auto;
+    padding: 12px 20px;
+    background: var(--color-ink-deep);
+    color: var(--color-paper-white);
+    border-radius: var(--radius-button);
+    z-index: 9999;
+  }
+
+  /* Reduced motion: every layout/duration > 120ms → opacity-only crossfade. */
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
     ::after {
-      animation-duration: 0.01ms !important;
-      transition-duration: 0.01ms !important;
+      animation-duration: 100ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 100ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Utilities
+   ───────────────────────────────────────────────────────────────── */
 
 @utility tap-target {
   min-height: 44px;
   min-width: 44px;
 }
 
+/* Semantic stripes (Front-upgrade §2.1) — 3px left border, never combined. */
 @utility validated-stripe {
   border-left: 3px solid var(--color-validated);
 }
@@ -89,4 +193,54 @@
 }
 @utility caution-stripe {
   border-left: 3px solid var(--color-caution);
+}
+@utility danger-stripe {
+  border-left: 3px solid var(--color-sindoor);
+}
+
+/* Subtle paper texture (atmosphere without theatre). Apply via class
+ * `.paper-grain` on a wrapper that already establishes a stacking context. */
+.paper-grain {
+  position: relative;
+  isolation: isolate;
+}
+.paper-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(14, 26, 31, 1) 0.5px, transparent 0.5px),
+    radial-gradient(circle at 75% 75%, rgba(14, 26, 31, 1) 0.5px, transparent 0.5px);
+  background-size: 5px 5px, 7px 7px;
+}
+
+/* Skeleton pulse — opacity-only, no shimmer (banned theatre per §1.3) */
+@keyframes paper-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+@utility skeleton-pulse {
+  animation: paper-pulse 1.2s ease-in-out infinite;
+  background: var(--color-paper-edge);
+}
+
+/* Staggered fade-in for list/grid hydration */
+@keyframes paper-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility fade-up {
+  animation: paper-fade-up var(--motion-enter, 180ms) var(--ease-out, ease-out) both;
+}
+
+/* Pricing currency crossfade (no layout shift) */
+@keyframes price-crossfade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@utility price-fade {
+  animation: price-crossfade 140ms ease-out both;
 }

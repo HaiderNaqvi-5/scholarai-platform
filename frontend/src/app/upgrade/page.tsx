@@ -1,31 +1,39 @@
 "use client";
 
 /**
- * /upgrade — Pakistan-pivot pricing page (PRD §0.5).
+ * /upgrade — Pricing (Front-upgrade §6.3).
  *
- * 4-tier cards (Explorer / Pro / Elite / Institution), currency switcher across
- * the five supported currencies, comparison table, and a waitlist form
- * (no Stripe — payment is post-FYP). Institution CTA is a mailto.
+ * 4-tier cards (Explorer / Pro / Elite / Institution), currency switcher
+ * across the five supported currencies, comparison table, and a waitlist
+ * accordion within each card (no Stripe — payment is post-FYP).
+ * Institution CTA is a mailto.
+ *
+ * Per-screen bans: "Most popular" badge with gradient ribbon, "Save 20%!"
+ * strikethrough red, faux-3D card, "Best value" auto-highlight without
+ * explanation. Allowed: a neutral "Recommended" chip with a one-line
+ * reason; named features ("5 SOP drafts per month").
  */
 
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Mail, Sparkles } from "lucide-react";
+import { Check, Mail, ChevronDown, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, endpoints } from "@/lib/api";
 import type { Currency, Plan, PricingTier } from "@/lib/api";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardEyebrow } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/utils";
 
-import { partnershipsMailto } from "@/lib/brand";
+import { partnershipsMailto, BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { defaultCurrencyForCountry } from "@/lib/countries";
 
 const CURRENCIES: Currency[] = ["PKR", "GBP", "EUR", "AED", "USD"];
@@ -39,7 +47,7 @@ function defaultCurrencyFor(
 
 export default function UpgradePage() {
   return (
-    <Suspense fallback={<UpgradeSkeleton />}>
+    <Suspense fallback={<PageSkeleton />}>
       <UpgradeInner />
     </Suspense>
   );
@@ -57,9 +65,6 @@ function UpgradeInner() {
       : defaultCurrencyFor(auth.status === "authed" ? auth.user : null);
 
   const [currency, setCurrency] = useState<Currency>(initialCurrency);
-  // No effect-driven re-sync to auth: the URL pins currency when supplied and
-  // the lazy initial honours user.plan_currency at first paint. Manual switch
-  // via <CurrencySwitcher /> is the only post-mount path.
 
   const pricingQ = useQuery({
     queryKey: ["upgrade", "pricing", currency],
@@ -70,33 +75,46 @@ function UpgradeInner() {
   const currentPlan: Plan | null = auth.status === "authed" ? auth.user.plan : null;
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-screen bg-ivory">
       <Header />
-      <main className="mx-auto max-w-6xl px-4 pb-20 pt-10 md:pt-16">
+      <main id="main" className="mx-auto max-w-[1200px] px-6 pb-24 pt-12 md:px-12 md:pt-20">
         <Hero />
 
         <CurrencySwitcher current={currency} onChange={setCurrency} />
 
-        {pricingQ.isLoading && <UpgradeSkeleton />}
+        {pricingQ.isLoading ? <PageSkeleton /> : null}
 
-        {pricingQ.isError && (
-          <ErrorBlock onRetry={() => pricingQ.refetch()} message="Couldn't load pricing." />
-        )}
+        {pricingQ.isError ? (
+          <div className="mt-12">
+            <ErrorState
+              title="Couldn't load pricing."
+              description="Live currency rates are unavailable right now. Try again or default to PKR."
+              action={
+                <>
+                  <Button variant="secondary" onClick={() => pricingQ.refetch()}>
+                    Retry
+                  </Button>
+                  <Button variant="ghost" onClick={() => setCurrency("PKR")}>
+                    Show in PKR
+                  </Button>
+                </>
+              }
+            />
+          </div>
+        ) : null}
 
-        {pricingQ.data && (
+        {pricingQ.data ? (
           <>
             <PricingGrid
               tiers={pricingQ.data.tiers}
               currentPlan={currentPlan}
               focusedPlan={queryPlan || null}
+              currency={currency}
             />
             <ComparisonTable tiers={pricingQ.data.tiers} />
-            <WaitlistSection
-              currency={currency}
-              defaultPlan={(queryPlan === "elite" ? "elite" : "pro") as "pro" | "elite"}
-            />
+            <Faq />
           </>
-        )}
+        ) : null}
 
         <PartnerFooter />
       </main>
@@ -104,18 +122,24 @@ function UpgradeInner() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Sections
-// ---------------------------------------------------------------------------
+// ───────────────────────────────────────────────────────────────────────────
+// Header / Hero
+// ───────────────────────────────────────────────────────────────────────────
 
 function Header() {
   return (
-    <header className="border-b border-[var(--color-border)] bg-paper-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Link href="/" className="font-display text-lg text-ink">
-          AidwiseAI
+    <header className="sticky top-0 z-30 border-b border-[var(--color-border-quiet)] bg-ivory/90 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-4 md:px-12">
+        <Link
+          href="/"
+          className="font-display text-[22px] italic font-[450] tracking-[-0.02em] text-ink-deep"
+        >
+          {BRAND_DISPLAY_NAME}
         </Link>
-        <Link href="/feed" className="text-sm text-ink-muted hover:text-ink">
+        <Link
+          href="/feed"
+          className="text-[13px] text-ink-muted transition-colors hover:text-ink-deep"
+        >
           Back to dashboard →
         </Link>
       </div>
@@ -126,15 +150,13 @@ function Header() {
 function Hero() {
   return (
     <section className="text-center">
-      <p className="font-mono text-xs uppercase tracking-widest text-ink-muted">
-        Pricing
-      </p>
-      <h1 className="mt-2 font-display text-3xl text-ink md:text-4xl">
-        Less than one consultant meeting. Every month.
+      <CardEyebrow>Pricing</CardEyebrow>
+      <h1 className="mt-3 mx-auto max-w-[18ch] font-display text-[40px] italic font-[400] leading-[1.1] tracking-[-0.02em] text-ink-deep md:text-[52px]">
+        Pakistan-priced. Pay in PKR or your local currency.
       </h1>
-      <p className="mx-auto mt-3 max-w-2xl text-ink-muted">
-        AidwiseAI is free to try. When the matching, SOP drafts, and visa
-        practice become indispensable, Pro and Elite remove the limits.
+      <p className="mx-auto mt-5 max-w-[60ch] text-[16px] leading-[1.55] text-ink-muted">
+        {BRAND_DISPLAY_NAME} is free to try. When the matching, SOP drafts, and
+        visa practice become indispensable, Pro and Elite remove the limits.
       </p>
     </section>
   );
@@ -148,22 +170,27 @@ function CurrencySwitcher({
   onChange: (c: Currency) => void;
 }) {
   return (
-    <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-      <span className="font-mono text-xs uppercase tracking-wide text-ink-muted">
+    <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+      <Label htmlFor="currency-switch" className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
         Show prices in
-      </span>
-      <div className="inline-flex rounded-[12px] border border-[var(--color-border)] bg-paper-white p-1">
+      </Label>
+      <div
+        id="currency-switch"
+        role="radiogroup"
+        className="inline-flex rounded-[12px] border border-[var(--color-border)] bg-paper-white p-1"
+      >
         {CURRENCIES.map((c) => (
           <button
             key={c}
             type="button"
+            role="radio"
+            aria-checked={current === c}
             onClick={() => onChange(c)}
-            aria-pressed={current === c}
             className={cn(
-              "h-9 min-w-12 rounded-[10px] px-3 text-sm font-medium transition-colors",
+              "h-9 min-w-[52px] rounded-[10px] px-3 font-mono text-[13px] font-medium tabular-nums transition-colors duration-[var(--motion-micro)]",
               current === c
-                ? "bg-ink text-paper"
-                : "text-ink-muted hover:bg-paper-warm hover:text-ink",
+                ? "bg-ink-deep text-paper-white"
+                : "text-ink-muted hover:bg-paper-warm hover:text-ink-deep",
             )}
           >
             {c}
@@ -174,23 +201,30 @@ function CurrencySwitcher({
   );
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Pricing grid
+// ───────────────────────────────────────────────────────────────────────────
+
 function PricingGrid({
   tiers,
   currentPlan,
   focusedPlan,
+  currency,
 }: {
   tiers: PricingTier[];
   currentPlan: Plan | null;
   focusedPlan: string | null;
+  currency: Currency;
 }) {
   return (
-    <section className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <section className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4" aria-label="Plan options">
       {tiers.map((plan) => (
         <PricingCard
           key={plan.key}
           plan={plan}
           isCurrent={currentPlan === (plan.key as Plan)}
           isFocused={focusedPlan === plan.key}
+          currency={currency}
         />
       ))}
     </section>
@@ -201,126 +235,214 @@ function PricingCard({
   plan,
   isCurrent,
   isFocused,
+  currency,
 }: {
   plan: PricingTier;
   isCurrent: boolean;
   isFocused: boolean;
+  currency: Currency;
 }) {
   const isInstitution = plan.key === "institution";
-  const cta =
-    isInstitution ? (
-      <Button asChild variant="secondary" className="w-full">
-        <a href={INSTITUTION_MAILTO}>
-          <Mail className="size-4" aria-hidden />
-          Contact us
-        </a>
-      </Button>
-    ) : plan.key === "explorer" ? (
-      <Button asChild variant="secondary" className="w-full">
-        <Link href={isCurrent ? "/feed" : "/signup"}>
-          {isCurrent ? "Your current plan" : "Start free"}
-        </Link>
-      </Button>
-    ) : (
-      <Button asChild className="w-full">
-        <a href={`#waitlist-${plan.key}`}>
-          {isCurrent ? "Your current plan" : `Choose ${plan.label}`}
-        </a>
-      </Button>
-    );
+  const isPaid = plan.key === "pro" || plan.key === "elite";
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   return (
     <Card
+      asPanel
       className={cn(
         "relative flex h-full flex-col",
-        plan.is_recommended && "border-ink/40 shadow-[0_8px_30px_rgba(12,17,23,0.07)]",
-        isFocused && "ring-2 ring-[var(--color-ring)] ring-offset-2 ring-offset-paper",
+        plan.is_recommended && "ring-1 ring-lapis/30",
+        isFocused && "ring-2 ring-[var(--color-ring)] ring-offset-2 ring-offset-ivory",
       )}
+      aria-labelledby={`tier-${plan.key}`}
     >
-      {plan.is_recommended && (
-        <span className="absolute -top-3 left-5 rounded-full bg-ink px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper">
-          Most popular
-        </span>
-      )}
-      {plan.key === "elite" && (
-        <span className="absolute -top-3 right-5 inline-flex items-center gap-1 rounded-full bg-generated px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-paper-white">
-          <Sparkles className="size-3" aria-hidden />
-          Serious applicants
-        </span>
-      )}
-
-      <CardHeader>
-        <CardTitle>{plan.label}</CardTitle>
-        <p className="text-sm text-ink-muted">{plan.feature_summary}</p>
-      </CardHeader>
-      <CardBody className="flex flex-1 flex-col gap-4">
-        <div>
-          <p className="font-display text-2xl text-ink">{plan.monthly_price}</p>
-          {plan.yearly_hint && (
-            <p className="mt-1 text-xs text-ink-muted">{plan.yearly_hint}</p>
+      <div className="flex items-center justify-between">
+        <h2
+          id={`tier-${plan.key}`}
+          className={cn(
+            "font-display text-[22px] leading-tight text-ink-deep",
+            plan.key === "explorer" ? "font-[500]" : "italic font-[450]",
           )}
-        </div>
-        <ul className="flex-1 space-y-2">
-          {plan.bullet_features.map((bullet) => (
-            <li key={bullet} className="flex gap-2 text-sm text-ink">
-              <Check
-                className="mt-0.5 size-4 shrink-0 text-validated"
-                aria-hidden
+        >
+          {plan.label}
+        </h2>
+        {plan.is_recommended ? <Badge tone="lapis">Recommended</Badge> : null}
+        {isCurrent ? <Badge tone="validated">Current</Badge> : null}
+      </div>
+
+      <div className="mt-5">
+        <p className="price-fade font-mono text-[28px] font-semibold leading-none tabular-nums text-ink-deep" key={`${plan.key}-${currency}`}>
+          {plan.monthly_price}
+        </p>
+        {plan.yearly_hint ? (
+          <p className="mt-2 text-[12px] text-ink-subtle">{plan.yearly_hint}</p>
+        ) : null}
+      </div>
+
+      <p className="mt-4 text-[14px] leading-[1.55] text-ink-muted">{plan.feature_summary}</p>
+
+      <ul className="mt-5 flex-1 space-y-2.5 border-t border-[var(--color-border-quiet)] pt-5">
+        {plan.bullet_features.map((bullet) => (
+          <li key={bullet} className="flex gap-2.5 text-[14px] leading-[1.5] text-ink-deep">
+            <Check className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.75} aria-hidden />
+            <span>{bullet}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-6">
+        {isInstitution ? (
+          <Button asChild variant="secondary" className="w-full">
+            <a href={INSTITUTION_MAILTO}>
+              <Mail className="size-4" strokeWidth={1.5} aria-hidden />
+              Email partnerships
+            </a>
+          </Button>
+        ) : plan.key === "explorer" ? (
+          <Button asChild variant="secondary" className="w-full">
+            <Link href={isCurrent ? "/feed" : "/signup"}>
+              {isCurrent ? "Your current plan" : "Get started"}
+            </Link>
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="button"
+              variant={plan.is_recommended ? "lapis" : "secondary"}
+              className="w-full"
+              onClick={() => setWaitlistOpen((o) => !o)}
+              aria-expanded={waitlistOpen}
+              aria-controls={`waitlist-${plan.key}`}
+            >
+              {isCurrent ? "Your current plan" : `Join ${plan.label} waitlist`}
+              <ChevronDown
+                className={cn(
+                  "size-4 transition-transform duration-[var(--motion-micro)]",
+                  waitlistOpen && "rotate-180",
+                )}
+                strokeWidth={1.5}
               />
-              <span>{bullet}</span>
-            </li>
-          ))}
-        </ul>
-      </CardBody>
-      <CardFooter>{cta}</CardFooter>
+            </Button>
+            {waitlistOpen ? (
+              <WaitlistAccordion
+                planKey={plan.key as "pro" | "elite"}
+                planLabel={plan.label}
+                currency={currency}
+                onClose={() => setWaitlistOpen(false)}
+              />
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {isPaid ? (
+        <p className="mt-3 text-center font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
+          No card required
+        </p>
+      ) : null}
     </Card>
   );
 }
 
-// Tier-key union mirrors the backend `_build_tiers` keys (waitlist.py). Typing
-// the values map by this union catches drift between the table and the cards
-// at compile time — a misspelled "elite" / "explorer" fails build.
+// ───────────────────────────────────────────────────────────────────────────
+// Waitlist accordion (within card, never modal)
+// ───────────────────────────────────────────────────────────────────────────
+
+function WaitlistAccordion({
+  planKey,
+  planLabel,
+  currency,
+  onClose,
+}: {
+  planKey: "pro" | "elite";
+  planLabel: string;
+  currency: Currency;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const join = useMutation({
+    mutationFn: () => endpoints.upgrade.joinWaitlist({ email, plan: planKey, currency }),
+    onSuccess: () => {
+      setSubmitted(true);
+      toast.success("On the waitlist — we'll email you when payment opens.");
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Couldn't join the waitlist.";
+      toast.error(msg);
+    },
+  });
+
+  if (submitted) {
+    return (
+      <div
+        id={`waitlist-${planKey}`}
+        className="mt-4 rounded-[10px] border border-validated/30 bg-validated-soft px-4 py-3"
+        role="status"
+      >
+        <p className="text-[13px] leading-[1.5] text-validated">
+          You&apos;re on the {planLabel} waitlist. We&apos;ll email <span className="font-mono">{email}</span>{" "}
+          when payment opens.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      id={`waitlist-${planKey}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (email) join.mutate();
+      }}
+      className="mt-4 space-y-2.5"
+    >
+      <Label htmlFor={`waitlist-${planKey}-email`} className="text-[12px]">
+        Email for early access
+      </Label>
+      <Input
+        id={`waitlist-${planKey}-email`}
+        type="email"
+        required
+        placeholder="you@example.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        autoComplete="email"
+      />
+      <div className="flex gap-2">
+        <Button type="submit" loading={join.isPending} size="sm" className="flex-1">
+          Reserve my spot
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Comparison table
+// ───────────────────────────────────────────────────────────────────────────
+
 type TierKey = "explorer" | "pro" | "elite" | "institution";
 
 const COMPARISON_ROWS: { label: string; values: Record<TierKey, string> }[] = [
   {
     label: "Scholarship matches",
-    values: {
-      explorer: "3 sample",
-      pro: "6 personalised",
-      elite: "12 with every match revealed",
-      institution: "Bulk",
-    },
+    values: { explorer: "3 sample", pro: "6 personalised", elite: "12 with provenance", institution: "Bulk" },
   },
-  {
-    label: "University matches",
-    values: { explorer: "—", pro: "6", elite: "12", institution: "Unlimited" },
-  },
-  {
-    label: "Application tracker",
-    values: { explorer: "3 cards", pro: "6 cards", elite: "12 cards", institution: "Unlimited" },
-  },
+  { label: "University matches", values: { explorer: "—", pro: "6", elite: "12", institution: "Unlimited" } },
+  { label: "Application tracker", values: { explorer: "3 cards", pro: "6 cards", elite: "12 cards", institution: "Unlimited" } },
   {
     label: "SOP drafts",
-    values: {
-      explorer: "1 lifetime",
-      pro: "5 / month",
-      elite: "10 / month",
-      institution: "50 / seat",
-    },
+    values: { explorer: "1 lifetime", pro: "5 / month", elite: "10 / month", institution: "50 / seat" },
   },
-  {
-    label: "SOP line-by-line AI",
-    values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" },
-  },
+  { label: "SOP line-by-line feedback", values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" } },
   {
     label: "Visa interview",
-    values: {
-      explorer: "Q1–Q3",
-      pro: "Full 10 questions",
-      elite: "Full + downloadable transcript",
-      institution: "Full",
-    },
+    values: { explorer: "Q1–Q3", pro: "Full 10 questions", elite: "Full + downloadable transcript", institution: "Full" },
   },
   {
     label: "Deadline alerts",
@@ -331,177 +453,166 @@ const COMPARISON_ROWS: { label: string; values: Record<TierKey, string> }[] = [
       institution: "Email + WhatsApp",
     },
   },
-  {
-    label: "Professor email generator",
-    values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" },
-  },
-  {
-    label: "Strategy report (PDF)",
-    values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" },
-  },
+  { label: "Professor email generator", values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" } },
+  { label: "Strategy report (PDF)", values: { explorer: "—", pro: "—", elite: "Included", institution: "Included" } },
 ];
 
 function ComparisonTable({ tiers }: { tiers: PricingTier[] }) {
   return (
-    <section className="mt-12 overflow-x-auto">
-      <h2 className="font-display text-xl text-ink">What&apos;s in each plan</h2>
-      <table className="mt-4 w-full min-w-[640px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-[var(--color-border)] text-left">
-            <th className="py-3 pr-4 font-medium text-ink-muted">Feature</th>
-            {tiers.map((t) => (
-              <th key={t.key} className="px-3 py-3 font-display text-ink">
-                {t.label}
+    <section className="mt-20">
+      <h2 className="font-display text-[24px] italic font-[450] leading-tight text-ink-deep">
+        What you get at each tier
+      </h2>
+      <div className="mt-6 overflow-x-auto rounded-[18px] border border-[var(--color-border)] bg-paper-white">
+        <table className="w-full min-w-[720px] border-collapse">
+          <caption className="sr-only">Feature comparison across Explorer, Pro, Elite, and Institution plans</caption>
+          <thead className="border-b border-[var(--color-border-quiet)] bg-paper-warm/40">
+            <tr className="text-left">
+              <th scope="col" className="px-5 py-4 text-[11px] font-mono uppercase tracking-[0.06em] text-ink-subtle">
+                Feature
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {COMPARISON_ROWS.map((row) => (
-            <tr
-              key={row.label}
-              className="border-b border-[var(--color-border)] last:border-b-0"
-            >
-              <td className="py-3 pr-4 text-ink">{row.label}</td>
               {tiers.map((t) => (
-                <td key={t.key} className="px-3 py-3 text-ink-muted">
-                  {row.values[t.key as TierKey] ?? "—"}
-                </td>
+                <th
+                  key={t.key}
+                  scope="col"
+                  className="px-4 py-4 font-display text-[15px] font-semibold text-ink-deep"
+                >
+                  {t.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {COMPARISON_ROWS.map((row) => (
+              <tr
+                key={row.label}
+                className="border-b border-[var(--color-border-quiet)] last:border-b-0 hover:bg-paper-warm/30"
+              >
+                <th scope="row" className="px-5 py-3.5 text-left text-[14px] font-medium text-ink-deep">
+                  {row.label}
+                </th>
+                {tiers.map((t) => (
+                  <td key={t.key} className="px-4 py-3.5 text-[14px] text-ink-muted">
+                    {row.values[t.key as TierKey] ?? "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
 
-function WaitlistSection({
-  currency,
-  defaultPlan,
-}: {
-  currency: Currency;
-  defaultPlan: "pro" | "elite";
-}) {
-  // Track which defaultPlan we initialised against so a parent change
-  // (?plan=elite vs ?plan=pro) re-keys the selection without a setState-in-effect.
-  const [planRow, setPlanRow] = useState<{ key: "pro" | "elite"; from: "pro" | "elite" }>(
-    { key: defaultPlan, from: defaultPlan },
-  );
-  if (planRow.from !== defaultPlan) {
-    setPlanRow({ key: defaultPlan, from: defaultPlan });
-  }
-  const plan = planRow.key;
-  const setPlan = (next: "pro" | "elite") =>
-    setPlanRow({ key: next, from: planRow.from });
+// ───────────────────────────────────────────────────────────────────────────
+// FAQ
+// ───────────────────────────────────────────────────────────────────────────
 
-  const [email, setEmail] = useState("");
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: "When does payment go live?",
+    a: "After the FYP cohort completes its trial. Until then, joining the waitlist reserves your spot — you'll be billed only after you confirm payment method.",
+  },
+  {
+    q: "How does the Air University trial work?",
+    a: `Use code AIRU2026 at signup before May 26, 23:59 PKT. You get 30 days of Pro free — every match, every SOP draft, every visa question. No card required.`,
+  },
+  {
+    q: "Can I switch plans later?",
+    a: "Yes. Pro and Elite are month-to-month. Downgrading takes effect at the next billing cycle; we don't pro-rate.",
+  },
+  {
+    q: "Which currencies do you accept?",
+    a: "PKR, GBP, EUR, AED, USD. Switch the toggle above the cards. Pricing is anchored in PKR — non-PKR values are converted at the current bank rate.",
+  },
+  {
+    q: "What's the refund policy?",
+    a: "7-day refund on any first-time monthly purchase. See the refund policy in our legal docs for the exact terms.",
+  },
+  {
+    q: "Do you share my data with universities?",
+    a: "Only with explicit opt-in (Pro+) and only with institutions that have signed a DPA. We snapshot once at share time — never retro-leak.",
+  },
+];
 
-  const join = useMutation({
-    mutationFn: () =>
-      endpoints.upgrade.joinWaitlist({ email, plan, currency }),
-    onSuccess: () => {
-      toast.success("You're on the waitlist — we'll email you when payments open.");
-      setEmail("");
-    },
-    onError: (err) => {
-      const msg =
-        err instanceof ApiError ? err.message : "Couldn't join the waitlist.";
-      toast.error(msg);
-    },
-  });
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email) return;
-    join.mutate();
-  }
+function Faq() {
+  const [openId, setOpenId] = useState<number | null>(null);
 
   return (
-    <section className="mt-12">
-      <Card id={`waitlist-${plan}`} className="bg-paper-white">
-        <CardHeader>
-          <CardTitle>Join the waitlist</CardTitle>
-          <p className="text-sm text-ink-muted">
-            Payment goes live after FYP. Reserve your email and we&apos;ll
-            switch you on the day Pro and Elite become billable.
-          </p>
-        </CardHeader>
-        <CardBody>
-          <form
-            onSubmit={onSubmit}
-            className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end"
-            data-testid="waitlist-form"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="waitlist-email">Email</Label>
-              <Input
-                id="waitlist-email"
-                type="email"
-                required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="waitlist-plan">Plan</Label>
-              <select
-                id="waitlist-plan"
-                value={plan}
-                onChange={(e) => setPlan(e.target.value as "pro" | "elite")}
-                className="h-11 w-full rounded-[12px] border border-[var(--color-border)] bg-paper-white px-3 text-[15px] text-ink"
+    <section className="mt-20">
+      <h2 className="font-display text-[24px] italic font-[450] leading-tight text-ink-deep">
+        Questions
+      </h2>
+      <ul className="mt-6 divide-y divide-[var(--color-border-quiet)] rounded-[18px] border border-[var(--color-border)] bg-paper-white">
+        {FAQ_ITEMS.map((item, i) => {
+          const open = openId === i;
+          return (
+            <li key={item.q}>
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? null : i)}
+                aria-expanded={open}
+                aria-controls={`faq-panel-${i}`}
+                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-paper-warm/30 tap-target"
               >
-                <option value="pro">Pro</option>
-                <option value="elite">Elite</option>
-              </select>
-            </div>
-            <Button type="submit" loading={join.isPending}>
-              Reserve my spot
-            </Button>
-          </form>
-          <p className="mt-3 font-mono text-xs uppercase text-ink-muted">
-            Currency: {currency}. No card required.
-          </p>
-        </CardBody>
-      </Card>
+                <span className="text-[15px] font-medium text-ink-deep">{item.q}</span>
+                {open ? (
+                  <Minus className="size-4 shrink-0 text-ink-muted" strokeWidth={1.5} />
+                ) : (
+                  <Plus className="size-4 shrink-0 text-ink-muted" strokeWidth={1.5} />
+                )}
+              </button>
+              {open ? (
+                <p
+                  id={`faq-panel-${i}`}
+                  className="px-5 pb-4 text-[14px] leading-[1.6] text-ink-muted"
+                >
+                  {item.a}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
 function PartnerFooter() {
   return (
-    <footer className="mt-16 border-t border-[var(--color-border)] pt-8 text-center text-sm text-ink-muted">
-      Are you a university or Pakistani school?{" "}
-      <Link href="/universities" className="text-ink underline-offset-4 hover:underline">
-        Partner with us →
-      </Link>
+    <footer className="mt-20 border-t border-[var(--color-border-quiet)] pt-8 text-center">
+      <p className="text-[14px] text-ink-muted">
+        Are you a university or Pakistani school?{" "}
+        <Link
+          href="/universities"
+          className="text-lapis underline decoration-1 underline-offset-2 hover:decoration-2"
+        >
+          Partner with us →
+        </Link>
+      </p>
+      <p className="mt-2 font-mono text-[12px] text-ink-subtle">
+        Questions? <a className="underline underline-offset-2" href={INSTITUTION_MAILTO}>partnerships@scholarai.pk</a>
+      </p>
     </footer>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Status surfaces
-// ---------------------------------------------------------------------------
+// ───────────────────────────────────────────────────────────────────────────
+// Skeleton
+// ───────────────────────────────────────────────────────────────────────────
 
-function UpgradeSkeleton() {
+function PageSkeleton() {
   return (
-    <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-80 w-full" />
-      ))}
-    </div>
-  );
-}
-
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="mt-8 rounded-[16px] border border-[var(--color-border)] bg-paper-white p-6 text-center">
-      <p className="text-ink">{message}</p>
-      <Button onClick={onRetry} variant="secondary" className="mt-3">
-        Retry
-      </Button>
+    <div className="mt-12">
+      <div className="mb-4 flex justify-center">
+        <Skeleton className="h-9 w-72 rounded-[12px]" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonCard key={i} className="h-[420px]" />
+        ))}
+      </div>
     </div>
   );
 }

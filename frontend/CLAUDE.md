@@ -20,7 +20,7 @@ This directory is the result of a greenfield rebuild on branch `feat/frontend-gr
 - @tanstack/react-query for server state
 - sonner for toasts
 - Lucide React for icons (no emojis as UI)
-- Sora (display) + IBM Plex Sans (body) + IBM Plex Mono (data) via `next/font`
+- **Fraunces** (display, variable, italic on h1) + **Inter** (body, ss01/cv11) + **JetBrains Mono** (data) via `next/font`. Pre-S88: Sora + IBM Plex.
 - Bun as canonical package manager and runtime; npm fallback supported
 
 ## Run
@@ -129,17 +129,23 @@ src/
 | S8 | Admin ingestion (start/filter/bulk-retry/select), run detail (diagnostics + snapshot viewer/clear), curation list, curation detail (raw→validated→published with audit notes) | **Done** |
 | S9 | Admin overview (KPI alerts polled 60s + stats grid), Users (role mutation Dialog w/ reason), Audit (revert Dialog), Rec-eval (benchmarks + per-case + aggregate) | **Done** |
 | S10 | Polish: data-testid added (login-form, app-shell, name attrs); auth smoke re-pointed to /feed. **Remaining**: axe-core gate, responsive matrix at 375/768/1024/1440, full smoke selector re-point for documents/recs/curation/interview/curation, RBAC matrix Playwright spec | Partial |
+| S88 | **Premium Cultural rebuild** (2026-05-17): tokens swap (ivory/ink-deep/lapis/gold-leaf/sindoor); fonts swap (Fraunces/Inter/JBM); UI primitives repainted (Button + lapis/gold/sindoor variants, Card + asPanel, Badge + Chip atoms, IconButton, EmptyState/ErrorState, SectionHeader/PageHeader, StatChip, Skeleton with opacity-pulse). 9 routes rebuilt: `/`, `/booth/air-university` (NEW), `/upgrade`, `/signup` (+invite chip + Air U fields), `/login` (CapsLock + rate-limit countdown), `/onboarding`, `/feed`. CookieBanner + CookiePreferences modal wired in `providers.tsx`. AidwiseAI metadata. Sidebar + TopBar repainted: lapis active nav, gold trial banner, ink-deep avatar pip, `/` keyboard shortcut. Visual audit script at `scripts/visual-audit.mjs` (Playwright headless, 375/1024/1440 viewports, console-error capture); screenshots to `audit-out/`. | **Done** |
 
-## UI primitives
+## UI primitives (post-S88)
 
-- `ui/button` (CVA, asChild Slot, `loading`, `tap-target`)
-- `ui/input`, `ui/label` (Radix Label)
-- `ui/card` (Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter)
-- `ui/badge` (tones: validated, generated, caution, danger, neutral, ink)
-- `ui/skeleton`
+- `ui/button` (CVA, asChild Slot, `loading`, sizes sm/md/lg/icon, variants: `primary` / `lapis` / `secondary` / `ghost` / `danger` / `gold` / `validated` / `link`).
+- `ui/icon-button` (square 44×44, tones `ghost` / `solid` / `danger`, required `aria-label`).
+- `ui/input` + `ui/textarea` (10 radius, lapis focus ring, tap-target).
+- `ui/card` (`Card`, `CardHeader`, `CardTitle`, `CardEyebrow`, `CardDescription`, `CardBody`, `CardFooter`; `hoverable` lifts shadow; `asPanel` upgrades to 22 radius + 24 padding).
+- `ui/badge` + `ui/chip` (tones: neutral, validated, generated, caution, sindoor, lapis, gold, ink, live, outline).
+- `ui/skeleton` (`Skeleton` opacity-pulse shapes block/text/circle; `SkeletonText`; `SkeletonCard`).
+- `ui/states` (`EmptyState`, `ErrorState` — no illustration ever).
+- `ui/section-header` (`PageHeader` for route h1; `SectionHeader` for in-page h2).
+- `ui/stat-chip` (mono numeral + ink-muted label, used on marketing surfaces).
 - `ui/dialog` (Radix Dialog wrapper — Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose). Used by admin/users + admin/audit modals.
 - `ui/tabs` (Radix Tabs wrapper).
-- `ui/select` (Radix Select wrapper). Forms still use native `<select>` where simpler — both are acceptable.
+- `ui/select` (Radix Select wrapper). Forms still use native `<select>` where simpler — both acceptable.
+- `consent/CookieBanner` (bottom sheet + CookiePreferences modal, persists `aidwise.cookie_consent` localStorage).
 
 ## Shared feature components
 

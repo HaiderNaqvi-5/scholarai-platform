@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
+import { CookieBanner } from "@/components/consent/CookieBanner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -26,14 +27,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <AuthProvider>{children}</AuthProvider>
+      <CookieBanner />
       <Toaster
         position="bottom-right"
         toastOptions={{
           style: {
             background: "var(--color-paper-white)",
-            color: "var(--color-ink)",
+            color: "var(--color-ink-deep)",
             border: "1px solid var(--color-border)",
             borderRadius: "12px",
+            fontFamily: "var(--font-ui), sans-serif",
+            fontSize: "13px",
           },
         }}
       />
