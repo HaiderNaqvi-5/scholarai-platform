@@ -16,9 +16,11 @@ type AuthState =
   | { status: "guest"; user: null }
   | { status: "authed"; user: User };
 
+type SignupInput = Parameters<typeof endpoints.auth.register>[0];
+
 type AuthContextValue = AuthState & {
   login: (input: { email: string; password: string }) => Promise<User>;
-  signup: (input: { email: string; password: string; full_name?: string }) => Promise<User>;
+  signup: (input: SignupInput) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
 };

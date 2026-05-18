@@ -27,16 +27,28 @@ import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const AIR_UNI_INVITE = "AIRU2026";
+const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
 
 function passwordScore(pw: string): { score: 0 | 1 | 2 | 3; label: string } {
   if (pw.length < 12) return { score: 0, label: "Too short" };
-  const hasMixed = /[a-z]/.test(pw) && /[A-Z]/.test(pw);
+  const hasLower = /[a-z]/.test(pw);
+  const hasUpper = /[A-Z]/.test(pw);
   const hasDigit = /\d/.test(pw);
-  const long = pw.length >= 16;
-  const points = (hasMixed ? 1 : 0) + (hasDigit ? 1 : 0) + (long ? 1 : 0);
-  if (points <= 1) return { score: 1, label: "Weak" };
-  if (points === 2) return { score: 2, label: "OK" };
+  const hasSpecial = PASSWORD_SPECIAL_RE.test(pw);
+  const passed = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length;
+  if (passed <= 1) return { score: 1, label: "Weak" };
+  if (passed <= 3) return { score: 2, label: "Add a symbol, upper, lower, and number" };
   return { score: 3, label: "Strong" };
+}
+
+function isBackendValidPassword(pw: string): boolean {
+  return (
+    pw.length >= 12 &&
+    /[a-z]/.test(pw) &&
+    /[A-Z]/.test(pw) &&
+    /\d/.test(pw) &&
+    PASSWORD_SPECIAL_RE.test(pw)
+  );
 }
 
 export default function SignupPage() {
@@ -70,7 +82,7 @@ function SignupInner() {
 
   const isAirU = invite.toUpperCase() === AIR_UNI_INVITE;
   const meter = useMemo(() => passwordScore(password), [password]);
-  const canSubmit = email.length > 3 && meter.score >= 1 && pdpb;
+  const canSubmit = email.length > 3 && fullName.trim().length >= 2 && isBackendValidPassword(password) && pdpb;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,15 +93,22 @@ function SignupInner() {
       await auth.signup({
         email,
         password,
-        full_name: fullName || undefined,
-        // Other fields require backend wiring; harmless if ignored.
+        full_name: fullName.trim(),
         ...(invite ? { invite_code: invite } : {}),
         ...(isAirU
-          ? { air_uni_uni: airUni, air_uni_dept: airDept, air_uni_batch: airBatch }
+          ? {
+              air_uni_uni: airUni,
+              ...(airDept.trim() ? { air_uni_dept: airDept.trim() } : {}),
+              ...(airBatch.trim() && !Number.isNaN(Number.parseInt(airBatch, 10))
+                ? { air_uni_batch: Number.parseInt(airBatch, 10) }
+                : {}),
+            }
           : {}),
-        marketing_opt_in: marketing,
-        consent_v: "1.0",
-      } as Parameters<typeof auth.signup>[0]);
+        marketing_consent: marketing,
+        terms_version: "1.0",
+        privacy_version: "1.0",
+        accepted: pdpb,
+      });
       router.replace("/onboarding");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Couldn't create your account.";
@@ -176,10 +195,11 @@ function SignupInner() {
           ) : null}
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
-            <Field id="signup-name" label="Your name" optional>
+            <Field id="signup-name" label="Your name" required>
               <Input
                 id="signup-name"
                 autoComplete="name"
+                required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
@@ -200,7 +220,7 @@ function SignupInner() {
               <Label htmlFor="signup-password" className="mb-1.5 block text-[13px] font-medium text-ink-deep">
                 Password{" "}
                 <span className="font-mono text-[11px] font-normal uppercase tracking-[0.06em] text-ink-subtle">
-                  (12 characters minimum)
+                  (12+ chars, upper/lower, number, symbol)
                 </span>
               </Label>
               <div className="relative">
