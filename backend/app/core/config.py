@@ -67,11 +67,21 @@ class Settings(BaseSettings):
     AUTH_RATE_LIMIT_LOGOUT_REQUESTS: int = 10
 
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Hostnames the API is willing to serve. Empty list (default) disables
+    # TrustedHostMiddleware. Prod MUST set this; main.py middleware skips
+    # when list is empty so local dev w/ raw IP keeps working.
+    ALLOWED_HOSTS: list[str] = []
+    # Number of trusted reverse-proxy hops in front of the API. 0 keeps
+    # request.client.host as the immediate socket peer (compose / local dev).
+    # Behind nginx/cloudflare set to 1 so X-Forwarded-For chain is honored.
+    TRUSTED_PROXY_HOPS: int = 0
 
     MVP_PRIMARY_COUNTRY: str = "CA"
     MVP_SECONDARY_COUNTRY: str = "US"
     MVP_FULBRIGHT_KEYWORD: str = "fulbright"
-    AUTO_SEED_DEMO_DATA: bool = True
+    # Default OFF — must be explicitly opted-in via env even in dev.
+    # Prevents shipping known credentials by accident.
+    AUTO_SEED_DEMO_DATA: bool = False
     DEMO_STUDENT_EMAIL: str = "student@example.com"
     DEMO_STUDENT_PASSWORD: str = "strongpass1"
     DEMO_STUDENT_FULL_NAME: str = "ScholarAI Demo Student"
@@ -110,6 +120,16 @@ class Settings(BaseSettings):
     SENTRY_PROFILES_SAMPLE_RATE: float = 0.10
     SENTRY_ENVIRONMENT: str = "development"
 
+    # OpenSearch admin password — production-only enforcement in
+    # validate_production_settings. Default tolerates docker-compose
+    # local-dev value (`ScholarAI_Secure_123!`).
+    OPENSEARCH_PASSWORD: str = "ScholarAI_Secure_123!"
+
+    # Account lockout (S8) — Redis-backed sliding window per email.
+    AUTH_LOCKOUT_MAX_FAILURES: int = 5
+    AUTH_LOCKOUT_WINDOW_SECONDS: int = 900   # 15 min
+    AUTH_LOCKOUT_DURATION_SECONDS: int = 900  # 15 min
+
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
         if env_name not in {"production", "staging"}:
@@ -131,6 +151,30 @@ class Settings(BaseSettings):
             )
         if self.AUTO_SEED_DEMO_DATA:
             raise RuntimeError("PROD_ERROR: AUTO_SEED_DEMO_DATA must be False in production/staging.")
+
+        # S5 — CORS hardening: no localhost origins in prod.
+        bad_origins = [o for o in self.CORS_ORIGINS if "localhost" in o or "127.0.0.1" in o]
+        if bad_origins:
+            raise RuntimeError(
+                "PROD_ERROR: CORS_ORIGINS must not contain localhost in production/staging. "
+                f"Offending entries: {bad_origins}"
+            )
+
+        # S1+S4 — TrustedHostMiddleware requires explicit allowlist in prod.
+        if not self.ALLOWED_HOSTS:
+            raise RuntimeError(
+                "PROD_ERROR: ALLOWED_HOSTS must list every public hostname the API answers on."
+            )
+        if any(h in {"*", ""} for h in self.ALLOWED_HOSTS):
+            raise RuntimeError(
+                "PROD_ERROR: ALLOWED_HOSTS may not contain wildcards in production/staging."
+            )
+
+        # S4 — Defense against shipped default credentials.
+        if self.OPENSEARCH_PASSWORD in {"ScholarAI_Secure_123!", "admin", "password"}:
+            raise RuntimeError(
+                "PROD_ERROR: OPENSEARCH_PASSWORD looks like a default — override before deploy."
+            )
 
 
 settings = Settings()

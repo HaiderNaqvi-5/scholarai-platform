@@ -198,7 +198,7 @@ function ListEditor({
       ? "validated-stripe"
       : tone === "caution"
         ? "caution-stripe"
-        : "border-l-2 border-l-danger pl-3";
+        : "danger-stripe";
 
   return (
     <div className="space-y-2">

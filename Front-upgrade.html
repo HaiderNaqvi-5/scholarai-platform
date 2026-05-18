@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AidwiseAI — Front-upgrade Plan v3</title>
+<style>
+  :root {
+    --ink: #0C1117;
+    --ink-strong: #1B2633;
+    --ink-muted: #334155;
+    --ink-subtle: #64748B;
+    --paper: #F7F5F0;
+    --paper-warm: #F1EDE4;
+    --paper-dim: #E7E1D5;
+    --paper-white: #FFFDF9;
+    --validated: #426B5A;
+    --validated-soft: #DDE9E2;
+    --caution: #B7791F;
+    --caution-soft: #F4E7CF;
+    --danger: #B94A48;
+    --danger-soft: #F4D8D6;
+    --generated: #2E5B9A;
+    --generated-soft: #DCE6F4;
+    --gold: #8B6914;
+    --gold-soft: #F5EDD6;
+    --border: rgba(12,17,23,0.08);
+    --shadow: 0 4px 20px rgba(12,17,23,0.07);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  .doc-header { background: var(--ink); color: #fff; padding: 48px 64px; }
+  .doc-header .eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 12px;
+  }
+  .doc-header h1 { font-size: 36px; font-weight: 700; line-height: 1.2; margin-bottom: 12px; }
+  .doc-header .subtitle { font-size: 16px; color: rgba(255,255,255,0.65); max-width: 660px; }
+  .doc-header .meta { display: flex; gap: 32px; margin-top: 28px; flex-wrap: wrap; }
+  .doc-header .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .doc-header .meta-label { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: .08em; }
+  .doc-header .meta-value { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
+
+  /* LAYOUT */
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 64px; }
+  section { margin-bottom: 64px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-subtle);
+    margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  p { color: var(--ink-muted); margin-bottom: 12px; }
+  code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; background: var(--paper-warm); padding: 1px 5px; border-radius: 5px; }
+
+  /* TABLES */
+  .compare-table, .priority-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 16px; }
+  .compare-table th, .priority-table th {
+    background: var(--paper-warm); padding: 10px 16px; text-align: left;
+    font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-muted); border-bottom: 2px solid var(--border);
+  }
+  .compare-table td, .priority-table td {
+    padding: 11px 16px; border-bottom: 1px solid var(--border);
+    vertical-align: top; color: var(--ink-muted); line-height: 1.5;
+  }
+  .compare-table tr:last-child td, .priority-table tr:last-child td { border-bottom: none; }
+  .compare-table td:first-child, .priority-table td:first-child { font-weight: 500; color: var(--ink); }
+  .win { color: var(--validated); font-weight: 500; }
+  .lose { color: var(--danger); }
+  .neutral { color: var(--caution); font-weight: 500; }
+  .badge {
+    display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px;
+    font-size: 11px; font-weight: 600; letter-spacing: .03em;
+  }
+  .badge-win { background: var(--validated-soft); color: var(--validated); }
+  .badge-lose { background: var(--danger-soft); color: var(--danger); }
+  .badge-neutral { background: var(--caution-soft); color: var(--caution); }
+  .badge-info { background: var(--generated-soft); color: var(--generated); }
+  .badge-gold { background: var(--gold-soft); color: var(--gold); }
+
+  /* STATUS PILLS (current-state audit) */
+  .pill { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+  .pill-done { background: var(--validated-soft); color: var(--validated); }
+  .pill-stub { background: var(--caution-soft); color: var(--caution); }
+  .pill-missing { background: var(--danger-soft); color: var(--danger); }
+
+  /* AUDIT GRID */
+  .audit-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .audit-col { background: var(--paper-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+  .audit-col h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .audit-col .count { font-size: 11px; color: var(--ink-subtle); margin-bottom: 12px; }
+  .audit-col ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .audit-col li { font-size: 12.5px; color: var(--ink-muted); padding-left: 14px; position: relative; line-height: 1.4; }
+  .audit-col li::before { content: "·"; position: absolute; left: 3px; color: var(--ink-subtle); }
+  .audit-done { border-top: 3px solid var(--validated); }
+  .audit-stub { border-top: 3px solid var(--caution); }
+  .audit-missing { border-top: 3px solid var(--danger); }
+
+  /* PRINCIPLES */
+  .principles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .principle-card { background: var(--paper-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; }
+  .principle-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .principle-card p { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+  .principle-card .tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-subtle); }
+
+  /* DIFFERENTIATORS */
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .diff-card { background: var(--paper-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; }
+  .diff-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .diff-card p { font-size: 13px; color: var(--ink-muted); margin: 0; line-height: 1.45; }
+
+  /* ONBOARDING FLOW */
+  .flow-steps { display: flex; gap: 0; margin-top: 20px; flex-wrap: wrap; }
+  .flow-step { flex: 1; min-width: 150px; padding: 18px 16px; background: var(--paper-white); border: 1px solid var(--border); border-right: none; }
+  .flow-step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .flow-step:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; }
+  .flow-step .step-n { font-size: 11px; font-weight: 700; color: var(--ink-subtle); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .flow-step h4 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .flow-step ul { list-style: none; }
+  .flow-step ul li { font-size: 11.5px; color: var(--ink-muted); padding-left: 12px; position: relative; margin-bottom: 4px; }
+  .flow-step ul li::before { content: "·"; position: absolute; left: 2px; color: var(--ink-subtle); }
+  .flow-step .time-note { margin-top: 10px; font-size: 11px; color: var(--validated); font-weight: 600; }
+
+  /* SPRINT CARDS */
+  .sprint-list { display: flex; flex-direction: column; gap: 24px; margin-top: 8px; }
+  .sprint-card { background: var(--paper-white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .sprint-header { display: flex; align-items: flex-start; gap: 20px; padding: 24px 28px 20px; }
+  .sprint-number { min-width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .sprint-meta { flex: 1; }
+  .sprint-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sprint-subtitle { font-size: 13px; color: var(--ink-subtle); }
+  .sprint-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .sprint-tag { background: var(--paper-warm); border: 1px solid var(--border); border-radius: 99px; padding: 3px 10px; font-size: 11.5px; color: var(--ink-muted); font-weight: 500; }
+  .sprint-effort { min-width: 80px; text-align: right; font-size: 12px; color: var(--ink-subtle); }
+  .sprint-effort span { display: block; font-size: 18px; font-weight: 700; color: var(--ink); }
+  .sprint-body { border-top: 1px solid var(--border); padding: 20px 28px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+  .sprint-col-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-subtle); margin-bottom: 10px; }
+  .task-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .task-list li { font-size: 13px; color: var(--ink-muted); padding-left: 16px; position: relative; line-height: 1.45; }
+  .task-list li::before { content: "\2192"; position: absolute; left: 0; color: var(--ink-subtle); font-size: 11px; top: 1px; }
+  .task-list li strong { color: var(--ink); font-weight: 600; }
+  .gate-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .gate-list li { font-size: 12.5px; color: var(--ink-muted); padding-left: 18px; position: relative; line-height: 1.4; }
+  .gate-list li::before { content: "\2713"; position: absolute; left: 0; color: var(--validated); font-weight: 700; font-size: 11px; top: 1px; }
+  .reuse { font-size: 11.5px; color: var(--validated); font-weight: 600; }
+
+  .s1 .sprint-number { background: #1B2633; color: #fff; }
+  .s2 .sprint-number { background: var(--generated-soft); color: var(--generated); }
+  .s3 .sprint-number { background: var(--validated-soft); color: var(--validated); }
+  .s4 .sprint-number { background: #EAE4FF; color: #5B3FC5; }
+  .s5 .sprint-number { background: var(--caution-soft); color: var(--caution); }
+  .s6 .sprint-number { background: #FFE4F0; color: #9B2258; }
+  .s7 .sprint-number { background: #E0F4FF; color: #0369A1; }
+  .s8 .sprint-number { background: var(--gold-soft); color: var(--gold); }
+  .s9 .sprint-number { background: var(--paper-dim); color: var(--ink-muted); }
+
+  /* PRIORITY */
+  .p1 { background: var(--danger-soft); color: var(--danger) !important; font-weight: 700 !important; }
+  .p2 { background: var(--caution-soft); color: var(--caution) !important; font-weight: 600 !important; }
+  .p3 { background: var(--validated-soft); color: var(--validated) !important; font-weight: 600 !important; }
+
+  /* CALLOUT */
+  .callout { background: var(--generated-soft); border: 1px solid rgba(46,91,154,.2); border-radius: var(--radius); padding: 18px 22px; margin-top: 16px; }
+  .callout h4 { font-size: 13px; font-weight: 600; color: var(--generated); margin-bottom: 6px; }
+  .callout p { font-size: 13px; color: #1e3d6b; margin: 0; line-height: 1.5; }
+  .callout.gold { background: var(--gold-soft); border-color: rgba(139,105,20,.25); }
+  .callout.gold h4 { color: var(--gold); }
+  .callout.gold p { color: #5e470d; }
+
+  /* FOOTER */
+  .doc-footer { background: var(--paper-warm); border-top: 1px solid var(--border); padding: 32px 64px; font-size: 13px; color: var(--ink-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .doc-footer strong { color: var(--ink); }
+
+  @media (max-width: 720px) {
+    .container { padding: 32px 24px; }
+    .doc-header { padding: 32px 24px; }
+    .sprint-body, .principles-grid, .diff-grid, .audit-grid { grid-template-columns: 1fr; }
+  }
+  @media print { body { background: white; } .container { padding: 32px; } .sprint-card { box-shadow: none; } }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div class="eyebrow">AidwiseAI — Frontend Design &amp; Engineering Brief</div>
+  <h1>Front-upgrade Plan<br>v3 — Pakistan Pivot, Delta Edition</h1>
+  <p class="subtitle">A re-scoped, sprint-by-sprint plan to finish the AidwiseAI frontend so it beats GoScholar.ai for Pakistani students. Unlike v2, this plan is keyed to the <strong>actual codebase</strong>: the Pakistan API layer and UpgradeWall already exist, so this is wire-up plus the missing pages, not a greenfield build.</p>
+  <div class="meta">
+    <div class="meta-item"><span class="meta-label">Version</span><span class="meta-value">3.0 — Delta Edition</span></div>
+    <div class="meta-item"><span class="meta-label">Created</span><span class="meta-value">May 2026</span></div>
+    <div class="meta-item"><span class="meta-label">Supersedes</span><span class="meta-value">FRONTEND_ENHANCEMENT_PLAN.html</span></div>
+    <div class="meta-item"><span class="meta-label">Companion</span><span class="meta-value">Front-upgrade.md (design spec)</span></div>
+    <div class="meta-item"><span class="meta-label">Total Sprints</span><span class="meta-value">9 sprints</span></div>
+    <div class="meta-item"><span class="meta-label">Est. Effort</span><span class="meta-value">~21 dev-days</span></div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- 00 — HOW THIS PLAN IS DIFFERENT -->
+<section>
+  <div class="section-label">00 — How v3 differs from v2</div>
+  <h2>The codebase moved. The plan now matches it.</h2>
+  <p>The v2 plan (<code>FRONTEND_ENHANCEMENT_PLAN.html</code>) was written before the Pakistan API layer landed. Since then, the backend ships and the frontend has wired: <code>client.ts</code> with a 402 <code>PlanRequiredDetail</code> guard, all 17 endpoint modules including <code>tracker</code>, <code>scholarshipMatch</code>, <code>sopBuilder</code>, <code>visaInterview</code>, <code>upgrade</code> and <code>reports</code>, the <code>index.ts</code> barrel, the <code>UpgradeWall</code> component, and a 6-card B2B profile page. The design tokens in <code>globals.css</code> already match the spec palette.</p>
+  <p>What v2 listed as "build the API module" or "new UpgradeWall component" is <span class="pill pill-done">DONE</span>. What remains is the <strong>student-facing pages</strong>: the Pakistan landing, the 5-step onboarding, the dashboard redesign, and the four feature pages (Scholarship Finder, Tracker, SOP Builder, Visa Interview), plus the Upgrade page and the privacy/consent surface. v3 re-scopes every sprint to that real gap and drops ~5 dev-days of already-finished work.</p>
+  <div class="callout gold">
+    <h4>Brand decision baked into this plan</h4>
+    <p>Public display brand is <strong>AidwiseAI</strong> everywhere; <code>frontend/CLAUDE.md</code> is updated to match. ScholarAI stays internal/repo only. The codebase currently hardcodes a previous brand string in <code>app/page.tsx</code> and <code>Sidebar.tsx</code> — rename it to AidwiseAI in S1/S3. The old <code>DESIGN_SPEC.md</code> instruction to rename the brand to "ScholarAI Pakistan" is not actioned.</p>
+  </div>
+</section>
+
+<!-- 01 — COMPETITIVE ANALYSIS -->
+<section>
+  <div class="section-label">01 — Competitive Analysis</div>
+  <h2>Where GoScholar wins today, and where AidwiseAI owns them</h2>
+  <p>GoScholar is built for African students. Their edge is emotional storytelling and a fast-match promise. AidwiseAI's edge is Pakistan-specific depth no platform offers anywhere.</p>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Dimension</th><th>GoScholar.ai</th><th>AidwiseAI (current)</th><th>AidwiseAI (after this plan)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Landing emotional hook</td>
+        <td class="win">Founder story by an African grad</td>
+        <td class="lose">Generic: "For grad school applicants. Canada-first." No identity.</td>
+        <td><span class="badge badge-win">Owned</span> Pakistani student story, PKR cost pain, visa-fear hook</td>
+      </tr>
+      <tr>
+        <td>Match speed promise</td>
+        <td class="win">"Results in under 60 seconds", repeated on page</td>
+        <td class="lose">No promise, no urgency</td>
+        <td><span class="badge badge-win">Owned</span> "Matches in under 60 seconds" in hero and CTA</td>
+      </tr>
+      <tr>
+        <td>Live preview in hero</td>
+        <td class="win">Animated "12 schools found for you" card</td>
+        <td class="lose">No preview, three static pillars</td>
+        <td><span class="badge badge-win">Owned</span> Static match-card preview, Chevening 96% match, loads instant</td>
+      </tr>
+      <tr>
+        <td>Onboarding depth</td>
+        <td class="neutral">~3 min, basic fields</td>
+        <td class="lose">4 generic steps, no Pakistan fields, no university autocomplete</td>
+        <td><span class="badge badge-win">Better</span> 5-step Pakistan-specific, smart defaults, under 3 min</td>
+      </tr>
+      <tr>
+        <td>Visa interview simulator</td>
+        <td class="lose">"Coming Soon", not built</td>
+        <td class="neutral">Backend + <code>visaInterview.ts</code> wired; no UI</td>
+        <td><span class="badge badge-win">We Win</span> Full UK/USA/Canada/Germany simulator, first in market</td>
+      </tr>
+      <tr>
+        <td>SOP builder</td>
+        <td class="neutral">Generic AI writing assistant</td>
+        <td class="neutral">Backend + <code>sopBuilder.ts</code> wired; no UI</td>
+        <td><span class="badge badge-win">We Win</span> Pakistan-context SOP: HEC, NUST, ties-to-Pakistan framing</td>
+      </tr>
+      <tr>
+        <td>Application tracker</td>
+        <td class="neutral">Basic kanban</td>
+        <td class="neutral">4-col <code>/saved</code> kanban; <code>tracker.ts</code> wired, no 6-col page</td>
+        <td><span class="badge badge-win">Better</span> 6-column kanban + HEC-attestation checklist</td>
+      </tr>
+      <tr>
+        <td>CGPA / grading context</td>
+        <td class="lose">None</td>
+        <td class="lose">None surfaced (converter exists backend)</td>
+        <td><span class="badge badge-win">We Win</span> Pakistani CGPA to US GPA conversion in onboarding + match cards</td>
+      </tr>
+      <tr>
+        <td>Freemium / pricing</td>
+        <td class="neutral">Paid plan, basic gating</td>
+        <td class="neutral"><code>UpgradeWall</code> built; no <code>/upgrade</code> page, no gates wired</td>
+        <td><span class="badge badge-win">Owned</span> Blur gates + UpgradeWall on 4 surfaces, PKR-first pricing</td>
+      </tr>
+      <tr>
+        <td>Mobile UX</td>
+        <td class="neutral">Decent, desktop-first</td>
+        <td class="neutral">Tokens + tap-target util exist; new pages untested at 375px</td>
+        <td><span class="badge badge-win">Better</span> Mobile-first new pages, bottom tab bar, WhatsApp share</td>
+      </tr>
+      <tr>
+        <td>Social proof</td>
+        <td class="win">525+ students, named success stories</td>
+        <td class="lose">None</td>
+        <td><span class="badge badge-neutral">Partial</span> Stats bar + 3 seeded testimonial placeholders</td>
+      </tr>
+      <tr>
+        <td>Country focus</td>
+        <td class="neutral">African students broadly</td>
+        <td class="lose">"Canada-first" copy still in the footer</td>
+        <td><span class="badge badge-win">We Win</span> Pakistan-first, PKR context on every screen</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 02 — CURRENT STATE AUDIT -->
+<section>
+  <div class="section-label">02 — Current State Audit</div>
+  <h2>What is built, what is a stub, what is missing</h2>
+  <p>Honest scoping. The frontend is a greenfield rebuild (branch <code>feat/frontend-greenfield</code>) with sprints S1–S9 done and S10 partial. The Pakistan API layer landed on top. This is the real gap the sprints below close.</p>
+  <div class="audit-grid">
+    <div class="audit-col audit-done">
+      <h4><span class="pill pill-done">Built</span></h4>
+      <div class="count">reuse, do not rebuild</div>
+      <ul>
+        <li><code>lib/api/client.ts</code> — bearer + silent refresh + 402 guard</li>
+        <li>All 17 <code>endpoints/*</code> modules incl. tracker, scholarshipMatch, sopBuilder, visaInterview, upgrade, reports</li>
+        <li><code>lib/api/index.ts</code> barrel, <code>types.ts</code> hand-synced</li>
+        <li><code>components/UpgradeWall</code> — standalone + overlay modes, PartialSummary</li>
+        <li><code>AuthProvider</code>, <code>RoleGuard</code></li>
+        <li><code>ui/</code>: button, input, label, card, badge, skeleton, dialog, tabs, select</li>
+        <li><code>globals.css</code> @theme tokens + 3 stripe utilities + tap-target</li>
+        <li>Pages: login, signup, feed, discover, scholarship detail, saved kanban, documents (list/new/detail), interviews (list/session), profile (6-card B2B), settings, all admin (bar 2 stubs), mentor review</li>
+      </ul>
+    </div>
+    <div class="audit-col audit-stub">
+      <h4><span class="pill pill-stub">Stub / partial</span></h4>
+      <div class="count">finish, low effort</div>
+      <ul>
+        <li><code>/admin/ingestion/[id]</code> — empty file</li>
+        <li><code>/admin/curation/[id]</code> — empty file</li>
+        <li><code>/mentor/queue</code> — sidebar link, no page</li>
+        <li><code>/settings</code> — email/password change is placeholder text</li>
+        <li>S10 polish — axe-core gate, responsive matrix, smoke selector re-point, RBAC Playwright spec all outstanding</li>
+        <li>Landing — code hardcodes a previous brand string (rename to AidwiseAI); also generic copy + "Canada-first" footer</li>
+      </ul>
+    </div>
+    <div class="audit-col audit-missing">
+      <h4><span class="pill pill-missing">Missing</span></h4>
+      <div class="count">the real build, this plan</div>
+      <ul>
+        <li>Pakistan landing body (rewrite <code>app/page.tsx</code>)</li>
+        <li>5-step Pakistan onboarding (rewrite <code>app/onboarding/page.tsx</code>)</li>
+        <li>Dashboard action grid (extend <code>feed</code>)</li>
+        <li><code>/dashboard/scholarships/match</code> — Scholarship Finder</li>
+        <li><code>/dashboard/tracker</code> — 6-col kanban</li>
+        <li><code>/dashboard/documents/sop</code> — SOP Builder</li>
+        <li><code>/dashboard/interview</code> — Visa simulator</li>
+        <li><code>/upgrade</code> page + currency switcher + waitlist</li>
+        <li>Consent banner, <code>/legal/[slug]</code>, settings privacy panel</li>
+        <li>Sidebar relabel + 3 new nav items; demo banner; bottom tab bar</li>
+        <li>Primitives: <code>gold</code> button variant + badge tone + token; SVG radar; combobox</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 03 — DESIGN PRINCIPLES -->
+<section>
+  <div class="section-label">03 — Design Principles for This Build</div>
+  <h2>Non-negotiable rules — PR-blocking</h2>
+  <p>These carry forward the nine UX rules from v2 and bind them to the hard constraints already in <code>frontend/CLAUDE.md</code>. They override default behaviour. GoScholar wins on emotion; AidwiseAI wins on depth, trust, and Pakistan specificity.</p>
+  <div class="principles-grid">
+    <div class="principle-card"><span class="tag">Trust</span><h4>Validated is not AI-generated</h4><p>Scholarship facts (deadlines, amounts, eligibility) get a <code>validated-stripe</code> + soft-green tint + "Verified" badge + source link. AI output (SOP draft, match reasons, feedback) gets a <code>generated-stripe</code> + soft-blue tint + one 14px Sparkles icon + one-line provenance. Never mixed in a paragraph.</p></div>
+    <div class="principle-card"><span class="tag">Honesty</span><h4>Show locked, never hide</h4><p>Free tier sees blurred results with real counts. <code>UpgradeWall</code> renders the API 402 <code>detail.message</code> verbatim. Never write a generic "unlock this feature".</p></div>
+    <div class="principle-card"><span class="tag">Speed</span><h4>Zero AI theatre</h4><p>No fake streaming, no typewriter on REST data, no spinner-on-every-card. Recommendations render once. Skeleton shows once per route load. SOP generation shows a milestone progress bar, not a spinner.</p></div>
+    <div class="principle-card"><span class="tag">Focus</span><h4>One primary CTA per screen</h4><p>Landing to "Find My Scholarships". Onboarding to "Continue". Finder card to "Add to Tracker". No decision paralysis, no twin hero buttons.</p></div>
+    <div class="principle-card"><span class="tag">Identity</span><h4>Pakistan context everywhere</h4><p>PKR pricing, Pakistani university names, CGPA/HEC context, visa-fear language. Every screen should feel built for a student in Lahore or Karachi.</p></div>
+    <div class="principle-card"><span class="tag">Reach</span><h4>Mobile-first, WhatsApp-aware</h4><p>375px is the primary canvas. Bottom tab bar on mobile. Share-to-WhatsApp on scholarship cards. Every primary action is a 44x44 tap target.</p></div>
+    <div class="principle-card"><span class="tag">Craft</span><h4>No emoji as UI, no AI tells</h4><p>Lucide SVG icons only; emoji allowed only in content (country flags from data). No purple glow, no gradient text, no model names, no "Powered by", no floating chat bubble, no "Ask AI" buttons. No em dashes in product copy.</p></div>
+    <div class="principle-card"><span class="tag">Performance</span><h4>Latency and bundle budgets</h4><p>LCP &lt; 1.8s on <code>/feed</code> (3G simulated). INP &lt; 200ms on save toggle, kanban drag, filter change. Initial JS &le; 180KB gzipped per route. Tree-shake Radix, no full-barrel imports. Animate only transform and opacity.</p></div>
+    <div class="principle-card"><span class="tag">Resilience</span><h4>Every state, every time</h4><p>Loading (skeleton matching layout), empty (composed, with a CTA), error ("Couldn't load. [Retry]", never "Network error"). Optimistic mutations with rollback toast on 4xx.</p></div>
+    <div class="principle-card"><span class="tag">Access</span><h4>Keyboard and motion safe</h4><p><code>/</code> focuses search anywhere, <code>Esc</code> closes any drawer/dialog. Visible focus rings (<code>--color-ring</code>). <code>prefers-reduced-motion</code> respected globally — all slide/fade degrade to instant, kanban drag still works.</p></div>
+  </div>
+</section>
+
+<!-- 04 — DIFFERENTIATORS -->
+<section>
+  <div class="section-label">04 — Unique Differentiators vs GoScholar</div>
+  <h2>What AidwiseAI has that they don't, and must make visible</h2>
+  <div class="diff-grid">
+    <div class="diff-card"><h4>Visa Interview Simulator, first in market</h4><p>GoScholar lists visa prep as "Coming Soon". AidwiseAI has 70 seeded questions for UK, USA, Canada, Germany with AI rubric evaluation, and the <code>visaInterview.ts</code> client is already wired. This is the headline feature: front-and-centre on landing and the dashboard action grid.</p></div>
+    <div class="diff-card"><h4>Pakistani CGPA conversion context</h4><p>"Your 3.7 CGPA from NUST is approximately a 3.7 US GPA, First Class Honours (UK)." No competitor shows this. Surface it live in onboarding Step 2 and on every match card.</p></div>
+    <div class="diff-card"><h4>SOP with Pakistani academic context</h4><p>Understands HEC degrees, Pakistani university prestige, ties-to-Pakistan framing for government scholarships, the visa-officer reading lens. GoScholar's assistant is generic.</p></div>
+    <div class="diff-card"><h4>HEC attestation awareness</h4><p>Every tracker card's checklist has "HEC Degree Attestation, required for UK/Germany" as a highlighted row with an info tooltip. A Pakistan-specific pain point no other platform surfaces.</p></div>
+    <div class="diff-card"><h4>PKR-first freemium pricing</h4><p>"Less than one consultant meeting, PKR 2,499/month." Positioned against the Pakistani consultant market, with a currency switcher for diaspora families in GBP/EUR/AED.</p></div>
+    <div class="diff-card"><h4>Multi-channel alerts (Elite)</h4><p>Email + SMS + WhatsApp deadline alerts. WhatsApp is the communication layer in Pakistan; GoScholar has none. A real retention moat, surfaced on the Upgrade comparison table.</p></div>
+  </div>
+</section>
+
+<!-- 05 — ONBOARDING FLOW -->
+<section>
+  <div class="section-label">05 — Onboarding Flow Redesign</div>
+  <h2>Pakistan-specific 5-step onboarding, under 3 minutes</h2>
+  <p>Rewrite the current 4-step generic form. Keep the proven mechanics: the <code>grantpath.onboarding_draft</code> localStorage autosave (debounced), the <code>Field</code> / <code>Chip</code> / <code>ProgressDots</code> helpers, the <code>endpoints.profile.upsert</code> submit. Extend the step count to 5 and the field set to Pakistan-specific. Every field must map to a real <code>StudentProfile</code> column (<code>extra="forbid"</code>) — confirm against <code>types.ts</code> first.</p>
+  <div class="flow-steps">
+    <div class="flow-step"><div class="step-n">Step 1</div><h4>About You</h4><ul><li>Full name (to User)</li><li>City (Karachi, Lahore, Islamabad...)</li><li>Pakistani university autocomplete (NUST, LUMS, FAST, UET, IBA, QAU...)</li><li>Degree subject</li><li>Graduation year</li></ul><div class="time-note">~45 seconds</div></div>
+    <div class="flow-step"><div class="step-n">Step 2</div><h4>Academic Record</h4><ul><li>CGPA value + scale</li><li>Live US-GPA conversion (validated-stripe)</li><li>HEC degree level</li><li>Research publications toggle + count</li></ul><div class="time-note">~45 seconds</div></div>
+    <div class="flow-step"><div class="step-n">Step 3</div><h4>Test Scores</h4><ul><li>IELTS / TOEFL (optional)</li><li>GRE Quant / Verbal (optional)</li><li>GRE waiver toggle</li><li>Clear "all optional" messaging</li></ul><div class="time-note">~30 seconds</div></div>
+    <div class="flow-step"><div class="step-n">Step 4</div><h4>Your Goal</h4><ul><li>Target degree (MS/PhD/MBA)</li><li>Target countries (flag cards, multi)</li><li>Target fields (chips)</li><li>Funding requirement</li><li>Intake target</li></ul><div class="time-note">~45 seconds</div></div>
+    <div class="flow-step"><div class="step-n">Step 5</div><h4>Financial Context</h4><ul><li>Afford application fees?</li><li>Family funds for bank statement?</li><li>GRE fee waiver needed?</li><li>Skip option visible</li><li>CTA to /feed</li></ul><div class="time-note">~20 seconds</div></div>
+  </div>
+  <div class="callout">
+    <h4>Critical UX decisions for onboarding</h4>
+    <p>1. Progress bar + step dots + "~3 min left" estimate, persistent across steps.<br>
+       2. CGPA US-equivalent shows inline as the student types (debounced 300ms), in a validated-stripe — builds trust immediately.<br>
+       3. Pakistani university field is a searchable combobox, 25 universities pre-loaded, free-text fallback.<br>
+       4. Step 4 country select uses large tappable flag cards, not a dropdown — mobile-friendly and satisfying.<br>
+       5. "Continue" is always enabled except Step 4 (needs target_degree + at least one country).<br>
+       6. <code>target_countries[]</code> is multi-select; mirror the first choice into the legacy single <code>target_country_code</code> column.<br>
+       7. Final step CTA reads "Find My Scholarships", not "Save".</p>
+  </div>
+</section>
+
+<!-- 06 — SPRINT PLAN -->
+<section>
+  <div class="section-label">06 — Sprint-by-Sprint Build Plan</div>
+  <h2>9 sprints, re-scoped to the real gap</h2>
+  <p>Each sprint is self-contained and independently testable. Effort estimates are <strong>down from v2</strong> because the API modules, <code>UpgradeWall</code>, and tokens already exist — the green <strong>Reuse</strong> line on each sprint names what is already done. Read <code>node_modules/next/dist/docs/</code> before route work (this is Next.js 16, conventions differ from training data).</p>
+
+  <div class="sprint-list">
+
+    <!-- S1 -->
+    <div class="sprint-card s1">
+      <div class="sprint-header">
+        <div class="sprint-number">S1</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Pakistan Landing Page</div>
+          <div class="sprint-subtitle">Route <code>/</code> — rewrite <code>app/page.tsx</code> body. Public, no auth.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P1 demo-blocking</span><span class="sprint-tag">Conversion critical</span><span class="sprint-tag">Mobile-first</span></div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Hero:</strong> asymmetric split, headline "No consultant. No fees.", 60-second promise, static match-card preview (Chevening 96%)</li>
+            <li><strong>Stats bar:</strong> 150K+ students abroad, 62% want to go, 0 dedicated platforms — on bg-ink</li>
+            <li><strong>Problem section:</strong> 2x2 grid — PKR consultant cost, WhatsApp chaos, visa fear, currency pain</li>
+            <li><strong>How it works:</strong> 4 horizontal steps with Lucide icons + LIVE badges</li>
+            <li><strong>Featured scholarships:</strong> horizontal-scroll row of 5 (Chevening, Fulbright, DAAD, Commonwealth, HEC)</li>
+            <li><strong>Visa callout</strong> + <strong>pricing teaser</strong> + <strong>footer</strong> with "Partner with us" mailto</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Rename the hardcoded brand string to <strong>AidwiseAI</strong>; remove the stale "Canada-first" / "For grad school applicants" copy</li>
+            <li>Single hero CTA "Find My Scholarships" — routes to <code>/signup</code> logged-out, <code>/feed</code> logged-in</li>
+            <li>No auto-redirect for logged-in users; let them see the page</li>
+            <li>LCP &lt; 1.8s: CSS gradient + SVG only, no hero raster</li>
+            <li>Mobile: single column, preview card hidden &lt; 640px, CTA full-width</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Lighthouse mobile loads &lt; 2s</li>
+            <li>CTA routes correctly by auth state</li>
+            <li>All sections render at 375px</li>
+            <li>No "Canada-first" / "grad school applicants" copy left</li>
+            <li>Footer mailto works</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: Button, Badge, Card. Swap the hardcoded brand string to AidwiseAI.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S2 -->
+    <div class="sprint-card s2">
+      <div class="sprint-header">
+        <div class="sprint-number">S2</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Pakistan Onboarding Redesign</div>
+          <div class="sprint-subtitle">Route <code>/onboarding</code> — rewrite <code>app/onboarding/page.tsx</code>, 4 to 5 steps.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P1 demo-blocking</span><span class="sprint-tag">Profile quality</span></div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>5 steps</strong> per section 05: About You, Academic Record, Test Scores, Your Goal, Financial Context</li>
+            <li><strong>University combobox</strong> — new <code>ui/combobox.tsx</code>, 25 pre-loaded + free text</li>
+            <li><strong>CGPA live conversion</strong> — debounced 300ms, validated-stripe</li>
+            <li><strong>Flag-card multi-select</strong> for target countries</li>
+            <li><strong>Slide transitions</strong> between steps (transform, prefers-reduced-motion safe)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Keep the existing <code>grantpath.onboarding_draft</code> autosave + <code>Field</code>/<code>Chip</code>/<code>ProgressDots</code> helpers</li>
+            <li>Every field maps to a real <code>StudentProfile</code> column — verify against <code>types.ts</code>, schema forbids extras</li>
+            <li><code>full_name</code> writes to User, not the profile</li>
+            <li>Pre-fill all fields from <code>profile.get()</code> on mount for returning users</li>
+            <li>Only Step 4 gates Continue (target_degree + &ge;1 country)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>All 5 steps complete in &lt; 3 min (user test)</li>
+            <li>CGPA converter shows live US equivalent</li>
+            <li>All Pakistan fields persist to backend, no 422 from extra keys</li>
+            <li>Existing demo account still loads + saves</li>
+            <li>Slides animate, reduced-motion degrades to instant</li>
+            <li>Redirect to <code>/feed</code> after Step 5</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: autosave effect, STORAGE_KEY, Field/Chip/ProgressDots, profile.upsert.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S3 -->
+    <div class="sprint-card s3">
+      <div class="sprint-header">
+        <div class="sprint-number">S3</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Dashboard Redesign + Shell</div>
+          <div class="sprint-subtitle">Route <code>/feed</code> extend; <code>Sidebar</code> rewrite; new demo banner + bottom tabs.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P1 demo-blocking</span><span class="sprint-tag">Navigation restructure</span></div>
+        </div>
+        <div class="sprint-effort"><span>2</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Action grid (2x2):</strong> Find Scholarships, Visa Interview, Write SOP, Tracker — primary UI</li>
+            <li><strong>Welcome bar</strong> + incomplete-profile nudge + recent matches (top 3) + tracker summary widget</li>
+            <li><strong>Sidebar rewrite:</strong> EXPLORE / APPLY / ACCOUNT / UPGRADE groups, 3 new links, footer with avatar</li>
+            <li><strong>Demo banner</strong> (gold, sticky, dismissible) + <strong>mobile bottom tab bar</strong></li>
+            <li><strong>Tokens:</strong> add <code>--color-gold</code> / <code>--color-gold-soft</code>, <code>gold</code> Button variant + Badge tone</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Action grid is the primary UI; recommendations demoted to a secondary block</li>
+            <li>Action grid renders instant (static); recommendations stream below async</li>
+            <li>Tracker/deadline widgets only show with items, else an "Add your first" CTA</li>
+            <li>Demo banner dismissal persisted to localStorage</li>
+            <li>Sidebar keeps <code>hasRole</code> filter + <code>usePathname</code> active logic</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Action grid above the fold at 1280px</li>
+            <li>Sidebar shows renamed groups + Tracker/SOP/Visa links</li>
+            <li>Demo banner shows correct PKR pricing, dismiss persists</li>
+            <li>Top 3 matches render skeleton then data</li>
+            <li>Mobile: action grid 1-col, bottom tabs visible, all targets &ge; 44px</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: feed recommendations fetch, RecommendationCard, AppShell/TopBar, hasRole.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S4 -->
+    <div class="sprint-card s4">
+      <div class="sprint-header">
+        <div class="sprint-number">S4</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Scholarship Finder</div>
+          <div class="sprint-subtitle">New route <code>/dashboard/scholarships/match</code>. <code>scholarshipMatch.ts</code> already wired.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P2 high-impact</span><span class="sprint-tag">Freemium gate</span></div>
+        </div>
+        <div class="sprint-effort"><span>2.5</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Auto-run match</strong> on load from saved profile — no form</li>
+            <li><strong>Summary bar</strong> (gold) + <strong>3 tabs</strong> Eligible / Partially Eligible / Stretch with counts</li>
+            <li><strong>MatchCard</strong> — flag, funding badge, deadline countdown, validated CGPA stripe, generated match-reason stripe, View / Add-to-Tracker</li>
+            <li><strong>Freemium blur:</strong> wrap result cards 4+ in <code>&lt;UpgradeWall&gt;</code> overlay mode</li>
+            <li><strong>Filter bar</strong> (country / funding / deadline) + empty state to <code>/onboarding</code></li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Deadline urgency colors: &gt;60d neutral, 31–60d caution, &le;30d danger, &le;14d danger card tint</li>
+            <li>"Add to Tracker" is optimistic — calls <code>endpoints.tracker.add</code>, button to "Added", rollback toast</li>
+            <li>Blur uses the existing UpgradeWall overlay (blur-sm opacity-50); never hide a card</li>
+            <li>Partially-eligible cards use caution-stripe stating what is missing</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Complete profile sees &ge;3 matches, correctly tabbed</li>
+            <li>Results 4+ blurred for free tier, UpgradeWall shows PKR-correct price</li>
+            <li>Add-to-Tracker persists, visible on tracker page</li>
+            <li>CGPA conversion note on each card</li>
+            <li>INP &lt; 200ms on tab switch + add-to-tracker</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: scholarshipMatch.ts, tracker.ts, UpgradeWall, ui/tabs, ui/badge.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S5 -->
+    <div class="sprint-card s5">
+      <div class="sprint-header">
+        <div class="sprint-number">S5</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Application Tracker (Kanban)</div>
+          <div class="sprint-subtitle">New route <code>/dashboard/tracker</code>. <code>tracker.ts</code> already wired.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P2 expected feature</span><span class="sprint-tag">@hello-pangea/dnd</span></div>
+        </div>
+        <div class="sprint-effort"><span>3</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>6 columns:</strong> Researching, Preparing Documents, Applied, Interview/Test, Decision, Accepted</li>
+            <li><strong>TrackerCard</strong> — program, university, flag, deadline countdown, X/13 docs progress, urgency left treatment</li>
+            <li><strong>Checklist panel</strong> — expands on click, HEC Attestation highlighted row + info tooltip</li>
+            <li><strong>Deadline alert banner</strong> (sticky, danger) + <strong>Add Application dialog</strong></li>
+            <li><strong>Free-tier gate:</strong> 4th item swaps the dialog for a standalone <code>&lt;UpgradeWall&gt;</code></li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>DnD via <code>@hello-pangea/dnd</code> — DragDropContext to Droppable-per-column to Draggable-per-card, PATCH stage on drop</li>
+            <li>Checklist toggles optimistic, PATCH /tracker/{id}/checklist debounced 500ms</li>
+            <li>Mobile: 280px columns, horizontal scroll with momentum; empty column shows dashed "Drag cards here"</li>
+            <li>Alert banner only when deadline &le;30d AND checklist &lt;100%; links + flashes the card</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Cards drag across all 6 columns, stage persists after reload</li>
+            <li>Checklist persists per card; HEC row visible + labeled</li>
+            <li>Urgency colors correct; alert banner shows for near-deadline items</li>
+            <li>Free tier hits UpgradeWall on the 4th item</li>
+            <li>Mobile horizontal scroll works on iOS; INP &lt; 200ms on drag</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: tracker.ts (full CRUD wired), UpgradeWall, ui/dialog. New dep: @hello-pangea/dnd.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S6 -->
+    <div class="sprint-card s6">
+      <div class="sprint-header">
+        <div class="sprint-number">S6</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">SOP Builder</div>
+          <div class="sprint-subtitle">New route <code>/dashboard/documents/sop</code>. <code>sopBuilder.ts</code> already wired.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P2 high-impact</span><span class="sprint-tag">Pakistan SOP context</span></div>
+        </div>
+        <div class="sprint-effort"><span>2.5</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Two-panel layout:</strong> input form 40%, preview 60%; mobile tab switcher</li>
+            <li><strong>4 form steps:</strong> Academic (pre-filled from profile), Research/Work, Why Program/Country, Goals/Pakistan</li>
+            <li><strong>Scholarship selector</strong> from tracker items + DB</li>
+            <li><strong>Preview:</strong> 6 labeled paragraphs, action bar (copy/download/regenerate), generated-stripe, caution-stripe disclaimer</li>
+            <li><strong>Elite line-by-line feedback</strong> accordion; <strong>free-tier gate</strong> on 2nd generation</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Generation shows a milestone progress bar (Structuring to Drafting to Refining to Done), not a spinner</li>
+            <li>Step 1 pre-fills from <code>profile.get()</code> — student edits, never starts blank</li>
+            <li>Draft persists as a DocumentRecord, also visible at <code>/documents</code></li>
+            <li>Validated scholarship facts vs generated draft text always partitioned</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Form pre-fills from profile on load</li>
+            <li>Generation completes &lt; 30s with milestone progress bar</li>
+            <li>Draft is 600–800 words, 6 labeled paragraphs, Pakistan framing visible</li>
+            <li>Copy + .txt download work</li>
+            <li>Free tier hits UpgradeWall (showElite=true) on 2nd generation</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: sopBuilder.ts, documents endpoints, profile.get, UpgradeWall.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S7 -->
+    <div class="sprint-card s7">
+      <div class="sprint-header">
+        <div class="sprint-number">S7</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Visa Interview Simulator</div>
+          <div class="sprint-subtitle">New route <code>/dashboard/interview</code>. <code>visaInterview.ts</code> wired. Headline differentiator.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P1 headline feature</span><span class="sprint-tag">Study + Exam modes</span></div>
+        </div>
+        <div class="sprint-effort"><span>3.5</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Setup screen:</strong> country flag cards (UK/USA/Canada/Germany) + Study/Exam mode cards</li>
+            <li><strong>Q&amp;A screen:</strong> progress bar, category badge, question, textarea, Submit Answer</li>
+            <li><strong>Feedback panel</strong> (study mode): 3 score meters, red-flag/good/improve/ideal stripes</li>
+            <li><strong>Free-tier gate</strong> after Q3 — UpgradeWall renders the API <code>partial_summary</code></li>
+            <li><strong>Session summary:</strong> SVG/recharts radar, Q-by-Q table, improvements, download actions</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>Exam mode suppresses all feedback until the summary</li>
+            <li>Submit button text changes to "Evaluating your answer...", not a spinner</li>
+            <li>Reuse recharts (already a dependency, used by RubricRadar) for the summary radar — do NOT add Chart.js</li>
+            <li>Timer counts up in exam mode (duration), not a countdown</li>
+            <li>Mobile: full-screen question, feedback slides up as a sheet</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Full 10-question UK session end-to-end</li>
+            <li>Study shows feedback per answer; Exam suppresses until summary</li>
+            <li>Red flags detected for a bad answer ("I plan to stay in the UK")</li>
+            <li>Free tier hits UpgradeWall after Q3 with partial summary</li>
+            <li>Summary radar renders; all 4 countries functional</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: visaInterview.ts, UpgradeWall (PartialSummary built in), recharts.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S8 -->
+    <div class="sprint-card s8">
+      <div class="sprint-header">
+        <div class="sprint-number">S8</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Upgrade Page + Privacy/Consent UI</div>
+          <div class="sprint-subtitle">New <code>/upgrade</code> + consent banner + <code>/legal/[slug]</code> + settings privacy panel.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P2 business model</span><span class="sprint-tag">No Stripe, waitlist only</span></div>
+        </div>
+        <div class="sprint-effort"><span>2.5</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>Currency switcher</strong> PKR/GBP/EUR/AED/USD — updates all prices instantly</li>
+            <li><strong>4 pricing cards</strong> (Explorer/Pro/Elite/Institution) + <strong>comparison table</strong></li>
+            <li><strong>Inline waitlist form</strong> per card (email + pre-selected plan), Institution to mailto</li>
+            <li><strong>Consent banner</strong> + <strong><code>/legal/[slug]</code></strong> viewer + <strong>settings privacy panel</strong> (consent status, data export, account deletion dialog)</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li><code>UpgradeWall</code> already links here with <code>?plan=pro|elite</code> — read the param, pre-open that waitlist</li>
+            <li>Pro card: gold ring + "Most popular" gold badge; Institution tier shows only here, never in a student UpgradeWall</li>
+            <li>No Stripe, no checkout — waitlist posts to <code>POST /waitlist</code></li>
+            <li>Account deletion uses a typed-confirm Radix Dialog, states the 30-day window</li>
+            <li>Consent posts IP + user-agent + doc sha256; version mismatch re-shows the banner</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>Currency switcher changes all prices instantly; PKR default for PK accounts</li>
+            <li>Waitlist saves email + plan; Institution CTA opens mailto</li>
+            <li>UpgradeWall deep-link pre-opens the right plan</li>
+            <li>Consent grant persists; legal viewer renders all slugs</li>
+            <li>Data export + deletion request round-trip to backend</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: upgrade.ts, UpgradeWall, ui/dialog. New: privacy.ts + waitlist endpoint if unwired.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- S9 -->
+    <div class="sprint-card s9">
+      <div class="sprint-header">
+        <div class="sprint-number">S9</div>
+        <div class="sprint-meta">
+          <div class="sprint-title">Polish, A11y, Stubs &amp; E2E</div>
+          <div class="sprint-subtitle">axe-core gate, Playwright F1–F3, mobile matrix, finish 3 admin/mentor stubs, bundle audit.</div>
+          <div class="sprint-tags"><span class="sprint-tag">P3 quality gate</span><span class="sprint-tag">Depends on S1–S8</span></div>
+        </div>
+        <div class="sprint-effort"><span>2</span>dev-days</div>
+      </div>
+      <div class="sprint-body">
+        <div>
+          <div class="sprint-col-title">What to build</div>
+          <ul class="task-list">
+            <li><strong>A11y:</strong> axe-core devDep, run on all new routes, 0 critical violations</li>
+            <li><strong>Playwright E2E:</strong> F1 signup to onboarding to dashboard, F2 finder to add-to-tracker, F3 SOP generate to download</li>
+            <li><strong>Finish stubs:</strong> <code>/admin/ingestion/[id]</code>, <code>/admin/curation/[id]</code>, <code>/mentor/queue</code></li>
+            <li><strong>Mobile matrix</strong> 375/768/1024/1440 on every new route; <strong>WhatsApp share</strong> on scholarship cards</li>
+            <li><strong>Bundle audit:</strong> initial JS &le; 180KB gz/route; re-point browser-smoke selectors</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Key UX decisions</div>
+          <ul class="task-list">
+            <li>WhatsApp share only on scholarship detail + match cards (<code>wa.me</code> link, name + deadline)</li>
+            <li>Keyboard: Tab through every form step, Esc closes dialogs/drawers, <code>/</code> focuses search</li>
+            <li><code>prefers-reduced-motion</code> disables slide/fade; kanban drag still works</li>
+            <li>Error states everywhere say what to do next, never "Network error"</li>
+          </ul>
+        </div>
+        <div>
+          <div class="sprint-col-title">Acceptance gates</div>
+          <ul class="gate-list">
+            <li>0 critical axe violations on all routes</li>
+            <li>E2E F1–F3 pass in CI; browser-smoke selectors green</li>
+            <li>3 stub pages now render</li>
+            <li>Mobile matrix verified at 4 widths</li>
+            <li>LCP &lt; 1.8s on /feed and /dashboard/scholarships/match; JS &le; 180KB gz</li>
+          </ul>
+          <p class="reuse" style="margin-top:10px;">Reuse: existing data-testid scaffold, RubricRadar pattern, admin/mentor endpoints.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- 07 — PRIORITY MATRIX -->
+<section>
+  <div class="section-label">07 — Priority Matrix</div>
+  <h2>What to build first if time is tight</h2>
+  <p>If the FYP deadline forces cuts, use this. P1 = demo-blocking. P2 = differentiating. P3 = polish. Total ~21 dev-days, down from v2's ~26 because the API layer and UpgradeWall are already done.</p>
+  <table class="priority-table">
+    <thead>
+      <tr><th>Feature</th><th>Priority</th><th>Effort</th><th>Impact</th><th>If skipped</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Pakistan Landing (S1)</td><td><span class="badge p1">P1 demo-blocking</span></td><td>3 days</td><td>First impression, conversion</td><td>Demo opens on stale "Canada-first" copy, kills credibility</td></tr>
+      <tr><td>Onboarding Redesign (S2)</td><td><span class="badge p1">P1 demo-blocking</span></td><td>3 days</td><td>Profile quality drives match quality</td><td>Demo student can't enter Pakistani fields, matches stay generic</td></tr>
+      <tr><td>Dashboard + Shell (S3)</td><td><span class="badge p1">P1 demo-blocking</span></td><td>2 days</td><td>Feature discovery, navigation</td><td>Evaluator lands on a list with no path to any feature</td></tr>
+      <tr><td>Visa Interview Simulator (S7)</td><td><span class="badge p1">P1 headline feature</span></td><td>3.5 days</td><td>The single biggest edge over GoScholar</td><td>The differentiator stays invisible</td></tr>
+      <tr><td>Scholarship Finder (S4)</td><td><span class="badge p2">P2 high-impact</span></td><td>2.5 days</td><td>Core value proposition</td><td><code>/feed</code> recommendations are a tolerable fallback</td></tr>
+      <tr><td>SOP Builder (S6)</td><td><span class="badge p2">P2 high-impact</span></td><td>2.5 days</td><td>Pakistan-context differentiator</td><td>Generic <code>/documents/new</code> still works</td></tr>
+      <tr><td>Application Tracker (S5)</td><td><span class="badge p2">P2 expected feature</span></td><td>3 days</td><td>Retention feature</td><td>4-col <code>/saved</code> kanban is a weak fallback</td></tr>
+      <tr><td>Upgrade + Privacy (S8)</td><td><span class="badge p2">P2 business model</span></td><td>2.5 days</td><td>Freemium + compliance visible</td><td>Business model invisible; consent endpoints unused (compliance risk)</td></tr>
+      <tr><td>Polish, A11y, Stubs, E2E (S9)</td><td><span class="badge p3">P3 quality gate</span></td><td>2 days</td><td>Demo stability</td><td>Risk of demo breaks on mobile or edge cases</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 08 — NEW FILES & ROUTES -->
+<section>
+  <div class="section-label">08 — Files &amp; Routes Summary</div>
+  <h2>What gets created, rewritten, or extended — and what already exists</h2>
+  <table class="compare-table">
+    <thead>
+      <tr><th>File / Route</th><th>Action</th><th>Sprint</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>app/page.tsx</code></td><td><span class="badge badge-info">Rewrite</span></td><td>S1</td><td>Pakistan landing body. Rename brand string to AidwiseAI.</td></tr>
+      <tr><td><code>app/onboarding/page.tsx</code></td><td><span class="badge badge-info">Rewrite</span></td><td>S2</td><td>4 to 5 steps, Pakistan fields. Keep autosave + helpers.</td></tr>
+      <tr><td><code>app/(student)/feed/page.tsx</code></td><td><span class="badge badge-neutral">Extend</span></td><td>S3</td><td>Action grid, nudge, tracker widget; recs demoted.</td></tr>
+      <tr><td><code>components/shell/Sidebar.tsx</code></td><td><span class="badge badge-info">Rewrite</span></td><td>S3</td><td>Renamed groups + 3 new links + Upgrade group + footer.</td></tr>
+      <tr><td><code>components/shell/DemoBanner.tsx</code>, <code>BottomTabs.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S3</td><td>Gold demo banner; mobile bottom tab bar.</td></tr>
+      <tr><td><code>app/(student)/dashboard/scholarships/match/page.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S4</td><td>Scholarship Finder. Auto-runs the match.</td></tr>
+      <tr><td><code>app/(student)/dashboard/tracker/page.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S5</td><td>6-column kanban + checklist.</td></tr>
+      <tr><td><code>app/(student)/dashboard/documents/sop/page.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S6</td><td>Two-panel SOP builder.</td></tr>
+      <tr><td><code>app/(student)/dashboard/interview/page.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S7</td><td>Visa simulator. Separate from generic <code>/interviews</code>.</td></tr>
+      <tr><td><code>app/upgrade/page.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S8</td><td>Pricing, currency switcher, waitlist. No Stripe.</td></tr>
+      <tr><td><code>app/legal/[slug]/page.tsx</code> + <code>components/privacy/ConsentBanner.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S8</td><td>Legal viewer + cookie/consent banner.</td></tr>
+      <tr><td><code>app/(student)/settings/page.tsx</code></td><td><span class="badge badge-neutral">Extend</span></td><td>S8</td><td>Add privacy panel: consent status, export, deletion.</td></tr>
+      <tr><td><code>app/globals.css</code></td><td><span class="badge badge-neutral">Extend</span></td><td>S3</td><td>Add <code>--color-gold</code> / <code>--color-gold-soft</code> to @theme.</td></tr>
+      <tr><td><code>components/ui/button.tsx</code>, <code>badge.tsx</code></td><td><span class="badge badge-neutral">Extend</span></td><td>S3</td><td>Add <code>gold</code> variant / tone.</td></tr>
+      <tr><td><code>components/ui/combobox.tsx</code></td><td><span class="badge badge-win">New</span></td><td>S2</td><td>Searchable university picker.</td></tr>
+      <tr><td>Feature components (MatchCard, TrackerBoard, SopForm, visa/*, upgrade/*)</td><td><span class="badge badge-win">New</span></td><td>S4–S8</td><td>Per-sprint component sets, see Front-upgrade.md.</td></tr>
+      <tr><td><code>lib/api/endpoints/tracker|scholarshipMatch|sopBuilder|visaInterview|upgrade|reports.ts</code></td><td><span class="badge badge-gold">Exists</span></td><td>—</td><td>Already wired in <code>index.ts</code>. Do not rebuild.</td></tr>
+      <tr><td><code>components/UpgradeWall/index.tsx</code></td><td><span class="badge badge-gold">Exists</span></td><td>—</td><td>Standalone + overlay modes, PartialSummary. Do not rebuild.</td></tr>
+      <tr><td><code>lib/api/client.ts</code> (402 guard), <code>ui/*</code> primitives, <code>AuthProvider</code>, <code>RoleGuard</code></td><td><span class="badge badge-gold">Exists</span></td><td>—</td><td>Reuse as-is.</td></tr>
+      <tr><td><code>app/(admin)/admin/ingestion/[id]</code>, <code>curation/[id]</code>, <code>(mentor)/mentor/queue</code></td><td><span class="badge badge-neutral">Finish stub</span></td><td>S9</td><td>Empty files exist; endpoints wired.</td></tr>
+      <tr><td><code>lib/api/endpoints/privacy.ts</code></td><td><span class="badge badge-win">New</span></td><td>S8</td><td>If consent/export/deletion not yet wired in a module.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 09 — DEPENDENCIES -->
+<section>
+  <div class="section-label">09 — npm Dependencies</div>
+  <h2>What to install (Bun is the canonical package manager)</h2>
+  <table class="compare-table">
+    <thead><tr><th>Package</th><th>Version</th><th>Why</th><th>Sprint</th></tr></thead>
+    <tbody>
+      <tr><td><code>@hello-pangea/dnd</code></td><td>latest</td><td>Drag-and-drop for the kanban tracker. React 19-compatible fork of react-beautiful-dnd.</td><td>S5</td></tr>
+      <tr><td><code>axe-core</code> (devDep)</td><td>latest</td><td>Accessibility audit in CI and local dev.</td><td>S9</td></tr>
+      <tr><td><code>@playwright/test</code></td><td>latest</td><td>E2E F1–F3. Playwright smoke harness already partially configured.</td><td>S9</td></tr>
+    </tbody>
+  </table>
+  <div class="callout gold">
+    <h4>Do NOT add these</h4>
+    <p><strong>No Chart.js</strong> — recharts is already a dependency (used by <code>interview/RubricRadar</code>); reuse its Radar for the visa summary. Chart.js (~200KB) blows the 180KB route budget.<br>
+    <strong>No date-fns or moment</strong> — use native <code>Intl.RelativeTimeFormat</code> for deadline countdowns; <code>lib/utils.ts</code> already has <code>formatDeadline()</code>.<br>
+    <strong>No framer-motion</strong> — CSS transforms + transitions cover the onboarding slide and feedback-panel reveal. Keep the bundle lean.<br>
+    <strong>No new state library</strong> — React Query + AuthProvider context is the established pattern. No Redux/Zustand/Jotai.</p>
+  </div>
+</section>
+
+<!-- 10 — DESIGN METHODOLOGY -->
+<section>
+  <div class="section-label">10 — Design Methodology</div>
+  <h2>How the design skills shaped this plan</h2>
+  <p>The design system and UX principles above were pressure-tested against three design skills: <strong>impeccable</strong>, <strong>design-taste-frontend</strong>, and <strong>ui-ux-pro-max</strong>. Where a skill conflicted with a project rule already codified in <code>frontend/CLAUDE.md</code>, the project rule won — that file is authoritative.</p>
+  <div class="principles-grid">
+    <div class="principle-card"><span class="tag">impeccable</span><h4>Color strategy + anti-slop</h4><p>Palette declared as <strong>Restrained</strong>: warm tinted neutrals plus semantic accents used only for meaning, one gold identity accent under ~10%. No <code>#000</code>/<code>#fff</code>, no gradient text, no glassmorphism-by-default, no hero-metric template, no identical card grids. Hero is asymmetric, not centered. No em dashes in product copy.</p></div>
+    <div class="principle-card"><span class="tag">impeccable — exception</span><h4>The stripe carve-out</h4><p>impeccable bans &gt;1px side-stripe borders. AidwiseAI keeps <code>validated/generated/caution-stripe</code> because <code>frontend/CLAUDE.md</code> rule 1 makes the validated-vs-AI partition <strong>PR-blocking</strong>. Paired with a full border + tint + badge + icon, the stripe is a semantic affordance, not decoration — a documented, intentional exception.</p></div>
+    <div class="principle-card"><span class="tag">design-taste-frontend</span><h4>Component architecture + bias correction</h4><p>Interactivity isolated in <code>'use client'</code> leaf components; static layout in Server Components. Cards used only where elevation communicates hierarchy, never nested, grouping otherwise via <code>border-t</code>/<code>divide-y</code>/space. Mandatory loading + empty + error states. Animate only <code>transform</code>/<code>opacity</code>. No "Jane Doe" placeholder data, no startup-slop names.</p></div>
+    <div class="principle-card"><span class="tag">ui-ux-pro-max</span><h4>Metric-based priority rules</h4><p>Accessibility and touch targets are CRITICAL: 4.5:1 contrast, visible focus rings, aria-labels on icon-only buttons, 44x44 minimum (the <code>tap-target</code> utility already enforces this). Performance HIGH: reserve space for async content, respect <code>prefers-reduced-motion</code>, 150–300ms micro-interactions. SVG icons only, never emoji as UI.</p></div>
+  </div>
+</section>
+
+</div>
+
+<div class="doc-footer">
+  <div><strong>AidwiseAI</strong> &middot; Front-upgrade Plan v3 &middot; Delta Edition &middot; May 2026</div>
+  <div>9 sprints &middot; ~21 dev-days &middot; Companion: Front-upgrade.md &middot; Beat GoScholar for Pakistani students</div>
+</div>
+
+</body>
+</html>

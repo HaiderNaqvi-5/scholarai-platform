@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardEyebrow } from "@/components/ui/card";
 import { StatChip } from "@/components/ui/stat-chip";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
+import { RotatingDegree } from "@/components/marketing/RotatingDegree";
 
 /**
  * Marketing landing (Front-upgrade §6.1).
@@ -147,8 +148,8 @@ export default function Landing() {
               <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-lapis">
                 For Pakistani applicants · UK · US · Canada · Germany · Australia
               </p>
-              <h1 className="mt-6 max-w-[14ch] font-display text-[44px] italic font-[400] leading-[1.05] tracking-[-0.02em] text-ink-deep md:text-[64px] md:leading-[1.02]">
-                Funded master&apos;s degrees, found for you.
+              <h1 className="mt-6 max-w-[16ch] font-display text-[44px] italic font-[400] leading-[1.05] tracking-[-0.02em] text-ink-deep md:text-[64px] md:leading-[1.02]">
+                Funded <RotatingDegree /> degrees, found for you.
               </h1>
               <p className="mt-6 max-w-[60ch] text-[17px] leading-[1.55] text-ink-muted md:text-[19px]">
                 {BRAND_DISPLAY_NAME} matches Pakistani students with fully-funded

@@ -29,6 +29,22 @@ logger = logging.getLogger(__name__)
 _DEFAULT_EMAIL_SUBJECT = "AidwiseAI notification"
 
 
+def _sanitize_header(value: str) -> str:
+    """Strip CR/LF + NUL to prevent SMTP header injection (S13).
+
+    Mailgun's HTTP API normally normalises headers, but the subject + to
+    fields end up in the outgoing message envelope. A `\\r\\n` in
+    user-supplied input lets an attacker inject arbitrary headers
+    (e.g. BCC). Defence-in-depth even though Mailgun catches most.
+    """
+    if not value:
+        return ""
+    cleaned = (
+        value.replace("\r", " ").replace("\n", " ").replace("\x00", "").strip()
+    )
+    return cleaned[:998]  # RFC 5322 max line length
+
+
 PLAN_CHANNELS: dict[str, tuple[str, ...]] = {
     "free": ("email",),
     "pro": ("email",),
@@ -81,15 +97,16 @@ async def send_email(
         )
         return True
 
-    effective_subject = subject or _DEFAULT_EMAIL_SUBJECT
+    effective_subject = _sanitize_header(subject or _DEFAULT_EMAIL_SUBJECT)
+    safe_recipient = _sanitize_header(recipient)
     sender = (
-        f"{settings.BRAND_DISPLAY_NAME} "
+        f"{_sanitize_header(settings.BRAND_DISPLAY_NAME)} "
         f"<{settings.EMAIL_FROM_LOCALPART}@{settings.MAILGUN_DOMAIN}>"
     )
     url = f"{settings.MAILGUN_BASE_URL.rstrip('/')}/{settings.MAILGUN_DOMAIN}/messages"
     data = {
         "from": sender,
-        "to": [recipient],
+        "to": [safe_recipient],
         "subject": effective_subject,
         "text": message,
     }

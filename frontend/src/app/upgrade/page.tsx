@@ -18,7 +18,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Mail, ChevronDown, Plus, Minus } from "lucide-react";
+import { Check, Mail, ChevronDown, Plus, Minus, Globe2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, endpoints } from "@/lib/api";
@@ -34,16 +34,10 @@ import { ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/utils";
 
 import { partnershipsMailto, BRAND_DISPLAY_NAME } from "@/lib/brand";
-import { defaultCurrencyForCountry } from "@/lib/countries";
+import { useGeoCurrency } from "@/lib/geo/useGeoCurrency";
 
 const CURRENCIES: Currency[] = ["PKR", "GBP", "EUR", "AED", "USD"];
 const INSTITUTION_MAILTO = partnershipsMailto("Institution Partnership Inquiry");
-
-function defaultCurrencyFor(
-  user: { billing_country?: string | null; plan_currency?: Currency } | null,
-): Currency {
-  return user?.plan_currency ?? defaultCurrencyForCountry(user?.billing_country);
-}
 
 export default function UpgradePage() {
   return (
@@ -59,12 +53,35 @@ function UpgradeInner() {
   const queryPlan = (params.get("plan") || "").toLowerCase();
   const queryCurrency = (params.get("currency") || "").toUpperCase() as Currency | "";
 
-  const initialCurrency: Currency =
+  const authedCurrency: Currency | null =
+    auth.status === "authed" && auth.user.plan_currency &&
+    CURRENCIES.includes(auth.user.plan_currency)
+      ? auth.user.plan_currency
+      : null;
+
+  const geo = useGeoCurrency(authedCurrency ?? "PKR");
+  const [fallbackOverride, setFallbackOverride] = useState<Currency | null>(null);
+
+  const queryOverride: Currency | null =
     CURRENCIES.includes(queryCurrency as Currency) && queryCurrency !== ""
       ? (queryCurrency as Currency)
-      : defaultCurrencyFor(auth.status === "authed" ? auth.user : null);
+      : null;
 
-  const [currency, setCurrency] = useState<Currency>(initialCurrency);
+  const currency: Currency =
+    fallbackOverride ?? queryOverride ?? authedCurrency ?? geo.currency;
+
+  const detectionLabel: string =
+    queryOverride !== null
+      ? "Shared link override"
+      : fallbackOverride !== null
+        ? "Manual selection"
+        : authedCurrency !== null
+          ? "Your billing currency"
+          : geo.source === "geo" || geo.source === "cache"
+            ? geo.country
+              ? `Detected from ${geo.country}`
+              : "Detected from your location"
+            : "Default for Pakistan";
 
   const pricingQ = useQuery({
     queryKey: ["upgrade", "pricing", currency],
@@ -80,7 +97,7 @@ function UpgradeInner() {
       <main id="main" className="mx-auto max-w-[1200px] px-6 pb-24 pt-12 md:px-12 md:pt-20">
         <Hero />
 
-        <CurrencySwitcher current={currency} onChange={setCurrency} />
+        <DetectedCurrency currency={currency} label={detectionLabel} />
 
         {pricingQ.isLoading ? <PageSkeleton /> : null}
 
@@ -94,7 +111,7 @@ function UpgradeInner() {
                   <Button variant="secondary" onClick={() => pricingQ.refetch()}>
                     Retry
                   </Button>
-                  <Button variant="ghost" onClick={() => setCurrency("PKR")}>
+                  <Button variant="ghost" onClick={() => setFallbackOverride("PKR")}>
                     Show in PKR
                   </Button>
                 </>
@@ -162,40 +179,28 @@ function Hero() {
   );
 }
 
-function CurrencySwitcher({
-  current,
-  onChange,
+function DetectedCurrency({
+  currency,
+  label,
 }: {
-  current: Currency;
-  onChange: (c: Currency) => void;
+  currency: Currency;
+  label: string;
 }) {
   return (
     <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-      <Label htmlFor="currency-switch" className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
-        Show prices in
-      </Label>
       <div
-        id="currency-switch"
-        role="radiogroup"
-        className="inline-flex rounded-[12px] border border-[var(--color-border)] bg-paper-white p-1"
+        role="status"
+        aria-live="polite"
+        className="inline-flex items-center gap-2.5 rounded-[12px] border border-[var(--color-border)] bg-paper-white px-3.5 py-2"
       >
-        {CURRENCIES.map((c) => (
-          <button
-            key={c}
-            type="button"
-            role="radio"
-            aria-checked={current === c}
-            onClick={() => onChange(c)}
-            className={cn(
-              "h-9 min-w-[52px] rounded-[10px] px-3 font-mono text-[13px] font-medium tabular-nums transition-colors duration-[var(--motion-micro)]",
-              current === c
-                ? "bg-ink-deep text-paper-white"
-                : "text-ink-muted hover:bg-paper-warm hover:text-ink-deep",
-            )}
-          >
-            {c}
-          </button>
-        ))}
+        <Globe2 className="size-4 text-lapis" strokeWidth={1.5} aria-hidden />
+        <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
+          {label}
+        </span>
+        <span className="h-4 w-px bg-[var(--color-border-quiet)]" aria-hidden />
+        <span className="font-mono text-[13px] font-medium tabular-nums text-ink-deep">
+          {currency}
+        </span>
       </div>
     </div>
   );

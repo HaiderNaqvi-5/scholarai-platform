@@ -73,7 +73,12 @@ class UserLogin(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: str = Field(..., min_length=5, max_length=255, description="Registered email address")
-    password: str = Field(..., min_length=8, max_length=128, description="User password")
+    # S10 — Login schema does not enforce a min length on the password.
+    # Enforcement happens server-side via `verify_password` (constant-time
+    # bcrypt compare). A 422 here would (a) lock out legacy users with
+    # short passwords + (b) leak the policy to attackers via differential
+    # responses (422 vs 401). max_length kept as a DoS guardrail only.
+    password: str = Field(..., max_length=128, description="User password")
 
     @field_validator("email")
     @classmethod
