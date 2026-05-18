@@ -1,119 +1,68 @@
-# progress.md — 2026-05-18 (S89 + S89.1 cleanup pass)
+# progress.md — 2026-05-18 (S20 Security hardening pass)
 
-**Date:** 2026-05-18
+**Date:** 2026-05-18 (S89 + S89.1 already in git)
 **Branch:** `feat/s89-premium-cultural`
 **Alembic head:** `20260516_0026 (head)` — backend schema unchanged
-**Commits this session:** S89.1 cleanup commit on top of `99cc4c7` (landing polish) and `cb9cfbb` (S89 base)
+**Commits this session:** S20 security hardening commit on top of `41f3793` (S89.1) and `99cc4c7` (landing polish) and `cb9cfbb` (S89 base)
 
-## Tasks completed this session (S89.1)
+## Tasks completed this session (S20)
 
-All open items from prior `progress.md` either shipped or documented with run-once recipe. Lint + tsc + build + emoji-grep across 121 files all green.
+Closes P0 + P1 items from `SECURITY_AUDIT.md`. **396 unit + 63 integration backend tests pass.** Frontend lint + tsc + build + emoji-grep green across 123 files. Backend `create_app()` boots clean (112 routes) with Sentry stub.
 
-### P1 — Match-route alias
+### P0 (HIGH severity)
 
-- `frontend/src/app/(student)/dashboard/scholarships/match/page.tsx` (new) — `export { default } from "@/app/(student)/scholarships/page"`. Unblocks sidebar (`Sidebar.tsx:57`), onboarding redirect (`onboarding/page.tsx:154`), `/feed` action tile + see-all link.
+**S1 — Backend SecurityHeadersMiddleware + TrustedHost.** `app/main.py` mounts a new `SecurityHeadersMiddleware` after CORS so every response (including CORS preflights) carries:
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Resource-Policy: same-site`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'` (JSON API surface)
 
-### P2 — StudentProfile type sync + /profile 6-card expansion
+`TrustedHostMiddleware` mounted only when `ALLOWED_HOSTS` setting is non-empty (skips dev, enforced in prod).
 
-- `frontend/src/lib/api/types.ts` — `StudentProfile` grew from 10 to 28 fields, mirrors `backend/app/schemas/students.py:StudentProfileResponse` field-for-field. New string-literal aliases: `TargetDegreeLevel`, `HecDegreeLevel`, `CgpaScaleChoice`, `FundingRequirement`, `IntakeTarget`.
-- `frontend/src/app/(student)/profile/page.tsx` — full rewrite, 6 cards per Front-upgrade §6.22:
-  1. **Contact** — email (locked), citizenship select, city_of_origin
-  2. **Academic record** — pakistani_university, hec_degree_level, cgpa_scale_choice, degree_subject, graduation_year, gpa + scale, target_degree_level
-  3. **Test scores** — IELTS, TOEFL, GRE quant + verbal
-  4. **Your goal** — target_countries multi-chip, target_fields multi-chip, intake_target, funding_requirement
-  5. **Aspirations** — has_research_publications (Yes/No), conditional research_publication_count
-  6. **Background** — can_afford_application_fees, needs_gre_waiver, family_has_funds_for_bank_statement (each Yes/No)
-- `frontend/src/components/profile/MultiChip.tsx` (new) — multi-select chip group rendered as `<button role="checkbox" aria-checked>` with `<div role="group">` parent. Lapis-soft active fill, hairline neutral resting.
-- `StickySaveFooter` retained from S89 (slides up when form dirty; PATCH on save; `recommendations` + `scholarships.match` queries invalidated after success).
-- `toPayload` shapes single PATCH with both `target_country_code` (single) + `target_countries` (multi) so backend's reconcile model_validator stays happy.
+**S2 — Frontend next.config.ts headers.** `next.config.ts:headers()` returns the same header set per response on every route. CSP allows `NEXT_PUBLIC_API_BASE_URL` host for `connect-src`; allows `'unsafe-inline'` for `style-src` because Tailwind 4 ships generated `<style>` blocks; production drops `'unsafe-eval'` from `script-src`.
 
-### P3 — Admin repaint (8 routes)
+**S3 — `AUTO_SEED_DEMO_DATA` default flipped to `False`.** Prod assertion in `validate_production_settings` already rejects `True`. Demo seed must now be explicitly opted-in even in dev. `.env.example` flag still reads `true` w/ explicit comment that prod assertion rejects it.
 
-Each route's `<header><h1 font-display text-3xl></h1></header>` swapped to `<PageHeader title= description= />` from `@/components/ui/section-header`. Original `<header>` retained with `sr-only` where it was wrapping form labels or paragraphs the screen-reader still needs. Touched:
+**S4 — Boot secret assertions strengthened.** New `OPENSEARCH_PASSWORD` setting + prod assertion that rejects the docker-compose default (`ScholarAI_Secure_123!`) and common weak values. `ALLOWED_HOSTS` becomes required-non-empty in prod via the same assertion; wildcards forbidden. Existing `SECRET_KEY` / Neo4j / DB / Redis / Celery checks unchanged.
 
-- `frontend/src/app/(admin)/admin/page.tsx` (overview) — `data-testid="admin-overview"`, KPI numbers reshaped Fraunces 3xl → JBM 28/tabular-nums, `caution-stripe` utility on KPI alert card (replaces ad-hoc `border-l-4 border-l-caution`).
-- `frontend/src/app/(admin)/admin/users/page.tsx`
-- `frontend/src/app/(admin)/admin/audit/page.tsx`
-- `frontend/src/app/(admin)/admin/rec-eval/page.tsx`
-- `frontend/src/app/(admin)/admin/ingestion/page.tsx`
-- `frontend/src/app/(admin)/admin/curation/page.tsx`
-- `frontend/src/app/(admin)/admin/curation/[id]/page.tsx` — record-detail h1 now Fraunces 24 italic + JBM mono record-id eyebrow (matches `/documents/[id]` pattern).
+**S5 — CORS prod hardening.** `validate_production_settings` rejects any `CORS_ORIGINS` entry containing `localhost` or `127.0.0.1` when `ENVIRONMENT in {production, staging}`.
 
-### P4 — Mentor repaint (2 routes)
+### P1 (MED severity)
 
-- `frontend/src/app/(mentor)/mentor/queue/page.tsx` — `PageHeader` + `data-testid="mentor-queue"`.
-- `frontend/src/app/(mentor)/mentor/documents/[id]/page.tsx` — review h1 reshaped Fraunces 24 italic.
+**S7 — `ProxyHeadersMiddleware`.** `uvicorn.middleware.proxy_headers.ProxyHeadersMiddleware` mounts when `TRUSTED_PROXY_HOPS > 0`. Rate-limiter Redis keys + Sentry breadcrumb + account-lockout email key now reflect real client IP behind nginx / Cloudflare / caddy.
 
-### P5 — Partners repaint (2 routes)
+**S8 — Account lockout.** New `backend/app/core/account_lockout.py` Redis sliding window per email. 5 failed logins inside 15 min → 15-min lockout. `AuthService.login`:
+- checks `is_locked` first (constant-time response, no DB hit, no enumeration)
+- records failure on every wrong-password attempt — including unknown email — so lock-trip behaviour can't be used as an existence oracle
+- `clear()` wipes counter + lock on successful auth
+- fail-open on Redis outage (logged warning; auth still works but no lockout)
+5 unit tests in `backend/tests/unit/test_account_lockout.py` cover below-threshold / at-threshold / case-insensitive email / clear / Redis-outage fail-open.
 
-- `frontend/src/app/(partners)/partners/page.tsx` — `PageHeader` with `eyebrow="Institution"`, KPI numbers reshaped Fraunces 3xl → JBM 28/tabular-nums (3 stat cards), `data-testid="partners-overview"`.
-- `frontend/src/app/(partners)/partners/universities/page.tsx` — `PageHeader`, `data-testid="partners-universities"`.
+**S10 — `UserLogin.password.min_length` dropped.** Was 8-char min; rejecting short passwords at login locks out legacy users + leaks policy via 422-vs-401 differential. Now only `max_length=128` DoS guardrail. `UserCreate.password` 12-char min unchanged.
 
-### P6 — Backend gap quick wins
+**S11 — Frontend Dockerfile hardened.** Switched to `oven/bun:1-alpine` base + `bun install --frozen-lockfile` (lockfile must agree with package.json or install fails — refuses drift). Multi-stage build keeps build dependencies out of runtime. `tini` PID 1 for clean SIGTERM. Non-root `nextjs` user (uid 1001). `HEALTHCHECK wget /` every 30s. Telemetry disabled via `NEXT_TELEMETRY_DISABLED=1`.
 
-- `backend/.env.example` — Mailgun keys (`MAILGUN_API_KEY` / `MAILGUN_DOMAIN` / `MAILGUN_BASE_URL` / `MAILGUN_TIMEOUT_SECONDS` / `BRAND_DISPLAY_NAME` / `EMAIL_FROM_LOCALPART`) + Sentry keys (`SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` / `SENTRY_PROFILES_SAMPLE_RATE` / `SENTRY_ENVIRONMENT`) appended.
-- `backend/app/core/config.py` — `SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` / `SENTRY_PROFILES_SAMPLE_RATE` / `SENTRY_ENVIRONMENT` Settings fields added.
-- `backend/app/main.py:_init_sentry()` — bundled `sentry-sdk[fastapi]==2.18.0` wired. Imports `sentry_sdk` + `FastApiIntegration` + `StarletteIntegration`. Reads DSN from settings; no-op when unset. `send_default_pii=False` per PDPB. Fail-soft on init error so an invalid DSN never blocks app boot. **Verified**: `python -c "from app.main import create_app; app = create_app(); print('OK', len(app.routes))"` returns `OK 112` with DSN unset.
+**S12 — Sentry capture on 500.** `app/main.py:handle_unexpected_exception` calls `sentry_sdk.capture_exception(exc)` before building the error envelope. No-op when DSN unset (the import succeeds but the un-initialised hub silently drops the call). Defensive try/except so telemetry can never mask the actual 500.
 
-### P7 — Deferred live-backend recipes documented
+**S13 — Mailgun header sanitize.** New `_sanitize_header()` in `services/notifications/channels.py` strips `\r` / `\n` / `\x00` and truncates to RFC 5322 998-char line limit. Applied to subject, recipient, and sender fields. Defence-in-depth — Mailgun's HTTP API normalises most input, but this blocks BCC-injection via a malicious display name.
 
-Two gates still require local docker compose stack + 3 green runs:
+**S14 — `pip-audit` in CI.** Added step to `.github/workflows/ci.yml` `backend-sanity` job. `pip-audit --strict --skip-editable -r backend/requirements.txt`. `continue-on-error: true` for the first run so the baseline isn't a hard block; flip to hard-fail after a clean run is on record.
 
-#### Audit recipe (full state-matrix against live backend)
+**S15 — `/health` KPI leak fix.** Public probe now returns only `{ status, version, database, kpi_alerts: [] }`. KPI alert messages were leaking volume + pass-rate signals to unauthenticated callers. Admins read full KPI surface via auth-gated `/api/v1/analytics` (already wired into the admin shell). Test renamed `test_health_endpoint_does_not_leak_kpi_alerts` and asserts the empty list.
 
-```bash
-# Terminal 1 — boot stack
-docker compose up --build
-# Wait for healthchecks (~2-3 min). OpenSearch needs DISABLE_SECURITY_PLUGIN=true
-# (set in docker-compose.yml) or backend never reaches "alive".
+### Deferred to backlog
 
-# Terminal 2 — seed Pakistan demo (idempotent)
-python backend/scripts/bootstrap_local.py
-python backend/scripts/demo_seed_pakistan.py
-# Confirm zara.khan@example.com exists, plan=elite, plan_expires_at=2099-12-31
-
-# Terminal 3 — run audit
-cd frontend
-bun scripts/audit/emoji-grep.mjs              # sub-second, must be 0
-bun run audit:public                          # no-auth subset first
-bun run audit                                 # full matrix; writes audit-out/REPORT.md
-
-# Inspect REPORT.md — every cell must be PASS (or WARN with explicit
-# expected_phrases allowlist in scripts/audit/routes.mjs).
-```
-
-Acceptance: zero axe-serious / zero banned-phrase across all routes × viewports × states. Open `audit-out/REPORT.md` then `audit-out/<route>-<state>-<viewport>.png` for any FAIL.
-
-#### Smoke gate flip recipe (`.github/workflows/ci.yml:198`)
-
-```bash
-# Stack must be running from the audit recipe above.
-
-# Three consecutive green runs required:
-python tests/e2e/playwright/run_smoke_suite.py
-python tests/e2e/playwright/run_smoke_suite.py
-python tests/e2e/playwright/run_smoke_suite.py
-
-# After 3/3 green:
-# 1. Update tests/e2e/playwright/*.py selectors to target the S89 testids
-#    (saved-list / documents-list / discover-grid / interviews-list /
-#     profile-form / settings-tabs / legal-doc / scholarships-list /
-#     tracker-board / visa-setup-form / interview-session-shell /
-#     admin-overview / mentor-queue / partners-overview).
-# 2. Delete `continue-on-error: true` from .github/workflows/ci.yml:198 +
-#    the TODO block at lines 192-197.
-# 3. Keep `if: failure()` log-dump at lines 209-216.
-# 4. Push as a separate one-line commit so revert is trivial if the gate
-#    bites in the next 24h after merge.
-```
-
-Acceptance: `browser-smoke` CI step is a hard-fail gate; PRs touching auth / api / app-shell stop the merge button on failure.
-
-### Earlier work this session (already in git)
-
-S89 base (commit `cb9cfbb`, 2026-05-17): audit harness + 6 missing routes (404 / 500 / offline / denied / maintenance / legal[slug]) + /saved rewrite + /documents/new deletion + repaints across /documents, /documents/[id], /profile, /settings, /interviews, /scholarships/[id], /discover + 11 testids.
-
-Landing polish (commit `99cc4c7`, 2026-05-18): hero 2-col + FAQ + closing CTA + lapis lift on 5 eyebrows.
+Recorded in `SECURITY_AUDIT.md` "Open backlog":
+- **S6** — caddy/nginx reverse proxy + TLS termination in `docker-compose.yml`. Backend + frontend currently bind directly to host ports. ~1-2 hr; needs production deploy decision.
+- **S9** — Refresh-token rotation + DB revocation table. Logout currently clears client only. ~2-3 hr.
+- **S16** — Move tokens from `localStorage` → httpOnly + Secure + SameSite=Lax cookies. CSP in S1/S2 narrows the XSS surface in the meantime. ~1-2 days.
+- **S17** — TOTP MFA for admin / owner roles. WebAuthn long-term. ~2-3 days.
+- **S18** — Password hash pbkdf2_sha256 → Argon2id (OWASP 2025). Dual-read transition. ~1 day.
+- **S19** — JWT HS256 → RS256 w/ private/public key separation. ~4 hr.
 
 ## Tasks in progress
 
@@ -121,81 +70,74 @@ None.
 
 ## Open bugs / blockers
 
-- Smoke selector re-point + CI flag removal (P7 above). Both gated by 3 green local runs against `docker compose up` — operator action.
-- Prod Supabase has not yet been seeded with `AIRU2026` (`backend/scripts/seed_invite_codes.py` idempotent, awaits operator run before May-19 booth). Tracked in CLAUDE.md "Backend gap audit".
-- `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md` predates Pakistan pivot + Q1 retier + S89. Long-form doc refresh deferred.
+- Same as prior session: smoke selector re-point + `ci.yml:198` flag flip pending 3 green local runs against `docker compose up`. Recipes preserved from S89.1 progress.md (run from this branch root).
+- `pip-audit` first run will surface any current advisories; `continue-on-error: true` keeps CI green during the baseline pass. Flip to hard-fail in a follow-up PR.
+- `python-jose` is at 3.3.0+ which has had CVEs in some 3.x versions — `pip-audit` will surface if our pin is exposed.
+- Prod Supabase still needs `python scripts/seed_invite_codes.py` for `AIRU2026` before May-19 booth.
 
-Carry-over from S89 base:
-- `frontend/src/app/(student)/profile/page.tsx` field set still relies on backend reconciling single ↔ multi country + field. Backend tested green; frontend manual UAT recommended once docker compose is back up.
-- `/dashboard/scholarships/match` resolves now via alias; if spec ever wants a distinct UI variant, the alias becomes a real page.
+## Files touched this session
 
-## Files touched this session (S89.1)
+**Backend new (2):**
+- `backend/app/core/account_lockout.py`
+- `backend/tests/unit/test_account_lockout.py`
 
-**Frontend new (2):**
-- `frontend/src/app/(student)/dashboard/scholarships/match/page.tsx` — alias re-export
-- `frontend/src/components/profile/MultiChip.tsx`
+**Backend modified (5):**
+- `backend/app/main.py` — `SecurityHeadersMiddleware` + `TrustedHostMiddleware` + `ProxyHeadersMiddleware` + Sentry `capture_exception` on 500 + `/health` KPI strip
+- `backend/app/core/config.py` — `ALLOWED_HOSTS`, `TRUSTED_PROXY_HOPS`, `OPENSEARCH_PASSWORD`, account-lockout settings; `AUTO_SEED_DEMO_DATA` default flipped; prod assertions strengthened
+- `backend/app/schemas/auth.py` — `UserLogin.password` min_length dropped
+- `backend/app/services/auth/service.py` — account-lockout integration
+- `backend/app/services/notifications/channels.py` — `_sanitize_header()` on subject/recipient/sender
+- `backend/.env.example` — `AUTO_SEED_DEMO_DATA` comment
+- `backend/tests/unit/test_health_kpi_alerts.py` — assert no KPI leak
 
-**Frontend modified (16):**
-- `frontend/src/lib/api/types.ts` — StudentProfile expansion + 5 string-literal aliases
-- `frontend/src/app/(student)/profile/page.tsx` — full rewrite to 6 cards
-- `frontend/src/app/(admin)/admin/page.tsx` — PageHeader + KPI mono + caution-stripe + testid
-- `frontend/src/app/(admin)/admin/users/page.tsx` — PageHeader
-- `frontend/src/app/(admin)/admin/audit/page.tsx` — PageHeader
-- `frontend/src/app/(admin)/admin/rec-eval/page.tsx` — PageHeader
-- `frontend/src/app/(admin)/admin/ingestion/page.tsx` — PageHeader
-- `frontend/src/app/(admin)/admin/curation/page.tsx` — PageHeader
-- `frontend/src/app/(admin)/admin/curation/[id]/page.tsx` — Fraunces 24 italic detail h1
-- `frontend/src/app/(mentor)/mentor/queue/page.tsx` — PageHeader + testid
-- `frontend/src/app/(mentor)/mentor/documents/[id]/page.tsx` — Fraunces 24 italic detail h1
-- `frontend/src/app/(partners)/partners/page.tsx` — PageHeader + KPI mono + testid
-- `frontend/src/app/(partners)/partners/universities/page.tsx` — PageHeader + testid
+**Frontend modified (2):**
+- `frontend/next.config.ts` — `headers()` block w/ CSP + HSTS + etc.
+- `frontend/Dockerfile` — bun + frozen-lockfile + multi-stage + tini + non-root + HEALTHCHECK
 
-**Backend modified (3):**
-- `backend/.env.example` — Mailgun + Sentry keys
-- `backend/app/core/config.py` — Sentry settings fields
-- `backend/app/main.py` — `_init_sentry()` gated by SENTRY_DSN
+**CI (1):**
+- `.github/workflows/ci.yml` — `pip-audit` step in `backend-sanity`
 
-**Docs (3):**
-- `CLAUDE.md` — S89.1 section appended before S89
-- `frontend/CLAUDE.md` — S89.1 row in sprint table (above S89)
+**Docs (4):**
+- `SECURITY_AUDIT.md` (new) — 30 findings + plan + operator deploy checklist + sticky knowns
+- `CLAUDE.md` — S20 section appended; older sections compressed to fit 200-line cap
+- `frontend/CLAUDE.md` — S20 row in sprint table
 - `progress.md` — this file (overwrite per device rule §2)
 
 ## Commands to resume
 
 ```bash
-# Dev server
-cd frontend && bun dev                                 # http://localhost:3000
-
-# Frontend gates (all green)
-bun run lint
-bunx --bun tsc --noEmit
-bun run build                                          # 36 routes (S89 35 + S89.1 alias 1)
-bun run audit:emoji                                    # sub-second, 0 hits
-
-# Backend smoke import (verifies Sentry stub boots clean)
+# Verify backend boots clean
 cd backend && python -c "from app.main import create_app; app = create_app(); print('OK', len(app.routes))"
+# Expected: OK 112
 
-# Backend gates (when ready to push)
-pytest tests/unit tests/integration -q
-python scripts/docs_governance_check.py
+# Backend test suite
+cd backend && pytest tests/unit -q                 # 396 passed, 1 xfailed
+cd backend && pytest tests/integration -q          # 63 passed
 
-# Audit + smoke gates (require docker compose — see P7 recipes above)
+# Frontend
+cd frontend && bun run lint                        # 0 errors
+cd frontend && bunx --bun tsc --noEmit             # clean
+cd frontend && bun run build                       # 36 routes
+cd frontend && bun scripts/audit/emoji-grep.mjs    # 0 hits / 123 files
+
+# Production-assertion smoke (set ENVIRONMENT=production to trigger)
+cd backend && ENVIRONMENT=production python -c "from app.core.config import settings; settings.validate_production_settings()"
+# Expected: raises RuntimeError until ALLOWED_HOSTS + non-default secrets are set.
+
+# Live-backend audit + smoke (operator action — recipe from prior session in git history)
 docker compose up --build
 python backend/scripts/demo_seed_pakistan.py
-bun run audit                                          # full state matrix
-python tests/e2e/playwright/run_smoke_suite.py         # × 3
+bun run audit                                      # full state matrix
+python tests/e2e/playwright/run_smoke_suite.py     # × 3 green before flipping ci.yml:198
 ```
 
 ## Next session
 
-Priority order:
-
-1. **Run the audit + smoke recipes from P7** against `docker compose up`. Open `audit-out/REPORT.md` and fix any FAIL. After 3 green smoke runs, delete `continue-on-error: true` from `.github/workflows/ci.yml:198` as a one-line commit.
-2. **Prod Supabase seed**: `DATABASE_URL=...supabase... python backend/scripts/seed_invite_codes.py` before the May-19 booth.
-3. **`docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md` refresh**: reflect alembic head `20260516_0026` + Pakistan-pivot endpoints + Q1 retier + Air-Uni cohort flow + S89 + S89.1.
-4. **Trial-lifecycle integration test** — backend pytest covering signup → invite-redeem → plan flip → 30-day expire end-to-end.
-5. **Burn-cap pruning task** — Celery beat `tasks.run_usage_ledger_prune` first of month, drop rows older than 13 months.
+1. Run pip-audit baseline locally; document any CVEs in `SECURITY_AUDIT.md` "Open backlog"; flip the CI step to hard-fail in a one-line PR if clean.
+2. Tackle the audit + smoke recipes from prior session: 3 green smoke runs → drop `continue-on-error: true` from `ci.yml:198`.
+3. Pick one S20-deferred item to ship next. Recommended order: S9 refresh-token rotation (highest cost/benefit ratio at the moment).
+4. Refresh `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md` to reflect S87 + S89 + S89.1 + S20.
 
 ## Verdict
 
-S89.1 cleanup pass **SHIPPED**. Every open item from prior `progress.md` either landed in code (P1–P6) or documented with a verbatim run-once recipe (P7). Frontend lint + tsc + build + emoji-grep all green. Backend `create_app()` boots clean with Sentry stub (112 routes, DSN unset). The two remaining gates (audit-matrix + smoke flag flip) are operator actions: they need the docker compose stack up, which this session intentionally did not start. Recipes are in P7 above — paste, run, then flip the flag.
+S20 security hardening **SHIPPED** to `feat/s89-premium-cultural`. 11 P0+P1 audit items closed in code + 1 new unit-test module + new ops doc (`SECURITY_AUDIT.md`). Backend tests 396 + 63 green; frontend gates green; create_app() boots clean. Remaining 6 deferred items have explicit cost estimates in `SECURITY_AUDIT.md` — pick the next one based on the deploy timeline.
