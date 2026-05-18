@@ -81,7 +81,14 @@ async def test_kpi_alert_messages_skips_low_volume_domains():
     assert alerts == []
 
 
-async def test_health_endpoint_exposes_kpi_alerts(app, client, monkeypatch):
+async def test_health_endpoint_does_not_leak_kpi_alerts(app, client, monkeypatch):
+    """S15 — Public /health probe must not surface KPI alert messages.
+
+    KPI alerts can reveal volume + pass-rate signals to attackers. Admins
+    consume the full KPI surface through the auth-gated
+    /api/v1/analytics endpoint instead.
+    """
+
     class _FakeDBSession:
         async def execute(self, _query):
             return None
@@ -93,19 +100,12 @@ async def test_health_endpoint_exposes_kpi_alerts(app, client, monkeypatch):
         async def __aexit__(self, exc_type, exc, tb):
             return None
 
-    class _StubSnapshotService:
-        def __init__(self, _db):
-            return None
-
-        async def alert_messages(self, **_kwargs):
-            return ["recommendation KPI pass rate degraded: 50.00% over last 10 snapshots (threshold 60.00%)."]
-
-    monkeypatch.setattr("app.main.KPISnapshotService", _StubSnapshotService)
     monkeypatch.setattr("app.main.async_session_factory", _FakeSessionFactory)
 
     response = client.get("/health")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "degraded"
-    assert payload["kpi_alerts"]
+    assert payload["status"] == "healthy"
+    assert payload["database"] == "ok"
+    assert payload["kpi_alerts"] == []

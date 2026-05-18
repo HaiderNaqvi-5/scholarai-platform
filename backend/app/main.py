@@ -8,6 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -17,8 +20,46 @@ from app.core.config import settings
 from app.core.database import async_session_factory
 from app.demo import seed_demo_data_if_enabled
 from app.schemas import ErrorDetail, ErrorEnvelope, HealthResponse
-from app.services.kpi_snapshot_service import KPISnapshotService
 from scholarai_common.errors import ScholarAIException
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Attach OWASP-recommended response headers to every response.
+
+    Values are conservative defaults that work for an API + thin frontend.
+    Override per-route via response.headers when a relaxation is necessary.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        # HTTPS-only enforcement. Browsers honor only when delivered over TLS.
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+        # Clickjacking
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        # MIME-sniffing
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        # Referrer leak
+        response.headers.setdefault(
+            "Referrer-Policy", "strict-origin-when-cross-origin"
+        )
+        # Cross-origin isolation hints
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+        # Permissions API surface — drop everything the API does not use.
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        )
+        # API responses are JSON. A strict CSP for the FastAPI surface keeps
+        # browsers honest even if /docs swagger is open to the network.
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+        )
+        return response
 
 
 def _init_sentry() -> None:
@@ -68,6 +109,20 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # S7 — Trust X-Forwarded-* when behind a reverse proxy. trusted_hosts
+    # filters which upstream IPs are allowed to set the header chain;
+    # "*" trusts the host network, which is fine inside the docker compose
+    # private network. For prod set behind cloudflare/caddy to "127.0.0.1".
+    if settings.TRUSTED_PROXY_HOPS > 0:
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+    # Order matters: TrustedHost runs first (rejects bad Host header before
+    # any other middleware reads it), CORS next (preflight needs to land
+    # before security headers attach), security headers last so every
+    # response — including CORS preflight — carries them.
+    if settings.ALLOWED_HOSTS:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -75,6 +130,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*", "X-Request-ID"],
     )
+
+    app.add_middleware(SecurityHeadersMiddleware)
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):
@@ -156,6 +213,16 @@ def create_app() -> FastAPI:
         request: Request,
         exc: Exception,
     ) -> JSONResponse:
+        # S12 — best-effort Sentry capture. No-op when DSN is unset because
+        # the sentry_sdk hub is uninitialised; in that case the import is
+        # cheap and the call returns immediately.
+        try:
+            import sentry_sdk
+
+            sentry_sdk.capture_exception(exc)
+        except Exception:  # pragma: no cover — never let telemetry mask the 500
+            pass
+
         return build_error_response(
             request=request,
             status_code=500,
@@ -180,29 +247,24 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     async def health_check() -> HealthResponse:
+        # S15 — Public probe only. DB reachability + version are safe to
+        # leak; KPI alert messages are not (they can reveal recommendation
+        # pass-rates / volume signals to attackers). Admins read the full
+        # KPI surface via the auth-gated /api/v1/analytics endpoint
+        # already wired in the admin shell.
         db_ok = False
-        kpi_alerts: list[str] = []
         try:
             async with async_session_factory() as db:
                 await db.execute(text("SELECT 1"))
-                if settings.KPI_OBSERVABILITY_ENABLED:
-                    snapshot_service = KPISnapshotService(db)
-                    kpi_alerts = await snapshot_service.alert_messages(
-                        lookback_days=settings.KPI_HEALTH_LOOKBACK_DAYS,
-                        min_snapshots_per_domain=settings.KPI_ALERT_MIN_SNAPSHOTS_PER_DOMAIN,
-                        recommendation_pass_rate_min=settings.KPI_ALERT_RECOMMENDATION_PASS_RATE_MIN,
-                        document_pass_rate_min=settings.KPI_ALERT_DOCUMENT_PASS_RATE_MIN,
-                        interview_pass_rate_min=settings.KPI_ALERT_INTERVIEW_PASS_RATE_MIN,
-                    )
             db_ok = True
         except Exception:
             db_ok = False
 
         return HealthResponse(
-            status="healthy" if db_ok and not kpi_alerts else "degraded",
+            status="healthy" if db_ok else "degraded",
             version=settings.APP_VERSION,
             database="ok" if db_ok else "error",
-            kpi_alerts=kpi_alerts,
+            kpi_alerts=[],
         )
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)

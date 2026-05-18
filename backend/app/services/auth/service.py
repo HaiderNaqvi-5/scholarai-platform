@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core import account_lockout
 from app.core.authorization import get_role_capabilities
 from app.core.security import (
     create_access_token,
@@ -169,10 +170,23 @@ class AuthService:
                 pass
 
     async def login(self, payload: UserLogin) -> TokenResponse:
+        # S8 — Account lockout gate. Checked before any DB / hash work so a
+        # locked account fails fast with a constant-time response that does
+        # not leak whether the email exists.
+        if await account_lockout.is_locked(payload.email):
+            raise ScholarAIException(
+                code=ErrorCode.AUTH_INVALID_CREDENTIALS,
+                message="Account temporarily locked. Try again later.",
+                status_code=423,
+            )
+
         result = await self.db.execute(select(User).where(User.email == payload.email.lower()))
         user = result.scalar_one_or_none()
 
         if user is None or not verify_password(payload.password, user.password_hash):
+            # Record the failure even when the email does not exist so an
+            # attacker can't enumerate live accounts via lock-trip behaviour.
+            await account_lockout.register_failure(payload.email)
             raise ScholarAIException(
                 code=ErrorCode.AUTH_INVALID_CREDENTIALS,
                 message="Invalid email or password",
@@ -185,6 +199,9 @@ class AuthService:
                 message="Account is disabled",
                 status_code=403
             )
+
+        # Successful auth — wipe any prior failures.
+        await account_lockout.clear(payload.email)
 
         capabilities = await self._resolve_capabilities(user)
         token_data = {
