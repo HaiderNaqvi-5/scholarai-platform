@@ -157,6 +157,9 @@ P0+P1 closed (`SECURITY_AUDIT.md`). 396 unit + 63 integration pass; FE green; cr
 - **S14** `pip-audit` in CI backend-sanity. **S15** `/health` public probe DB+version only.
 - **Deferred** (`SECURITY_AUDIT.md`): S6 caddy/TLS, S9 refresh rotation, S16 httpOnly cookies, S17 TOTP, S18 Argon2id, S19 RS256.
 
+## S89.3 Emil ui polish (2026-05-18, branch `feat/s89-premium-cultural`)
+Commit `1757420`. Lint + tsc + build green (40 routes). Emil Kowalski design-engineering pass on 5 core primitives in `frontend/src/components/ui/`: Button + IconButton + Dialog + Select + Tabs. `transition-all` → explicit prop lists. Universal `active:scale(0.96-0.99)` press feedback. Loading spinner sped 1000→700ms. Dialog overlay/content swap `data-state animate-in` keyframes → interruptible CSS transitions (opacity + scale 0.96→1, center-origin per modal exception). Dialog close promoted to 44×44 tap target. Select content `origin-[var(--radix-select-content-transform-origin)]` so popover scales from trigger. Tabs trigger gets `var(--motion-micro)` + `var(--ease-out)` tokens + hairline shadow on active.
+
 ## S89.2 landing rotator + IP currency (2026-05-18, branch `feat/s89-premium-cultural`)
 Commits `02bc5bb` + `7b85c46`. Lint + tsc + build green (40 routes); 0 emoji / 0 gradient text / 0 heavy backdrop-blur / 0 heavy shadow across 123 files.
 - **Hero word cycler**: `frontend/src/components/marketing/RotatingDegree.tsx` cycles `bachelor's → master's → PhD` in landing h1 (opacity fade 320ms, 2.2s hold, `aria-live="polite"`, `prefers-reduced-motion` honored, `min-w-[5ch]` no layout jump).
@@ -170,12 +173,10 @@ Closes S89 progress.md items. Lint + tsc + build + emoji-grep green across 121 f
 Closes student-core delta + 6 missing routes from `Front-upgrade.md` §3.1 IA. Commits `cb9cfbb` + landing polish. Lint + tsc + build green; emoji-grep 0/119.
 - **Audit harness** `frontend/scripts/audit/`: state-matrix runner (routes × viewports × states) via `@axe-core/playwright`, copy-grep §7.5 banned ledger, emoji guard, `page.route()` 402/500/empty/loading mocks, `zara.khan` token-inject. Output `audit-out/REPORT.md`. Scripts: `bun run audit{,:public,:emoji,:self-test}`.
 - **6 missing routes**: `/not-found`, `/error` + `/global-error`, `/offline`, `/denied`, `/maintenance`, `/legal/[slug]` (server-rendered against `GET /privacy/legal/{slug}`, `generateStaticParams` over `[terms,privacy,dpa,cookie,refund]`, `print.css`). `OfflineBanner` + `ConsentBar` mounted in `providers.tsx`.
-- **/saved rewrite** Kanban→list + sort dropdown + inline Promote-to-tracker (POST `/tracker` then DELETE saved, optimistic + rollback). Kebab replaces drag. **/documents/new deleted** (not in IA §3.1) — refs → `/documents/sop`.
-- **Repaints**: /documents (Add dropdown, URL-stateful filter chips, lg+ table / sm cards), /documents/[id] (`validated-stripe`/`generated-stripe` `@utility`), /profile (6 cards w/ PageHeader + StickySaveFooter), /settings (6 tabs incl. TypedConfirm "DELETE MY ACCOUNT" → `/privacy/account-deletion` 30-day window), /interviews (TrendStrip + RubricSparkline), /scholarships/[id] (sticky AsideAtAGlance, "Estimated Scholarship Fit Score" verbatim), /discover (Pagination w/ ellipsis ≥5).
-- **Landing polish**: hero 2-col at lg+ + editorial preview card (3 providers + "See 17 more →"), 6-Q FAQ native `<details>`, closing CTA, lapis-lifted eyebrows (§2.1 one-accent-per-screen respected).
-- **Endpoint module** `lib/api/endpoints/legal.ts`: `legal.{document,consentState,grant}` + `privacy.{requestExport,exportStatus,scheduleDeletion,cancelDeletion}`. Types: `LegalDocument`, `ConsentState`, `ConsentGrantInput`, `DataExportResponse`, `DataDeletionRequestResponse`.
-- **11 testids** backfilled for smoke re-point: `saved-list`, `documents-list`, `discover-grid`, `interviews-list`, `profile-form`, `settings-tabs`, `legal-doc`, `scholarships-list`, `tracker-board`, `visa-setup-form`, `interview-session-shell`.
-- **Deferred**: smoke selector re-point in `tests/e2e/playwright/*.py` + `.github/workflows/ci.yml:198` `continue-on-error: true` removal — need 3 green local runs vs `docker compose up`.
+- **/saved rewrite** Kanban→list + sort dropdown + inline Promote-to-tracker (POST `/tracker` then DELETE saved, optimistic + rollback). Kebab replaces drag. **/documents/new deleted** — refs → `/documents/sop`. Repaints: /documents, /documents/[id] (`validated`/`generated-stripe`), /profile (6 cards), /settings (6 tabs + TypedConfirm), /interviews (TrendStrip + RubricSparkline), /scholarships/[id] (AsideAtAGlance, "Estimated Scholarship Fit Score" verbatim), /discover (Pagination ≥5).
+- **Landing polish**: hero 2-col at lg+ + editorial preview card, 6-Q FAQ native `<details>`, closing CTA, lapis-lifted eyebrows.
+- **Endpoint module** `lib/api/endpoints/legal.ts`: `legal.{document,consentState,grant}` + `privacy.{requestExport,exportStatus,scheduleDeletion,cancelDeletion}`.
+- **11 testids** backfilled. **Deferred**: smoke selector re-point + `.github/workflows/ci.yml:198` `continue-on-error: true` removal — needs 3 green local runs.
 
 ## Backend gap audit (2026-05-17 → 18, post-PR-#87)
 Frontend out of scope. Open items strictly on backend / ops. ✅ = resolved in S89.1.
