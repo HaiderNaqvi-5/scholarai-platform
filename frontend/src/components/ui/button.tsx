@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
  * (the sm row uses the tap-target utility to inflate hit area only).
  */
 const button = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] font-medium leading-none transition-all duration-[var(--motion-micro)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-ivory)] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] font-medium leading-none will-change-transform transition-[background-color,color,border-color,transform,box-shadow,opacity] duration-[var(--motion-micro)] ease-[var(--ease-out)] active:scale-[0.97] active:duration-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-ivory)] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100",
   {
     variants: {
       variant: {
@@ -83,7 +83,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <span
-            className="size-[18px] animate-spin rounded-full border-2 border-current border-t-transparent"
+            className="size-[18px] animate-spin [animation-duration:700ms] rounded-full border-2 border-current border-t-transparent"
             aria-hidden
           />
         ) : null}

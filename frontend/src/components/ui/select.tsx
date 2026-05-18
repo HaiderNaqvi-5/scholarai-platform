@@ -17,8 +17,9 @@ export const SelectTrigger = forwardRef<
     ref={ref}
     className={cn(
       "flex h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-[var(--color-border)] bg-paper-white px-3 text-[15px] text-ink",
+      "will-change-transform transition-[border-color,box-shadow,transform] duration-[var(--motion-micro)] ease-[var(--ease-out)] active:scale-[0.99]",
       "focus-visible:border-generated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
-      "disabled:cursor-not-allowed disabled:opacity-60",
+      "disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100",
       "tap-target",
       className,
     )}
@@ -42,7 +43,11 @@ export const SelectContent = forwardRef<
       position={position}
       className={cn(
         "z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-[12px] border border-[var(--color-border)] bg-paper-white shadow-lg",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "origin-[var(--radix-select-content-transform-origin)] will-change-transform",
+        "transition-[opacity,transform] duration-[var(--motion-enter)] ease-[var(--ease-out)]",
+        "data-[state=closed]:opacity-0 data-[state=closed]:scale-[0.96]",
+        "data-[state=open]:opacity-100 data-[state=open]:scale-100",
+        "data-[state=closed]:duration-[var(--motion-exit)]",
         position === "popper" && "translate-y-1",
         className,
       )}

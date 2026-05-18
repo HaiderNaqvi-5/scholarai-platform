@@ -17,7 +17,10 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-ink/40 data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "fixed inset-0 z-50 bg-ink/40",
+      "transition-opacity duration-[var(--motion-enter)] ease-[var(--ease-out)]",
+      "data-[state=closed]:opacity-0 data-[state=open]:opacity-100",
+      "data-[state=closed]:duration-[var(--motion-exit)]",
       className,
     )}
     {...props}
@@ -36,6 +39,11 @@ export const DialogContent = forwardRef<
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2",
         "rounded-[20px] border border-[var(--color-border)] bg-paper-white p-5 shadow-lg",
+        "origin-center will-change-transform",
+        "transition-[opacity,transform] duration-[var(--motion-enter)] ease-[var(--ease-out)]",
+        "data-[state=closed]:opacity-0 data-[state=closed]:scale-[0.96]",
+        "data-[state=open]:opacity-100 data-[state=open]:scale-100",
+        "data-[state=closed]:duration-[var(--motion-exit)]",
         "focus-visible:outline-none",
         className,
       )}
@@ -44,7 +52,7 @@ export const DialogContent = forwardRef<
       {children}
       <DialogPrimitive.Close
         aria-label="Close"
-        className="absolute right-3 top-3 rounded p-1 text-ink-subtle hover:bg-paper-warm hover:text-ink"
+        className="absolute right-2 top-2 inline-flex tap-target items-center justify-center rounded-[10px] text-ink-subtle will-change-transform transition-[background-color,color,transform] duration-[var(--motion-micro)] ease-[var(--ease-out)] hover:bg-paper-warm hover:text-ink active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
       >
         <X className="size-4" strokeWidth={2} />
       </DialogPrimitive.Close>
