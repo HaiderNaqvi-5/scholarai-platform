@@ -1,8 +1,6 @@
 name: aidwiseai-backend
 region: blr
 
-# Source repo - update branch when promoting to prod
-# (currently feat/pakistan-frontend-pass; switch to `main` after PR #87 merge confirmed live)
 services:
   - name: web
     github:
@@ -11,7 +9,7 @@ services:
       deploy_on_push: true
     source_dir: backend
     dockerfile_path: backend/Dockerfile
-    instance_size_slug: basic-xxs    # 512MB / $5 — uvicorn fits easily
+    instance_size_slug: basic-xxs
     instance_count: 1
     http_port: 8000
     run_command: uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -22,34 +20,98 @@ services:
       timeout_seconds: 5
       failure_threshold: 3
       success_threshold: 1
-    routes:
-      - path: /
     envs:
-      - { key: ENVIRONMENT, value: production, scope: RUN_AND_BUILD_TIME }
-      - { key: DEBUG, value: "false", scope: RUN_AND_BUILD_TIME }
-      - { key: APP_NAME, value: ScholarAI, scope: RUN_AND_BUILD_TIME }
-      - { key: APP_VERSION, value: 0.1.0, scope: RUN_AND_BUILD_TIME }
-      - { key: API_V1_PREFIX, value: /api/v1, scope: RUN_AND_BUILD_TIME }
-      - { key: AUTO_SEED_DEMO_DATA, value: "false", scope: RUN_AND_BUILD_TIME }
-      - { key: CORS_ORIGINS, value: '["https://aidwiseai.com","https://www.aidwiseai.com","https://aidwise.me"]', scope: RUN_TIME }
-      - { key: BRAND_DISPLAY_NAME, value: AidwiseAI, scope: RUN_TIME }
-      - { key: EMAIL_FROM_LOCALPART, value: noreply, scope: RUN_TIME }
-      - { key: MAILGUN_BASE_URL, value: "https://api.mailgun.net/v3", scope: RUN_TIME }
-      - { key: MAILGUN_TIMEOUT_SECONDS, value: "10", scope: RUN_TIME }
-      - { key: ANTHROPIC_MODEL_FAST, value: "claude-haiku-4-5-20251001", scope: RUN_TIME }
-      - { key: ANTHROPIC_MODEL_DEEP, value: "claude-sonnet-4-6", scope: RUN_TIME }
-      - { key: LLM_REQUEST_TIMEOUT_SECONDS, value: "30", scope: RUN_TIME }
-      - { key: LLM_FALLBACK_DETERMINISTIC, value: "true", scope: RUN_TIME }
-      # --- SECRETS (set via doctl after first create; SECRET scope encrypts at rest) ---
-      - { key: DATABASE_URL, value: REPLACE_AT_DEPLOY, scope: RUN_AND_BUILD_TIME, type: SECRET }
-      - { key: REDIS_URL, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: CELERY_BROKER_URL, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: CELERY_RESULT_BACKEND, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: SECRET_KEY, value: REPLACE_AT_DEPLOY, scope: RUN_AND_BUILD_TIME, type: SECRET }
-      - { key: ANTHROPIC_API_KEY, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: MAILGUN_API_KEY, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: MAILGUN_DOMAIN, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
-      - { key: SENTRY_DSN, value: REPLACE_AT_DEPLOY, scope: RUN_TIME, type: SECRET }
+      - key: ENVIRONMENT
+        value: production
+        scope: RUN_AND_BUILD_TIME
+      - key: DEBUG
+        value: "false"
+        scope: RUN_AND_BUILD_TIME
+      - key: APP_NAME
+        value: ScholarAI
+        scope: RUN_AND_BUILD_TIME
+      - key: APP_VERSION
+        value: 0.1.0
+        scope: RUN_AND_BUILD_TIME
+      - key: API_V1_PREFIX
+        value: /api/v1
+        scope: RUN_AND_BUILD_TIME
+      - key: AUTO_SEED_DEMO_DATA
+        value: "false"
+        scope: RUN_AND_BUILD_TIME
+      - key: ALLOWED_HOSTS
+        value: '["api.aidwiseai.com","aidwiseai-backend-xxxxx.ondigitalocean.app"]'
+        scope: RUN_TIME
+      - key: CORS_ORIGINS
+        value: '["https://aidwiseai.com","https://www.aidwiseai.com","https://aidwise.me"]'
+        scope: RUN_TIME
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+        scope: RUN_TIME
+      - key: BRAND_DISPLAY_NAME
+        value: AidwiseAI
+        scope: RUN_TIME
+      - key: EMAIL_FROM_LOCALPART
+        value: noreply
+        scope: RUN_TIME
+      - key: MAILGUN_BASE_URL
+        value: https://api.mailgun.net/v3
+        scope: RUN_TIME
+      - key: MAILGUN_TIMEOUT_SECONDS
+        value: "10"
+        scope: RUN_TIME
+      - key: ANTHROPIC_MODEL_FAST
+        value: claude-haiku-4-5-20251001
+        scope: RUN_TIME
+      - key: ANTHROPIC_MODEL_DEEP
+        value: claude-sonnet-4-6
+        scope: RUN_TIME
+      - key: LLM_REQUEST_TIMEOUT_SECONDS
+        value: "30"
+        scope: RUN_TIME
+      - key: LLM_FALLBACK_DETERMINISTIC
+        value: "true"
+        scope: RUN_TIME
+      - key: DATABASE_URL
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: REDIS_URL
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: CELERY_BROKER_URL
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: CELERY_RESULT_BACKEND
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SECRET_KEY
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+      - key: ANTHROPIC_API_KEY
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: MAILGUN_API_KEY
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: MAILGUN_DOMAIN
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SENTRY_DSN
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: OPENSEARCH_PASSWORD
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
 
 workers:
   - name: celery-worker
@@ -59,21 +121,41 @@ workers:
       deploy_on_push: true
     source_dir: backend
     dockerfile_path: backend/Dockerfile
-    instance_size_slug: basic-xxs    # 512MB / $5 — bump to basic-xs ($10) once scraper enabled
+    instance_size_slug: basic-xxs
     instance_count: 1
     run_command: celery -A app.tasks.celery_app:celery_app worker -l info --concurrency 2
     envs:
-      - { key: ENVIRONMENT, value: production }
-      - { key: AUTO_SEED_DEMO_DATA, value: "false" }
-      - { key: DATABASE_URL, value: ${web.DATABASE_URL}, type: SECRET }
-      - { key: REDIS_URL, value: ${web.REDIS_URL}, type: SECRET }
-      - { key: CELERY_BROKER_URL, value: ${web.CELERY_BROKER_URL}, type: SECRET }
-      - { key: CELERY_RESULT_BACKEND, value: ${web.CELERY_RESULT_BACKEND}, type: SECRET }
-      - { key: SECRET_KEY, value: ${web.SECRET_KEY}, type: SECRET }
-      - { key: ANTHROPIC_API_KEY, value: ${web.ANTHROPIC_API_KEY}, type: SECRET }
-      - { key: MAILGUN_API_KEY, value: ${web.MAILGUN_API_KEY}, type: SECRET }
-      - { key: MAILGUN_DOMAIN, value: ${web.MAILGUN_DOMAIN}, type: SECRET }
-      - { key: SENTRY_DSN, value: ${web.SENTRY_DSN}, type: SECRET }
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTO_SEED_DEMO_DATA
+        value: "false"
+      - key: DATABASE_URL
+        value: ${web.DATABASE_URL}
+        type: SECRET
+      - key: REDIS_URL
+        value: ${web.REDIS_URL}
+        type: SECRET
+      - key: CELERY_BROKER_URL
+        value: ${web.CELERY_BROKER_URL}
+        type: SECRET
+      - key: CELERY_RESULT_BACKEND
+        value: ${web.CELERY_RESULT_BACKEND}
+        type: SECRET
+      - key: SECRET_KEY
+        value: ${web.SECRET_KEY}
+        type: SECRET
+      - key: ANTHROPIC_API_KEY
+        value: ${web.ANTHROPIC_API_KEY}
+        type: SECRET
+      - key: MAILGUN_API_KEY
+        value: ${web.MAILGUN_API_KEY}
+        type: SECRET
+      - key: MAILGUN_DOMAIN
+        value: ${web.MAILGUN_DOMAIN}
+        type: SECRET
+      - key: SENTRY_DSN
+        value: ${web.SENTRY_DSN}
+        type: SECRET
 
   - name: celery-beat
     github:
@@ -82,20 +164,30 @@ workers:
       deploy_on_push: true
     source_dir: backend
     dockerfile_path: backend/Dockerfile
-    instance_size_slug: basic-xxs    # 512MB / $5 — beat scheduler is tiny
+    instance_size_slug: basic-xxs
     instance_count: 1
     run_command: celery -A app.tasks.celery_app:celery_app beat -l info
     envs:
-      - { key: ENVIRONMENT, value: production }
-      - { key: AUTO_SEED_DEMO_DATA, value: "false" }
-      - { key: DATABASE_URL, value: ${web.DATABASE_URL}, type: SECRET }
-      - { key: REDIS_URL, value: ${web.REDIS_URL}, type: SECRET }
-      - { key: CELERY_BROKER_URL, value: ${web.CELERY_BROKER_URL}, type: SECRET }
-      - { key: CELERY_RESULT_BACKEND, value: ${web.CELERY_RESULT_BACKEND}, type: SECRET }
-      - { key: SECRET_KEY, value: ${web.SECRET_KEY}, type: SECRET }
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTO_SEED_DEMO_DATA
+        value: "false"
+      - key: DATABASE_URL
+        value: ${web.DATABASE_URL}
+        type: SECRET
+      - key: REDIS_URL
+        value: ${web.REDIS_URL}
+        type: SECRET
+      - key: CELERY_BROKER_URL
+        value: ${web.CELERY_BROKER_URL}
+        type: SECRET
+      - key: CELERY_RESULT_BACKEND
+        value: ${web.CELERY_RESULT_BACKEND}
+        type: SECRET
+      - key: SECRET_KEY
+        value: ${web.SECRET_KEY}
+        type: SECRET
 
-# Pre-deploy migration job — runs alembic upgrade head before each deploy.
-# Idempotent. Failure aborts the deploy.
 jobs:
   - name: alembic-migrate
     kind: PRE_DEPLOY
@@ -108,6 +200,10 @@ jobs:
     instance_count: 1
     run_command: alembic upgrade head
     envs:
-      - { key: ENVIRONMENT, value: production }
-      - { key: AUTO_SEED_DEMO_DATA, value: "false" }
-      - { key: DATABASE_URL, value: ${web.DATABASE_URL}, type: SECRET }
+      - key: ENVIRONMENT
+        value: production
+      - key: AUTO_SEED_DEMO_DATA
+        value: "false"
+      - key: DATABASE_URL
+        value: ${web.DATABASE_URL}
+        type: SECRET
