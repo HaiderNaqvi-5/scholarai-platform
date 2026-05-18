@@ -28,8 +28,10 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-[8px] px-3 text-sm font-medium text-ink-muted transition-colors",
-      "data-[state=active]:bg-paper-white data-[state=active]:text-ink",
+      "inline-flex h-9 items-center justify-center rounded-[8px] px-3 text-sm font-medium text-ink-muted will-change-transform",
+      "transition-[color,background-color,box-shadow,transform] duration-[var(--motion-micro)] ease-[var(--ease-out)]",
+      "active:scale-[0.98] active:duration-75",
+      "data-[state=active]:bg-paper-white data-[state=active]:text-ink data-[state=active]:shadow-[var(--shadow-hairline)]",
       "hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
       className,
     )}

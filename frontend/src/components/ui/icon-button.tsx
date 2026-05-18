@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * hover, ink-muted icon → ink-deep on hover. Carries aria-label.
  */
 const iconButton = cva(
-  "inline-flex items-center justify-center rounded-[10px] transition-colors duration-[var(--motion-micro)] ease-[var(--ease-out)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-ivory)] disabled:opacity-50 disabled:pointer-events-none",
+  "inline-flex items-center justify-center rounded-[10px] will-change-transform transition-[background-color,color,transform] duration-[var(--motion-micro)] ease-[var(--ease-out)] active:scale-[0.96] active:duration-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-ivory)] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100",
   {
     variants: {
       tone: {
