@@ -92,79 +92,79 @@ All must pass before push: backend unit+integration, KPI regression, frontend li
 3. Trace requirements → code → e2e before declaring feature done. Evidence > assertion.
 
 ## Front-upgrade planning docs
-- **v4 spec authored 2026-05-17** (`Front-upgrade.md`, 2646 lines, 11 sections / 36 screen specs). Premium Cultural: ivory `#FBF7EE` + ink-deep `#0E1A1F` + lapis `#1B3A6B` + gold-leaf `#B08A3E` + sindoor `#B94A48`; Fraunces italic display + Inter body + JetBrains Mono data. Every screen: states + backend contract + anti-slop ban list + verbatim copy + a11y + telemetry. Banned-phrase grep in §7.5. Prior v3 at `Front-upgrade.legacy.md`.
-- **S88 Premium Cultural rebuild landed 2026-05-17** — foundations + 9 routes + cookie banner + visual audit. See `frontend/CLAUDE.md` "S88" section. Lint + typecheck + build all clean. 21/24 audit routes 200 (only `/legal/privacy` missing — future task). Playwright audit runner at `frontend/scripts/visual-audit.mjs`; screenshots at `frontend/audit-out/`.
-- **Brand rename 2026-05-15:** GrantPath → **AidwiseAI**. `grantpath.*` localStorage keys kept (renaming logs users out).
+- **Front-upgrade.md v4** (2026-05-17, 2646 lines, 11 sec / 36 screens). Premium Cultural: ivory `#FBF7EE` + ink-deep `#0E1A1F` + lapis `#1B3A6B` + gold-leaf `#B08A3E` + sindoor `#B94A48`. Fraunces italic display + Inter body + JBM data. Every screen has states + contract + anti-slop bans + copy + a11y + telemetry. Banned-phrase grep §7.5. Prior v3 at `Front-upgrade.legacy.md`.
+- **S88 rebuild 2026-05-17** — foundations + 9 routes + cookie banner + visual audit. See `frontend/CLAUDE.md` S88. Lint + tsc + build clean. 21/24 audit routes 200. Audit runner at `frontend/scripts/visual-audit.mjs`.
+- **Brand rename 2026-05-15**: GrantPath → AidwiseAI. `grantpath.*` localStorage keys kept (renaming logs users out).
+- **Security audit 2026-05-18** — see `SECURITY_AUDIT.md`. P0+P1 closed; S6/S9/S16/S17/S18/S19 deferred.
 
 ## Open work
-- ~~Frontend Pass~~ **landed 2026-05-15** on branch `feat/pakistan-frontend-pass`. Remaining: re-point Playwright smoke selectors to new routes and remove `continue-on-error: true` from the `browser-smoke` step in `.github/workflows/ci.yml`; consent UI + cookie banner + settings privacy.
-- ~~Apply migrations 0014–0018 against live dev DB and run seed orchestrator before manual smoke.~~ **Done 2026-05-12**: alembic at head `20260511_0018`; `demo_seed_pakistan.py` ran (20 PK scholarships, 30 universities, 70 visa Q, 5 legal docs, demo `zara.khan@example.com`). Q1 retier (2026-05-16) advanced head to `20260516_0025`.
-- Update `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` to reflect Pakistan pivot.
+- Smoke selector re-point + `ci.yml:198` `continue-on-error` removal (needs 3 green local runs).
+- Settings privacy panel polish (backend routes shipped).
+- Refresh `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` for Pakistan pivot.
 
 ## Q1 retier (2026-05-16, branch `feat/pakistan-frontend-pass`)
-Closed Tasks 1-17 across 21 commits `23942f5..d20ab14`. **444 backend tests pass + 1 xpass**, frontend green, docs governance 0 fails, vocab guard 6 pass + 1 xpass. Push-gate closeout commit: `d20ab14`. Live DB at `alembic head = 20260516_0025`; scholarships mix = 6 premium / 20 standard.
-- **New tables:** `sop_monthly_usage` (migration `20260516_0024`), `usage_ledger` (`_0025`); **column** `scholarships.tier` (`_0023` w/ keyword backfill).
-- **New module** `backend/app/core/burn_cap.py` — 60% per-tier monthly budget, `assert_within_burn_cap` 429, `record_llm`/`record_whatsapp` writers, offline path emits zero-cost rows.
-- **Vocab guard** `tests/unit/test_user_facing_vocab.py` blocks internal tokens (`eligible`/`partially_eligible`/`stretch`/`locked`/`tier`) leaking to user-visible strings.
-- **Pricing:** PKR 2,999 / 6,000 monthly. **Caps** free/pro/elite = 3/6/12 for matches + tracker. **SOP quotas** 1 lifetime / 5 monthly / 10 monthly.
-- **Premium paywall** on `/scholarships` public catalog: list filter for `tier=standard` when anonymous/non-premium; detail/provenance gates via `_guard_premium_tier` → 402 for anon/free.
-- **WhatsApp-only Elite alerts** — SMS channel removed; `fan_out_for_plan` async; alert + reminder tasks migrated.
-- **Burn-cap LLM wrapper** — `AnthropicClient.complete_with_accounting` pre-flights cap, records real usage; offline writes synthetic row. Callers migrated: sop_builder, visa evaluator (now async), professor_email, strategy_report.
-- **Frontend** — neutral `MatchResponse { items, unlock_offer }`, new `CompatibilityMeter.tsx`, `(student)/scholarships/page.tsx` (MatchCard + UnlockBlock + blurred locked placeholders), `upgrade/page.tsx` `tier`→`plan` rename.
+Tasks 1-17 across 21 commits `23942f5..d20ab14`. **444 backend pass + 1 xpass**, frontend green, vocab guard 6+1xpass. Closeout `d20ab14`. Alembic head `20260516_0025`; scholarships 6 premium / 20 standard.
+- New tables `sop_monthly_usage` (`_0024`) + `usage_ledger` (`_0025`); col `scholarships.tier` (`_0023` keyword backfill).
+- `core/burn_cap.py` — 60% per-tier monthly budget, `assert_within_burn_cap` 429, ledger writers.
+- Vocab guard `tests/unit/test_user_facing_vocab.py` blocks internal classification tokens leaking.
+- Pricing: PKR 2,999 / 6,000 monthly. Caps free/pro/elite = 3/6/12 (matches + tracker). SOP quotas 1 lifetime / 5 / 10 monthly.
+- Premium paywall on `/scholarships` catalog (list filter for `tier=standard` if anon/non-premium; detail/provenance via `_guard_premium_tier` → 402).
+- WhatsApp-only Elite alerts; SMS removed; `fan_out_for_plan` async.
+- Burn-cap LLM wrapper — `AnthropicClient.complete_with_accounting` pre-flights cap; sop_builder + visa evaluator + professor_email + strategy_report migrated.
+- FE — neutral `MatchResponse`, new `CompatibilityMeter`, `(student)/scholarships/page.tsx` match UI, `upgrade/page.tsx` `tier`→`plan` rename.
 
 ## Air University exhibition trial launch (2026-05-16, branch `feat/pakistan-frontend-pass`)
-Backend bundle for the May-19 booth launch — Pro plan via shared invite code `AIRU2026`, 100 redemptions, 30 days per user from redemption. Push gate: **454 passed + 1 xpassed**. Frontend bundle queued in `Front-upgrade.md` §16.
-- **Migration `20260516_0026`** adds `invite_codes` table (code PK, cohort, grants_plan, trial_days, max_uses, uses, valid_from/until, is_active) + 4 user cols (`air_uni_uni`, `air_uni_dept`, `air_uni_batch`, `redeemed_invite_code` indexed). Reuses existing `User.marketing_consent` rather than duplicating.
-- **`AuthService._redeem_invite_code`** (in `services/auth/service.py`) — row-locked invite redemption raises 400 on unknown/inactive/out-of-window/exhausted; on success sets `user.plan = invite.grants_plan` + `plan_expires_at = now + trial_days` + `redeemed_invite_code`. `UserCreate` / `UserResponse` extended.
-- **`app/tasks/trial_tasks.py`** — `expire_trial_plans` async + `run_expire_trial_plans` Celery task scheduled daily 02:00 UTC. Idempotent UPDATE: free + null-expiry where `plan_expires_at < now AND plan != 'free'`.
-- **Mailgun email** — `services/notifications/channels.send_email` now POSTs to `${MAILGUN_BASE_URL}/${MAILGUN_DOMAIN}/messages` via httpx. Fail-soft to log-only when MAILGUN_API_KEY / MAILGUN_DOMAIN absent. New settings: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_BASE_URL`, `MAILGUN_TIMEOUT_SECONDS`, `BRAND_DISPLAY_NAME`, `EMAIL_FROM_LOCALPART`.
-- **Dockerfile** bakes Chromium for the scraper Celery worker — `playwright install --with-deps chromium` with `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers`. Image ≈ 1.2 GB, fits DO App Platform Basic S (1 GB dedicated).
-- **CLI scripts** — `scripts/seed_invite_codes.py` (AIRU2026 100 uses, May 19 09:00 → May 26 23:59 PKT), `scripts/grant_invite_uses.py CODE N` (atomic on-spot bump), `scripts/generate_qr_flyers.py` (900×900 PNG of `https://aidwiseai.com/signup?invite=AIRU2026`).
-- **New deps** in `requirements.txt`: `anthropic==0.39.0`, `qrcode[pil]==7.4.2`, `sentry-sdk[fastapi]==2.18.0`.
-- **New tests** — `tests/unit/test_trial_tasks.py` (4 pass) + 6 invite-redemption cases in `test_auth_service.py`.
+Backend for May-19 booth — Pro plan via shared invite `AIRU2026`, 100 redemptions, 30 days/user. Push gate **454 pass + 1 xpass**.
+- Migration `20260516_0026` adds `invite_codes` + 4 user cols (`air_uni_*`, `redeemed_invite_code` indexed).
+- `AuthService._redeem_invite_code` row-locked; 400 on unknown/inactive/out-of-window/exhausted. Sets plan + expiry + code on success.
+- `tasks/trial_tasks.py:expire_trial_plans` Celery beat daily 02:00 UTC. Idempotent UPDATE.
+- Mailgun `send_email` POSTs to `${MAILGUN_BASE_URL}/${MAILGUN_DOMAIN}/messages` via httpx; fail-soft to log-only when keys absent.
+- Dockerfile bakes Chromium for scraper worker (`playwright install --with-deps chromium`, image ≈1.2GB).
+- CLI: `seed_invite_codes.py` (AIRU2026, 100 uses, May 19→26 PKT), `grant_invite_uses.py`, `generate_qr_flyers.py` (900×900 PNG of signup URL).
+- New deps: `anthropic==0.39.0`, `qrcode[pil]==7.4.2`, `sentry-sdk[fastapi]==2.18.0`.
+- Tests: `test_trial_tasks.py` (4 pass) + 6 invite-redemption cases in `test_auth_service.py`.
 
-## Session S87 — Pakistan Frontend Pass (2026-05-15, branch `feat/pakistan-frontend-pass`)
-Closes full PRD frontend gap + 4 missing backend items. **369 backend tests pass** (312 unit + 57 integration); frontend lint/tsc/build green; docs governance 0 fails; KPI regression 17 pass.
-- **Backend**: `/auth/me` exposes plan + plan_currency + billing_country; `services/documents/professor_email.py` + `services/reports/strategy_report.py` (Elite-gated 402, deterministic-template fallback, persisted as `DocumentRecord` with new enum values via migration `20260515_0022`); `services/notifications/channels.py` (log-only fan-out); `tasks/alert_tasks.py` daily 06:07 + `tasks/reminder_tasks.py` daily 06:30; new routes `POST /documents/professor-email` + `POST /reports/strategy`; 28 new unit tests. Trust boundary holds.
-- **Frontend**: `lib/api/client.ts` exports `isPlanRequiredError` + 6 new endpoint modules; `components/UpgradeWall` consumes 402 `detail` verbatim; `app/upgrade/page.tsx` (4 tiers + 5-currency switcher + waitlist); `app/(student)/{tracker,documents/sop,documents/professor-email,interviews/visa}/page.tsx`; `app/page.tsx` Pakistan landing; `app/universities/page.tsx` + `(partners)/*` w/ PARTNER_ROLES in `RoleGuard.ROLE_GROUPS`; sidebar gains Tracker + Visa-practice. `User` extended w/ plan / plan_currency / billing_country.
-- **Trust boundary verified**: student role group excludes university; partner group excludes every student role.
+## S87 Pakistan Frontend Pass (2026-05-15, `feat/pakistan-frontend-pass`)
+**369 backend pass** (312 unit + 57 integration); FE green; docs gov 0 fails; KPI regression 17 pass. BE: `/auth/me` exposes plan/currency/country; professor_email + strategy_report (Elite 402, mig `_0022`); notifications log-only fan-out; alert/reminder Celery tasks; new routes `POST /documents/professor-email` + `POST /reports/strategy`; 28 new tests. FE: `isPlanRequiredError` + 6 new endpoint modules; `UpgradeWall` 402 verbatim; `app/upgrade` 4 tiers + 5-currency + waitlist; `(student)/{tracker,documents/sop,documents/professor-email,interviews/visa}`; PK landing; `(partners)/*` + PARTNER_ROLES in `RoleGuard`; sidebar adds Tracker + Visa-practice. `User` extended w/ plan/currency/country. Trust boundary: student excludes university; partner excludes every student role.
 
 ## Dev env notes (2026-05-12)
-- OpenSearch 2.11 needs `DISABLE_SECURITY_PLUGIN=true` + `DISABLE_INSTALL_DEMO_CONFIG=true` (in `docker-compose.yml`) — default HTTPS-only blocks the HTTP healthcheck → backend never starts.
-- Backend Dockerfile stage-2 install must use `--find-links=/wheels -r requirements.txt` with `--default-timeout=600 --retries 10`; `pip install /wheels/*` re-fetches transitive CUDA wheels and times out.
-- Dev rate limits relaxed via `.env.example`: `AUTH_RATE_LIMIT_LOGIN_REQUESTS=50`, `REGISTER=30`, `REFRESH/LOGOUT=100`.
-- `CORS_ORIGINS` covers `:3000` and `:3001`.
-- Backend role values are lowercase StrEnum (`student`, `admin`, `owner` …). Frontend `Role` type + `RoleGuard.ROLE_GROUPS` must mirror — uppercase ENUM names cause blanket "Not available" guard.
-- `StudentProfile` shape (backend canonical): `citizenship_country_code`, `gpa_value`, `gpa_scale`, `target_field` (single string), `target_degree_level`, `target_country_code`, `language_test_type`, `language_test_score`. `extra="forbid"` — no `full_name` / `field_tags[]` / `language_scores[]`. Frontend onboarding/profile map to this exactly.
-- Curation route fix: `services.CurationService.list_records()` returns `(items, total)` tuple and takes `page`/`page_size`, **not** `limit`. Hot-patched in `app/api/v1/routes/curation.py:288`.
-- Admin endpoints verified 200: `access-control/users`, `access-control/role-changes`, `recommendations/benchmarks`, `analytics`, `curation/records`, `curation/ingestion-runs`. Pakistan endpoints verified 200: `scholarships/match`, `tracker`, `upgrade/pricing`, `privacy/consent`, `privacy/legal/{slug}`.
-- Frontend `/login` now has Student / Admin demo-fill buttons.
-- Signup min password length is **12** (backend Pydantic requires it).
-- Healthcheck architecture (2026-05-12): liveness/readiness split. `GET /livez` (process-only, no I/O) is the Docker HEALTHCHECK target; `GET /readyz` (DB ping) is the LB readiness gate; `GET /health` (DB + KPI alerts) is the ops dashboard endpoint. Image `HEALTHCHECK` directive removed from `backend/Dockerfile` — the backend image is process-agnostic (uvicorn / celery worker / celery beat share it), so healthchecks live in `docker-compose.yml` per service: backend → `/livez`, celery-worker → `celery inspect ping`, celery-beat → `grep beat /proc/1/cmdline`, neo4j → bash TCP probe on 7687 (replaces JVM cypher-shell which timed out at 5s).
-- Scraper optimization (2026-05-13→14, `feat/phase-c-and-scraper-wip`, 4 PRs): conditional GET via stored ETag/Last-Modified (commit `1bdde98`); sitemap + RSS/Atom feed discovery via new `source_feed` table (commit `457b047`, migration `20260514_0020`); `DiscoveryService` Claude-classified candidate scholarships from seed URLs (commit `fbdf473`); tests for ETag short-circuit + b2b trust boundary + Pakistan demo seed (commit `779490f`).
-- B2B Phase C (2026-05-13): `/profile` rewritten to 6 cards exposing 25+ editable fields incl. multi-select chips; `b2b_share.py::_profile_snapshot` surfaces every new field at share time. DPA + `b2b_share_consent` enforcement unchanged.
-- `.gitignore`: `graphify-out/` (4.7M of AST cache from the graphify skill) now excluded.
-- **Session S86 — Scraper Ingestion Completion** (2026-05-15, migration `20260514_0021_source_health.py`): destination-aware geo inference (PK default + GB/US/DE/AU/CA hints), JSON-LD + microdata extraction, structured deadline/funding parsing, fuzzy-dedup at `SequenceMatcher ≥ 0.9` → advisory `review_recommended: true`, snapshot drift sha256 (`provenance_payload.needs_revalidation`), rel=next + Load-More + numbered pagination, parser-diagnostic + provenance APIs (`GET /scholarships/{id}/provenance`), async orchestration threshold `AUTO_WORKER_RECORD_THRESHOLD=10`, nightly catch-up `NIGHTLY_MAX_AGE_HOURS=25`, source-health table (`healthy/degraded/down` at 0-2/3-5/≥6 consecutive failures). Tests: 369 passed at landing.
+- OpenSearch 2.11 needs `DISABLE_SECURITY_PLUGIN=true` + `DISABLE_INSTALL_DEMO_CONFIG=true` or backend never starts.
+- Backend Dockerfile stage-2: `--find-links=/wheels -r requirements.txt --default-timeout=600 --retries 10`; `pip install /wheels/*` re-fetches CUDA wheels + times out.
+- Dev rate limits relaxed in `.env.example`: LOGIN=50, REGISTER=30, REFRESH/LOGOUT=100.
+- `CORS_ORIGINS` covers `:3000` + `:3001`. Backend roles lowercase StrEnum; FE `Role` + `RoleGuard.ROLE_GROUPS` must mirror.
+- `StudentProfile` (S89.1 sync'd) — 28 fields incl. PK pivot + research + financial. `extra="forbid"`.
+- Curation route fix: `CurationService.list_records()` returns `(items, total)` w/ `page`/`page_size` (not `limit`). Patched `curation.py:288`.
+- Verified 200 admin: `access-control/users`, `role-changes`, `recommendations/benchmarks`, `analytics`, `curation/*`. Verified 200 PK: `scholarships/match`, `tracker`, `upgrade/pricing`, `privacy/consent`, `privacy/legal/{slug}`.
+- Signup min password 12 (backend Pydantic). Login no min (S10).
+- Healthcheck split (2026-05-12): `/livez` process-only (Docker HEALTHCHECK), `/readyz` DB-ping (LB gate), `/health` DB+version (S20 stripped KPI). Image HEALTHCHECK removed; healthchecks per-service in `docker-compose.yml`.
+- Scraper opt (2026-05-13→14, `feat/phase-c-and-scraper-wip`, 4 PRs): conditional GET (`1bdde98`), sitemap+RSS+`source_feed` table (`457b047`, mig `_0020`), `DiscoveryService` Claude classification (`fbdf473`), tests (`779490f`).
+- B2B Phase C (2026-05-13): `/profile` 6-card 25-field editor; `b2b_share.py::_profile_snapshot` snapshots every new field at share time.
+- `.gitignore` excludes `graphify-out/` (4.7M AST cache).
+- **S86 Scraper Ingestion** (2026-05-15, mig `_0021`): destination geo (PK default + GB/US/DE/AU/CA), JSON-LD + microdata extraction, fuzzy-dedup (`SequenceMatcher≥0.9`), snapshot drift sha256, multi-pagination (rel=next + Load-More + numbered), parser-diagnostic + `GET /scholarships/{id}/provenance`, source-health table (healthy/degraded/down at 0-2/3-5/≥6 failures). Tests 369 pass.
 
-## PR #87 merge + Q1 retier live (2026-05-17)
-PR https://github.com/HaiderNaqvi-5/scholarai-platform/pull/87 all-green after 4 root-cause fixes on `feat/pakistan-frontend-pass`. Alembic head: `20260516_0026 (head)`. Latest checks: backend-sanity / kpi-regression-gate / frontend-sanity / docs-governance / browser-smoke / **Vercel** all SUCCESS. mergeStateStatus=`CLEAN`.
-- **Merge of origin/main** (`d4a063d`) — resolved CLAUDE.md + progress.md conflicts. Initial Vercel deploy failed at 16s because Q1 frontend imported `@/lib/brand` / `@/lib/countries` / `@/lib/tracker/*` / `endpoints.scholarshipMatch` / `endpoints.upgrade` that were never committed (Next.js fast-fails on resolve).
-- **S87 WIP cluster landed** (`f5a8391`, 58 files) — UpgradeWall, full `(student)` page set (tracker / sop / professor-email / visa), `(partners)`, `/universities`, kanban, endpoint modules, `lib/brand`, `lib/countries`, `lib/tracker/*`, sidebar partner roles, `RubricRadar` 0-10→0-5, landing rewrite. Backend: provenance schema, `/auth/me` plan fields, professor-email + strategy-report services + routes + tests, ingestion S86 hardening, migration `20260515_0022_document_type_pakistan_elite.py` (chains 0023).
-- **Invite-codes cluster** (`ee94799`) — `class InviteCode(Base)` in models.py was missing despite `__init__.py` re-export → CI `ImportError`. Landed model + migration `20260516_0026_invite_codes_and_trial.py` + `tasks/trial_tasks.py` + scripts (`seed_invite_codes` / `grant_invite_uses` / `generate_qr_flyers`).
-- **Schema fix** (`8140338`) — merge with main reverted Task 7 `scholarships_match.py` to legacy bucketed shape → conftest `ImportError: cannot import name 'MatchResponse'`. Re-applied neutral `MatchResponse` / `UnlockOffer` / `ScholarshipMatchOut`.
-- **Vercel trigger** (`24ba352`) — empty commit cleared a stuck 35-min PENDING build (rapid-push queue congestion). Deployment succeeded on the same tree.
+## PR #87 + Q1 retier live (2026-05-17)
+PR https://github.com/HaiderNaqvi-5/scholarai-platform/pull/87 all-green after 4 root-cause fixes. Alembic head `20260516_0026 (head)`. All checks SUCCESS, mergeStateStatus=CLEAN. Key fixes: missing FE imports cluster (`f5a8391`), `InviteCode` model re-export (`ee94799`), `MatchResponse` schema re-apply (`8140338`), empty commit to clear stuck Vercel build (`24ba352`).
+
+## S20 Security hardening pass (2026-05-18, `feat/s89-premium-cultural`)
+P0+P1 closed (`SECURITY_AUDIT.md`). 396 unit + 63 integration pass; FE green; create_app() 112 routes.
+- **S1 BE headers** SecurityHeadersMiddleware (HSTS/X-Frame DENY/X-CTO/Referrer/Permissions/COOP/CORP/CSP default-src 'none') + TrustedHostMiddleware gated by ALLOWED_HOSTS.
+- **S2 FE headers** `next.config.ts:headers()` mirrors BE; CSP allows API origin; prod drops `'unsafe-eval'`.
+- **S3/S4** `AUTO_SEED_DEMO_DATA=False` default; `OPENSEARCH_PASSWORD` setting + prod rejects defaults; `ALLOWED_HOSTS` required in prod.
+- **S5** prod CORS rejects localhost. **S7** `ProxyHeadersMiddleware` when `TRUSTED_PROXY_HOPS > 0`.
+- **S8 lockout** new `core/account_lockout.py` Redis sliding window per email (5 fail/15min → 15-min lock). Fail-open. 5/5 tests.
+- **S10** `UserLogin.password min_length` dropped (422 leak fix). **S11 Dockerfile** `oven/bun:1-alpine` + `--frozen-lockfile` + tini + non-root + HEALTHCHECK.
+- **S12** `capture_exception` in catch-all 500. **S13** Mailgun `_sanitize_header()` strips CR/LF/NUL.
+- **S14** `pip-audit` in CI backend-sanity. **S15** `/health` public probe DB+version only.
+- **Deferred** (`SECURITY_AUDIT.md`): S6 caddy/TLS, S9 refresh rotation, S16 httpOnly cookies, S17 TOTP, S18 Argon2id, S19 RS256.
 
 ## S89.1 cleanup pass (2026-05-18, branch `feat/s89-premium-cultural`)
-Closes the open items from `progress.md` after the S89 base shipped. Lint + tsc + build + emoji-grep across 121 files all green.
-- **Match-route alias**: `frontend/src/app/(student)/dashboard/scholarships/match/page.tsx` re-exports `/scholarships` default. Sidebar / onboarding redirect / feed all stop 404-ing.
-- **StudentProfile type sync (10 → 28 fields)**: `frontend/src/lib/api/types.ts` now mirrors backend `StudentProfileResponse` (`backend/app/schemas/students.py`). New aliases: `TargetDegreeLevel`, `HecDegreeLevel`, `CgpaScaleChoice`, `FundingRequirement`, `IntakeTarget`.
-- **/profile expansion 3 → 6 cards** per §6.22: Contact (email locked, citizenship, city_of_origin) / Academic record (pakistani_university + hec_degree_level + cgpa_scale_choice + degree_subject + graduation_year + GPA + target degree) / Test scores (IELTS, TOEFL, GRE quant+verbal) / Your goal (multi-select countries + fields via new `components/profile/MultiChip.tsx`, intake_target, funding_requirement) / Aspirations (research publications + count) / Background (3 booleans). Hooked into existing `endpoints.profile.upsert`; backend reconciles single-vs-multi country server-side.
-- **Admin / mentor / partners repaint** (12 routes): all headers swapped to `PageHeader` primitive; KPI numbers reshaped from Fraunces 3xl → JetBrains Mono 28/tabular-nums; `caution-stripe` utility on KPI alert card; testids added (`admin-overview`, `mentor-queue`, `partners-overview`, `partners-universities`).
-- **Backend gap quick wins**:
-  - `backend/.env.example` — Mailgun keys (`MAILGUN_API_KEY` / `MAILGUN_DOMAIN` / `MAILGUN_BASE_URL` / `MAILGUN_TIMEOUT_SECONDS` / `BRAND_DISPLAY_NAME` / `EMAIL_FROM_LOCALPART`) + Sentry keys (`SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` / `SENTRY_PROFILES_SAMPLE_RATE` / `SENTRY_ENVIRONMENT`) appended. Operator signpost closes the env-docs gap.
-  - `backend/app/core/config.py` — `SENTRY_DSN` / `SENTRY_TRACES_SAMPLE_RATE` / `SENTRY_PROFILES_SAMPLE_RATE` / `SENTRY_ENVIRONMENT` settings added.
-  - `backend/app/main.py:_init_sentry()` — bundled `sentry-sdk[fastapi]==2.18.0` finally wired. Gated by `SENTRY_DSN`; no-op when unset, fail-soft on init error. Verified: `create_app()` boots clean (112 routes) with DSN unset.
-- **Still deferred (require live backend + 3 green local runs)**: smoke selector re-point in `tests/e2e/playwright/*.py` + `.github/workflows/ci.yml:198` `continue-on-error: true` removal. Recipe documented in `progress.md`.
+Closes open items from S89 progress.md. Lint + tsc + build + emoji-grep green across 121 files.
+- **Match alias**: `(student)/dashboard/scholarships/match/page.tsx` re-exports `/scholarships` — sidebar / onboarding / feed stop 404-ing.
+- **StudentProfile sync 10→28 fields** mirroring `backend/app/schemas/students.py`. 5 new string-literal aliases.
+- **/profile 3→6 cards** per §6.22 (Contact / Academic record / Test scores / Your goal w/ multi-select chips / Aspirations / Background). New `components/profile/MultiChip.tsx`.
+- **Admin / mentor / partners** (12 routes) headers → `PageHeader`, KPI Fraunces 3xl → JBM 28/tabular-nums, `caution-stripe` on alert card, testids backfilled.
+- **Backend gap quick wins**: Mailgun + Sentry keys appended to `.env.example` + `core/config.py`; `_init_sentry()` gated by `SENTRY_DSN` (no-op when unset, fail-soft on init).
+- **Deferred** (need live backend + 3 green local runs): smoke selector re-point + `ci.yml:198` flag removal. Recipe in `progress.md`.
 
 ## S89 Premium Cultural pass (2026-05-17 → 2026-05-18, branch `feat/s89-premium-cultural`)
 Closes the student-core delta routes + 6 missing routes from `Front-upgrade.md` §3.1 IA. Two commits: `cb9cfbb` (audit harness + missing routes + repaints) and the landing polish follow-up. Lint + tsc + build all green. `emoji-grep` 0 hits across 119 source files.
