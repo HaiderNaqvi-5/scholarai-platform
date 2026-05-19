@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AidwiseAI">
+  <style>
+    .bg { fill: #FBF7EE; }
+    .glyph { fill: #1B3A6B; }
+    .jewel { fill: #B08A3E; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0E1A1F; }
+      .glyph { fill: #FBF7EE; }
+      .jewel { fill: #B08A3E; }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="7" />
+  <text
+    class="glyph"
+    x="15.5"
+    y="23.5"
+    text-anchor="middle"
+    font-family="'Fraunces','Playfair Display',Georgia,'Times New Roman',serif"
+    font-style="italic"
+    font-weight="600"
+    font-size="22"
+    letter-spacing="-0.5"
+  >A</text>
+  <circle class="jewel" cx="23.5" cy="9" r="1.9" />
+</svg>
