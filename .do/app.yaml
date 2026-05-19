@@ -3,12 +3,12 @@ region: blr
 
 services:
   - name: web
-    github:
-      repo: HaiderNaqvi-5/scholarai-platform
-      branch: main
-      deploy_on_push: true
-    source_dir: backend
-    dockerfile_path: backend/Dockerfile
+    image:
+      registry_type: DOCR
+      repository: backend
+      tag: v1
+      deploy_on_push:
+        enabled: true
     instance_size_slug: basic-xxs
     instance_count: 1
     http_port: 8000
@@ -115,12 +115,12 @@ services:
 
 workers:
   - name: celery-worker
-    github:
-      repo: HaiderNaqvi-5/scholarai-platform
-      branch: main
-      deploy_on_push: true
-    source_dir: backend
-    dockerfile_path: backend/Dockerfile
+    image:
+      registry_type: DOCR
+      repository: backend
+      tag: v1
+      deploy_on_push:
+        enabled: true
     instance_size_slug: basic-xxs
     instance_count: 1
     run_command: celery -A app.tasks.celery_app:celery_app worker -l info --concurrency 2
@@ -158,12 +158,12 @@ workers:
         type: SECRET
 
   - name: celery-beat
-    github:
-      repo: HaiderNaqvi-5/scholarai-platform
-      branch: main
-      deploy_on_push: true
-    source_dir: backend
-    dockerfile_path: backend/Dockerfile
+    image:
+      registry_type: DOCR
+      repository: backend
+      tag: v1
+      deploy_on_push:
+        enabled: true
     instance_size_slug: basic-xxs
     instance_count: 1
     run_command: celery -A app.tasks.celery_app:celery_app beat -l info
@@ -191,11 +191,10 @@ workers:
 jobs:
   - name: alembic-migrate
     kind: PRE_DEPLOY
-    github:
-      repo: HaiderNaqvi-5/scholarai-platform
-      branch: main
-    source_dir: backend
-    dockerfile_path: backend/Dockerfile
+    image:
+      registry_type: DOCR
+      repository: backend
+      tag: v1
     instance_size_slug: basic-xxs
     instance_count: 1
     run_command: alembic upgrade head
