@@ -51,6 +51,7 @@ export const STUDENT_ROUTES = [
   { path: "/discover", name: "discover", auth: "student", states: ["loaded", "empty", "error"] },
   { path: "/scholarships", name: "match", auth: "student", states: ["loaded", "empty", "error", "locked402"] },
   { path: "/scholarships/1", name: "scholarship-detail", auth: "student", states: ["loaded", "error"] },
+  { path: "/dashboard/scholarships/match", name: "match-alias", auth: "student", states: ["loaded"] },
   { path: "/saved", name: "saved", auth: "student", states: ["loaded", "empty", "error"] },
   { path: "/tracker", name: "tracker", auth: "student", states: ["loaded", "empty", "error", "locked402"] },
   { path: "/documents", name: "documents", auth: "student", states: ["loaded", "empty", "error"] },
@@ -62,11 +63,42 @@ export const STUDENT_ROUTES = [
   { path: "/settings", name: "settings", auth: "student", states: ["loaded"] },
 ];
 
+/**
+ * Admin uses admin@example.com (strongpass1). Admin role is included in
+ * MENTOR_ROLES + PARTNER_ROLES per frontend/src/lib/auth/RoleGuard.tsx, so
+ * the admin token can drive mentor/* and partners/* surfaces too.
+ *
+ * Dynamic detail routes (admin/curation/1, admin/ingestion/1) assume seed
+ * IDs exist. If they 404 the report will surface that.
+ */
+export const ADMIN_ROUTES = [
+  { path: "/admin", name: "admin-overview", auth: "admin", states: ["loaded", "error"] },
+  { path: "/admin/ingestion", name: "admin-ingestion", auth: "admin", states: ["loaded", "empty", "error"] },
+  { path: "/admin/ingestion/1", name: "admin-ingestion-detail", auth: "admin", states: ["loaded", "error"] },
+  { path: "/admin/curation", name: "admin-curation", auth: "admin", states: ["loaded", "empty", "error"] },
+  { path: "/admin/curation/1", name: "admin-curation-detail", auth: "admin", states: ["loaded", "error"] },
+  { path: "/admin/users", name: "admin-users", auth: "admin", states: ["loaded", "empty", "error"] },
+  { path: "/admin/audit", name: "admin-audit", auth: "admin", states: ["loaded", "empty", "error"] },
+  { path: "/admin/rec-eval", name: "admin-rec-eval", auth: "admin", states: ["loaded", "error"] },
+];
+
+export const MENTOR_ROUTES = [
+  { path: "/mentor/queue", name: "mentor-queue", auth: "admin", states: ["loaded", "empty", "error"] },
+];
+
+export const PARTNER_ROUTES = [
+  { path: "/partners", name: "partners-overview", auth: "admin", states: ["loaded", "error"] },
+  { path: "/partners/universities", name: "partners-universities", auth: "admin", states: ["loaded", "empty", "error"] },
+];
+
 export const ALL_ROUTES = [
   ...SYSTEM_ROUTES,
   ...PUBLIC_ROUTES,
   ...LEGAL_ROUTES,
   ...STUDENT_ROUTES,
+  ...ADMIN_ROUTES,
+  ...MENTOR_ROUTES,
+  ...PARTNER_ROUTES,
 ];
 
 export const VIEWPORTS = [

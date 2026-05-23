@@ -30,6 +30,9 @@ import {
   PUBLIC_ROUTES,
   LEGAL_ROUTES,
   STUDENT_ROUTES,
+  ADMIN_ROUTES,
+  MENTOR_ROUTES,
+  PARTNER_ROUTES,
   VIEWPORTS,
 } from "./routes.mjs";
 import { login, attachAuth } from "./auth.mjs";
@@ -60,6 +63,9 @@ function pickRoutes(filter) {
     public: PUBLIC_ROUTES,
     legal: LEGAL_ROUTES,
     student: STUDENT_ROUTES,
+    admin: ADMIN_ROUTES,
+    mentor: MENTOR_ROUTES,
+    partner: PARTNER_ROUTES,
     all: ALL_ROUTES,
   };
   const out = [];
@@ -199,6 +205,7 @@ async function main() {
   const browser = await chromium.launch({
     timeout: 60_000,
     headless: true,
+    channel: process.env.AIDWISE_BROWSER_CHANNEL || "chrome",
     args: ["--disable-dev-shm-usage", "--no-sandbox"],
   });
 
