@@ -77,13 +77,13 @@ function CurationInner() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      ) : !recordsQ.data || recordsQ.data.items.length === 0 ? (
+      ) : !recordsQ.data || (recordsQ.data.items ?? []).length === 0 ? (
         <div className="rounded-[20px] border border-[var(--color-border)] bg-paper-white p-10 text-center">
           <p className="font-display text-ink">No records.</p>
         </div>
       ) : (
         <ul className="space-y-3">
-          {recordsQ.data.items.map((r) => (
+          {(recordsQ.data.items ?? []).map((r) => (
             <li key={r.record_id}>
               <Link href={`/admin/curation/${r.record_id}`} className="block">
                 <Card className="hover:border-ink-muted">

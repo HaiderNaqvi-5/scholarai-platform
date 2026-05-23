@@ -43,7 +43,7 @@ function InterviewsInner() {
       <section className="mt-6 space-y-6">
         {analyticsQ.isLoading ? (
           <Skeleton className="h-[56px] w-full rounded-[12px]" />
-        ) : analyticsQ.data && Object.keys(analyticsQ.data.trends).length > 0 ? (
+        ) : analyticsQ.data && Object.keys(analyticsQ.data.trends ?? {}).length > 0 ? (
           <TrendStrip trends={analyticsQ.data.trends} />
         ) : null}
 
