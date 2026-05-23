@@ -66,7 +66,7 @@ const STEPS = [
 const FAQS = [
   {
     q: "Is AidwiseAI really free?",
-    a: "Yes. The Explorer tier stays free forever: 3 matches, 1 lifetime SOP, and 3 UK visa questions. Pro (PKR 2,999/mo) and Elite (PKR 6,000/mo) unlock the full match list, monthly SOPs, and all four country banks. No card needed to sign up.",
+    a: "Yes. The Explorer tier stays free forever: 3 matches, 1 lifetime SOP, and 3 UK visa questions. Pro (PKR 2,999/mo) and Elite (PKR 6,000/mo) open the full match list, monthly SOPs, and all four country banks. No card needed to sign up.",
   },
   {
     q: "How is this different from a consultant?",

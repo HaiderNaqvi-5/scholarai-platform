@@ -146,7 +146,7 @@ function MatchCard({ row }: { row: ScholarshipMatchOut }) {
         </div>
         <div className="absolute inset-0 grid place-items-center bg-ink/5">
           <Button asChild>
-            <Link href="/upgrade?plan=elite">Unlock with Elite</Link>
+            <Link href="/upgrade?plan=elite">See full list with Elite</Link>
           </Button>
         </div>
       </div>

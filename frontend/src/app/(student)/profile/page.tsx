@@ -551,7 +551,7 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Aspirations</CardTitle>
-          <CardDescription>Research signals help unlock funded PhD bands.</CardDescription>
+          <CardDescription>Research signals open funded PhD bands.</CardDescription>
         </CardHeader>
         <CardBody className="space-y-4">
           <Field label="Have research publications?" id="has-pub">
