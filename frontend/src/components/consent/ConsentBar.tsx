@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { endpoints, isPlanRequiredError } from "@/lib/api";
 import type { ConsentState, ConsentType } from "@/lib/api/types";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 const LOCAL_VERSIONS_KEY = "aidwise.consent_versions";
 type LocalVersions = Partial<Record<ConsentType, string>>;
@@ -63,6 +64,7 @@ const TYPE_LABEL: Record<ConsentType, string> = {
  * null) for public / signed-out users.
  */
 export function ConsentBar() {
+  const auth = useAuth();
   const [state, setState] = useState<ConsentState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -78,11 +80,12 @@ export function ConsentBar() {
   }, []);
 
   useEffect(() => {
+    if (auth.status !== "authed") return;
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     load();
     const id = window.setInterval(load, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [load, auth.status]);
 
   const mismatch = findMismatch(state);
   if (dismissed || !mismatch) return null;
