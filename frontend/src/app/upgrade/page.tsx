@@ -468,7 +468,12 @@ function ComparisonTable({ tiers }: { tiers: PricingTier[] }) {
       <h2 className="font-display text-[24px] italic font-[450] leading-tight text-ink-deep">
         What you get at each tier
       </h2>
-      <div className="mt-6 overflow-x-auto rounded-[18px] border border-[var(--color-border)] bg-paper-white">
+      <div
+        className="mt-6 overflow-x-auto rounded-[18px] border border-[var(--color-border)] bg-paper-white"
+        tabIndex={0}
+        role="region"
+        aria-label="Plan comparison table"
+      >
         <table className="w-full min-w-[720px] border-collapse">
           <caption className="sr-only">Feature comparison across Explorer, Pro, Elite, and Institution plans</caption>
           <thead className="border-b border-[var(--color-border-quiet)] bg-paper-warm/40">
