@@ -16,11 +16,11 @@
   --color-ink-deep:       #0E1A1F;
   --color-ink:            #1B2630;
   --color-ink-muted:      #4A5663;
-  --color-ink-subtle:     #6E7984;
+  --color-ink-subtle:     #5C6772;     /* 5.0:1 on ivory — PASS AA */
 
   --color-lapis:          #1B3A6B;
   --color-lapis-soft:     #DCE3EE;
-  --color-gold-leaf:      #B08A3E;
+  --color-gold-leaf:      #876724;     /* 4.9:1 on ivory — PASS AA, preserves warm gold */
   --color-gold-soft:      #F1E6CA;
   --color-sindoor:        #B94A48;
   --color-sindoor-soft:   #F2D9D5;

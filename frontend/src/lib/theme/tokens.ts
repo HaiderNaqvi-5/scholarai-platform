@@ -17,11 +17,11 @@ export const themeTokens = {
     inkDeep: "#0E1A1F",
     ink: "#1B2630",
     inkMuted: "#4A5663",
-    inkSubtle: "#6E7984",
+    inkSubtle: "#5C6772",
     /* Accents */
     lapis: "#1B3A6B",
     lapisSoft: "#DCE3EE",
-    goldLeaf: "#B08A3E",
+    goldLeaf: "#876724",
     goldSoft: "#F1E6CA",
     sindoor: "#B94A48",
     sindoorSoft: "#F2D9D5",
