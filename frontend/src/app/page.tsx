@@ -180,7 +180,7 @@ export default function Landing() {
             {/* Editorial preview — visible at lg+. Shows real provider output
                 so the hero anchors visually without a stock illustration. */}
             <aside
-              aria-hidden
+              aria-label="Live this week — provider preview"
               className="hidden lg:col-span-5 lg:block"
             >
               <div className="rounded-[28px] border border-[var(--color-border)] bg-paper-warm p-7">
