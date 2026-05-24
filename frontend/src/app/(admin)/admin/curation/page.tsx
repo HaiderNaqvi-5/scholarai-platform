@@ -97,11 +97,11 @@ function CurationInner() {
                       <ArrowRight className="size-4 text-ink-subtle" strokeWidth={2} />
                     </div>
                   </CardHeader>
-                  {r.audit_log.length > 0 ? (
+                  {(r.audit_log ?? []).length > 0 ? (
                     <CardBody>
                       <p className="text-xs text-ink-subtle">
-                        Last action: {r.audit_log[r.audit_log.length - 1].action} by{" "}
-                        {r.audit_log[r.audit_log.length - 1].actor}
+                        Last action: {(r.audit_log ?? []).at(-1)?.action} by{" "}
+                        {(r.audit_log ?? []).at(-1)?.actor}
                       </p>
                     </CardBody>
                   ) : null}

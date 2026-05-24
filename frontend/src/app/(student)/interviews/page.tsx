@@ -64,7 +64,7 @@ function InterviewsInner() {
                 description="Try again in a moment."
                 action={<Button onClick={() => analyticsQ.refetch()}>Retry</Button>}
               />
-            ) : !analyticsQ.data || analyticsQ.data.sessions.length === 0 ? (
+            ) : !analyticsQ.data || (analyticsQ.data.sessions ?? []).length === 0 ? (
               <EmptyState
                 icon={<MessageSquare className="size-8" strokeWidth={1.5} />}
                 title="No sessions yet."
@@ -77,7 +77,7 @@ function InterviewsInner() {
               />
             ) : (
               <ul className="divide-y divide-[var(--color-border-quiet)]">
-                {analyticsQ.data.sessions.slice(0, 12).map((s) => (
+                {(analyticsQ.data.sessions ?? []).slice(0, 12).map((s) => (
                   <li key={s.session_id} className="py-3">
                     <Link
                       href={`/interviews/${s.session_id}`}

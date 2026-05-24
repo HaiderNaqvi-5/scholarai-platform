@@ -111,7 +111,7 @@ export default function AdminOverviewPage() {
             </CardHeader>
             <CardBody>
               <ul className="space-y-1 text-sm">
-                {platformQ.data.ingestion_runs_recent.map((r, i) => (
+                {(platformQ.data.ingestion_runs_recent ?? []).map((r, i) => (
                   <li key={i} className="flex items-center justify-between">
                     <span className="text-ink">{r.status}</span>
                     <span className="font-mono text-ink">{r.count}</span>
