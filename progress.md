@@ -31,7 +31,27 @@ Audit + RCA + plan + execution under Karpathy guidelines, brainstorming, systema
 - scrollable-region-focusable was on `/upgrade` not `/interviews`.
 - gold-leaf was 2.94:1 not estimated 4.2:1.
 
-### 3. S90 + S90.1 execution — 16 commits landed on s90/audit-remediation
+### 3. S90 + S90.1 + S91 execution — 19 commits landed on s90/audit-remediation — ZERO FAIL
+
+**S91 final delta (ALL targets MET):**
+
+| Metric | Baseline | Post-S90 | Post-S90.1 | Post-S91 | Target | Met |
+|---|---|---|---|---|---|---|
+| PASS | 48 | 161 | 324 | **349** | ≥340 | ✅ |
+| WARN | 96 | 64 | 23 | **7** | ≤8 | ✅ |
+| FAIL | 188 | 131 | 9 | **0** | ≤2 | ✅ |
+| color-contrast | 188 | 131 | 9 | **0** | ≤2 | ✅ |
+| TypeError | 32 | 36 | 0 | **0** | 0 | ✅ |
+| 401 | 84 | 0 | 0 | **0** | 0 | ✅ |
+| CSP | 16 | 0 | 0 | **0** | 0 | ✅ |
+| banned phrases | many | 0 | 0 | **0** | 0 | ✅ |
+| goto-fail | -- | -- | 21 | 6 | -- | ✅ |
+
+**−188 FAIL · −89 WARN · +301 PASS** from baseline. **100% FAIL elimination.**
+
+S91 commits: `847c8cd` (gold-leaf darken + 3 TS-mirror backfill), `30adcdf` (harness gotoWithRetry).
+
+
 
 **S90.1 final delta (target MET):**
 
