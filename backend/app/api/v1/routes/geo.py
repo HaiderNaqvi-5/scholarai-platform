@@ -37,10 +37,16 @@ def _client_ip(request: Request) -> Optional[str]:
 
 @router.get("/currency")
 async def get_currency(request: Request) -> dict[str, Optional[str]]:
-    """Return ISO currency + country code for the requester's IP."""
+    """Return ISO currency + country code for the requester's IP.
+
+    Currency is the upstream value when in SUPPORTED, otherwise null —
+    the frontend maps country->currency via defaultCurrencyForCountry when
+    currency is null/unsupported. ipwho.is's free tier returns currency=null
+    for most IPs, so falling back to country mapping is the common path.
+    """
     ip = _client_ip(request)
     currency, country = await resolve_currency(ip)
     return {
-        "currency": currency if currency in SUPPORTED else "PKR",
+        "currency": currency if currency in SUPPORTED else None,
         "country": country,
     }

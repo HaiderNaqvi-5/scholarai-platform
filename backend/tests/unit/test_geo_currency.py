@@ -46,17 +46,18 @@ def _fake_httpx(json_payload: dict, *, raise_exc: Exception | None = None) -> Ma
     return factory
 
 
-def test_geo_currency_missing_ip_returns_pkr(client):
-    """No X-Forwarded-For, no client host -> PKR fallback."""
+def test_geo_currency_missing_ip_returns_null(client):
+    """No X-Forwarded-For, no client host -> currency=null, country=null.
+    Frontend will then map via defaultCurrencyForCountry (-> PKR for null cc).
+    """
     with patch("app.services.geo.ipwho_client._redis_client", _fake_redis_no_cache()):
         r = client.get("/api/v1/geo/currency")
     assert r.status_code == 200
     body = r.json()
     # TestClient sets request.client.host to "testclient" — that string is
     # not a routable IP so ipwho would fail; we patch redis but not httpx,
-    # so the real httpx call would fail or timeout in test env. We accept
-    # PKR fallback either way.
-    assert body["currency"] == "PKR"
+    # so the real httpx call would fail. Result: currency=null.
+    assert body["currency"] is None
 
 
 def test_geo_currency_gbp_for_uk_ip(client):
@@ -75,8 +76,10 @@ def test_geo_currency_gbp_for_uk_ip(client):
     assert body["country"] == "GB"
 
 
-def test_geo_currency_unsupported_falls_back_to_pkr(client):
-    """ipwho returns THB (unsupported) -> PKR fallback, country preserved."""
+def test_geo_currency_unsupported_returns_null_keeps_country(client):
+    """ipwho returns THB (unsupported) -> currency=null, country=TH preserved.
+    Frontend maps TH -> regional default via defaultCurrencyForCountry.
+    """
     fake_redis = _fake_redis_no_cache()
     fake_httpx = _fake_httpx(
         {"success": True, "country_code": "TH", "currency": {"code": "THB"}}
@@ -86,12 +89,12 @@ def test_geo_currency_unsupported_falls_back_to_pkr(client):
     ):
         r = client.get("/api/v1/geo/currency", headers={"X-Forwarded-For": "1.2.3.4"})
     body = r.json()
-    assert body["currency"] == "PKR"
+    assert body["currency"] is None
     assert body["country"] == "TH"
 
 
-def test_geo_currency_lookup_failure_falls_back_to_pkr(client):
-    """httpx raises -> service returns (None, None) -> route returns PKR."""
+def test_geo_currency_lookup_failure_returns_null(client):
+    """httpx raises -> service returns (None, None) -> route returns null/null."""
     import httpx
 
     fake_redis = _fake_redis_no_cache()
@@ -101,5 +104,5 @@ def test_geo_currency_lookup_failure_falls_back_to_pkr(client):
     ):
         r = client.get("/api/v1/geo/currency", headers={"X-Forwarded-For": "1.2.3.4"})
     body = r.json()
-    assert body["currency"] == "PKR"
+    assert body["currency"] is None
     assert body["country"] is None
