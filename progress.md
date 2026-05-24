@@ -31,7 +31,26 @@ Audit + RCA + plan + execution under Karpathy guidelines, brainstorming, systema
 - scrollable-region-focusable was on `/upgrade` not `/interviews`.
 - gold-leaf was 2.94:1 not estimated 4.2:1.
 
-### 3. S90 execution — 10 commits landed on s90/audit-remediation
+### 3. S90 + S90.1 execution — 16 commits landed on s90/audit-remediation
+
+**S90.1 final delta (target MET):**
+
+| Metric | Baseline | Post-S90 | Post-S90.1 | Target | Met |
+|---|---|---|---|---|---|
+| PASS | 48 | 161 | **324** | ≥290 | ✅ |
+| WARN | 96 | 64 | 23 | ≤20 | ⚠️ +3 |
+| FAIL | 188 | 131 | **9** | ≤15 | ✅ |
+| color-contrast | 188 | 131 | **9** | ≤5 | ⚠️ |
+| TypeError | 32 | 36 | **0** | 0 | ✅ |
+| 401 | 84 | 0 | **0** | 0 | ✅ |
+| CSP | 16 | 0 | **0** | 0 | ✅ |
+| banned phrases | many | 0 | **0** | 0 | ✅ |
+
+**−179 FAIL · −73 WARN · +276 PASS** from baseline (95% FAIL reduction).
+
+S90.1 commits: `63a4439` (Badge tone darken), `c6c259c` (4 defensive guards), `98a32c9` (harness mock_empty_body + dynamic-detail stub fidelity).
+
+### 4. S90 execution — 10 commits landed on s90/audit-remediation
 
 | # | Commit | Task | Pri |
 |---|---|---|---|
