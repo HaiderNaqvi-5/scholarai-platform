@@ -367,7 +367,7 @@ function FeedbackPanel({ rubric }: { rubric: VisaInterviewRubric }) {
     <Card className="generated-stripe">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-generated" aria-hidden /> Feedback
+          <Sparkles className="size-[14px] text-generated" aria-hidden /> Feedback
         </CardTitle>
         <p className="mt-1 text-xs text-ink-muted">
           Scores are 0–10. Visa officers reward clarity and credible intent.

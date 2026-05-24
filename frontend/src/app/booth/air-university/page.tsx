@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight, Copy, Check, ShieldCheck, Sparkles, FileSignature, Plane } from "lucide-react";
+import { ArrowRight, Copy, Check, ShieldCheck, FileSignature, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -128,7 +128,7 @@ export default function BoothAirUniversity() {
           {!state.expired ? (
             <ul className="mt-10 space-y-4">
               <ValueBullet
-                icon={<Sparkles className="size-5" strokeWidth={1.5} />}
+                icon={<Plane className="size-5" strokeWidth={1.5} />}
                 count="20"
                 title="fully-funded scholarships"
                 detail="Match against Chevening, Fulbright, DAAD, Commonwealth, HEC Overseas, and 15 more."
