@@ -127,6 +127,23 @@ async function applyStateMock(page, route, state) {
   }
 }
 
+/** Single retry on transient socket errors. Bounded — does not loop. Real
+ *  backend outages still fail after the 2nd attempt and surface as a
+ *  console error captured in the cell entry. Added in S91-B after the
+ *  post-S90.1 sweep produced 21 WARN cells from ERR_CONNECTION_REFUSED /
+ *  ERR_EMPTY_RESPONSE during parallel Playwright contexts on Windows. */
+async function gotoWithRetry(page, url, opts) {
+  const TRANSIENT = /ERR_CONNECTION_REFUSED|ERR_EMPTY_RESPONSE|ERR_CONNECTION_RESET|ERR_NETWORK_CHANGED|ERR_SOCKET_NOT_CONNECTED/;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await page.goto(url, opts);
+    } catch (e) {
+      if (attempt === 2 || !TRANSIENT.test(e.message || "")) throw e;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+}
+
 async function runCell(browser, route, vp, state, tokens) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
   await attachAuth(ctx, tokens);
@@ -145,7 +162,7 @@ async function runCell(browser, route, vp, state, tokens) {
   let status = 0;
   let title = "";
   try {
-    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const resp = await gotoWithRetry(page, url, { waitUntil: "domcontentloaded", timeout: 30_000 });
     status = resp ? resp.status() : 0;
     await dismissCookie(page);
     // Wait for paint to settle; loading state intentionally captures mid-skeleton.
