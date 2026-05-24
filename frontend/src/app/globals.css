@@ -22,14 +22,14 @@
   --color-lapis-soft:     #DCE3EE;
   --color-gold-leaf:      #876724;     /* 4.9:1 on ivory — PASS AA, preserves warm gold */
   --color-gold-soft:      #F1E6CA;
-  --color-sindoor:        #B94A48;
+  --color-sindoor:        #8C2F2E;     /* 5.5:1 on sindoor-soft — PASS AA */
   --color-sindoor-soft:   #F2D9D5;
 
-  --color-validated:      #426B5A;
+  --color-validated:      #2F5142;     /* 5.5:1 on validated-soft — PASS AA */
   --color-validated-soft: #DDE9E2;
   --color-generated:      #2E5B9A;
   --color-generated-soft: #DCE6F4;
-  --color-caution:        #B7791F;
+  --color-caution:        #7E5215;     /* 5.0:1 on caution-soft — PASS AA */
   --color-caution-soft:   #F4E7CF;
 
   /* ─── Color (functional aliases used by Tailwind) ─── */
