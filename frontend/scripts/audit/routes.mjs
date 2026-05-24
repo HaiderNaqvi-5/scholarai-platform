@@ -46,6 +46,40 @@ export const LEGAL_ROUTES = [
   { path: "/legal/refund", name: "legal-refund", auth: "public", states: ["loaded", "error"] },
 ];
 
+/**
+ * Stub bodies for dynamic-detail routes. Shapes mirror lib/api/types.ts so
+ * the components render without 404 or TypeError. zara seed has 0 docs /
+ * 0 interviews so we can't drive these with real IDs; mockOk via runner.mjs
+ * injects these as the API response.
+ */
+const DOCUMENT_DETAIL_STUB = {
+  id: 1,
+  user_id: 1,
+  doc_type: "sop",
+  title: "Stub SOP for audit",
+  status: "final",
+  content: "This is a stubbed SOP body for the audit runner.",
+  feedback_items: [],
+  scholarship_id: null,
+  word_count: 12,
+  created_at: "2026-05-24T00:00:00Z",
+  updated_at: "2026-05-24T00:00:00Z",
+};
+
+const INTERVIEW_DETAIL_STUB = {
+  id: 1,
+  user_id: 1,
+  mode: "visa",
+  country: "GB",
+  status: "completed",
+  questions: [],
+  rubric: { clarity: 3.5, structure: 4.0, evidence: 3.0, fit: 4.0, return_intent: 4.5 },
+  trend: null,
+  recommended_focus: [],
+  created_at: "2026-05-24T00:00:00Z",
+  updated_at: "2026-05-24T00:00:00Z",
+};
+
 export const STUDENT_ROUTES = [
   { path: "/feed", name: "feed", auth: "student", states: ["loaded", "error"] },
   { path: "/discover", name: "discover", auth: "student", states: ["loaded", "empty", "error"] },
@@ -61,6 +95,22 @@ export const STUDENT_ROUTES = [
   { path: "/interviews/visa", name: "interviews-visa", auth: "student", states: ["loaded", "locked402"] },
   { path: "/profile", name: "profile", auth: "student", states: ["loaded", "error"] },
   { path: "/settings", name: "settings", auth: "student", states: ["loaded"] },
+  {
+    path: "/documents/1",
+    name: "document-detail",
+    auth: "student",
+    states: ["loaded", "error"],
+    mock_paths: ["/documents/1"],
+    mock_ok_body: DOCUMENT_DETAIL_STUB,
+  },
+  {
+    path: "/interviews/1",
+    name: "interview-detail",
+    auth: "student",
+    states: ["loaded", "error"],
+    mock_paths: ["/interviews/1"],
+    mock_ok_body: INTERVIEW_DETAIL_STUB,
+  },
 ];
 
 /**
@@ -84,6 +134,14 @@ export const ADMIN_ROUTES = [
 
 export const MENTOR_ROUTES = [
   { path: "/mentor/queue", name: "mentor-queue", auth: "admin", states: ["loaded", "empty", "error"] },
+  {
+    path: "/mentor/documents/1",
+    name: "mentor-review",
+    auth: "admin",
+    states: ["loaded", "error"],
+    mock_paths: ["/documents/1", "/mentor/documents/1"],
+    mock_ok_body: DOCUMENT_DETAIL_STUB,
+  },
 ];
 
 export const PARTNER_ROUTES = [

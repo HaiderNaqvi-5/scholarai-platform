@@ -38,7 +38,7 @@ import {
 import { login, attachAuth } from "./auth.mjs";
 import { runAxe } from "./a11y.mjs";
 import { scanCopy } from "./copy-grep.mjs";
-import { mock402, mockError, mockEmpty, mockLoading, endpointsFor } from "./state-mock.mjs";
+import { mock402, mockError, mockEmpty, mockLoading, mockOk, endpointsFor } from "./state-mock.mjs";
 import { writeReport, verdictOf } from "./report.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -104,6 +104,12 @@ async function applyStateMock(page, route, state) {
   const endpoints = route.mock_paths || endpointsFor(route.path);
   if (endpoints.length === 0) return;
   switch (state) {
+    case "loaded":
+      // Inject a realistic 200 body only when the route manifest provides one.
+      // Used for dynamic-detail routes (e.g. /documents/1) where the real
+      // backend has no seed data for zara; without this they 404 or crash.
+      if (route.mock_ok_body) await mockOk(page, endpoints, route.mock_ok_body);
+      break;
     case "locked402":
       await mock402(page, endpoints);
       break;
@@ -111,7 +117,7 @@ async function applyStateMock(page, route, state) {
       await mockError(page, endpoints, 500);
       break;
     case "empty":
-      await mockEmpty(page, endpoints);
+      await mockEmpty(page, endpoints, route.mock_empty_body);
       break;
     case "loading":
       await mockLoading(page, endpoints, 4000);
