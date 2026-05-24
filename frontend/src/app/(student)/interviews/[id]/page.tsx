@@ -72,8 +72,8 @@ export default function InterviewSessionPage({
   const session = sessionQ.data;
   const ended = session.status === "ended";
   const weakest =
-    session.rubric_scores.length > 0
-      ? [...session.rubric_scores].sort((a, b) => a.score - b.score)[0]
+    (session.rubric_scores ?? []).length > 0
+      ? [...(session.rubric_scores ?? [])].sort((a, b) => a.score - b.score)[0]
       : null;
 
   const onSubmit = (e: React.FormEvent) => {
@@ -175,9 +175,9 @@ export default function InterviewSessionPage({
               <CardDescription>0-5 per dimension. Updates after each answer.</CardDescription>
             </CardHeader>
             <CardBody>
-              <RubricRadar dimensions={session.rubric_scores} />
+              <RubricRadar dimensions={session.rubric_scores ?? []} />
               <ul className="mt-3 space-y-1.5">
-                {session.rubric_scores.map((d) => (
+                {(session.rubric_scores ?? []).map((d) => (
                   <RubricRow key={d.dimension} d={d} />
                 ))}
               </ul>

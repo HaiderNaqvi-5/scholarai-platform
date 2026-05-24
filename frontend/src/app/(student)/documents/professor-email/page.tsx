@@ -155,7 +155,7 @@ export default function ProfessorEmailPage() {
                   </select>
                 </div>
                 <Button type="submit" loading={generate.isPending}>
-                  <Sparkles className="size-4" aria-hidden /> Generate email
+                  Generate email
                 </Button>
               </CardBody>
             </Card>
@@ -198,7 +198,7 @@ function EmailPreview({ result }: { result: ProfessorEmailResponse }) {
     <Card className="generated-stripe">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-generated" aria-hidden /> Draft email
+          <Sparkles className="size-[14px] text-generated" aria-hidden /> Draft email
         </CardTitle>
         <Button variant="ghost" size="sm" onClick={copy}>
           <Copy className="size-4" aria-hidden /> Copy

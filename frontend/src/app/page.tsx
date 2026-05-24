@@ -15,6 +15,7 @@ import { Card, CardEyebrow } from "@/components/ui/card";
 import { StatChip } from "@/components/ui/stat-chip";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { RotatingDegree } from "@/components/marketing/RotatingDegree";
+import { StickySubNav } from "@/components/marketing/StickySubNav";
 
 /**
  * Marketing landing (Front-upgrade §6.1).
@@ -66,7 +67,7 @@ const STEPS = [
 const FAQS = [
   {
     q: "Is AidwiseAI really free?",
-    a: "Yes. The Explorer tier stays free forever: 3 matches, 1 lifetime SOP, and 3 UK visa questions. Pro (PKR 2,999/mo) and Elite (PKR 6,000/mo) unlock the full match list, monthly SOPs, and all four country banks. No card needed to sign up.",
+    a: "Yes. The Explorer tier stays free forever: 3 matches, 1 lifetime SOP, and 3 UK visa questions. Pro (PKR 2,999/mo) and Elite (PKR 6,000/mo) open the full match list, monthly SOPs, and all four country banks. No card needed to sign up.",
   },
   {
     q: "How is this different from a consultant?",
@@ -139,6 +140,7 @@ export default function Landing() {
           </nav>
         </div>
       </header>
+      <StickySubNav />
 
       <main id="main">
         {/* ─── §6.1 Hero ─── */}
@@ -180,7 +182,7 @@ export default function Landing() {
             {/* Editorial preview — visible at lg+. Shows real provider output
                 so the hero anchors visually without a stock illustration. */}
             <aside
-              aria-hidden
+              aria-label="Live this week — provider preview"
               className="hidden lg:col-span-5 lg:block"
             >
               <div className="rounded-[28px] border border-[var(--color-border)] bg-paper-warm p-7">

@@ -26,7 +26,7 @@ export default function AdminOverviewPage() {
         description="Platform health, KPI alerts, and roll-up counts."
       />
 
-      {healthQ.data && healthQ.data.kpi_alerts.length > 0 ? (
+      {healthQ.data && (healthQ.data.kpi_alerts ?? []).length > 0 ? (
         <Card className="caution-stripe">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -36,7 +36,7 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardBody>
             <ul className="space-y-2">
-              {healthQ.data.kpi_alerts.map((a, i) => (
+              {(healthQ.data.kpi_alerts ?? []).map((a, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm">
                   <Badge
                     tone={
@@ -111,7 +111,7 @@ export default function AdminOverviewPage() {
             </CardHeader>
             <CardBody>
               <ul className="space-y-1 text-sm">
-                {platformQ.data.ingestion_runs_recent.map((r, i) => (
+                {(platformQ.data.ingestion_runs_recent ?? []).map((r, i) => (
                   <li key={i} className="flex items-center justify-between">
                     <span className="text-ink">{r.status}</span>
                     <span className="font-mono text-ink">{r.count}</span>

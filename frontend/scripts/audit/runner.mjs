@@ -30,12 +30,15 @@ import {
   PUBLIC_ROUTES,
   LEGAL_ROUTES,
   STUDENT_ROUTES,
+  ADMIN_ROUTES,
+  MENTOR_ROUTES,
+  PARTNER_ROUTES,
   VIEWPORTS,
 } from "./routes.mjs";
 import { login, attachAuth } from "./auth.mjs";
 import { runAxe } from "./a11y.mjs";
 import { scanCopy } from "./copy-grep.mjs";
-import { mock402, mockError, mockEmpty, mockLoading, endpointsFor } from "./state-mock.mjs";
+import { mock402, mockError, mockEmpty, mockLoading, mockOk, endpointsFor } from "./state-mock.mjs";
 import { writeReport, verdictOf } from "./report.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +63,9 @@ function pickRoutes(filter) {
     public: PUBLIC_ROUTES,
     legal: LEGAL_ROUTES,
     student: STUDENT_ROUTES,
+    admin: ADMIN_ROUTES,
+    mentor: MENTOR_ROUTES,
+    partner: PARTNER_ROUTES,
     all: ALL_ROUTES,
   };
   const out = [];
@@ -98,6 +104,12 @@ async function applyStateMock(page, route, state) {
   const endpoints = route.mock_paths || endpointsFor(route.path);
   if (endpoints.length === 0) return;
   switch (state) {
+    case "loaded":
+      // Inject a realistic 200 body only when the route manifest provides one.
+      // Used for dynamic-detail routes (e.g. /documents/1) where the real
+      // backend has no seed data for zara; without this they 404 or crash.
+      if (route.mock_ok_body) await mockOk(page, endpoints, route.mock_ok_body);
+      break;
     case "locked402":
       await mock402(page, endpoints);
       break;
@@ -105,13 +117,30 @@ async function applyStateMock(page, route, state) {
       await mockError(page, endpoints, 500);
       break;
     case "empty":
-      await mockEmpty(page, endpoints);
+      await mockEmpty(page, endpoints, route.mock_empty_body);
       break;
     case "loading":
       await mockLoading(page, endpoints, 4000);
       break;
     default:
       break;
+  }
+}
+
+/** Single retry on transient socket errors. Bounded — does not loop. Real
+ *  backend outages still fail after the 2nd attempt and surface as a
+ *  console error captured in the cell entry. Added in S91-B after the
+ *  post-S90.1 sweep produced 21 WARN cells from ERR_CONNECTION_REFUSED /
+ *  ERR_EMPTY_RESPONSE during parallel Playwright contexts on Windows. */
+async function gotoWithRetry(page, url, opts) {
+  const TRANSIENT = /ERR_CONNECTION_REFUSED|ERR_EMPTY_RESPONSE|ERR_CONNECTION_RESET|ERR_NETWORK_CHANGED|ERR_SOCKET_NOT_CONNECTED/;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await page.goto(url, opts);
+    } catch (e) {
+      if (attempt === 2 || !TRANSIENT.test(e.message || "")) throw e;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
   }
 }
 
@@ -133,7 +162,7 @@ async function runCell(browser, route, vp, state, tokens) {
   let status = 0;
   let title = "";
   try {
-    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const resp = await gotoWithRetry(page, url, { waitUntil: "domcontentloaded", timeout: 30_000 });
     status = resp ? resp.status() : 0;
     await dismissCookie(page);
     // Wait for paint to settle; loading state intentionally captures mid-skeleton.
@@ -199,6 +228,7 @@ async function main() {
   const browser = await chromium.launch({
     timeout: 60_000,
     headless: true,
+    channel: process.env.AIDWISE_BROWSER_CHANNEL || "chrome",
     args: ["--disable-dev-shm-usage", "--no-sandbox"],
   });
 

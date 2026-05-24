@@ -16,11 +16,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
-  Sparkles,
   KanbanSquare,
   FileSignature,
   Plane,
   CheckCircle2,
+  Sprout,
 } from "lucide-react";
 import { toast } from "sonner";
 import { endpoints } from "@/lib/api";
@@ -190,7 +190,7 @@ export default function FeedPage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <ActionTile
             href="/dashboard/scholarships/match"
-            icon={<Sparkles className="size-5" strokeWidth={1.5} />}
+            icon={<Sprout className="size-5" strokeWidth={1.5} />}
             label="Find matches"
             body="Score the live catalog against your profile."
           />

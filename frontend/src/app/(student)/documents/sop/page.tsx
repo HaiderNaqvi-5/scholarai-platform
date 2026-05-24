@@ -301,7 +301,7 @@ function SOPForm({
 
       <div className="flex items-center gap-2">
         <Button type="submit" loading={submitting}>
-          <Sparkles className="size-4" aria-hidden /> Generate draft
+          Generate draft
         </Button>
       </div>
     </form>
@@ -375,7 +375,7 @@ function DraftPreview({
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="size-4 text-generated" aria-hidden /> SOP draft
+              <Sparkles className="size-[14px] text-generated" aria-hidden /> SOP draft
             </CardTitle>
             <p className="mt-1 text-xs text-ink-muted">
               {draft.word_count} words · {draft.model_used}
@@ -429,7 +429,7 @@ function LineFeedback({
     <Card className="generated-stripe">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-generated" aria-hidden /> Line-by-line
+          <Sparkles className="size-[14px] text-generated" aria-hidden /> Line-by-line
           feedback
         </CardTitle>
         <p className="mt-1 text-xs text-ink-muted">
