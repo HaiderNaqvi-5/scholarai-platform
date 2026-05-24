@@ -21,16 +21,16 @@ export const themeTokens = {
     /* Accents */
     lapis: "#1B3A6B",
     lapisSoft: "#DCE3EE",
-    goldLeaf: "#876724",
+    goldLeaf: "#6E521B",
     goldSoft: "#F1E6CA",
-    sindoor: "#B94A48",
+    sindoor: "#8C2F2E",
     sindoorSoft: "#F2D9D5",
     /* Semantic */
-    validated: "#426B5A",
+    validated: "#2F5142",
     validatedSoft: "#DDE9E2",
     generated: "#2E5B9A",
     generatedSoft: "#DCE6F4",
-    caution: "#B7791F",
+    caution: "#7E5215",
     cautionSoft: "#F4E7CF",
   },
   surfaces: {
