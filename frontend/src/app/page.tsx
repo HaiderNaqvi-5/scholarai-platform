@@ -15,6 +15,7 @@ import { Card, CardEyebrow } from "@/components/ui/card";
 import { StatChip } from "@/components/ui/stat-chip";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { RotatingDegree } from "@/components/marketing/RotatingDegree";
+import { StickySubNav } from "@/components/marketing/StickySubNav";
 
 /**
  * Marketing landing (Front-upgrade §6.1).
@@ -139,6 +140,7 @@ export default function Landing() {
           </nav>
         </div>
       </header>
+      <StickySubNav />
 
       <main id="main">
         {/* ─── §6.1 Hero ─── */}

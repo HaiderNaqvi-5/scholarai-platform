@@ -97,6 +97,9 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Smooth scroll for in-page anchors (StickySubNav, FAQ jumps).
+       Reduced-motion media query below overrides to `auto`. */
+    scroll-behavior: smooth;
   }
 
   body {
