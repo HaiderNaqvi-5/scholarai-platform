@@ -29,6 +29,7 @@ import { visaInterview } from "./endpoints/visaInterview";
 import { upgrade } from "./endpoints/upgrade";
 import { reports } from "./endpoints/reports";
 import { legal, privacy } from "./endpoints/legal";
+import { geo } from "./endpoints/geo";
 
 export const endpoints = {
   auth,
@@ -51,4 +52,5 @@ export const endpoints = {
   reports,
   legal,
   privacy,
+  geo,
 };

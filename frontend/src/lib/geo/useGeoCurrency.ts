@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Currency } from "@/lib/api";
+import { endpoints, type Currency } from "@/lib/api";
 import { defaultCurrencyForCountry } from "@/lib/countries";
 
 const CACHE_KEY = "aidwise.geo_currency";
@@ -43,7 +43,12 @@ function writeCache(value: Cached): void {
 }
 
 /**
- * Detect the visitor's currency from their IP via ipwho.is.
+ * Detect the visitor's currency from their IP via the backend geo proxy
+ * (GET /api/v1/geo/currency). The backend resolves IP -> currency through
+ * ipwho.is server-side and Redis-caches 1h. The frontend does NOT call
+ * ipwho.is directly because the S20 CSP `connect-src 'self' ${API_ORIGIN}`
+ * blocks third-party hosts (RC-4 from audit-out/ROOT_CAUSE_ANALYSIS.md).
+ *
  * Falls back to PKR (Pakistan-first audience) on any error. Cached 24h
  * in localStorage so repeat visits skip the network round-trip.
  */
@@ -67,20 +72,13 @@ export function useGeoCurrency(initial: Currency = "PKR"): State {
 
     (async () => {
       try {
-        const r = await fetch("https://ipwho.is/?fields=success,country_code,currency", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!r.ok) throw new Error(`ipwho ${r.status}`);
-        const j: {
-          success?: boolean;
-          country_code?: string;
-          currency?: { code?: string };
-        } = await r.json();
-        if (j.success === false) throw new Error("ipwho lookup failed");
-
-        const code = (j.currency?.code ?? "").toUpperCase();
-        const cc = (j.country_code ?? "").toUpperCase();
+        // Backend proxy: returns { currency, country }. Backend already
+        // maps unsupported currencies to PKR + caches 1h in Redis. We still
+        // pass through defaultCurrencyForCountry for the rare case where
+        // the backend returns PKR but the country deserves a regional default.
+        const j = await endpoints.geo.currency();
+        const code = (j.currency ?? "").toUpperCase();
+        const cc = (j.country ?? "").toUpperCase();
         const detected: Currency = isSupported(code)
           ? code
           : defaultCurrencyForCountry(cc);
