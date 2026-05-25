@@ -21,6 +21,7 @@ from app.schemas import (
     IngestionRunRetryRequest,
     IngestionRunSnapshotResponse,
     IngestionRunStartRequest,
+    NightlyStatusResponse,
     SourceHealthListResponse,
 )
 from app.services.curation import CurationService
@@ -239,6 +240,15 @@ async def bulk_retry_ingestion_runs(
     response = await service.bulk_retry_runs(payload=payload, actor_user=current_user)
     await db.commit()
     return response
+
+
+@router.get("/ingestion-runs/nightly-status", response_model=NightlyStatusResponse)
+async def get_nightly_ingestion_status(
+    current_user: CurationQueueUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> NightlyStatusResponse:
+    """Roll-up for the admin ingestion banner: last completion, freshness, per-source health."""
+    return await IngestionService(db).get_nightly_status(actor_user=current_user)
 
 
 @router.get("/ingestion-runs/{run_id}", response_model=IngestionRunDetail)

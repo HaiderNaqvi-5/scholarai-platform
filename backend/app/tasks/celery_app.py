@@ -23,6 +23,7 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_default_queue="default",
+    broker_connection_retry_on_startup=True,
 )
 
 celery_app.conf.beat_schedule = {
@@ -45,6 +46,12 @@ celery_app.conf.beat_schedule = {
     "expire-trial-plans": {
         "task": "tasks.expire_trial_plans",
         "schedule": crontab(hour=2, minute=0),
+    },
+    # Ingestion freshness sentinel — runs every N minutes; emits Sentry +
+    # admin-email when no nightly completion lands within INGESTION_STALE_HOURS.
+    "ingestion-health-check": {
+        "task": "tasks.run_ingestion_health_check",
+        "schedule": crontab(minute=f"*/{settings.INGESTION_HEALTH_CHECK_INTERVAL_MINUTES}"),
     },
 }
 

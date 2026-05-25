@@ -22,6 +22,7 @@ from app.schemas.curation import (
     CurationRecordListResponse,
     CurationRecordSummary,
     CurationRecordUpdateRequest,
+    NightlyStatusResponse,
     ScholarshipProvenanceResponse,
     SourceHealthListResponse,
     SourceHealthSummary,

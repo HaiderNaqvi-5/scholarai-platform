@@ -5,9 +5,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import async_session_factory
 from app.models import IngestionRun, IngestionRunStatus, SourceRegistry
 from app.services.ingestion import IngestionService
+from app.services.notifications import send_email
 from app.schemas.curation import IngestionRunStartRequest
 from app.tasks.celery_app import celery_app
 
@@ -191,12 +193,132 @@ async def _run_nightly_ingestion_async(system_actor_id: str) -> dict:
         if not await _should_run_nightly(session):
             logger.info("nightly_ingestion_skip reason=recent_run_present")
             return {"status": "skipped", "reason": "recent_run_present"}
-    return await _run_source_ingestion_async(
-        run_id=None,
-        source_key=NIGHTLY_SOURCE_KEY,
-        actor_user_id=system_actor_id,
-        source_display_name="Auto Nightly Ingestion",
-        source_base_url=None,
-        source_type="official",
-        max_records=20,
+
+        active_sources = (
+            (
+                await session.execute(
+                    select(SourceRegistry)
+                    .where(
+                        SourceRegistry.is_active == True,  # noqa: E712
+                        SourceRegistry.source_key != NIGHTLY_SOURCE_KEY,
+                    )
+                    .order_by(SourceRegistry.source_key)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    if not active_sources:
+        return await _run_source_ingestion_async(
+            run_id=None,
+            source_key=NIGHTLY_SOURCE_KEY,
+            actor_user_id=system_actor_id,
+            source_display_name="Auto Nightly Ingestion",
+            source_base_url=None,
+            source_type="official",
+            max_records=20,
+        )
+
+    stagger_seconds = max(0, int(settings.INGESTION_STAGGER_SECONDS))
+    dispatched: list[dict] = []
+    for index, source in enumerate(active_sources):
+        countdown = index * stagger_seconds
+        run_source_ingestion.apply_async(
+            kwargs={
+                "run_id": None,
+                "source_key": source.source_key,
+                "actor_user_id": system_actor_id,
+                "source_display_name": source.display_name,
+                "source_base_url": source.base_url,
+                "source_type": source.source_type or "official",
+                "max_records": 20,
+            },
+            countdown=countdown,
+        )
+        dispatched.append(
+            {"source_key": source.source_key, "countdown_seconds": countdown}
+        )
+    logger.info(
+        "nightly_ingestion_fanout dispatched=%d stagger_seconds=%d",
+        len(dispatched),
+        stagger_seconds,
     )
+    return {
+        "status": "dispatched",
+        "count": len(dispatched),
+        "stagger_seconds": stagger_seconds,
+        "sources": dispatched,
+    }
+
+
+@celery_app.task(name="tasks.run_ingestion_health_check")
+def run_ingestion_health_check() -> dict:
+    """Alert when no nightly ingestion completion has landed within INGESTION_STALE_HOURS.
+
+    Logs + Sentry capture_message + admin email (all fail-soft). Returns status
+    dict for Flower visibility.
+    """
+    return asyncio.run(_run_ingestion_health_check_async())
+
+
+async def _run_ingestion_health_check_async() -> dict:
+    threshold_hours = max(1, int(settings.INGESTION_STALE_HOURS))
+    async with async_session_factory() as session:
+        last_completed_at = await _load_last_nightly_completion(session)
+
+    now = datetime.now(timezone.utc)
+    hours_since: float | None = None
+    if last_completed_at is not None:
+        if last_completed_at.tzinfo is None:
+            last_completed_at = last_completed_at.replace(tzinfo=timezone.utc)
+        hours_since = (now - last_completed_at).total_seconds() / 3600.0
+
+    is_stale = last_completed_at is None or (
+        hours_since is not None and hours_since > threshold_hours
+    )
+
+    payload = {
+        "status": "stale" if is_stale else "ok",
+        "last_completed_at": last_completed_at.isoformat() if last_completed_at else None,
+        "hours_since": hours_since,
+        "threshold_hours": threshold_hours,
+    }
+
+    if not is_stale:
+        logger.info("ingestion.health.ok", extra={"event": "ingestion.health.ok", **payload})
+        return payload
+
+    logger.error(
+        "ingestion.health.stale",
+        extra={"event": "ingestion.health.stale", **payload},
+    )
+
+    try:
+        import sentry_sdk
+
+        if settings.SENTRY_DSN:
+            sentry_sdk.capture_message(
+                f"Ingestion nightly stale: {hours_since}h > {threshold_hours}h",
+                level="error",
+            )
+    except Exception:  # noqa: BLE001 — fail-soft when sentry unavailable
+        pass
+
+    if settings.ADMIN_ALERT_EMAIL:
+        import types as _types
+
+        admin_stub = _types.SimpleNamespace(email=settings.ADMIN_ALERT_EMAIL)
+        subject = "[AidwiseAI] Nightly ingestion stale"
+        body = (
+            f"No completed nightly ingestion run found within the last "
+            f"{threshold_hours} hours.\n\n"
+            f"Last completion: {last_completed_at}\n"
+            f"Hours since: {hours_since}\n"
+        )
+        try:
+            await send_email(admin_stub, body, subject=subject)
+        except Exception:  # noqa: BLE001 — fail-soft, log already emitted
+            logger.exception("ingestion.health.alert_email_failed")
+
+    return payload

@@ -4,12 +4,13 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import random
 import re
 import uuid
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from functools import wraps
 from typing import Any
@@ -1101,12 +1102,24 @@ class IngestionService:
         transport_errors: list[dict[str, Any]] = []
         user_agent = "ScholarAI-Internal-Ingestion/0.1"
 
+        proxy_url = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+        launch_kwargs: dict[str, Any] = {"headless": True}
+        if proxy_url:
+            launch_kwargs["proxy"] = {"server": proxy_url}
+
         try:
             from playwright.async_api import async_playwright
 
+            try:
+                from playwright_stealth import stealth_async
+            except ImportError:
+                stealth_async = None
+
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(headless=True)
+                browser = await playwright.chromium.launch(**launch_kwargs)
                 page = await browser.new_page()
+                if stealth_async is not None:
+                    await stealth_async(page)
                 await page.goto(url, wait_until="networkidle", timeout=45_000)
                 html = await page.content()
                 title = await page.title()
@@ -1122,6 +1135,8 @@ class IngestionService:
                         "final_url": final_url,
                         "page_title": title,
                         "attempt": attempt,
+                        "stealth_applied": stealth_async is not None,
+                        "proxy": bool(proxy_url),
                         "transport_errors": transport_errors,
                     },
                 )
@@ -1132,6 +1147,18 @@ class IngestionService:
                     "error_type": exc.__class__.__name__,
                     "error_message": str(exc),
                 }
+            )
+            logger.warning(
+                "ingestion.capture.fallback",
+                extra={
+                    "event": "ingestion.capture.fallback",
+                    "url": url,
+                    "attempt": attempt,
+                    "from_transport": "playwright",
+                    "to_transport": "httpx",
+                    "error_type": exc.__class__.__name__,
+                    "error_message": str(exc),
+                },
             )
 
         try:
@@ -2482,6 +2509,67 @@ class IngestionService:
         sources = list(result.scalars().all())
         items = [self._build_source_health_summary(source) for source in sources]
         return SourceHealthListResponse(items=items, total=len(items))
+
+    async def get_nightly_status(
+        self, actor_user: User | None = None
+    ) -> "NightlyStatusResponse":
+        """Roll-up of nightly ingestion freshness + per-source health for the admin banner."""
+        from app.core.config import settings as _settings
+        from app.schemas.curation import NightlyStatusResponse
+
+        if actor_user is not None:
+            self._assert_actor_scope(actor_user)
+
+        health = await self.list_source_health(actor_user=actor_user)
+        active_count = sum(1 for s in health.items if s.is_active)
+
+        last_run_row = (
+            await self.db.execute(
+                select(IngestionRun.id, IngestionRun.status, IngestionRun.completed_at)
+                .join(SourceRegistry, IngestionRun.source_registry_id == SourceRegistry.id)
+                .where(
+                    IngestionRun.completed_at.is_not(None),
+                    IngestionRun.status.in_(
+                        (IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)
+                    ),
+                )
+                .order_by(IngestionRun.completed_at.desc())
+                .limit(1)
+            )
+        ).first()
+
+        last_run_id = last_run_row[0] if last_run_row else None
+        last_status = last_run_row[1].value if last_run_row else None
+        last_completed_at: datetime | None = last_run_row[2] if last_run_row else None
+
+        now = datetime.now(timezone.utc)
+        hours_since: float | None = None
+        if last_completed_at is not None:
+            if last_completed_at.tzinfo is None:
+                last_completed_at = last_completed_at.replace(tzinfo=timezone.utc)
+            hours_since = (now - last_completed_at).total_seconds() / 3600.0
+
+        threshold = max(1, int(_settings.INGESTION_STALE_HOURS))
+        is_stale = last_completed_at is None or (
+            hours_since is not None and hours_since > threshold
+        )
+
+        next_expected = now.replace(hour=2, minute=0, second=0, microsecond=0)
+        if next_expected <= now:
+            next_expected = next_expected + timedelta(days=1)
+
+        return NightlyStatusResponse(
+            last_completed_at=last_completed_at,
+            last_status=last_status,
+            last_run_id=last_run_id,
+            hours_since_last_completion=hours_since,
+            is_stale=is_stale,
+            stale_threshold_hours=threshold,
+            next_expected_at=next_expected,
+            stagger_seconds=max(0, int(_settings.INGESTION_STAGGER_SECONDS)),
+            active_source_count=active_count,
+            sources=health.items,
+        )
 
     async def trace_provenance(
         self,

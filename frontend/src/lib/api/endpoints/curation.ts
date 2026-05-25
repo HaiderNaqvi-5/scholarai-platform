@@ -1,5 +1,5 @@
 import { api } from "../client";
-import type { CurationRecord, CurationState, IngestionRun } from "../types";
+import type { CurationRecord, CurationState, IngestionRun, NightlyStatusResponse } from "../types";
 
 export const curation = {
   startRun: (input: { source_key: string; execution_mode?: "inline" | "worker" }) =>
@@ -13,6 +13,9 @@ export const curation = {
     dispatch_status?: string;
   } = {}) =>
     api.get<{ items: IngestionRun[]; total: number }>("/curation/ingestion-runs", { query: filters }),
+
+  nightlyStatus: () =>
+    api.get<NightlyStatusResponse>("/curation/ingestion-runs/nightly-status"),
 
   runDetail: (id: string) =>
     api.get<IngestionRun>(`/curation/ingestion-runs/${id}`),

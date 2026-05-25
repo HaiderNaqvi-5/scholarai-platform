@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/section-header";
 import { endpoints } from "@/lib/api";
 import type { IngestionRun, IngestionRunStatus } from "@/lib/api";
+import { NightlyStatusBanner } from "./_components/NightlyStatusBanner";
 
 const STATUSES: { code: IngestionRunStatus | ""; label: string }[] = [
   { code: "", label: "All" },
@@ -87,6 +88,8 @@ function IngestionInner() {
         title="Ingestion runs"
         description="Source registry runs, capture, retries, and snapshots."
       />
+
+      <NightlyStatusBanner />
 
       <Card>
         <CardHeader>

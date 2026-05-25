@@ -111,6 +111,16 @@ class Settings(BaseSettings):
     BRAND_DISPLAY_NAME: str = "AidwiseAI"
     EMAIL_FROM_LOCALPART: str = "noreply"
 
+    # --- Ingestion scheduling + health alerting ---
+    # Nightly 02:00 UTC beat fans out one task per active SourceRegistry row,
+    # spacing dispatches by INGESTION_STAGGER_SECONDS to spread load. A separate
+    # beat every INGESTION_HEALTH_CHECK_INTERVAL_MINUTES alerts if no nightly
+    # completion has landed within INGESTION_STALE_HOURS.
+    INGESTION_STAGGER_SECONDS: int = 300
+    INGESTION_STALE_HOURS: int = 26
+    INGESTION_HEALTH_CHECK_INTERVAL_MINUTES: int = 30
+    ADMIN_ALERT_EMAIL: str | None = None
+
     # --- Sentry (opt-in; unset DSN = no init, app boots clean) ---
     # sentry-sdk is bundled in requirements.txt for the Air-Uni booth.
     # main._init_sentry() reads these on app startup. Failure to init is
@@ -129,6 +139,7 @@ class Settings(BaseSettings):
     AUTH_LOCKOUT_MAX_FAILURES: int = 5
     AUTH_LOCKOUT_WINDOW_SECONDS: int = 900   # 15 min
     AUTH_LOCKOUT_DURATION_SECONDS: int = 900  # 15 min
+    HIBP_TIMEOUT_SECONDS: float = 2.0
 
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()

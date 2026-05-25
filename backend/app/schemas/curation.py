@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Literal
 
@@ -259,3 +260,18 @@ class SourceHealthSummary(BaseModel):
 class SourceHealthListResponse(BaseModel):
     items: list[SourceHealthSummary]
     total: int = Field(ge=0)
+
+
+class NightlyStatusResponse(BaseModel):
+    """At-a-glance nightly ingestion rollup for the admin dashboard."""
+
+    last_completed_at: datetime | None = None
+    last_status: str | None = None
+    last_run_id: uuid.UUID | None = None
+    hours_since_last_completion: float | None = None
+    is_stale: bool
+    stale_threshold_hours: int = Field(ge=1)
+    next_expected_at: datetime
+    stagger_seconds: int = Field(ge=0)
+    active_source_count: int = Field(ge=0)
+    sources: list[SourceHealthSummary]

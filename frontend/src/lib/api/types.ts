@@ -38,6 +38,16 @@ export type TokenResponse = {
   expires_in: number;
 };
 
+export type AccessControlManagedUser = {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: Role;
+  is_active: boolean;
+  auth_token_version: number;
+  effective_capabilities: string[];
+};
+
 /**
  * StudentProfile — mirrors backend `StudentProfileResponse`
  * (backend/app/schemas/students.py). Backend allowed values are enforced
@@ -232,27 +242,76 @@ export type IngestionRun = {
   finished_at?: string | null;
 };
 
+export type SourceHealthSummary = {
+  source_key: string;
+  display_name: string;
+  is_active: boolean;
+  health_status: string;
+  consecutive_failures: number;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+};
+
+export type NightlyStatusResponse = {
+  last_completed_at?: string | null;
+  last_status?: string | null;
+  last_run_id?: string | null;
+  hours_since_last_completion?: number | null;
+  is_stale: boolean;
+  stale_threshold_hours: number;
+  next_expected_at: string;
+  stagger_seconds: number;
+  active_source_count: number;
+  sources: SourceHealthSummary[];
+};
+
 export type CurationState = "raw" | "validated" | "published";
 
-export type CurationRecord = {
+export type CurationRecordSummary = {
   record_id: string;
-  state: CurationState;
   title: string;
-  fields: Record<string, unknown>;
-  audit_log: { actor: string; action: string; at: string; note?: string }[];
-  rejection_reason?: string | null;
+  provider_name?: string | null;
+  country_code: string;
+  record_state: CurationState;
+  source_url: string;
+  source_type?: string | null;
+  imported_at?: string | null;
+  source_last_seen_at?: string | null;
+  last_reviewed_at?: string | null;
+  validated_at?: string | null;
   published_at?: string | null;
+  review_notes?: string | null;
+};
+
+export type CurationRecord = CurationRecordSummary & {
+  summary?: string | null;
+  funding_summary?: string | null;
+  field_tags: string[];
+  degree_levels: string[];
+  citizenship_rules: string[];
+  min_gpa_value?: number | null;
+  source_document_ref?: string | null;
+  provenance_payload?: Record<string, unknown> | null;
+  reviewed_by_user_id?: string | null;
+  validated_by_user_id?: string | null;
+  published_by_user_id?: string | null;
+  rejected_at?: string | null;
+  unpublished_at?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type RoleChangeAudit = {
   audit_id: string;
   target_user_id: string;
-  actor_user_id: string;
-  from_role: Role;
-  to_role: Role;
-  reason: string;
+  actor_user_id?: string | null;
+  action: "update" | "revert";
+  previous_role: Role;
+  next_role: Role;
+  reason?: string | null;
   changed_at: string;
-  reverted_audit_id?: string | null;
+  reverted_by_audit_id?: string | null;
+  is_reversible: boolean;
 };
 
 export type HealthResponse = {
@@ -268,11 +327,20 @@ export type PlatformAnalytics = {
   mentor_count: number;
   admin_count: number;
   total_scholarships: number;
-  applications_count: number;
-  documents_count: number;
-  interview_sessions_count: number;
-  ingestion_runs_recent: { status: IngestionRunStatus; count: number }[];
-  kpi_trends: Record<string, { points: { at: string; value: number }[] }>;
+  total_applications: number;
+  submitted_applications: number;
+  total_documents: number;
+  total_interview_sessions: number;
+  ingestion_runs_total: number;
+  ingestion_runs_failed: number;
+  kpi_trends: {
+    metric_domain: string;
+    policy_version: string;
+    total_snapshots: number;
+    passed_snapshots: number;
+    failed_snapshots: number;
+    pass_rate: number;
+  }[];
 };
 
 // ───────────────────────────────────────────────────────────────────────────
