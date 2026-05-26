@@ -20,10 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ── Current user ─────────────────────────────────────────────────────────────
 
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> User:
+async def _get_user_from_local_jwt(token: str, db: AsyncSession) -> User:
     """Decode Bearer token and return the matching User row with Redis caching."""
     payload = decode_token(token, expected_type="access")
 
@@ -137,6 +134,48 @@ async def get_current_user(
         pass
 
     return user
+
+
+async def _get_user_from_clerk_jwt(token: str, db: AsyncSession) -> User:
+    """Verify a Clerk-issued JWT and return (or create) the matching local User."""
+    from app.integrations.clerk.jwt_verify import verify_clerk_jwt, ClerkAuthError
+    from app.integrations.clerk.user_sync import ensure_local_user_async
+    from app.core.authorization import get_role_capabilities
+
+    try:
+        claims = verify_clerk_jwt(token)
+    except ClerkAuthError as e:
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_EXPIRED,
+            message=str(e),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        ) from e
+
+    user = await ensure_local_user_async(claims.sub, session=db)
+    if not user.is_active:
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_INACTIVE_ACCOUNT,
+            message="Account is disabled",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Derive capabilities from role so downstream capability guards work.
+    setattr(user, "_token_capabilities", get_role_capabilities(user.role))
+    setattr(user, "_token_policy_version", None)
+    setattr(user, "_token_institution_scope", None)
+
+    return user
+
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """Dispatcher: route to Clerk or local JWT verification based on AUTH_PROVIDER."""
+    from app.core.config import settings
+    if settings.AUTH_PROVIDER == "clerk":
+        return await _get_user_from_clerk_jwt(token, db)
+    return await _get_user_from_local_jwt(token, db)
 
 
 def _has_capability(current_user: User, capability: Capability | str) -> bool:
