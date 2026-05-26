@@ -1,101 +1,80 @@
-# progress.md — 2026-05-18 (S89.2 landing rotator + IP currency)
+# progress.md — scholarai-platform
 
-**Date:** 2026-05-18
-**Branch:** `feat/s89-premium-cultural`
-**Head:** `7b85c46` (pushed to `origin/feat/s89-premium-cultural`)
+**Date:** 2026-05-27
+**Branch:** `s93/auth-tier-1`
 
-## Completed this session
+## Session: Clerk + Resend migration (Tasks 1–12 done; 13 pending)
 
-1. **Hero degree rotator** (`frontend/src/app/page.tsx:151` + new `frontend/src/components/marketing/RotatingDegree.tsx`)
-   - h1 cycles `bachelor's → master's → PhD`
-   - Opacity-only transition (320ms cross-fade, 2.2s hold)
-   - `aria-live="polite"`, `aria-atomic="true"`
-   - `prefers-reduced-motion`: no fade, instant swap
-   - `min-w-[5ch]` reserves layout to prevent jump
-   - Hero `max-w` bumped 14ch → 16ch to fit longest word
+Plan: `docs/superpowers/plans/2026-05-26-clerk-resend-migration.md`
+Execution mode: superpowers:subagent-driven-development + karpathy-guidelines (strict surgical).
 
-2. **Auto IP-based currency on /upgrade** (new `frontend/src/lib/geo/useGeoCurrency.ts` + edits to `frontend/src/app/upgrade/page.tsx`)
-   - Hook fetches `https://ipwho.is/?fields=success,country_code,currency` once
-   - 24h `localStorage` cache key `aidwise.geo_currency`
-   - Maps `currency.code` to supported set (PKR/GBP/EUR/AED/USD); falls back via `defaultCurrencyForCountry(country_code)` then PKR
-   - Aborts on unmount via `AbortController`
-   - `CurrencySwitcher` 5-button radiogroup → `DetectedCurrency` chip (Globe2 icon + source label + currency code)
-   - Precedence: `?currency=` query > `auth.user.plan_currency` > geo > PKR fallback
-   - Error-state "Show in PKR" button preserved via internal `fallbackOverride` state
+### Tasks completed this session
 
-3. **Stripe consistency** (`frontend/src/app/(mentor)/mentor/documents/[id]/page.tsx:201`)
-   - `ListEditor` danger tone swapped raw `border-l-2 border-l-danger pl-3` for the existing `danger-stripe` `@utility`
-   - All three tones (validated / caution / danger) now share 3px stripe geometry from `globals.css`
+| # | Commit | Summary | Tests |
+|---|--------|---------|-------|
+| 1 | `d9ad076` + `600b04a` | `Settings` adds `AUTH_PROVIDER` + `CLERK_*` + `RESEND_*`; `validate_production_settings` extended; deps pinned (`clerk-backend-api==1.6.0`, `resend==2.5.1`, `svix==1.30.0`, `@clerk/nextjs ^6.12.0`, `@clerk/themes ^2.2.0`); both `.env.example` + `backend/.env.example` updated. | 2/2 |
+| 1.1 | `a255b23` | Fix `test_prod_rejects_blank_clerk_when_provider_clerk` — `AUTO_SEED_DEMO_DATA=false` env override (validator returned early on prior check). | n/a |
+| 2 | `68bc086` | `User.clerk_user_id` (String 64, nullable, unique, indexed) + migration `20260526_0029` (parent `20260525_0028`); `backend/tests/db/conftest.py` SQLite in-memory fixture. | 2/2 |
+| 3 | `e616b47` | `jwt_verify.verify_clerk_jwt` — JWKS cache, RS256/384/512 only, rejects expired / unknown kid / `alg=none`. PyJWT 2.9.0 pinned. | 4/4 |
+| 4 | `ede6c51` | `clerk/client.clerk_client()` lazy init + `user_sync.ensure_local_user` (lookup → fetch → email-collision link → create) writing `full_name` (not `first_name/last_name`). | 3/3 |
+| 5 | `c632eb4` | Dual-mode `get_current_user`: preserved local body verbatim as `_get_user_from_local_jwt`; added `_get_user_from_clerk_jwt` (verify → `ensure_local_user_async` → sets `_token_capabilities` from `get_role_capabilities`). | 2/2 + 518 regression clean |
+| 6 | `6b328e4` | `POST /api/v1/webhooks/clerk` — Svix HMAC verify; `user.created` / `user.updated` (email + full_name sync) / `user.deleted` (soft delete `is_active=False`). Registered in `api/v1/__init__.py`. | 3/3 |
+| 7 | `e4a7e01` | `send_transactional` wrapper + Pydantic `TransactionalRequest` (EmailStr + CRLF reject) + 2-template registry (`welcome`, `data_export_ready`). `email-validator==2.2.0` pinned. | 3/3 |
+| 8 | `935eb6b` | `send_email_notification(*, to, template, context) -> str` added to `services/notifications/channels.py` as thin wrapper (additive; existing `send_email` left intact since Mailgun was already gone). | 1/1 |
+| 9 | `76cd469` | `_ensure_local_provider` injected as first dependency on `/register /login /refresh /logout`; returns `410 Gone` envelope `{"error":{"message":"auth handled by Clerk; ..."}}` when `AUTH_PROVIDER=clerk`. | 4/4 |
+| 10 | (committed this session — see git log) | Frontend Clerk scaffold (opt-in via `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`): `(auth)/sign-in`, `(auth)/sign-up`, gated `middleware.ts`, conditional `<ClerkProvider>` in `providers.tsx`, CSP entries. | tsc clean for new files (pre-existing admin/audit type errors unrelated). |
+| 11 | (committed this session) | `backend/scripts/clerk_bulk_import.py` + `clerk_seed_demo.py` + `backend/tests/scripts/test_clerk_bulk_import.py`. | 2/2 |
+| 12 | (committed this session) | `docs/operations/clerk-runbook.md`; CLAUDE.md + progress.md updated. | n/a |
 
-4. **Page audit** (read-only)
-   - `bun run audit:emoji` — 0 hits across 123 files
-   - Grep scan: 0 `bg-clip-text` + gradient combos, 0 heavy `backdrop-blur-(xl|2xl|3xl)`, 0 heavy `shadow-(xl|2xl)` / `ring-(4|8)`
-   - 1 raw side-stripe found → fixed (see #3)
+Final post-Task-9 backend suite: **533 pass + 1 xfailed** in `tests/`.
 
-5. **Doc upkeep**
-   - Root `CLAUDE.md` — added S89.2 section, compressed S89/S89.1 (199 lines, under 200 budget)
-   - `frontend/CLAUDE.md` — S89.2 row appended to sprint table; new "Geo / locale hooks" section; `marketing/RotatingDegree` listed under Shared feature components (185 lines)
+### Task 13 — staging dry-run + audit closure + PR (pending)
 
-## In progress
+1. Apply `alembic upgrade head` against staging DB (head = `20260526_0029`).
+2. Set Clerk + Resend env vars in staging.
+3. `python backend/scripts/clerk_seed_demo.py` against staging Clerk app.
+4. Manual smoke: sign-up → onboarding → `/feed` → `/profile` → data-export → receive Resend email.
+5. Webhook smoke: edit a user in Clerk dashboard, tail backend logs, confirm `clerk_webhook` handler fires.
+6. For each finding in `security-audit.md` claimed closed (H3, H4, H7, H10, H11, H12, H14, M18, M19, M23, M24, M26, M29, M30, M36, M43, M44), append one-line proof + commit SHA under a "Closed by Clerk + Resend migration" section.
+7. `gh pr create --base main --title "feat(auth): migrate to Clerk + Resend"` with the test-plan checklist from plan §Task 13 Step 4.
 
-None. S89.2 closed.
+### Known production-vs-test divergences
 
-## Open bugs / blockers
+- **Resend SDK 2.5.x** `resend.Emails.send(params)` returns `dict` (`{"id": "..."}`) in production. `send.py` calls `response.id` (matches `MagicMock(id=...)` in tests). On first staging send, change to `response["id"]` if `AttributeError` appears.
+- **`clerk_backend_api`** import deferred inside `clerk_client()` because the package fails to build pydantic-core wheels on Python 3.14. In production (Python 3.12 per Dockerfile) the import will succeed at first call.
+- **Migration `20260526_0029` not yet applied** — no live PostgreSQL in this session. Run `alembic upgrade head` after merging.
 
-None new. Pre-existing deferreds carry over from S89/S89.1:
-- Smoke selector re-point in `tests/e2e/playwright/*.py`
-- Removal of `.github/workflows/ci.yml:198` `continue-on-error: true` on `browser-smoke`
-- Both require 3 consecutive green local runs against `docker compose up`
+### Deferred from Task 10 (Frontend integration)
 
-## Files touched (this session, staged + committed)
+Track for a follow-up PR after staging dual-mode validates:
+- `frontend/src/lib/api/client.ts` token-source rewrite (`useAuth().getToken()` instead of `localStorage["grantpath.access_token"]`).
+- `/login` and `/signup` redirects → `/sign-in` and `/sign-up`.
+- Removal of `grantpath.*` localStorage tokens.
+- Playwright `tests/auth/sign-in.spec.ts` (project has no `tests/auth/` runner today).
 
-Commit `02bc5bb` — `feat(landing+upgrade): rotating hero degree + IP-based currency`
-- `frontend/src/app/page.tsx` (modified)
-- `frontend/src/app/upgrade/page.tsx` (modified)
-- `frontend/src/components/marketing/RotatingDegree.tsx` (new)
-- `frontend/src/lib/geo/useGeoCurrency.ts` (new)
+### Open bugs / blockers
 
-Commit `7b85c46` — `refactor(mentor): use danger-stripe utility in ListEditor`
-- `frontend/src/app/(mentor)/mentor/documents/[id]/page.tsx` (modified)
+- Pre-existing TypeScript errors in `frontend/src/app/(admin)/admin/{audit,page,users}.tsx` (`RoleChangeAudit` / `PlatformAnalytics` / `AccessControlManagedUser` shape drift). Tracked separately in `security-audit.md` D2–D4 / D7. **Not introduced by Clerk work.**
+- `frontend/src/lib/api/endpoints/access-control.ts` missing `AccessControlManagedUser` export — same drift.
+- /admin/curation crash fix (`CurationRecordSummary`/`Detail`/`ListResponse` split) is still on disk uncommitted — pre-existing WIP unrelated to this session's Clerk work.
 
-Untracked / unstaged pre-existing files left in tree (NOT part of this session, kept via `git stash` round-trip during rebase):
-- `.do/`, `Elite vs pro for Q1.md`, `Front-upgrade.html`, `Front-upgrade.legacy.md`, `STITCH_PROMPT_PACK.md`, `backend/app/core/account_lockout.py`, `frontend/.dockerignore`, `frontend/Dockerfile`
-- Modified but unstaged: `.github/workflows/ci.yml`, `backend/.env.example`, `backend/app/core/config.py`, `backend/app/main.py`, `backend/app/schemas/auth.py`, `backend/app/services/auth/service.py`, `backend/app/services/notifications/channels.py`, `frontend/next.config.ts`, `frontend/src/app/signup/page.tsx`, `frontend/src/lib/api/endpoints/auth.ts`, `frontend/src/lib/auth/AuthProvider.tsx`
+### Files touched this session
 
-## Commands to resume
+- backend: `app/core/config.py`, `app/core/dependencies.py`, `app/integrations/clerk/{__init__,client,jwt_verify,user_sync}.py`, `app/integrations/resend/{__init__,client,send}.py` + `templates/{__init__,welcome,data_export_ready}.py`, `app/api/v1/routes/{auth,clerk_webhook}.py`, `app/api/v1/__init__.py`, `app/services/notifications/channels.py`, `app/models/models.py`, `alembic/versions/20260526_0029_add_clerk_user_id.py`, `requirements.txt`, `scripts/{clerk_bulk_import,clerk_seed_demo}.py`, `tests/{core,db,api,integrations,scripts,services}/*`, `.env.example`
+- frontend: `package.json`, `bun.lock`, `src/middleware.ts`, `src/app/(auth)/{sign-in,sign-up}/[[...]]/page.tsx`, `src/app/providers.tsx`, `next.config.ts`, `.env.example`
+- repo root: `.env.example`
+- docs: `docs/operations/clerk-runbook.md`, `CLAUDE.md`, `progress.md` (this file)
+
+### Commands to resume
 
 ```bash
-# Run
-cd frontend && bun dev                  # http://localhost:3000
-cd backend && python -m uvicorn app.main:app --reload   # :8000
-
-# Verify
-cd frontend && bun run lint              # 0 errors
-cd frontend && bunx --bun tsc --noEmit   # clean
-cd frontend && bun run build             # 40 routes, green
-cd frontend && bun run audit:emoji       # 0 emoji
-
-# Live visual audit (requires docker compose up + zara.khan seeded)
-cd frontend && bun run audit             # writes audit-out/REPORT.md
-
-# Test the rotator
-open http://localhost:3000               # h1 cycles bachelor's → master's → PhD every ~2.5s
-
-# Test geo currency
-open http://localhost:3000/upgrade                       # detects via IP
-open http://localhost:3000/upgrade?currency=GBP          # override path
-# To retest detection from scratch:
-# localStorage.removeItem("aidwise.geo_currency")
+cd backend && python -m pytest tests/ -q --no-header --tb=line 2>&1 | tail -5
+git -C C:/Users/HP/scholarai-platform status --short
+cd backend && alembic upgrade head  # head should be 20260526_0029
+# After CLERK_SECRET_KEY in env:
+python backend/scripts/clerk_seed_demo.py
+python backend/scripts/clerk_bulk_import.py
+# After NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set:
+cd frontend && bun run build && bun dev
+# visit http://localhost:3000/sign-in
 ```
-
-## Verification log
-
-| Gate | Result |
-|------|--------|
-| `bun run lint` | exit 0 |
-| `bunx --bun tsc --noEmit` | exit 0 |
-| `bun run build` | 40 routes, "Compiled successfully" |
-| `bun run audit:emoji` | 0 banned emoji / 123 files |
-| Side-stripe grep | 0 raw hits after stripe-utility refactor |
-| Gradient-text grep | 0 hits |
-| Push | `02bc5bb..7b85c46` → `origin/feat/s89-premium-cultural` |
