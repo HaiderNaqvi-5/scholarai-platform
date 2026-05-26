@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     access_control,
     analytics,
     auth,
+    clerk_webhook,
     curation,
     documents,
     health,
@@ -53,3 +54,4 @@ router.include_router(tracker.router, prefix="/tracker", tags=["Application Trac
 router.include_router(privacy.router, prefix="/privacy", tags=["Privacy & Consent"])
 router.include_router(b2b.router, prefix="/b2b", tags=["B2B"])
 router.include_router(waitlist.router, prefix="", tags=["Waitlist & Upgrade"])
+router.include_router(clerk_webhook.router, prefix="/webhooks", tags=["Webhooks"])
