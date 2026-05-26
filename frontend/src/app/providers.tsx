@@ -3,14 +3,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { useState } from "react";
-import { ClerkProvider } from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { CookieBanner } from "@/components/consent/CookieBanner";
 import { ConsentBar } from "@/components/consent/ConsentBar";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
-
-const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -30,7 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  const inner = (
+  return (
     <QueryClientProvider client={client}>
       <AuthProvider>{children}</AuthProvider>
       <OfflineBanner />
@@ -50,13 +46,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
         }}
       />
     </QueryClientProvider>
-  );
-
-  return CLERK_PUBLISHABLE_KEY ? (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} appearance={{ baseTheme: dark }}>
-      {inner}
-    </ClerkProvider>
-  ) : (
-    inner
   );
 }

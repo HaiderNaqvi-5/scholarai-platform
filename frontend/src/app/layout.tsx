@@ -1,7 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
 import { Providers } from "./providers";
 import "./globals.css";
+
+const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 /**
  * Display — Fraunces.
@@ -72,13 +83,39 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const tree = (
+    <>
+      <a href="#main" className="skip-to-content">
+        Skip to content
+      </a>
+      {CLERK_PUBLISHABLE_KEY && (
+        <header className="flex items-center justify-end gap-3 px-4 py-2">
+          <SignedOut>
+            <SignInButton />
+            <SignUpButton />
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+        </header>
+      )}
+      <Providers>{children}</Providers>
+    </>
+  );
+
   return (
     <html lang="en" className={`${display.variable} ${ui.variable} ${mono.variable}`}>
       <body className="bg-ivory text-ink-deep antialiased">
-        <a href="#main" className="skip-to-content">
-          Skip to content
-        </a>
-        <Providers>{children}</Providers>
+        {CLERK_PUBLISHABLE_KEY ? (
+          <ClerkProvider
+            publishableKey={CLERK_PUBLISHABLE_KEY}
+            appearance={{ baseTheme: dark }}
+          >
+            {tree}
+          </ClerkProvider>
+        ) : (
+          tree
+        )}
       </body>
     </html>
   );

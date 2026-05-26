@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   "/legal/(.*)",
   "/api/healthz",
   "/booth/(.*)",
+  "/__clerk/(.*)",
 ]);
 
 const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -26,6 +27,8 @@ export default clerkEnabled
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js|jpg|jpeg|png|svg|gif|ico|webp|woff2?|ttf|otf|map)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/__clerk/(.*)",
+    "/(api|trpc)(.*)",
   ],
 };
