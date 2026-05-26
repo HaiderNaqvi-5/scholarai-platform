@@ -31,6 +31,7 @@ def test_prod_rejects_blank_clerk_when_provider_clerk(monkeypatch):
     monkeypatch.setenv("CORS_ORIGINS", '["https://example.com"]')
     monkeypatch.setenv("OPENSEARCH_PASSWORD", "real-prod-pw")
     monkeypatch.setenv("RESEND_API_KEY", "re_real")
+    monkeypatch.setenv("AUTO_SEED_DEMO_DATA", "false")
     s = Settings()
     with pytest.raises(RuntimeError, match="CLERK_SECRET_KEY"):
         s.validate_production_settings()
