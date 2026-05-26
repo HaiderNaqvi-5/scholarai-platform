@@ -22,18 +22,31 @@ router = APIRouter()
 _STRICT_RATE_LIMIT = settings.ENVIRONMENT.strip().lower() in {"production", "staging"}
 
 
+def _ensure_local_provider() -> None:
+    """Raise 410 Gone when AUTH_PROVIDER=clerk so callers route to the hosted Clerk pages."""
+    if settings.AUTH_PROVIDER == "clerk":
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="auth handled by Clerk; use the hosted sign-in / sign-up pages",
+        )
+
+
+_LOCAL_PROVIDER_DEP = Depends(_ensure_local_provider)
+
+
 @router.post(
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
+        _LOCAL_PROVIDER_DEP,
         Depends(
             RateLimiter(
                 requests_limit=settings.AUTH_RATE_LIMIT_REGISTER_REQUESTS,
                 window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
                 fail_open=not _STRICT_RATE_LIMIT,
             )
-        )
+        ),
     ],
 )
 async def register(
@@ -54,13 +67,14 @@ async def register(
     "/login",
     response_model=TokenResponse,
     dependencies=[
+        _LOCAL_PROVIDER_DEP,
         Depends(
             RateLimiter(
                 requests_limit=settings.AUTH_RATE_LIMIT_LOGIN_REQUESTS,
                 window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
                 fail_open=not _STRICT_RATE_LIMIT,
             )
-        )
+        ),
     ],
 )
 async def login(
@@ -80,13 +94,14 @@ async def get_current_user_info(current_user: SessionReadUser) -> User:
     "/refresh",
     response_model=TokenResponse,
     dependencies=[
+        _LOCAL_PROVIDER_DEP,
         Depends(
             RateLimiter(
                 requests_limit=settings.AUTH_RATE_LIMIT_REFRESH_REQUESTS,
                 window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
                 fail_open=not _STRICT_RATE_LIMIT,
             )
-        )
+        ),
     ],
 )
 async def refresh_session(
@@ -101,13 +116,14 @@ async def refresh_session(
     "/logout",
     response_model=LogoutResponse,
     dependencies=[
+        _LOCAL_PROVIDER_DEP,
         Depends(
             RateLimiter(
                 requests_limit=settings.AUTH_RATE_LIMIT_LOGOUT_REQUESTS,
                 window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
                 fail_open=not _STRICT_RATE_LIMIT,
             )
-        )
+        ),
     ],
 )
 async def logout(
