@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -130,6 +132,16 @@ class Settings(BaseSettings):
     AUTH_LOCKOUT_WINDOW_SECONDS: int = 900   # 15 min
     AUTH_LOCKOUT_DURATION_SECONDS: int = 900  # 15 min
 
+    AUTH_PROVIDER: Literal["local", "clerk"] = "local"
+
+    CLERK_SECRET_KEY: str = ""
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_JWKS_URL: str = ""
+    CLERK_WEBHOOK_SECRET: str = ""
+
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_ADDRESS: str = ""
+
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
         if env_name not in {"production", "staging"}:
@@ -174,6 +186,22 @@ class Settings(BaseSettings):
         if self.OPENSEARCH_PASSWORD in {"ScholarAI_Secure_123!", "admin", "password"}:
             raise RuntimeError(
                 "PROD_ERROR: OPENSEARCH_PASSWORD looks like a default — override before deploy."
+            )
+
+        if self.AUTH_PROVIDER == "clerk":
+            for field in (
+                "CLERK_SECRET_KEY",
+                "CLERK_PUBLISHABLE_KEY",
+                "CLERK_JWKS_URL",
+                "CLERK_WEBHOOK_SECRET",
+            ):
+                if not getattr(self, field):
+                    raise RuntimeError(
+                        f"PROD_ERROR: {field} required when AUTH_PROVIDER=clerk in production"
+                    )
+        if not self.RESEND_API_KEY:
+            raise RuntimeError(
+                "PROD_ERROR: RESEND_API_KEY required in production"
             )
 
 

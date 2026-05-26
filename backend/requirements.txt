@@ -38,3 +38,6 @@ sentence-transformers==3.1.1
 
 pytest==8.3.0
 pytest-asyncio==0.24.0
+clerk-backend-api==1.6.0
+resend==2.5.1
+svix==1.30.0
