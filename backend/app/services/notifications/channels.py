@@ -20,6 +20,7 @@ import httpx
 
 from app.core.burn_cap import record_whatsapp
 from app.core.config import settings
+from app.integrations.resend.send import send_transactional
 from app.models import User
 
 
@@ -27,15 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 _DEFAULT_EMAIL_SUBJECT = "AidwiseAI notification"
+_RESEND_ENDPOINT = "https://api.resend.com/emails"
 
 
 def _sanitize_header(value: str) -> str:
-    """Strip CR/LF + NUL to prevent SMTP header injection (S13).
+    """Strip CR/LF + NUL to prevent header injection (S13).
 
-    Mailgun's HTTP API normally normalises headers, but the subject + to
-    fields end up in the outgoing message envelope. A `\\r\\n` in
-    user-supplied input lets an attacker inject arbitrary headers
-    (e.g. BCC). Defence-in-depth even though Mailgun catches most.
+    Resend normalises subjects and recipient lists, but a `\\r\\n` in
+    user-supplied input could still smuggle headers in some edge cases.
+    Defence-in-depth even though the provider catches most.
     """
     if not value:
         return ""
@@ -70,18 +71,13 @@ async def send_email(
     subject: str | None = None,
     html: str | None = None,
 ) -> bool:
-    """Send a transactional email via Mailgun when configured.
+    """Send a transactional email via Resend when configured.
 
-    Falls back to log-only behaviour when ``MAILGUN_API_KEY`` or
-    ``MAILGUN_DOMAIN`` are absent — this keeps CI + offline dev deterministic
-    and means a Mailgun outage degrades to "alerts logged but not sent"
-    rather than 5xx-ing the calling task. Returns True iff Mailgun accepted
-    the request (or we successfully logged the stub message).
-
-    The ``subject`` arg is optional so existing callers (``alert_tasks``,
-    ``reminder_tasks``) that pass only ``(user, message)`` keep working;
-    when absent we use a generic ``_DEFAULT_EMAIL_SUBJECT`` so the inbox
-    never shows an empty subject line.
+    Falls back to log-only behaviour when ``RESEND_API_KEY`` or
+    ``RESEND_FROM_ADDRESS`` are absent — this keeps CI + offline dev
+    deterministic and means a Resend outage degrades to "alerts logged but
+    not sent" rather than 5xx-ing the calling task. Returns True iff Resend
+    accepted the request (or we successfully logged the stub message).
     """
 
     recipient = getattr(user, "email", None)
@@ -89,9 +85,9 @@ async def send_email(
         logger.warning("notify.email skipped: user has no email")
         return False
 
-    if not settings.MAILGUN_API_KEY or not settings.MAILGUN_DOMAIN:
+    if not settings.RESEND_API_KEY or not settings.RESEND_FROM_ADDRESS:
         logger.info(
-            "notify.email (log-only, mailgun unconfigured) to=%s len=%d",
+            "notify.email (log-only, resend unconfigured) to=%s len=%d",
             recipient,
             len(message or ""),
         )
@@ -101,36 +97,53 @@ async def send_email(
     safe_recipient = _sanitize_header(recipient)
     sender = (
         f"{_sanitize_header(settings.BRAND_DISPLAY_NAME)} "
-        f"<{settings.EMAIL_FROM_LOCALPART}@{settings.MAILGUN_DOMAIN}>"
+        f"<{settings.RESEND_FROM_ADDRESS}>"
     )
-    url = f"{settings.MAILGUN_BASE_URL.rstrip('/')}/{settings.MAILGUN_DOMAIN}/messages"
-    data = {
+    payload: dict[str, object] = {
         "from": sender,
         "to": [safe_recipient],
         "subject": effective_subject,
         "text": message,
     }
     if html:
-        data["html"] = html
+        payload["html"] = html
 
     try:
-        async with httpx.AsyncClient(timeout=settings.MAILGUN_TIMEOUT_SECONDS) as client:
-            resp = await client.post(url, auth=("api", settings.MAILGUN_API_KEY), data=data)
+        async with httpx.AsyncClient(timeout=settings.RESEND_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                _RESEND_ENDPOINT,
+                headers={
+                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
     except httpx.HTTPError as exc:
-        logger.warning("notify.email mailgun transport error to=%s err=%r", recipient, exc)
+        logger.warning("notify.email resend transport error to=%s err=%r", recipient, exc)
         return False
 
     if resp.status_code >= 400:
         logger.warning(
-            "notify.email mailgun rejected to=%s status=%d body=%s",
+            "notify.email resend rejected to=%s status=%d body=%s",
             recipient,
             resp.status_code,
             resp.text[:200],
         )
         return False
 
-    logger.info("notify.email mailgun accepted to=%s subject=%r", recipient, effective_subject)
+    logger.info("notify.email resend accepted to=%s subject=%r", recipient, effective_subject)
     return True
+
+
+def send_email_notification(*, to: str, template: str, context: dict) -> str:
+    """Send a templated transactional email via Resend.
+
+    Thin wrapper that surfaces the schema-validated send path
+    (``send_transactional``) at the notifications layer. New callers should
+    prefer this over the free-text ``send_email`` so all outbound mail flows
+    through a registered template with CRLF rejection.
+    """
+    return send_transactional(to=to, template=template, context=context)
 
 
 async def send_whatsapp(db, user: User, message: str) -> bool:
