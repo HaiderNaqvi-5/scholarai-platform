@@ -1,5 +1,26 @@
 "use client";
 
+/**
+ * AuthProvider — dual-mode shell.
+ *
+ * - LocalAuthProvider: legacy path. Backend `/auth/login` issues an HS256
+ *   JWT; tokens are stored in localStorage; `subscribeTokens` listens for
+ *   cross-tab logout. This is the v1 codebase behaviour, preserved verbatim.
+ *
+ * - ClerkBackedAuthProvider: clerk mode (enabled when
+ *   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set at build time). Observes the
+ *   Clerk session via @clerk/nextjs hooks; on every isSignedIn change,
+ *   fetches backend `/me` to populate the local `User` row. `login` and
+ *   `signup` throw if called — the only callers (/login + /signup pages)
+ *   branch on `clerkEnabled` and use the page-level useClerkLoginFlow /
+ *   useClerkSignupFlow hooks directly. `logout` delegates to Clerk signOut.
+ *
+ * The two implementations live in separate components so each one's
+ * effects + state machines stay isolated. The outer dispatcher picks the
+ * right one at module load time — env var is fixed for the lifetime of
+ * the process.
+ */
+
 import {
   createContext,
   useCallback,
@@ -9,7 +30,9 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth as useClerkAuth } from "@clerk/nextjs";
 import { endpoints, getTokens, setTokens, subscribeTokens, type User } from "@/lib/api";
+import { clerkEnabled, useClerkLogout } from "./clerkAdapter";
 
 type AuthState =
   | { status: "loading"; user: null }
@@ -28,6 +51,11 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  if (clerkEnabled) return <ClerkBackedAuthProvider>{children}</ClerkBackedAuthProvider>;
+  return <LocalAuthProvider>{children}</LocalAuthProvider>;
+}
+
+function LocalAuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: "loading", user: null });
   const router = useRouter();
 
@@ -86,6 +114,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ status: "guest", user: null });
     router.replace("/login");
   }, [router]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ ...state, login, signup, logout, refreshUser }),
+    [state, login, signup, logout, refreshUser],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function ClerkBackedAuthProvider({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn, userId } = useClerkAuth();
+  const clerkSignOut = useClerkLogout();
+  const router = useRouter();
+  const [state, setState] = useState<AuthState>({ status: "loading", user: null });
+
+  const refreshUser = useCallback(async () => {
+    if (!isLoaded) return null;
+    if (!isSignedIn) {
+      setState({ status: "guest", user: null });
+      return null;
+    }
+    try {
+      const user = await endpoints.auth.me();
+      setState({ status: "authed", user });
+      return user;
+    } catch {
+      setState({ status: "guest", user: null });
+      return null;
+    }
+  }, [isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshUser();
+  }, [refreshUser, userId]);
+
+  const login = useCallback<AuthContextValue["login"]>(async () => {
+    throw new Error(
+      "AuthProvider.login is not callable in clerk mode — use useClerkLoginFlow() from clerkAdapter on the page.",
+    );
+  }, []);
+
+  const signup = useCallback<AuthContextValue["signup"]>(async () => {
+    throw new Error(
+      "AuthProvider.signup is not callable in clerk mode — use useClerkSignupFlow() from clerkAdapter on the page.",
+    );
+  }, []);
+
+  const logout = useCallback(async () => {
+    await clerkSignOut();
+    setTokens(null);
+    setState({ status: "guest", user: null });
+    router.replace("/login");
+  }, [clerkSignOut, router]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ ...state, login, signup, logout, refreshUser }),

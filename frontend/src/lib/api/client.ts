@@ -1,15 +1,40 @@
 /**
  * REST client for ScholarAI/GrantPath backend.
  * - Bearer token injection
- * - Silent refresh 60s before access-token expiry
- * - Single 401 retry after refresh
+ * - Silent refresh 60s before access-token expiry (local mode)
+ * - Single 401 retry after refresh (local mode)
  * - Typed errors with `.code` for UI branching
  * - Thin: no global state beyond token store; AuthProvider owns lifecycle
+ *
+ * Clerk-mode (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set):
+ *   Bearer source switches to window.Clerk.session.getToken(). Preemptive
+ *   refresh + 401-retry-via-refresh are disabled — Clerk auto-rotates its
+ *   own session token, and `/auth/refresh` returns 410 Gone in clerk mode.
+ *   A null token (Clerk not yet hydrated) → no Authorization header sent;
+ *   AuthProvider observes Clerk hydration and re-fetches /me itself.
  */
 
 const STORAGE_ACCESS = "grantpath.access_token";
 const STORAGE_REFRESH = "grantpath.refresh_token";
 const STORAGE_EXPIRES = "grantpath.access_expires_at";
+
+const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
+type WindowWithClerk = Window & {
+  Clerk?: { session?: { getToken: () => Promise<string | null> } };
+};
+
+async function getClerkToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const w = window as WindowWithClerk;
+  const session = w.Clerk?.session;
+  if (!session) return null;
+  try {
+    return await session.getToken();
+  } catch {
+    return null;
+  }
+}
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
@@ -175,14 +200,21 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, query, formData, signal, auth = true } = opts;
 
-  let tokens = getTokens();
-  if (auth && shouldPreemptivelyRefresh(tokens)) {
-    tokens = (await refreshTokens()) ?? tokens;
-  }
-
   const headers: Record<string, string> = {};
   if (!formData) headers["Content-Type"] = "application/json";
-  if (auth && tokens?.access) headers["Authorization"] = `Bearer ${tokens.access}`;
+
+  if (auth) {
+    if (clerkEnabled) {
+      const clerkToken = await getClerkToken();
+      if (clerkToken) headers["Authorization"] = `Bearer ${clerkToken}`;
+    } else {
+      let tokens = getTokens();
+      if (shouldPreemptivelyRefresh(tokens)) {
+        tokens = (await refreshTokens()) ?? tokens;
+      }
+      if (tokens?.access) headers["Authorization"] = `Bearer ${tokens.access}`;
+    }
+  }
 
   const init: RequestInit = {
     method,
@@ -194,7 +226,7 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
 
   let res = await fetch(buildUrl(path, query), init);
 
-  if (res.status === 401 && auth && getTokens()?.refresh) {
+  if (res.status === 401 && auth && !clerkEnabled && getTokens()?.refresh) {
     const refreshed = await refreshTokens();
     if (refreshed?.access) {
       headers["Authorization"] = `Bearer ${refreshed.access}`;

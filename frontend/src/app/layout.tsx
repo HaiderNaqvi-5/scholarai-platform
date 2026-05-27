@@ -1,18 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import {
   ClerkProvider,
-  SignInButton,
-  SignUpButton,
   SignedIn,
   SignedOut,
   UserButton,
 } from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
 import { Providers } from "./providers";
 import "./globals.css";
 
 const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+/**
+ * Brand-aligned Clerk appearance. Variables only — `theme: [...]` arrays
+ * are skipped because the project has no `components.json` (shadcn theme
+ * not applicable). Maps the Premium Cultural palette onto Clerk's
+ * <UserButton /> menu and any future drop-in component.
+ */
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "#1B3A6B",          // lapis
+    colorBackground: "#FBF7EE",       // ivory
+    colorText: "#0E1A1F",             // ink-deep
+    colorTextSecondary: "#5C6770",    // ink-muted
+    colorInputBackground: "#FFFFFF",  // paper-white
+    colorInputText: "#0E1A1F",
+    colorDanger: "#B94A48",           // sindoor
+    colorSuccess: "#4A7C3B",          // validated
+    borderRadius: "10px",
+    fontFamily: "var(--font-ui), Inter, sans-serif",
+    fontSize: "13px",
+  },
+} as const;
 
 /**
  * Display — Fraunces.
@@ -89,10 +109,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         Skip to content
       </a>
       {CLERK_PUBLISHABLE_KEY && (
-        <header className="flex items-center justify-end gap-3 px-4 py-2">
+        <header className="flex items-center justify-end gap-3 px-6 py-3 md:px-12">
           <SignedOut>
-            <SignInButton />
-            <SignUpButton />
+            <Link
+              href="/login"
+              className="text-[13px] text-ink-muted hover:text-ink-deep"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-[10px] bg-lapis px-3 py-1.5 text-[13px] font-medium text-paper-white hover:bg-ink-deep"
+            >
+              Create account
+            </Link>
           </SignedOut>
           <SignedIn>
             <UserButton />
@@ -109,7 +139,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {CLERK_PUBLISHABLE_KEY ? (
           <ClerkProvider
             publishableKey={CLERK_PUBLISHABLE_KEY}
-            appearance={{ baseTheme: dark }}
+            appearance={clerkAppearance}
           >
             {tree}
           </ClerkProvider>

@@ -520,10 +520,6 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
     a: "After the FYP cohort completes its trial. Until then, joining the waitlist reserves your spot — you'll be billed only after you confirm payment method.",
   },
   {
-    q: "How does the Air University trial work?",
-    a: `Use code AIRU2026 at signup before May 26, 23:59 PKT. You get 30 days of Pro free — every match, every SOP draft, every visa question. No card required.`,
-  },
-  {
     q: "Can I switch plans later?",
     a: "Yes. Pro and Elite are month-to-month. Downgrading takes effect at the next billing cycle; we don't pro-rate.",
   },

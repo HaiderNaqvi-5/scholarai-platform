@@ -1,21 +1,18 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
   "/login",
   "/signup",
   "/legal/(.*)",
   "/api/healthz",
-  "/booth/(.*)",
   "/__clerk/(.*)",
 ]);
 
 const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
-const passThrough = (_req: NextRequest) => NextResponse.next();
+const passThrough = () => NextResponse.next();
 
 export default clerkEnabled
   ? clerkMiddleware(async (auth, req) => {
