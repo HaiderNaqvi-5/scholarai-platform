@@ -23,7 +23,10 @@ export default function SSOCallbackPage() {
           Verifying your account
         </p>
       </div>
-      <AuthenticateWithRedirectCallback />
+      <AuthenticateWithRedirectCallback
+        signInFallbackRedirectUrl="/feed"
+        signUpFallbackRedirectUrl="/onboarding"
+      />
     </div>
   );
 }
