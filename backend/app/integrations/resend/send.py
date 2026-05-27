@@ -9,11 +9,24 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.config import settings
 from app.integrations.resend.client import configure
-from app.integrations.resend.templates import welcome, data_export_ready
+from app.integrations.resend.templates import (
+    welcome,
+    data_export_ready,
+    account_deletion_scheduled,
+    account_deletion_cancelled,
+    waitlist_confirmation,
+    deadline_reminder,
+    priority_alert,
+)
 
 _TEMPLATES = {
     "welcome": welcome.render,
     "data_export_ready": data_export_ready.render,
+    "account_deletion_scheduled": account_deletion_scheduled.render,
+    "account_deletion_cancelled": account_deletion_cancelled.render,
+    "waitlist_confirmation": waitlist_confirmation.render,
+    "deadline_reminder": deadline_reminder.render,
+    "priority_alert": priority_alert.render,
 }
 
 _CRLF = re.compile(r"[\r\n\x00]")
@@ -21,7 +34,15 @@ _CRLF = re.compile(r"[\r\n\x00]")
 
 class TransactionalRequest(BaseModel):
     to: EmailStr
-    template: Literal["welcome", "data_export_ready"]
+    template: Literal[
+        "welcome",
+        "data_export_ready",
+        "account_deletion_scheduled",
+        "account_deletion_cancelled",
+        "waitlist_confirmation",
+        "deadline_reminder",
+        "priority_alert",
+    ]
     context: dict = Field(default_factory=dict)
 
     @field_validator("to", mode="before")
@@ -36,8 +57,6 @@ def send_transactional(*, to: str, template: str, context: dict) -> str:
     req = TransactionalRequest(to=to, template=template, context=context)
     configure()
     subject, html, text = _TEMPLATES[req.template](req.context)
-    # Prefer live env var so monkeypatch.setenv works in tests without
-    # re-instantiating the Settings singleton.
     from_address = os.environ.get("RESEND_FROM_ADDRESS") or settings.RESEND_FROM_ADDRESS
     response = resend.Emails.send({
         "from": from_address,

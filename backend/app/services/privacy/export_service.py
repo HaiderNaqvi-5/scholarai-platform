@@ -29,6 +29,7 @@ from app.models import (
     StudentProfile,
     User,
 )
+from app.services.notifications.channels import send_templated_email_best_effort
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,13 @@ class ExportService:
         record.download_url = path.as_uri()
         record.expires_at = record.completed_at + EXPORT_TTL
         await self.db.flush()
+
+        send_templated_email_best_effort(
+            to=user.email,
+            template="data_export_ready",
+            context={"name": user.full_name, "download_url": record.download_url},
+            source="data_export",
+        )
         return record
 
     async def _build_bundle(self, user: User) -> bytes:
@@ -241,7 +249,7 @@ def _serialise_consent(row: ConsentAuditLog) -> dict:
 
 def _render_readme(manifest: dict) -> str:
     return (
-        "# Your ScholarAI / GrantPath data export\n\n"
+        "# Your AidwiseAI data export\n\n"
         f"Exported at: {manifest['exported_at']}\n\n"
         "This ZIP contains every piece of data we hold about you, as required by "
         "GDPR Article 20 and equivalent provisions of UK DPA 2018, Pakistani PDPB, "

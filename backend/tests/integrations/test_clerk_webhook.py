@@ -57,10 +57,13 @@ class _FakeAsyncSession:
         except Exception:
             rendered = str(stmt).lower()
 
-        # Find a matching User by clerk_user_id in the rendered SQL.
+        # Match by clerk_user_id OR email — _user_exists queries both.
         for obj in self._store:
             cuid = (obj.clerk_user_id or "").lower()
             if cuid and cuid in rendered:
+                return _FakeResult(obj)
+            email = (obj.email or "").lower()
+            if email and email in rendered:
                 return _FakeResult(obj)
         return _FakeResult(None)
 
@@ -228,3 +231,138 @@ def test_user_deleted_event_soft_deletes(webhook_app, webhook_client, monkeypatc
     assert response.status_code == 200, response.text
     assert response.json() == {"status": "ok"}
     assert existing_user.is_active is False
+
+
+def test_user_created_sends_welcome_email(webhook_app, webhook_client, monkeypatch):
+    """Brand-new user.created event triggers a welcome email."""
+    import app.api.v1.routes.clerk_webhook as route
+
+    fake_session = _FakeAsyncSession()
+
+    async def override_db():
+        yield fake_session
+
+    async def fake_ensure(clerk_user_id, *, session, clerk_api=None):
+        from app.models.models import User
+        u = User(
+            email="newbie@example.com",
+            password_hash="clerk:placeholder",
+            clerk_user_id=clerk_user_id,
+            full_name="New Bie",
+        )
+        session.add(u)
+        await session.commit()
+        return u
+
+    sent: list[dict] = []
+
+    def fake_send(*, to, template, context, source):
+        sent.append({"to": to, "template": template, "context": context, "source": source})
+        return "msg_test"
+
+    monkeypatch.setattr(route, "ensure_local_user_async", fake_ensure)
+    monkeypatch.setattr(
+        "app.services.notifications.channels.send_templated_email_best_effort",
+        fake_send,
+    )
+    monkeypatch.setattr(settings, "FRONTEND_BASE_URL", "https://aidwiseai.com")
+    webhook_app.dependency_overrides[get_db] = override_db
+
+    payload = {
+        "type": "user.created",
+        "data": {
+            "id": "user_welcome_001",
+            "email_addresses": [{"id": "e1", "email_address": "newbie@example.com"}],
+            "primary_email_address_id": "e1",
+            "first_name": "New",
+            "last_name": "Bie",
+        },
+    }
+    msg_id, ts, sig = _sign_payload(TEST_SECRET, payload)
+    body = json.dumps(payload)
+
+    response = webhook_client.post(
+        "/api/v1/webhooks/clerk",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "svix-id": msg_id,
+            "svix-timestamp": ts,
+            "svix-signature": sig,
+        },
+    )
+    webhook_app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert len(sent) == 1
+    assert sent[0]["to"] == "newbie@example.com"
+    assert sent[0]["template"] == "welcome"
+    assert sent[0]["source"] == "welcome"
+    assert sent[0]["context"]["name"] == "New Bie"
+    assert sent[0]["context"]["login_url"] == "https://aidwiseai.com/login"
+
+
+def test_user_created_skips_welcome_when_user_already_exists(
+    webhook_app, webhook_client, monkeypatch
+):
+    """An email-collision (linked) flow must NOT send a welcome."""
+    from app.models.models import User
+    import app.api.v1.routes.clerk_webhook as route
+
+    fake_session = _FakeAsyncSession()
+    existing = User(
+        email="returning@example.com",
+        password_hash="local:hash",
+        clerk_user_id=None,
+        full_name="Returning User",
+    )
+    fake_session._store.append(existing)
+
+    async def override_db():
+        yield fake_session
+
+    async def fake_ensure(clerk_user_id, *, session, clerk_api=None):
+        existing.clerk_user_id = clerk_user_id
+        await session.commit()
+        return existing
+
+    sent: list = []
+
+    def fake_send(**kwargs):
+        sent.append(kwargs)
+        return "msg_should_not_fire"
+
+    monkeypatch.setattr(route, "ensure_local_user_async", fake_ensure)
+    monkeypatch.setattr(
+        "app.services.notifications.channels.send_templated_email_best_effort",
+        fake_send,
+    )
+    webhook_app.dependency_overrides[get_db] = override_db
+
+    payload = {
+        "type": "user.created",
+        "data": {
+            "id": "user_linked_001",
+            "email_addresses": [{"id": "e1", "email_address": "returning@example.com"}],
+            "primary_email_address_id": "e1",
+            "first_name": "Returning",
+            "last_name": "User",
+        },
+    }
+    msg_id, ts, sig = _sign_payload(TEST_SECRET, payload)
+    body = json.dumps(payload)
+
+    response = webhook_client.post(
+        "/api/v1/webhooks/clerk",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "svix-id": msg_id,
+            "svix-timestamp": ts,
+            "svix-signature": sig,
+        },
+    )
+    webhook_app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert sent == []

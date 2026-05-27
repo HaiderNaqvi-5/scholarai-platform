@@ -81,18 +81,42 @@ async def _run_deadline_reminders_async() -> dict[str, int]:
             else:
                 by_user[uid] = (user, [item])
 
+        from app.core.config import settings as _settings  # local import to avoid cycle
+
         users_notified = 0
         reminders_sent = 0
         for user, user_items in by_user.values():
-            lines: list[str] = []
+            upcoming = []
             for item in sorted(user_items, key=lambda i: i.deadline or window_end):
-                name = item.program_name or item.university_name or "Tracked application"
-                days_left = (item.deadline - today).days if item.deadline else None
-                lines.append(f"{name} — deadline in {days_left} day(s)")
-            subject = "Your application deadlines are approaching"
-            body = "Upcoming application deadlines on your tracker:\n" + "\n".join(lines)
-            message = f"{subject}\n\n{body}"
-            await fan_out_for_plan(session, user, message)
+                title = item.program_name or item.university_name or "Tracked application"
+                days_left = (item.deadline - today).days if item.deadline else 0
+                upcoming.append({
+                    "title": title,
+                    "deadline_iso": item.deadline.isoformat() if item.deadline else "",
+                    "days_left": days_left,
+                })
+
+            dashboard_url = (
+                _settings.FRONTEND_BASE_URL.rstrip("/") + "/tracker"
+                if _settings.FRONTEND_BASE_URL else ""
+            )
+            email_context = {
+                "name": user.full_name,
+                "upcoming": upcoming,
+                "dashboard_url": dashboard_url,
+            }
+            whatsapp_message = (
+                f"AidwiseAI: {len(upcoming)} application deadline"
+                f"{'s' if len(upcoming) != 1 else ''} in next 14 days."
+            )
+
+            await fan_out_for_plan(
+                session,
+                user,
+                email_template="deadline_reminder",
+                email_context=email_context,
+                whatsapp_message=whatsapp_message,
+            )
             plan_key = (user.plan or "free").lower()
             channels = PLAN_CHANNELS.get(plan_key, ("email",))
             if channels:

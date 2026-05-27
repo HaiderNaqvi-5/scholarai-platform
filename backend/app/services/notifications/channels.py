@@ -181,10 +181,28 @@ async def send_whatsapp(db, user: User, message: str) -> bool:
     return True
 
 
-async def fan_out_for_plan(db, user: User, message: str) -> None:
-    """Dispatch a message across the channels the user's plan unlocks."""
+async def fan_out_for_plan(
+    db,
+    user: User,
+    *,
+    email_template: str,
+    email_context: dict,
+    whatsapp_message: str,
+) -> None:
+    """Dispatch a notification across the channels the user's plan unlocks.
+
+    Email uses the schema-validated template registry via the best-effort
+    wrapper (Resend outage never bubbles up). WhatsApp gets a short
+    plaintext because WhatsApp Business doesn't render HTML and has a
+    different brevity budget — the caller supplies both.
+    """
     for ch in PLAN_CHANNELS.get((user.plan or "free").lower(), ("email",)):
         if ch == "email":
-            await send_email(user, message)
+            send_templated_email_best_effort(
+                to=user.email,
+                template=email_template,
+                context=email_context,
+                source=email_template,
+            )
         elif ch == "whatsapp":
-            await send_whatsapp(db, user, message)
+            await send_whatsapp(db, user, whatsapp_message)

@@ -3,6 +3,51 @@
 **Date:** 2026-05-27
 **Branch:** `s93/auth-tier-1`
 
+## Session: Email Phase 2 + Phase 3 docs (2026-05-27)
+
+Plan: `~/.claude/plans/enchanted-toasting-pebble.md`
+Execution: superpowers:writing-plans + karpathy-guidelines (TDD, surgical).
+
+### Phase 2 done (Tasks 1-7)
+
+| T | Subject | Files | Tests |
+|---|---------|-------|-------|
+| 1 | `deadline_reminder` template | `app/integrations/resend/templates/deadline_reminder.py`, `tests/integrations/test_resend_send.py` | 2 new |
+| 2 | `priority_alert` template | `app/integrations/resend/templates/priority_alert.py`, `tests/integrations/test_resend_send.py` | 2 new |
+| 3 | Register both in `send.py` `_TEMPLATES` + `Literal` (registry → 7) | `app/integrations/resend/send.py` | 1 new (round-trip) |
+| 4 | `fan_out_for_plan` signature: `(db, user, *, email_template, email_context, whatsapp_message)` | `app/services/notifications/channels.py` | n/a |
+| 5 | Reminder task migration — build `upcoming` list + WhatsApp short text | `app/tasks/reminder_tasks.py`, `tests/unit/test_reminder_tasks.py` (_patch_channels + full_name) | 6 updated |
+| 6 | Alert task migration — build `scholarships` list + WhatsApp short text | `app/tasks/alert_tasks.py`, `tests/unit/test_alert_tasks.py` (new _patch_channels) | 5 updated |
+| 7 | Regression + docs | `docs/operations/clerk-runbook.md`, `CLAUDE.md`, `progress.md` | suite: **561 pass + 1 xfail** (was 553; +8 net) |
+
+### Phase 3a (runbook only, no code)
+
+`docs/operations/clerk-runbook.md` § "Clerk lifecycle email branding" — operator click-path for verification / magic-link / password-reset / invitation emails. Subjects + sender + logo + footer table. Acceptance: send Clerk Dashboard test email per template, confirm receipt.
+
+### Phase 3b (optional, runbook only)
+
+`docs/operations/clerk-runbook.md` § "Resend as Clerk's custom SMTP provider" — defer until Clerk-originated volume crosses ~500/day. DNS sub-domain split (`mail.aidwiseai.com`), restricted Resend key, SMTP field table, rotation procedure.
+
+### Sticky knowns (carry over)
+
+- `config.py` keeps `SettingsConfigDict(extra="ignore")` — needed because frontend `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` lives in `backend/.env`.
+- `send_email(user, message)` free-text path still exists but is no longer used by either daily Celery task (kept for any surviving Mailgun-style call sites).
+- `FRONTEND_BASE_URL` required in `backend/.env` for all CTA-bearing email templates.
+
+### Commands to resume
+
+```powershell
+cd C:\Users\HP\scholarai-platform\backend
+python -m pytest tests/unit tests/integration tests/integrations tests/services tests/api tests/db tests/core tests/scripts -q
+# Expect 561 pass + 1 xfail.
+
+# Manual end-to-end (requires running backend + valid RESEND_API_KEY + verified domain):
+python -c "from app.tasks.reminder_tasks import run_deadline_reminders; print(run_deadline_reminders())"
+python -c "from app.tasks.alert_tasks import run_priority_scholarship_alerts; print(run_priority_scholarship_alerts())"
+```
+
+---
+
 ## Session: Clerk + Resend migration (Tasks 1–12 done; 13 pending)
 
 Plan: `docs/superpowers/plans/2026-05-26-clerk-resend-migration.md`
