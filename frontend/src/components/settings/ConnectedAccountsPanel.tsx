@@ -20,6 +20,7 @@ import { useUser } from "@clerk/nextjs";
 import type { OAuthStrategy } from "@clerk/types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { SOCIAL_PROVIDERS, providerStrategy } from "@/lib/auth/clerkAdapter";
 
 const PROVIDER_LABELS: Record<string, string> = {
   oauth_google: "Google",
@@ -28,12 +29,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   oauth_linkedin_oidc: "LinkedIn",
 };
 
-const ALL_STRATEGIES: OAuthStrategy[] = [
-  "oauth_google",
-  "oauth_microsoft",
-  "oauth_facebook",
-  "oauth_linkedin_oidc",
-];
+// Derive from clerkAdapter SOCIAL_PROVIDERS so enabling another provider
+// only requires editing one array.
+const ALL_STRATEGIES: OAuthStrategy[] = SOCIAL_PROVIDERS.map(providerStrategy);
 
 export function ConnectedAccountsPanel() {
   const { user, isLoaded } = useUser();

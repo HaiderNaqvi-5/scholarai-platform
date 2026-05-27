@@ -26,7 +26,10 @@ const PROVIDER_TO_STRATEGY: Record<SocialProvider, OAuthStrategy> = {
   linkedin: "oauth_linkedin_oidc",
 };
 
-export const SOCIAL_PROVIDERS: SocialProvider[] = ["google", "microsoft", "facebook", "linkedin"];
+// Google only for now. Microsoft / Facebook / LinkedIn strategies still
+// mapped above so re-enabling means appending to this array; no other
+// code changes needed.
+export const SOCIAL_PROVIDERS: SocialProvider[] = ["google"];
 
 export function providerStrategy(p: SocialProvider): OAuthStrategy {
   return PROVIDER_TO_STRATEGY[p];
