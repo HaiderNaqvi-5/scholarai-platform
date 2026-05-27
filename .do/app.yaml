@@ -51,13 +51,7 @@ services:
       - key: BRAND_DISPLAY_NAME
         value: AidwiseAI
         scope: RUN_TIME
-      - key: EMAIL_FROM_LOCALPART
-        value: noreply
-        scope: RUN_TIME
-      - key: MAILGUN_BASE_URL
-        value: https://api.mailgun.net/v3
-        scope: RUN_TIME
-      - key: MAILGUN_TIMEOUT_SECONDS
+      - key: RESEND_TIMEOUT_SECONDS
         value: "10"
         scope: RUN_TIME
       - key: ANTHROPIC_MODEL_FAST
@@ -96,11 +90,15 @@ services:
         value: REPLACE_AT_DEPLOY
         scope: RUN_TIME
         type: SECRET
-      - key: MAILGUN_API_KEY
+      - key: RESEND_API_KEY
         value: REPLACE_AT_DEPLOY
         scope: RUN_TIME
         type: SECRET
-      - key: MAILGUN_DOMAIN
+      - key: RESEND_FROM_ADDRESS
+        value: REPLACE_AT_DEPLOY
+        scope: RUN_TIME
+        type: SECRET
+      - key: FIRECRAWL_API_KEY
         value: REPLACE_AT_DEPLOY
         scope: RUN_TIME
         type: SECRET
@@ -147,11 +145,14 @@ workers:
       - key: ANTHROPIC_API_KEY
         value: ${web.ANTHROPIC_API_KEY}
         type: SECRET
-      - key: MAILGUN_API_KEY
-        value: ${web.MAILGUN_API_KEY}
+      - key: RESEND_API_KEY
+        value: ${web.RESEND_API_KEY}
         type: SECRET
-      - key: MAILGUN_DOMAIN
-        value: ${web.MAILGUN_DOMAIN}
+      - key: RESEND_FROM_ADDRESS
+        value: ${web.RESEND_FROM_ADDRESS}
+        type: SECRET
+      - key: FIRECRAWL_API_KEY
+        value: ${web.FIRECRAWL_API_KEY}
         type: SECRET
       - key: SENTRY_DSN
         value: ${web.SENTRY_DSN}

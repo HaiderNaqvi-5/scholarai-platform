@@ -985,6 +985,30 @@ async def test_conditional_get_returns_full_capture_on_200(monkeypatch):
 # ---------- PR 2: Sitemap + RSS/Atom feed discovery ----------
 
 
+class _DiscoveryFakeResp:
+    def __init__(self, text: str, status_code: int = 200):
+        self.text = text
+        self.status_code = status_code
+        self.headers: dict[str, str] = {}
+
+    def raise_for_status(self):
+        return None
+
+
+def _patch_discovery_fetch(monkeypatch, response_for_url):
+    """Replace the SSRF-aware safe_get used by the discovery helpers.
+
+    ``response_for_url`` is a callable ``(url: str) -> _DiscoveryFakeResp``;
+    the tests no longer need to mock httpx or DNS because safe_get is the
+    only transport touched by ``_discover_source_urls`` / ``_parse_*``.
+    """
+
+    async def fake_safe_get(url, **_kw):
+        return response_for_url(url)
+
+    monkeypatch.setattr("app.services.ingestion.service.safe_get", fake_safe_get)
+
+
 async def test_discover_urls_from_robots_sitemap(monkeypatch):
     """PR 2: robots.txt Sitemap: directives are followed and in-scope URLs are returned."""
 
@@ -1002,33 +1026,14 @@ async def test_discover_urls_from_robots_sitemap(monkeypatch):
         "</urlset>"
     )
 
-    class FakeResp:
-        def __init__(self, text: str, status_code: int = 200):
-            self.text = text
-            self.status_code = status_code
-            self.headers: dict[str, str] = {}
+    def respond(url: str) -> _DiscoveryFakeResp:
+        if url.endswith("robots.txt"):
+            return _DiscoveryFakeResp(robots)
+        if url.endswith("sitemap.xml"):
+            return _DiscoveryFakeResp(sitemap)
+        return _DiscoveryFakeResp("", status_code=404)
 
-        def raise_for_status(self):
-            return None
-
-    class FakeClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return None
-
-        async def get(self, url, headers=None, **kw):
-            if url.endswith("robots.txt"):
-                return FakeResp(robots)
-            if url.endswith("sitemap.xml"):
-                return FakeResp(sitemap)
-            return FakeResp("", status_code=404)
-
-    monkeypatch.setattr(
-        "app.services.ingestion.service.httpx.AsyncClient",
-        lambda **kw: FakeClient(),
-    )
+    _patch_discovery_fetch(monkeypatch, respond)
 
     svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
     urls = await svc._discover_source_urls(
@@ -1059,35 +1064,16 @@ async def test_discover_urls_from_rss_link_alternate(monkeypatch):
         "</channel></rss>"
     )
 
-    class FakeResp:
-        def __init__(self, text: str, status_code: int = 200):
-            self.text = text
-            self.status_code = status_code
-            self.headers: dict[str, str] = {}
+    def respond(url: str) -> _DiscoveryFakeResp:
+        if url.endswith("robots.txt"):
+            return _DiscoveryFakeResp("", status_code=404)
+        if url.endswith("sitemap.xml"):
+            return _DiscoveryFakeResp("", status_code=404)
+        if url.endswith(".rss") or url.endswith(".rss/"):
+            return _DiscoveryFakeResp(rss)
+        return _DiscoveryFakeResp(homepage)
 
-        def raise_for_status(self):
-            return None
-
-    class FakeClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return None
-
-        async def get(self, url, headers=None, **kw):
-            if url.endswith("robots.txt"):
-                return FakeResp("", status_code=404)
-            if url.endswith("sitemap.xml"):
-                return FakeResp("", status_code=404)
-            if url.endswith(".rss") or url.endswith(".rss/"):
-                return FakeResp(rss)
-            return FakeResp(homepage)
-
-    monkeypatch.setattr(
-        "app.services.ingestion.service.httpx.AsyncClient",
-        lambda **kw: FakeClient(),
-    )
+    _patch_discovery_fetch(monkeypatch, respond)
 
     svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
     urls = await svc._discover_source_urls(
@@ -1111,33 +1097,14 @@ async def test_discover_urls_filters_off_host(monkeypatch):
         "</urlset>"
     )
 
-    class FakeResp:
-        def __init__(self, text: str, status_code: int = 200):
-            self.text = text
-            self.status_code = status_code
-            self.headers: dict[str, str] = {}
+    def respond(url: str) -> _DiscoveryFakeResp:
+        if url.endswith("robots.txt"):
+            return _DiscoveryFakeResp("", status_code=404)
+        if url.endswith("sitemap.xml"):
+            return _DiscoveryFakeResp(sitemap)
+        return _DiscoveryFakeResp("", status_code=404)
 
-        def raise_for_status(self):
-            return None
-
-    class FakeClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return None
-
-        async def get(self, url, headers=None, **kw):
-            if url.endswith("robots.txt"):
-                return FakeResp("", status_code=404)
-            if url.endswith("sitemap.xml"):
-                return FakeResp(sitemap)
-            return FakeResp("", status_code=404)
-
-    monkeypatch.setattr(
-        "app.services.ingestion.service.httpx.AsyncClient",
-        lambda **kw: FakeClient(),
-    )
+    _patch_discovery_fetch(monkeypatch, respond)
 
     svc = IngestionService(db=FakeSession())  # type: ignore[arg-type]
     urls = await svc._discover_source_urls(
@@ -1607,3 +1574,39 @@ async def test_list_source_health_returns_per_source_rows():
     by_key = {item.source_key: item for item in response.items}
     assert by_key["chevening"].health_status == "down"
     assert by_key["chevening"].consecutive_failures == 7
+
+
+# ---------------------------------------------------------------------------
+# C1 SSRF guard wired through _get_or_create_source.
+# ---------------------------------------------------------------------------
+
+
+async def test_get_or_create_source_rejects_private_url(monkeypatch):
+    """A ``source_base_url`` that resolves to a private IP must be rejected
+    with HTTP 400 before the SourceRegistry row is created. Mirrors the
+    audit-fix contract: assert_public_url runs *before* any DB write.
+    """
+    from fastapi import HTTPException
+
+    from app.schemas.curation import IngestionRunStartRequest
+    from app.services.ingestion.service import IngestionService
+
+    # IngestionRunStartRequest accepts the URL syntactically (HttpUrl) — the
+    # DNS check happens in the service. We mock getaddrinfo so the test is
+    # deterministic and does not actually query DNS.
+    monkeypatch.setattr(
+        "app.utils.url_safety.socket.getaddrinfo",
+        lambda *_a, **_kw: [(2, 1, 0, "", ("169.254.169.254", 0))],
+    )
+
+    payload = IngestionRunStartRequest(
+        source_key="evil",
+        source_display_name="EvilCorp Awards",
+        source_base_url="http://attacker.example/",
+    )
+    service = IngestionService(db=FakeSession())  # type: ignore[arg-type]
+
+    with pytest.raises(HTTPException) as exc:
+        await service._get_or_create_source(payload, actor_user=None)
+    assert exc.value.status_code == 400
+    assert "not allowed" in exc.value.detail.lower()

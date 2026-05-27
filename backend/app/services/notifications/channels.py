@@ -146,6 +146,25 @@ def send_email_notification(*, to: str, template: str, context: dict) -> str:
     return send_transactional(to=to, template=template, context=context)
 
 
+def send_templated_email_best_effort(
+    *, to: str, template: str, context: dict, source: str
+) -> str | None:
+    """Wrap send_email_notification with try/except so callers never raise.
+
+    Every transactional touchpoint (welcome, data-export, deletion, waitlist)
+    treats email delivery as best-effort: the underlying state change has
+    already committed, and a Resend outage must not propagate as a 5xx.
+
+    ``source`` is a short tag for logs ("welcome", "data_export", etc.).
+    Returns the Resend message id on success, or None on any failure.
+    """
+    try:
+        return send_email_notification(to=to, template=template, context=context)
+    except Exception as exc:  # noqa: BLE001 — best-effort channel
+        logger.warning("notify.email %s failed to=%s err=%r", source, to, exc)
+        return None
+
+
 async def send_whatsapp(db, user: User, message: str) -> bool:
     """Stub: log-only WhatsApp send, also records a usage_ledger row.
 
