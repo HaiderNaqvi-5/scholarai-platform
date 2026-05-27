@@ -57,7 +57,9 @@ async def test_kpi_alert_messages_emits_alert_for_degraded_domain():
     )
 
     assert len(alerts) == 1
-    assert alerts[0].startswith("document KPI pass rate degraded")
+    assert alerts[0].domain == "document"
+    assert alerts[0].severity == "warn"
+    assert alerts[0].message.startswith("document KPI pass rate degraded")
 
 
 async def test_kpi_alert_messages_skips_low_volume_domains():
