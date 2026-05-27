@@ -19,16 +19,27 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { ApiError } from "@/lib/api";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
+import { clerkEnabled, useClerkLoginFlow } from "@/lib/auth/clerkAdapter";
 
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <LoginInner />
+      {clerkEnabled ? <ClerkLoginInner /> : <LocalLoginInner />}
     </Suspense>
   );
 }
 
-function LoginInner() {
+function ClerkLoginInner() {
+  const loginWithClerk = useClerkLoginFlow();
+  return <LoginInner submit={async (email, password) => loginWithClerk({ email, password })} />;
+}
+
+function LocalLoginInner() {
+  const auth = useAuth();
+  return <LoginInner submit={async (email, password) => { await auth.login({ email, password }); }} />;
+}
+
+function LoginInner({ submit }: { submit: (email: string, password: string) => Promise<void> }) {
   const auth = useAuth();
   const router = useRouter();
   const params = useSearchParams();
@@ -43,7 +54,7 @@ function LoginInner() {
   const [retrySeconds, setRetrySeconds] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const showDemo = process.env.NODE_ENV !== "production";
+  const showDemo = process.env.NODE_ENV !== "production" && !clerkEnabled;
 
   useEffect(() => {
     if (auth.status === "authed") router.replace(next);
@@ -66,7 +77,11 @@ function LoginInner() {
     setSubmitting(true);
     setError(null);
     try {
-      await auth.login({ email, password });
+      await submit(email, password);
+      // In local mode, auth.login mutates AuthProvider state -> the effect
+      // above redirects. In clerk mode, setActive() flips useClerkAuth ->
+      // ClerkBackedAuthProvider re-fetches /me -> same effect fires. Either
+      // way the explicit replace below speeds up the happy path.
       router.replace(next);
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {

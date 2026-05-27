@@ -12,6 +12,7 @@ from app.models import (
     RecommendationKPISnapshot,
 )
 from app.schemas.analytics import KPISnapshotTrendItem
+from app.schemas.health import KpiAlertItem
 
 
 class KPISnapshotService:
@@ -129,7 +130,7 @@ class KPISnapshotService:
         recommendation_pass_rate_min: float,
         document_pass_rate_min: float,
         interview_pass_rate_min: float,
-    ) -> list[str]:
+    ) -> list[KpiAlertItem]:
         lookback_cutoff = datetime.now(timezone.utc) - timedelta(days=max(lookback_days, 1))
 
         recommendation_alert = await self._domain_alert_message(
@@ -165,7 +166,7 @@ class KPISnapshotService:
         lookback_cutoff: datetime,
         min_snapshots: int,
         pass_rate_min: float,
-    ) -> str | None:
+    ) -> KpiAlertItem | None:
         total_count = func.count(model.id)
         passed_count = func.sum(case((model.kpi_passed.is_(True), 1), else_=0))
 
@@ -188,9 +189,13 @@ class KPISnapshotService:
         if pass_rate >= pass_rate_min:
             return None
 
-        return (
-            f"{metric_domain} KPI pass rate degraded: {pass_rate:.2%} over last "
-            f"{total_int} snapshots (threshold {pass_rate_min:.2%})."
+        return KpiAlertItem(
+            domain=metric_domain,
+            severity="warn",
+            message=(
+                f"{metric_domain} KPI pass rate degraded: {pass_rate:.2%} over last "
+                f"{total_int} snapshots (threshold {pass_rate_min:.2%})."
+            ),
         )
 
     async def purge_snapshots_older_than(self, *, retention_days: int) -> dict[str, int]:

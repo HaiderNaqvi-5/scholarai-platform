@@ -1,8 +1,10 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     APP_NAME: str = "ScholarAI"
     APP_VERSION: str = "0.1.0"
@@ -97,19 +99,29 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: int = 30
     LLM_FALLBACK_DETERMINISTIC: bool = True
 
-    # --- Mailgun (transactional email) ---
-    # When both API key and domain are set, ``app.services.notifications.channels.send_email``
-    # POSTs to Mailgun. When either is absent the function falls back to log-only
-    # behaviour so CI + dev stay deterministic without external credentials.
-    MAILGUN_API_KEY: str | None = None
-    MAILGUN_DOMAIN: str | None = None
-    MAILGUN_BASE_URL: str = "https://api.mailgun.net/v3"
-    MAILGUN_TIMEOUT_SECONDS: float = 10.0
+    # --- Firecrawl (capture path for scholarship ingestion) ---
+    # Cloud API replaces the in-process Playwright + Chromium launcher in
+    # ``services/ingestion/service.py::_capture_source_once``. Free tier covers
+    # the every-10-day cadence (~300 credits/month). Absence in prod is hard
+    # error so we never silently fall back to direct fetches.
+    FIRECRAWL_API_KEY: str | None = None
+    FIRECRAWL_API_URL: str = "https://api.firecrawl.dev"
+    FIRECRAWL_TIMEOUT_SECONDS: float = 60.0
+
+    # --- Transactional email (Resend) ---
+    # ``app.services.notifications.channels.send_email`` POSTs to Resend when
+    # both RESEND_API_KEY and RESEND_FROM_ADDRESS are set. Either absent →
+    # log-only fallback so CI + dev stay deterministic without external creds.
+    RESEND_TIMEOUT_SECONDS: float = 10.0
 
     # Display brand for outgoing email "from" + signature. Internal repo brand
     # stays ScholarAI per the source-of-truth hierarchy in CLAUDE.md.
     BRAND_DISPLAY_NAME: str = "AidwiseAI"
-    EMAIL_FROM_LOCALPART: str = "noreply"
+
+    # Public frontend origin used by transactional email CTA links
+    # (welcome login button, account-deletion cancel link, etc.). Empty
+    # string means "no CTA" — templates render text-only fallback.
+    FRONTEND_BASE_URL: str = ""
 
     # --- Sentry (opt-in; unset DSN = no init, app boots clean) ---
     # sentry-sdk is bundled in requirements.txt for the Air-Uni booth.
@@ -129,6 +141,17 @@ class Settings(BaseSettings):
     AUTH_LOCKOUT_MAX_FAILURES: int = 5
     AUTH_LOCKOUT_WINDOW_SECONDS: int = 900   # 15 min
     AUTH_LOCKOUT_DURATION_SECONDS: int = 900  # 15 min
+    HIBP_TIMEOUT_SECONDS: float = 2.0
+
+    AUTH_PROVIDER: Literal["local", "clerk"] = "local"
+
+    CLERK_SECRET_KEY: str = ""
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_JWKS_URL: str = ""
+    CLERK_WEBHOOK_SECRET: str = ""
+
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_ADDRESS: str = ""
 
     def validate_production_settings(self):
         env_name = self.ENVIRONMENT.strip().lower()
@@ -174,6 +197,30 @@ class Settings(BaseSettings):
         if self.OPENSEARCH_PASSWORD in {"ScholarAI_Secure_123!", "admin", "password"}:
             raise RuntimeError(
                 "PROD_ERROR: OPENSEARCH_PASSWORD looks like a default — override before deploy."
+            )
+
+        if self.AUTH_PROVIDER == "clerk":
+            for field in (
+                "CLERK_SECRET_KEY",
+                "CLERK_PUBLISHABLE_KEY",
+                "CLERK_JWKS_URL",
+                "CLERK_WEBHOOK_SECRET",
+            ):
+                if not getattr(self, field):
+                    raise RuntimeError(
+                        f"PROD_ERROR: {field} required when AUTH_PROVIDER=clerk in production"
+                    )
+        if not self.RESEND_API_KEY:
+            raise RuntimeError(
+                "PROD_ERROR: RESEND_API_KEY required in production"
+            )
+
+        # Firecrawl Cloud is the only capture path post-Playwright removal —
+        # absence in prod would leave the scraper unable to fetch anything.
+        if not self.FIRECRAWL_API_KEY:
+            raise RuntimeError(
+                "PROD_ERROR: FIRECRAWL_API_KEY required in production "
+                "(capture path for scholarship ingestion)"
             )
 
 

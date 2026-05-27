@@ -268,8 +268,8 @@ def test_run_nightly_ingestion_uses_reserved_system_identity(monkeypatch):
     result = scraper_tasks.run_nightly_ingestion()
 
     assert captured["db"] is session
-    assert captured["create"]["payload"].source_key == "nightly_sync_main"
-    assert captured["create"]["payload"].source_display_name == "Auto Nightly Ingestion"
+    assert captured["create"]["payload"].source_key == "scheduled_sync_main"
+    assert captured["create"]["payload"].source_display_name == "Auto Scheduled Ingestion"
     assert captured["create"]["payload"].source_base_url is None
     assert captured["create"]["payload"].source_type == "official"
     assert captured["create"]["payload"].max_records == 20
@@ -287,9 +287,11 @@ def test_run_nightly_ingestion_uses_reserved_system_identity(monkeypatch):
 def test_nightly_run_is_stale():
     from datetime import datetime, timedelta, timezone
 
+    # Cadence is every 10 days, so the stale window is 11 days (264h):
+    # a 10-day-old run is still fresh, an 11.5-day-old run is stale.
     now = datetime(2026, 5, 14, 12, 0, tzinfo=timezone.utc)
-    fresh = now - timedelta(hours=3)
-    stale = now - timedelta(hours=30)
+    fresh = now - timedelta(hours=24)
+    stale = now - timedelta(hours=270)
     assert scraper_tasks._nightly_run_is_stale(None, now=now) is True
     assert scraper_tasks._nightly_run_is_stale(fresh, now=now) is False
     assert scraper_tasks._nightly_run_is_stale(stale, now=now) is True
@@ -312,7 +314,7 @@ def test_should_run_nightly_runs_when_stale_or_never(monkeypatch):
     import asyncio
     from datetime import datetime, timedelta, timezone
 
-    stale = datetime.now(timezone.utc) - timedelta(hours=40)
+    stale = datetime.now(timezone.utc) - timedelta(hours=300)
 
     async def fake_stale(_session):
         return stale

@@ -26,9 +26,15 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
-    "nightly-scholarship-ingestion": {
-        "task": "tasks.run_nightly_ingestion",
-        "schedule": crontab(hour=2, minute=0),
+    # Every-10-day cadence (1st / 11th / 21st @ 02:00 UTC).
+    # Predictable calendar dates beat ``timedelta(days=10)`` — that anchor
+    # would drift across beat restarts. 11-day gap from the 21st to the 1st
+    # on 31-day months is acceptable. ``run_nightly_ingestion`` is the
+    # back-compat alias that scraper_tasks.py exposes; the canonical task
+    # name is ``tasks.run_scheduled_ingestion``.
+    "scholarship-ingestion-decadal": {
+        "task": "tasks.run_scheduled_ingestion",
+        "schedule": crontab(hour=2, minute=0, day_of_month="1,11,21"),
     },
     # PRD §0.6 — Elite priority scholarship alerts (deadlines within 7 days).
     "priority-scholarship-alerts": {

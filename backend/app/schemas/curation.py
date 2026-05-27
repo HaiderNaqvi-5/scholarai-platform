@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class CurationActionRequest(BaseModel):
@@ -15,7 +15,12 @@ class CurationRawImportRequest(BaseModel):
 
     source_key: str = Field(min_length=3, max_length=64)
     source_display_name: str = Field(min_length=3, max_length=255)
-    source_base_url: str = Field(min_length=8, max_length=2000)
+    source_base_url: HttpUrl = Field(
+        description=(
+            "Public http(s) URL — Pydantic rejects non-http schemes at the "
+            "request boundary; DNS-level SSRF guard runs in IngestionService."
+        ),
+    )
     source_type: str = Field(default="manual_import", max_length=64)
     title: str = Field(min_length=3, max_length=255)
     provider_name: str | None = Field(default=None, max_length=255)
@@ -46,7 +51,13 @@ class IngestionRunStartRequest(BaseModel):
 
     source_key: str = Field(min_length=3, max_length=64)
     source_display_name: str | None = Field(default=None, min_length=3, max_length=255)
-    source_base_url: str | None = Field(default=None, min_length=8, max_length=2000)
+    source_base_url: HttpUrl | None = Field(
+        default=None,
+        description=(
+            "Public http(s) URL — required when creating a new SourceRegistry "
+            "row. SSRF guard rejects private/loopback hosts in the service."
+        ),
+    )
     source_type: str = Field(default="official", max_length=64)
     max_records: int = Field(default=5, ge=1, le=20)
     execution_mode: Literal["inline", "worker", "auto"] = "inline"

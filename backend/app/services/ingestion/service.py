@@ -49,6 +49,12 @@ from app.schemas.curation import (
     SourceHealthSummary,
 )
 from app.services.curation import CurationService
+from app.services.ingestion.firecrawl_capture import (
+    FirecrawlNotConfiguredError,
+    firecrawl_capture,
+)
+from app.services.ingestion.types import CaptureResult
+from app.utils.url_safety import UnsafeURLError, assert_public_url, safe_get
 
 logger = logging.getLogger(__name__)
 
@@ -171,15 +177,6 @@ class RunMetadata(dict):
                     return False
             return True
         return super().__eq__(other)
-
-
-@dataclass
-class CaptureResult:
-    html: str
-    final_url: str
-    title: str | None
-    capture_mode: str
-    metadata: dict[str, Any]
 
 
 @dataclass
@@ -862,12 +859,24 @@ class IngestionService:
     async def _get_or_create_source(
         self, payload: IngestionRunStartRequest, actor_user: User | None = None
     ) -> SourceRegistry:
+        # SSRF guard (C1) — every base_url that touches the DB is also a URL
+        # the scraper or Firecrawl will eventually fetch.
+        validated_base_url: str | None = None
+        if payload.source_base_url is not None:
+            try:
+                validated_base_url = assert_public_url(str(payload.source_base_url))
+            except UnsafeURLError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"source_base_url is not allowed: {exc}",
+                ) from exc
+
         result = await self.db.execute(
             select(SourceRegistry).where(SourceRegistry.source_key == payload.source_key)
         )
         source = result.scalar_one_or_none()
         if source is None:
-            if not payload.source_display_name or not payload.source_base_url:
+            if not payload.source_display_name or not validated_base_url:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="New ingestion sources require source_display_name and source_base_url",
@@ -875,7 +884,7 @@ class IngestionService:
             source = SourceRegistry(
                 source_key=payload.source_key,
                 display_name=payload.source_display_name,
-                base_url=payload.source_base_url,
+                base_url=validated_base_url,
                 source_type=payload.source_type,
                 is_active=True,
             )
@@ -896,8 +905,8 @@ class IngestionService:
 
         if payload.source_display_name:
             source.display_name = payload.source_display_name
-        if payload.source_base_url:
-            source.base_url = payload.source_base_url
+        if validated_base_url:
+            source.base_url = validated_base_url
         source.source_type = payload.source_type or source.source_type
         source.is_active = True
         return source
@@ -998,6 +1007,10 @@ class IngestionService:
     def _classify_capture_error(self, exc: Exception) -> str:
         if isinstance(exc, HTTPException):
             return "http_exception"
+        if isinstance(exc, UnsafeURLError):
+            return "ssrf_blocked"
+        if isinstance(exc, FirecrawlNotConfiguredError):
+            return "scraper_unconfigured"
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
             if 500 <= status_code <= 599:
@@ -1044,15 +1057,13 @@ class IngestionService:
         On any other 2xx the full HTML is returned with fresh `etag`/`last_modified`
         in metadata so the caller can persist them back to `SourceRegistry`.
         """
-        user_agent = "ScholarAI-Internal-Ingestion/0.1"
-        headers: dict[str, str] = {"User-Agent": user_agent}
+        headers: dict[str, str] = {}
         if prior_etag:
             headers["If-None-Match"] = prior_etag
         if prior_last_modified:
             headers["If-Modified-Since"] = prior_last_modified
 
-        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-            response = await client.get(url, headers=headers)
+        response = await safe_get(url, timeout=30.0, headers=headers)
 
         new_etag = response.headers.get("ETag")
         new_last_modified = response.headers.get("Last-Modified")
@@ -1098,76 +1109,11 @@ class IngestionService:
         )
 
     async def _capture_source_once(self, url: str, attempt: int) -> CaptureResult:
-        transport_errors: list[dict[str, Any]] = []
-        user_agent = "ScholarAI-Internal-Ingestion/0.1"
-
-        try:
-            from playwright.async_api import async_playwright
-
-            async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(headless=True)
-                page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle", timeout=45_000)
-                html = await page.content()
-                title = await page.title()
-                final_url = page.url
-                await browser.close()
-                return CaptureResult(
-                    html=html,
-                    final_url=final_url,
-                    title=title,
-                    capture_mode="playwright",
-                    metadata={
-                        "requested_url": url,
-                        "final_url": final_url,
-                        "page_title": title,
-                        "attempt": attempt,
-                        "transport_errors": transport_errors,
-                    },
-                )
-        except Exception as exc:
-            transport_errors.append(
-                {
-                    "transport": "playwright",
-                    "error_type": exc.__class__.__name__,
-                    "error_message": str(exc),
-                }
-            )
-
-        try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-                response = await client.get(url, headers={"User-Agent": user_agent})
-            tls_mode = "verified"
-        except httpx.HTTPError as exc:
-            transport_errors.append(
-                {
-                    "transport": "httpx_verified",
-                    "error_type": exc.__class__.__name__,
-                    "error_message": str(exc),
-                }
-            )
-            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
-                response = await client.get(url, headers={"User-Agent": user_agent})
-            tls_mode = "insecure_retry"
-
-        response.raise_for_status()
-        html = response.text
-        title = self._extract_title(html)
-        return CaptureResult(
-            html=html,
-            final_url=str(response.url),
-            title=title,
-            capture_mode="httpx_fallback",
-            metadata={
-                "requested_url": url,
-                "final_url": str(response.url),
-                "page_title": title,
-                "status_code": response.status_code,
-                "tls_mode": tls_mode,
-                "attempt": attempt,
-                "transport_errors": transport_errors,
-            },
-        )
+        # SSRF guard runs both here and inside firecrawl_capture — keeping it
+        # at the entry point means the rejection is logged against the caller
+        # and not against the vendor SDK boundary.
+        safe_url = assert_public_url(url)
+        return await firecrawl_capture(safe_url, attempt=attempt)
 
     def _derive_scope_keywords(self, source: SourceRegistry) -> list[str]:
         """Scope keywords for sitemap/RSS filtering: scholarship vocabulary + source-specific tokens."""
@@ -1205,15 +1151,16 @@ class IngestionService:
         user_agent = "ScholarAI-Internal-Ingestion/0.1"
         discovered: set[str] = set()
 
-        # 1. robots.txt → Sitemap directives
+        # 1. robots.txt → Sitemap directives (safe_get re-validates redirects)
         sitemap_urls: list[str] = []
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), follow_redirects=True) as client:
-                r = await client.get(urljoin(base, "/robots.txt"), headers={"User-Agent": user_agent})
-                if r.status_code == 200:
-                    for match in _ROBOTS_SITEMAP_RE.finditer(r.text):
-                        sitemap_urls.append(match.group(1).strip())
-        except (httpx.HTTPError, OSError):
+            r = await safe_get(
+                urljoin(base, "/robots.txt"), timeout=10.0, user_agent=user_agent
+            )
+            if r.status_code == 200:
+                for match in _ROBOTS_SITEMAP_RE.finditer(r.text):
+                    sitemap_urls.append(match.group(1).strip())
+        except (httpx.HTTPError, OSError, UnsafeURLError):
             pass
 
         # 2. Fall back to /sitemap.xml at root if robots didn't surface any
@@ -1223,32 +1170,31 @@ class IngestionService:
         for sitemap_url in sitemap_urls:
             try:
                 discovered.update(await self._parse_sitemap(sitemap_url, _in_scope, max_urls))
-            except (httpx.HTTPError, OSError):
+            except (httpx.HTTPError, OSError, UnsafeURLError):
                 continue
 
         # 3. RSS/Atom feeds via homepage <link rel="alternate">
         if try_homepage_feeds:
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), follow_redirects=True) as client:
-                    r = await client.get(base, headers={"User-Agent": user_agent})
-                    if r.status_code == 200:
-                        soup = BeautifulSoup(r.text, "html.parser")
-                        for link in soup.find_all("link", rel="alternate"):
-                            if not isinstance(link, Tag):
+                r = await safe_get(base, timeout=10.0, user_agent=user_agent)
+                if r.status_code == 200:
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    for link in soup.find_all("link", rel="alternate"):
+                        if not isinstance(link, Tag):
+                            continue
+                        mime = (link.get("type") or "").lower()
+                        if "rss" in mime or "atom" in mime:
+                            feed_href = link.get("href") or ""
+                            if not feed_href:
                                 continue
-                            mime = (link.get("type") or "").lower()
-                            if "rss" in mime or "atom" in mime:
-                                feed_href = link.get("href") or ""
-                                if not feed_href:
-                                    continue
-                                feed_url = urljoin(base, feed_href)
-                                try:
-                                    discovered.update(
-                                        await self._parse_feed(feed_url, _in_scope, max_urls)
-                                    )
-                                except (httpx.HTTPError, OSError):
-                                    continue
-            except (httpx.HTTPError, OSError):
+                            feed_url = urljoin(base, feed_href)
+                            try:
+                                discovered.update(
+                                    await self._parse_feed(feed_url, _in_scope, max_urls)
+                                )
+                            except (httpx.HTTPError, OSError, UnsafeURLError):
+                                continue
+            except (httpx.HTTPError, OSError, UnsafeURLError):
                 pass
 
         # 4. Enforce same-host
@@ -1262,8 +1208,7 @@ class IngestionService:
         max_urls: int,
     ) -> set[str]:
         user_agent = "ScholarAI-Internal-Ingestion/0.1"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), follow_redirects=True) as client:
-            r = await client.get(sitemap_url, headers={"User-Agent": user_agent})
+        r = await safe_get(sitemap_url, timeout=15.0, user_agent=user_agent)
         if r.status_code != 200:
             return set()
         out: set[str] = set()
@@ -1273,7 +1218,7 @@ class IngestionService:
                 # nested sitemap-index — recurse one level
                 try:
                     out.update(await self._parse_sitemap(candidate, in_scope, max_urls - len(out)))
-                except (httpx.HTTPError, OSError):
+                except (httpx.HTTPError, OSError, UnsafeURLError):
                     continue
             elif in_scope(candidate):
                 out.add(candidate)
@@ -1288,8 +1233,7 @@ class IngestionService:
         max_urls: int,
     ) -> set[str]:
         user_agent = "ScholarAI-Internal-Ingestion/0.1"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), follow_redirects=True) as client:
-            r = await client.get(feed_url, headers={"User-Agent": user_agent})
+        r = await safe_get(feed_url, timeout=15.0, user_agent=user_agent)
         if r.status_code != 200:
             return set()
         soup = BeautifulSoup(r.text, "xml")

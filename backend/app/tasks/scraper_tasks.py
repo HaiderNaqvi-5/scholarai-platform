@@ -13,20 +13,26 @@ from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-# A nightly run is considered stale if more than this many hours have passed
-# since the last completion — gives the 02:00 UTC beat ~1h slack before a
-# catch-up fires.
-NIGHTLY_MAX_AGE_HOURS = 25
-NIGHTLY_SOURCE_KEY = "nightly_sync_main"
+# A scheduled run is considered stale if more than this many hours have
+# passed since the last completion. Cadence is every 10 days (1st/11th/21st
+# @ 02:00 UTC per celery_app beat) — ``SCHEDULED_MAX_AGE_HOURS = 11 * 24``
+# means a hourly catch-up beat (if one is added later) would only re-fire
+# after the canonical slot is fully missed.
+SCHEDULED_MAX_AGE_HOURS = 11 * 24
+SCHEDULED_SOURCE_KEY = "scheduled_sync_main"
+
+# Back-compat aliases — older deploys / logs reference these names.
+NIGHTLY_MAX_AGE_HOURS = SCHEDULED_MAX_AGE_HOURS
+NIGHTLY_SOURCE_KEY = SCHEDULED_SOURCE_KEY
 
 
 def _nightly_run_is_stale(
     last_completed_at: datetime | None,
     *,
     now: datetime | None = None,
-    max_age_hours: int = NIGHTLY_MAX_AGE_HOURS,
+    max_age_hours: int = SCHEDULED_MAX_AGE_HOURS,
 ) -> bool:
-    """True when the most recent nightly completion is missing or too old."""
+    """True when the most recent scheduled completion is missing or too old."""
     if last_completed_at is None:
         return True
     reference = now or datetime.now(timezone.utc)
@@ -36,13 +42,13 @@ def _nightly_run_is_stale(
 
 
 async def _load_last_nightly_completion(session) -> datetime | None:
-    """Most recent ``completed_at`` for the nightly-sync source, if any."""
+    """Most recent ``completed_at`` for the scheduled-sync source, if any."""
     try:
         result = await session.execute(
             select(IngestionRun.completed_at)
             .join(SourceRegistry)
             .where(
-                SourceRegistry.source_key == NIGHTLY_SOURCE_KEY,
+                SourceRegistry.source_key == SCHEDULED_SOURCE_KEY,
                 IngestionRun.status.in_(
                     (IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)
                 ),
@@ -172,31 +178,43 @@ async def _run_source_ingestion_async(
         return _detail_to_payload(detail)
 
 
-@celery_app.task(name="tasks.run_nightly_ingestion")
-def run_nightly_ingestion() -> dict:
-    """Automated nightly sync for major scholarship sources.
+@celery_app.task(name="tasks.run_scheduled_ingestion")
+def run_scheduled_ingestion() -> dict:
+    """Automated every-10-day sync for major scholarship sources.
 
-    Skips when a recent (≤ ``NIGHTLY_MAX_AGE_HOURS``) successful nightly run
-    already exists, so an hourly catch-up beat can call this task without
-    re-running mid-day if the 02:00 UTC slot succeeded.
+    Beat schedule (``app.tasks.celery_app``) fires this on the 1st, 11th, and
+    21st of each month at 02:00 UTC. Skips when a recent
+    (≤ ``SCHEDULED_MAX_AGE_HOURS``) successful run already exists so an
+    ad-hoc invocation cannot double-burn Firecrawl credits on the same slot.
     """
     # System Reserved UUID
     SYSTEM_ADMIN_ID = "00000000-0000-0000-0000-000000000000"
 
-    return asyncio.run(_run_nightly_ingestion_async(SYSTEM_ADMIN_ID))
+    return asyncio.run(_run_scheduled_ingestion_async(SYSTEM_ADMIN_ID))
 
 
-async def _run_nightly_ingestion_async(system_actor_id: str) -> dict:
+# Back-compat alias — queued tasks in flight from the nightly era still
+# resolve. Remove on the deploy after this rename has shipped + drained.
+@celery_app.task(name="tasks.run_nightly_ingestion")
+def run_nightly_ingestion() -> dict:
+    return run_scheduled_ingestion()
+
+
+async def _run_scheduled_ingestion_async(system_actor_id: str) -> dict:
     async with async_session_factory() as session:
         if not await _should_run_nightly(session):
-            logger.info("nightly_ingestion_skip reason=recent_run_present")
+            logger.info("scheduled_ingestion_skip reason=recent_run_present")
             return {"status": "skipped", "reason": "recent_run_present"}
     return await _run_source_ingestion_async(
         run_id=None,
-        source_key=NIGHTLY_SOURCE_KEY,
+        source_key=SCHEDULED_SOURCE_KEY,
         actor_user_id=system_actor_id,
-        source_display_name="Auto Nightly Ingestion",
+        source_display_name="Auto Scheduled Ingestion",
         source_base_url=None,
         source_type="official",
         max_records=20,
     )
+
+
+# Back-compat alias for any callers still importing the old coroutine name.
+_run_nightly_ingestion_async = _run_scheduled_ingestion_async

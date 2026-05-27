@@ -10,6 +10,8 @@ from app.services.notifications.channels import (
     NotificationResult,
     fan_out_for_plan,
     send_email,
+    send_email_notification,
+    send_templated_email_best_effort,
     send_whatsapp,
 )
 
@@ -18,5 +20,7 @@ __all__ = [
     "NotificationResult",
     "fan_out_for_plan",
     "send_email",
+    "send_email_notification",
+    "send_templated_email_best_effort",
     "send_whatsapp",
 ]

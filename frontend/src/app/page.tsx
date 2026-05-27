@@ -550,9 +550,8 @@ export default function Landing() {
               ]}
             />
             <FooterColumn
-              title="Trial"
+              title="Start"
               links={[
-                { href: "/booth/air-university", label: "Air University trial" },
                 { href: "/signup", label: "Create account" },
                 { href: "/login", label: "Sign in" },
               ]}

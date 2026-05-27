@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.schemas.health import HealthResponse
+from app.schemas.health import HealthResponse, KpiAlertItem
 from app.services.kpi_snapshot_service import KPISnapshotService
 
 router = APIRouter()
@@ -20,7 +20,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     except Exception:
         db_status = "error"
 
-    kpi_alerts: list[str] = []
+    kpi_alerts: list[KpiAlertItem] = []
     if settings.KPI_OBSERVABILITY_ENABLED and db_status == "ok":
         snapshot_service = KPISnapshotService(db)
         kpi_alerts = await snapshot_service.alert_messages(

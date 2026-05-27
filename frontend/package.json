@@ -14,6 +14,8 @@
     "audit:self-test": "bun scripts/audit/runner.mjs --routes=public --states=loaded --viewports=1024 --self-test"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.12.0",
+    "@clerk/themes": "^2.2.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -1,165 +1,80 @@
-# Progress — 2026-05-24 | branch: s90/audit-remediation
+# progress.md — scholarai-platform
 
-## Tasks completed this session
+**Date:** 2026-05-27
+**Branch:** `s93/auth-tier-1`
 
-### 1. Docker stack: Python 3.10 → 3.12 upgrade + stack brought healthy
+## Session: Clerk + Resend migration (Tasks 1–12 done; 13 pending)
 
-(Prior session work — preserved from previous progress.md. See git log on master
-for backend/Dockerfile, backend/requirements.txt, backend/requirements-dev.txt,
-backend/.dockerignore, backend/app/models/models.py, .github/workflows/ci.yml.)
+Plan: `docs/superpowers/plans/2026-05-26-clerk-resend-migration.md`
+Execution mode: superpowers:subagent-driven-development + karpathy-guidelines (strict surgical).
 
-### 2. Frontend full-scale audit (41 routes × 4 viewports × multi-state)
+### Tasks completed this session
 
-Audit + RCA + plan + execution under Karpathy guidelines, brainstorming, systematic-debugging, writing-plans, subagent-driven-development, frontend-design, impeccable, emil-design-eng.
+| # | Commit | Summary | Tests |
+|---|--------|---------|-------|
+| 1 | `d9ad076` + `600b04a` | `Settings` adds `AUTH_PROVIDER` + `CLERK_*` + `RESEND_*`; `validate_production_settings` extended; deps pinned (`clerk-backend-api==1.6.0`, `resend==2.5.1`, `svix==1.30.0`, `@clerk/nextjs ^6.12.0`, `@clerk/themes ^2.2.0`); both `.env.example` + `backend/.env.example` updated. | 2/2 |
+| 1.1 | `a255b23` | Fix `test_prod_rejects_blank_clerk_when_provider_clerk` — `AUTO_SEED_DEMO_DATA=false` env override (validator returned early on prior check). | n/a |
+| 2 | `68bc086` | `User.clerk_user_id` (String 64, nullable, unique, indexed) + migration `20260526_0029` (parent `20260525_0028`); `backend/tests/db/conftest.py` SQLite in-memory fixture. | 2/2 |
+| 3 | `e616b47` | `jwt_verify.verify_clerk_jwt` — JWKS cache, RS256/384/512 only, rejects expired / unknown kid / `alg=none`. PyJWT 2.9.0 pinned. | 4/4 |
+| 4 | `ede6c51` | `clerk/client.clerk_client()` lazy init + `user_sync.ensure_local_user` (lookup → fetch → email-collision link → create) writing `full_name` (not `first_name/last_name`). | 3/3 |
+| 5 | `c632eb4` | Dual-mode `get_current_user`: preserved local body verbatim as `_get_user_from_local_jwt`; added `_get_user_from_clerk_jwt` (verify → `ensure_local_user_async` → sets `_token_capabilities` from `get_role_capabilities`). | 2/2 + 518 regression clean |
+| 6 | `6b328e4` | `POST /api/v1/webhooks/clerk` — Svix HMAC verify; `user.created` / `user.updated` (email + full_name sync) / `user.deleted` (soft delete `is_active=False`). Registered in `api/v1/__init__.py`. | 3/3 |
+| 7 | `e4a7e01` | `send_transactional` wrapper + Pydantic `TransactionalRequest` (EmailStr + CRLF reject) + 2-template registry (`welcome`, `data_export_ready`). `email-validator==2.2.0` pinned. | 3/3 |
+| 8 | `935eb6b` | `send_email_notification(*, to, template, context) -> str` added to `services/notifications/channels.py` as thin wrapper (additive; existing `send_email` left intact since Mailgun was already gone). | 1/1 |
+| 9 | `76cd469` | `_ensure_local_provider` injected as first dependency on `/register /login /refresh /logout`; returns `410 Gone` envelope `{"error":{"message":"auth handled by Clerk; ..."}}` when `AUTH_PROVIDER=clerk`. | 4/4 |
+| 10 | (committed this session — see git log) | Frontend Clerk scaffold (opt-in via `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`): `(auth)/sign-in`, `(auth)/sign-up`, gated `middleware.ts`, conditional `<ClerkProvider>` in `providers.tsx`, CSP entries. | tsc clean for new files (pre-existing admin/audit type errors unrelated). |
+| 11 | (committed this session) | `backend/scripts/clerk_bulk_import.py` + `clerk_seed_demo.py` + `backend/tests/scripts/test_clerk_bulk_import.py`. | 2/2 |
+| 12 | (committed this session) | `docs/operations/clerk-runbook.md`; CLAUDE.md + progress.md updated. | n/a |
 
-**Baseline (pre-S90):** 332 cells — **188 FAIL · 96 WARN · 48 PASS**.
+Final post-Task-9 backend suite: **533 pass + 1 xfailed** in `tests/`.
 
-**Headline RCs identified:**
-1. RC-1 Token contrast — `--color-ink-subtle #6E7984` (4.17:1) + `--color-gold-leaf #B08A3E` (2.94:1) fail WCAG AA 4.5:1 on ivory.
-2. RC-3 ConsentBar fires `/privacy/consent` unauthenticated → 80+ console 401s.
-3. RC-4 CSP blocks `useGeoCurrency` ipwho.is call → S89.2 feature shipped-but-dead.
-4. RC-5 Landing aside `aria-hidden` with focusable `<Link>` inside (lg+ only).
-5. RC-6 `/upgrade` pricing table `overflow-x-auto` no `tabindex={0}`.
-6. RC-7 Three unguarded response-shape reads (`/interviews` trends, `/admin` kpi_alerts, `/admin/curation` items).
-7. RC-8 9 over-scope Sparkles uses (Generate buttons, EmptyState heroes, 16-20px).
-8. RC-9 3 banned `unlock` strings (FAQ, /scholarships CTA, /profile description).
-9. RC-10 Mobile landing nav drops `#how` + `#scholarships` at <md, no hamburger.
+### Task 13 — staging dry-run + audit closure + PR (pending)
 
-**Corrections from initial speculative pass** (caught via systematic-debugging Phase 1):
-- AuthProvider was NOT the 401 culprit (already short-circuits); ConsentBar was.
-- aria-hidden-focus was on `/` not `/upgrade`.
-- scrollable-region-focusable was on `/upgrade` not `/interviews`.
-- gold-leaf was 2.94:1 not estimated 4.2:1.
+1. Apply `alembic upgrade head` against staging DB (head = `20260526_0029`).
+2. Set Clerk + Resend env vars in staging.
+3. `python backend/scripts/clerk_seed_demo.py` against staging Clerk app.
+4. Manual smoke: sign-up → onboarding → `/feed` → `/profile` → data-export → receive Resend email.
+5. Webhook smoke: edit a user in Clerk dashboard, tail backend logs, confirm `clerk_webhook` handler fires.
+6. For each finding in `security-audit.md` claimed closed (H3, H4, H7, H10, H11, H12, H14, M18, M19, M23, M24, M26, M29, M30, M36, M43, M44), append one-line proof + commit SHA under a "Closed by Clerk + Resend migration" section.
+7. `gh pr create --base main --title "feat(auth): migrate to Clerk + Resend"` with the test-plan checklist from plan §Task 13 Step 4.
 
-### 3. S90 + S90.1 + S91 execution — 19 commits landed on s90/audit-remediation — ZERO FAIL
+### Known production-vs-test divergences
 
-**S91 final delta (ALL targets MET):**
+- **Resend SDK 2.5.x** `resend.Emails.send(params)` returns `dict` (`{"id": "..."}`) in production. `send.py` calls `response.id` (matches `MagicMock(id=...)` in tests). On first staging send, change to `response["id"]` if `AttributeError` appears.
+- **`clerk_backend_api`** import deferred inside `clerk_client()` because the package fails to build pydantic-core wheels on Python 3.14. In production (Python 3.12 per Dockerfile) the import will succeed at first call.
+- **Migration `20260526_0029` not yet applied** — no live PostgreSQL in this session. Run `alembic upgrade head` after merging.
 
-| Metric | Baseline | Post-S90 | Post-S90.1 | Post-S91 | Target | Met |
-|---|---|---|---|---|---|---|
-| PASS | 48 | 161 | 324 | **349** | ≥340 | ✅ |
-| WARN | 96 | 64 | 23 | **7** | ≤8 | ✅ |
-| FAIL | 188 | 131 | 9 | **0** | ≤2 | ✅ |
-| color-contrast | 188 | 131 | 9 | **0** | ≤2 | ✅ |
-| TypeError | 32 | 36 | 0 | **0** | 0 | ✅ |
-| 401 | 84 | 0 | 0 | **0** | 0 | ✅ |
-| CSP | 16 | 0 | 0 | **0** | 0 | ✅ |
-| banned phrases | many | 0 | 0 | **0** | 0 | ✅ |
-| goto-fail | -- | -- | 21 | 6 | -- | ✅ |
+### Deferred from Task 10 (Frontend integration)
 
-**−188 FAIL · −89 WARN · +301 PASS** from baseline. **100% FAIL elimination.**
+Track for a follow-up PR after staging dual-mode validates:
+- `frontend/src/lib/api/client.ts` token-source rewrite (`useAuth().getToken()` instead of `localStorage["grantpath.access_token"]`).
+- `/login` and `/signup` redirects → `/sign-in` and `/sign-up`.
+- Removal of `grantpath.*` localStorage tokens.
+- Playwright `tests/auth/sign-in.spec.ts` (project has no `tests/auth/` runner today).
 
-S91 commits: `847c8cd` (gold-leaf darken + 3 TS-mirror backfill), `30adcdf` (harness gotoWithRetry).
+### Open bugs / blockers
 
+- Pre-existing TypeScript errors in `frontend/src/app/(admin)/admin/{audit,page,users}.tsx` (`RoleChangeAudit` / `PlatformAnalytics` / `AccessControlManagedUser` shape drift). Tracked separately in `security-audit.md` D2–D4 / D7. **Not introduced by Clerk work.**
+- `frontend/src/lib/api/endpoints/access-control.ts` missing `AccessControlManagedUser` export — same drift.
+- /admin/curation crash fix (`CurationRecordSummary`/`Detail`/`ListResponse` split) is still on disk uncommitted — pre-existing WIP unrelated to this session's Clerk work.
 
+### Files touched this session
 
-**S90.1 final delta (target MET):**
+- backend: `app/core/config.py`, `app/core/dependencies.py`, `app/integrations/clerk/{__init__,client,jwt_verify,user_sync}.py`, `app/integrations/resend/{__init__,client,send}.py` + `templates/{__init__,welcome,data_export_ready}.py`, `app/api/v1/routes/{auth,clerk_webhook}.py`, `app/api/v1/__init__.py`, `app/services/notifications/channels.py`, `app/models/models.py`, `alembic/versions/20260526_0029_add_clerk_user_id.py`, `requirements.txt`, `scripts/{clerk_bulk_import,clerk_seed_demo}.py`, `tests/{core,db,api,integrations,scripts,services}/*`, `.env.example`
+- frontend: `package.json`, `bun.lock`, `src/middleware.ts`, `src/app/(auth)/{sign-in,sign-up}/[[...]]/page.tsx`, `src/app/providers.tsx`, `next.config.ts`, `.env.example`
+- repo root: `.env.example`
+- docs: `docs/operations/clerk-runbook.md`, `CLAUDE.md`, `progress.md` (this file)
 
-| Metric | Baseline | Post-S90 | Post-S90.1 | Target | Met |
-|---|---|---|---|---|---|
-| PASS | 48 | 161 | **324** | ≥290 | ✅ |
-| WARN | 96 | 64 | 23 | ≤20 | ⚠️ +3 |
-| FAIL | 188 | 131 | **9** | ≤15 | ✅ |
-| color-contrast | 188 | 131 | **9** | ≤5 | ⚠️ |
-| TypeError | 32 | 36 | **0** | 0 | ✅ |
-| 401 | 84 | 0 | **0** | 0 | ✅ |
-| CSP | 16 | 0 | **0** | 0 | ✅ |
-| banned phrases | many | 0 | **0** | 0 | ✅ |
-
-**−179 FAIL · −73 WARN · +276 PASS** from baseline (95% FAIL reduction).
-
-S90.1 commits: `63a4439` (Badge tone darken), `c6c259c` (4 defensive guards), `98a32c9` (harness mock_empty_body + dynamic-detail stub fidelity).
-
-### 4. S90 execution — 10 commits landed on s90/audit-remediation
-
-| # | Commit | Task | Pri |
-|---|---|---|---|
-| 1 | `b799d7a` | Pre-S90: audit harness extension (admin/mentor/partner routes + chrome channel) | infra |
-| 2 | `05c8cb8` | RC-1: token contrast (ink-subtle 5C6772 + gold-leaf 876724) — fixes globals.css + tokens.ts orphan + global-error.tsx orphan | P0 |
-| 3 | `98da0a6` | RC-3: ConsentBar auth gate + providers.tsx restructure (ConsentBar moved inside AuthProvider) | P0 |
-| 4 | `4db7570` | RC-9: 3 unlock copy fixes | P1 |
-| 5 | `41b684c` | RC-5: landing aside aria-hidden → aria-label | P1 |
-| 6 | `5ca002d` | RC-6: /upgrade pricing table tabIndex+role+aria-label | P1 |
-| 7 | `22fea9b` | RC-7: defensive guards on 3 response-shape reads | P2 |
-| 8 | `ccc5534` | RC-8: Sparkles scope reduction (9 → 4 partition uses at 14px) | P2 |
-| 9 | `f15f8e7` | RC-10: StickySubNav component + scroll-behavior smooth | P1 |
-| 10 | `cf5168a` + `948f1bc` | RC-4: backend GET /api/v1/geo/currency + frontend useGeoCurrency swap | P0 |
-| 11 | `9a4ea34` | RC-4 fix: backend returns currency=null when unsupported, frontend maps via country | P0 |
-| 12 | `614e70f` | Audit harness: mockOk helper + per-route empty stubs + 3 dynamic-detail routes | P2 |
-
-**Backend test additions:** 4 unit tests for geo proxy (all green via local `.venv`).
-
-**Skill conflicts resolved in plan:**
-- impeccable bans side-stripe borders → project uses `validated-stripe`/`danger-stripe` `@utility` per `Front-upgrade.md` §4 (project convention wins).
-- impeccable bans backdrop-blur as default → kept on sticky surfaces (header/filter/booth), noted as S91 polish candidate.
-- karpathy "validate at boundaries" → layer-1 surgical guards now, Zod adoption deferred to S91.
-
-## Tasks in-progress
-
-- T11: full audit re-run + delta tables + PR open (audit running, ~25 min).
-- Backend + frontend containers rebuilt (latest S90 code in both).
-- Backend geo endpoint verified live: `curl -H "X-Forwarded-For: 81.137.0.1" localhost:8000/api/v1/geo/currency` → `{"currency":null,"country":"GB"}`. Frontend maps GB → GBP via `defaultCurrencyForCountry`.
-
-## Open bugs / blockers
-
-- Network slow (~200-400kB/s); container rebuilds slow.
-- ipwho.is free tier returns `currency: null` for most IPs — backend now passes null through so frontend can map country → currency. Verified.
-- pytest not installed in backend Docker container (`tests/` excluded from build context per S20 hardening). Tests run via local `.venv/Scripts/python.exe -m pytest`.
-
-## Files created this session
-
-**Audit + planning artifacts:**
-- `docs/superpowers/specs/2026-05-24-frontend-audit-design.md`
-- `docs/superpowers/plans/` (synced from `C:\Users\HP\.claude\plans\bright-snacking-otter.md`)
-- `frontend/audit-out/AUDIT_REPORT_2026-05-24.md`
-- `frontend/audit-out/ROOT_CAUSE_ANALYSIS.md`
-- `frontend/audit-out/missing-vs-spec.md`
-- `frontend/audit-out/sprint-slice-S90.md`
-- `frontend/audit-out/REPORT-baseline-2026-05-24.md`
-
-**Code:**
-- `backend/app/api/v1/routes/geo.py`
-- `backend/app/services/geo/__init__.py`
-- `backend/app/services/geo/ipwho_client.py`
-- `backend/tests/unit/test_geo_currency.py`
-- `frontend/src/lib/api/endpoints/geo.ts`
-- `frontend/src/components/marketing/StickySubNav.tsx`
-
-## Open work (S91+ candidates from RCA architectural observations)
-
-- **MaxMind GeoLite2 self-host** (replace ipwho.is) — privacy purity. ~3h + license signup + monthly cron + 80MB DB.
-- **Zod runtime validation at API boundary** — eliminates RC-7-class bugs at source. ~6h initial + ongoing.
-- **Mentor + partner demo seed users** — backend currently has none; audit drove those via admin role membership.
-- **CSP allowlist convention doc** — first 3rd-party (ipwho) revealed gap; policy decision (proxy-everything vs explicit allowlist).
-- Smoke selector re-point + `ci.yml:198` `continue-on-error` removal.
-- Refresh `docs/scholarai/IMPLEMENTATION_STATUS_REPORT.md`, `frontend/README.md`, `.codex/AGENTS.md` for Pakistan pivot.
-- `tests/integration/test_trial_lifecycle.py` end-to-end invite flow.
-- Celery beat `tasks.run_usage_ledger_prune` monthly pruning.
-
-## Commands to resume
+### Commands to resume
 
 ```bash
-# Stack status
-docker compose ps
-
-# Backend geo smoke
-curl -s http://localhost:8000/api/v1/geo/currency
-curl -s -H "X-Forwarded-For: 81.137.0.1" http://localhost:8000/api/v1/geo/currency
-
-# Backend tests (local venv — not Docker container)
-./.venv/Scripts/python.exe -m pytest backend/tests/unit/test_geo_currency.py -v
-
-# Frontend audit (full matrix, ~25 min, uses node + system chrome)
-cd frontend
-node scripts/audit/runner.mjs
-
-# Frontend audit subsets
-node scripts/audit/runner.mjs --routes=public --states=loaded
-node scripts/audit/runner.mjs --routes=student,admin
-
-# Lint + typecheck + build
-cd frontend && bun run lint && bunx --bun tsc --noEmit && bun run build
-
-# Rebuild (slow on weak network)
-docker compose up --build -d
+cd backend && python -m pytest tests/ -q --no-header --tb=line 2>&1 | tail -5
+git -C C:/Users/HP/scholarai-platform status --short
+cd backend && alembic upgrade head  # head should be 20260526_0029
+# After CLERK_SECRET_KEY in env:
+python backend/scripts/clerk_seed_demo.py
+python backend/scripts/clerk_bulk_import.py
+# After NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set:
+cd frontend && bun run build && bun dev
+# visit http://localhost:3000/sign-in
 ```

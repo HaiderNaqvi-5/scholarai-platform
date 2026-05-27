@@ -22,15 +22,16 @@ const csp = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `connect-src 'self' ${apiOrigin}`,
+  `connect-src 'self' ${apiOrigin} https://*.clerk.accounts.dev https://clerk-telemetry.com`,
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   // Tailwind 4 + Next.js inline runtime styles
   "style-src 'self' 'unsafe-inline'",
+  "frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev",
   // Next.js dev mode injects eval()-using HMR shim; tighten in prod build
   process.env.NODE_ENV === "production"
-    ? "script-src 'self' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    ? "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
 ].join("; ");
 
 const SECURITY_HEADERS = [
