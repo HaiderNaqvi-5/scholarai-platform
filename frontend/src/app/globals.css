@@ -16,20 +16,20 @@
   --color-ink-deep:       #0E1A1F;
   --color-ink:            #1B2630;
   --color-ink-muted:      #4A5663;
-  --color-ink-subtle:     #6E7984;
+  --color-ink-subtle:     #5C6772;     /* 5.0:1 on ivory — PASS AA */
 
   --color-lapis:          #1B3A6B;
   --color-lapis-soft:     #DCE3EE;
-  --color-gold-leaf:      #B08A3E;
+  --color-gold-leaf:      #6E521B;     /* 5.8:1 on gold-soft (Badge tone=gold), 6.5:1 on ivory */
   --color-gold-soft:      #F1E6CA;
-  --color-sindoor:        #B94A48;
+  --color-sindoor:        #8C2F2E;     /* 5.5:1 on sindoor-soft — PASS AA */
   --color-sindoor-soft:   #F2D9D5;
 
-  --color-validated:      #426B5A;
+  --color-validated:      #2F5142;     /* 5.5:1 on validated-soft — PASS AA */
   --color-validated-soft: #DDE9E2;
   --color-generated:      #2E5B9A;
   --color-generated-soft: #DCE6F4;
-  --color-caution:        #B7791F;
+  --color-caution:        #7E5215;     /* 5.0:1 on caution-soft — PASS AA */
   --color-caution-soft:   #F4E7CF;
 
   /* ─── Color (functional aliases used by Tailwind) ─── */
@@ -97,6 +97,9 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Smooth scroll for in-page anchors (StickySubNav, FAQ jumps).
+       Reduced-motion media query below overrides to `auto`. */
+    scroll-behavior: smooth;
   }
 
   body {

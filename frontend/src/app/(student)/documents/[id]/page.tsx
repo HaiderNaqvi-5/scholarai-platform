@@ -207,7 +207,7 @@ function FeedbackPartitions({ fb }: { fb: DocumentFeedbackPartition }) {
 
       <Partition
         tone="generated"
-        icon={<Sparkles className="size-4" strokeWidth={2} />}
+        icon={<Sparkles className="size-[14px]" strokeWidth={2} />}
         title="Generated guidance"
         description="AI-written suggestions. Not authoritative."
       >

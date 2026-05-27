@@ -28,10 +28,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        {/* ConsentBar must live inside AuthProvider because it calls useAuth
+            (S90 Task 2 gate). OfflineBanner + CookieBanner don't need auth
+            context and stay as siblings to keep the tree shallow. */}
+        <ConsentBar />
+      </AuthProvider>
       <OfflineBanner />
       <CookieBanner />
-      <ConsentBar />
       <Toaster
         position="bottom-right"
         toastOptions={{

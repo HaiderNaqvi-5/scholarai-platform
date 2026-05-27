@@ -40,7 +40,7 @@ export default function GlobalError({
             .
           </p>
           {error.digest ? (
-            <div style={{ marginTop: 12, fontFamily: "ui-monospace, monospace", fontSize: 13, color: "#6E7984" }}>
+            <div style={{ marginTop: 12, fontFamily: "ui-monospace, monospace", fontSize: 13, color: "#5C6772" }}>
               Incident ID: <code>{error.digest}</code>
             </div>
           ) : null}

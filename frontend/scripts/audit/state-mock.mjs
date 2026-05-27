@@ -43,14 +43,35 @@ export async function mockError(page, paths, status = 500) {
   }
 }
 
-/** Empty list payload. Server returns 200 with [] or {items:[], total:0}. */
-export async function mockEmpty(page, paths) {
+/**
+ * Empty list payload. Default = generic `{items:[],total:0,...}`. Per-route
+ * override via the route manifest's `mock_empty_body` field — needed when the
+ * endpoint's real shape differs (e.g. `/analytics/health` returns
+ * `{kpi_alerts:[]}` not `{items:[]}`). Without per-route bodies, the generic
+ * stub masks real defects.
+ */
+export async function mockEmpty(page, paths, body) {
+  const payload = body ?? { items: [], total: 0, results: [], unlock_offer: null };
   for (const p of paths) {
     await page.route(`${API_PREFIX}${p}`, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ items: [], total: 0, results: [], unlock_offer: null }),
+        body: JSON.stringify(payload),
+      }),
+    );
+  }
+}
+
+/** 200 with provided body. Used for dynamic-detail routes that need a
+ *  realistic loaded payload (zara has 0 documents/interviews in seed data). */
+export async function mockOk(page, paths, body) {
+  for (const p of paths) {
+    await page.route(`${API_PREFIX}${p}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
       }),
     );
   }

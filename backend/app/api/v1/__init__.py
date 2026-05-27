@@ -19,6 +19,7 @@ from app.api.v1.routes import (
     privacy,
     b2b,
     waitlist,
+    geo,
 )
 
 router = APIRouter()
@@ -55,3 +56,4 @@ router.include_router(privacy.router, prefix="/privacy", tags=["Privacy & Consen
 router.include_router(b2b.router, prefix="/b2b", tags=["B2B"])
 router.include_router(waitlist.router, prefix="", tags=["Waitlist & Upgrade"])
 router.include_router(clerk_webhook.router, prefix="/webhooks", tags=["Webhooks"])
+router.include_router(geo.router, prefix="/geo", tags=["Geo / Currency"])
