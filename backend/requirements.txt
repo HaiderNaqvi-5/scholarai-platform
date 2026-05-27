@@ -19,6 +19,11 @@ redis==5.0.8
 
 httpx==0.28.1
 pandas==2.2.3
+# Test-only dependency: Playwright Python is used by ``tests/e2e/playwright``
+# browser-smoke jobs. The Chromium binary is NOT installed in the prod image
+# (Dockerfile no longer runs ``playwright install chromium``); CI fetches it
+# in a separate workflow step.
+playwright==1.52.0
 anthropic==0.39.0
 qrcode[pil]==7.4.2
 sentry-sdk[fastapi]==2.18.0
