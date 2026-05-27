@@ -149,3 +149,50 @@ Click "Send test email", confirm in inbox, save.
 ### Rotation
 
 Rotate the Clerk SMTP key (`re_clerk_smtp_...`) independently of the apex `RESEND_API_KEY` used by the backend. The two keys are restricted to different domains so a leak of one does not require rotating the other.
+
+---
+
+## Social OAuth + magic-link + connected accounts (2026-05-27)
+
+### Dashboard prerequisites (per Clerk environment)
+
+Frontend renders 4 social buttons on `/login` + `/signup` unconditionally when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set. A click on a disabled provider returns an error toast; the button stays visible.
+
+**Enable in dashboard → Configure → User & Authentication → Social Connections:**
+
+| Provider | Strategy | Clerk redirect URL pattern |
+|----------|----------|----------------------------|
+| Google | `oauth_google` | `https://<frontend>/sso-callback` |
+| Microsoft | `oauth_microsoft` | same |
+| Facebook | `oauth_facebook` | same |
+| LinkedIn | `oauth_linkedin_oidc` | same |
+
+For each provider, paste Clerk's generated "Redirect URL" into the provider's OAuth app config (Google Cloud Console / Microsoft Entra / Meta for Developers / LinkedIn Developers). Default scopes are sufficient — Clerk maps `email` + `name` claims automatically.
+
+**Enable magic-link sign-in:**
+
+Dashboard → Configure → User & Authentication → Email, Phone, Username → "Email verification link" toggle ON. Keep "Password" toggle ON (signup still requires it). Magic-link is sign-in only — `/signup` always uses the password + email-code 2-step flow.
+
+### Frontend wire-up (already shipped — reference only)
+
+- `frontend/src/components/auth/SocialAuthButtons.tsx` — 2x2 grid of branded buttons above the email form. Inline brand SVGs (Google 4-color G, Microsoft 4-square, Facebook f, LinkedIn in). No npm icon dep.
+- `frontend/src/app/sso-callback/page.tsx` — mounts `<AuthenticateWithRedirectCallback />` with Fraunces "Signing you in…" shell. Absorbs OAuth + magic-link returns.
+- `frontend/src/proxy.ts` — `/sso-callback` added to `isPublicRoute` matcher.
+- `frontend/src/app/login/page.tsx` — `mode` state cycles `password → magic-link → magic-sent`. Magic-link mode hides the password field and switches the submit to "Send sign-in link" with a 30s resend cooldown after success.
+- `frontend/src/app/signup/page.tsx` — social row shown only on create step (hidden during email-code verification).
+- `frontend/src/components/settings/ConnectedAccountsPanel.tsx` — lists `user.externalAccounts`; Disconnect per row; "Connect" for unlinked providers. Refuses to disconnect the last identification method.
+- `frontend/src/app/(student)/settings/page.tsx` — new "Connected accounts" tab between Privacy and Notifications (clerk-mode only).
+
+### Smoke per provider
+
+1. `/login` → click Google → redirect to accounts.google.com → choose account → return to `/sso-callback` → `/feed`. Cookie `__session` present afterwards.
+2. `/login` → "Or email me a sign-in link" → enter email → Send → inbox shows AidwiseAI-branded link → click → `/feed`.
+3. `/signup` → click LinkedIn → Clerk-hosted consent screen → `/sso-callback` → `/onboarding`.
+4. `/settings` → Connected accounts tab → confirm linked providers list + emails. Click Disconnect on one (must leave at least one method) → row disappears.
+5. `/settings` → Connect a new account → click an unlinked provider → OAuth roundtrip → row reappears.
+
+### Known caveats
+
+- Clerk SDK 6.39.4 exports `<SignedIn>` / `<SignedOut>` (not `<Show>` — that lands in a future major). Layout header uses the former pair.
+- LinkedIn strategy is `oauth_linkedin_oidc` (current) not legacy `oauth_linkedin`.
+- Apple Sign-In requires a $99/yr Apple Developer Account — deferred until the iOS app.

@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/ui/section-header";
 import { TypedConfirm } from "@/components/settings/TypedConfirm";
+import { ConnectedAccountsPanel } from "@/components/settings/ConnectedAccountsPanel";
+import { clerkEnabled } from "@/lib/auth/clerkAdapter";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { endpoints } from "@/lib/api";
 import { readConsent, writeConsent } from "@/components/consent/CookieBanner";
@@ -56,6 +58,7 @@ function SettingsBody() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          {clerkEnabled ? <TabsTrigger value="connected">Connected accounts</TabsTrigger> : null}
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="plan">Plan</TabsTrigger>
@@ -68,6 +71,11 @@ function SettingsBody() {
         <TabsContent value="privacy">
           <PrivacyTab />
         </TabsContent>
+        {clerkEnabled ? (
+          <TabsContent value="connected">
+            <ConnectedAccountsPanel />
+          </TabsContent>
+        ) : null}
         <TabsContent value="notifications">
           <NotificationsTab />
         </TabsContent>

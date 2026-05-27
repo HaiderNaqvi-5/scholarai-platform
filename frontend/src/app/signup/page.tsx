@@ -31,6 +31,7 @@ import { ApiError } from "@/lib/api";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { clerkEnabled, useClerkSignupFlow } from "@/lib/auth/clerkAdapter";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
 
@@ -292,6 +293,12 @@ function SignupInner({
               >
                 <X className="size-4" strokeWidth={1.5} />
               </button>
+            </div>
+          ) : null}
+
+          {step === "create" && clerkEnabled ? (
+            <div className="mb-6">
+              <SocialAuthButtons mode="signup" />
             </div>
           ) : null}
 

@@ -6,6 +6,11 @@
  * Centered 380-wide form. Demo chips appear only outside production.
  * `Enter` submits. Rate-limit countdown surfaces on 429. CapsLock
  * warning when password field is focused.
+ *
+ * Clerk mode adds:
+ *   - Social OAuth row above the form (Google / Microsoft / Facebook / LinkedIn)
+ *   - Magic-link mode toggle below the password field — switches the form to
+ *     a "Send sign-in link" submit + "Check {email}" confirmation state.
  */
 
 import Link from "next/link";
@@ -19,7 +24,12 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { ApiError } from "@/lib/api";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
-import { clerkEnabled, useClerkLoginFlow } from "@/lib/auth/clerkAdapter";
+import {
+  clerkEnabled,
+  useClerkLoginFlow,
+  useClerkMagicLink,
+} from "@/lib/auth/clerkAdapter";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 export default function LoginPage() {
   return (
@@ -31,20 +41,44 @@ export default function LoginPage() {
 
 function ClerkLoginInner() {
   const loginWithClerk = useClerkLoginFlow();
-  return <LoginInner submit={async (email, password) => loginWithClerk({ email, password })} />;
+  const sendMagicLink = useClerkMagicLink();
+  return (
+    <LoginInner
+      submit={async (email, password) => loginWithClerk({ email, password })}
+      magicLink={sendMagicLink}
+      social={<SocialAuthButtons mode="signin" />}
+    />
+  );
 }
 
 function LocalLoginInner() {
   const auth = useAuth();
-  return <LoginInner submit={async (email, password) => { await auth.login({ email, password }); }} />;
+  return (
+    <LoginInner
+      submit={async (email, password) => {
+        await auth.login({ email, password });
+      }}
+    />
+  );
 }
 
-function LoginInner({ submit }: { submit: (email: string, password: string) => Promise<void> }) {
+type Mode = "password" | "magic-link" | "magic-sent";
+
+function LoginInner({
+  submit,
+  magicLink,
+  social,
+}: {
+  submit: (email: string, password: string) => Promise<void>;
+  magicLink?: (email: string) => Promise<void>;
+  social?: React.ReactNode;
+}) {
   const auth = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/feed";
 
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -52,6 +86,7 @@ function LoginInner({ submit }: { submit: (email: string, password: string) => P
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retrySeconds, setRetrySeconds] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const showDemo = process.env.NODE_ENV !== "production" && !clerkEnabled;
@@ -71,6 +106,12 @@ function LoginInner({ submit }: { submit: (email: string, password: string) => P
     };
   }, [retrySeconds]);
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1_000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (retrySeconds > 0) return;
@@ -78,10 +119,6 @@ function LoginInner({ submit }: { submit: (email: string, password: string) => P
     setError(null);
     try {
       await submit(email, password);
-      // In local mode, auth.login mutates AuthProvider state -> the effect
-      // above redirects. In clerk mode, setActive() flips useClerkAuth ->
-      // ClerkBackedAuthProvider re-fetches /me -> same effect fires. Either
-      // way the explicit replace below speeds up the happy path.
       router.replace(next);
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
@@ -96,6 +133,37 @@ function LoginInner({ submit }: { submit: (email: string, password: string) => P
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onSendLink() {
+    if (!magicLink || email.length < 3) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await magicLink(email);
+      setMode("magic-sent");
+      setResendCooldown(30);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Couldn't send the link.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onResendLink() {
+    if (!magicLink || resendCooldown > 0) return;
+    setError(null);
+    try {
+      await magicLink(email);
+      setResendCooldown(30);
+      toast.success("Link resent.");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Couldn't resend the link.";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -121,89 +189,187 @@ function LoginInner({ submit }: { submit: (email: string, password: string) => P
             Sign in
           </h1>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4" noValidate data-testid="login-form">
-            <div>
-              <Label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-ink-deep">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoFocus
-              />
-            </div>
+          {social && mode !== "magic-sent" ? <div className="mt-8">{social}</div> : null}
 
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <Label htmlFor="password" className="text-[13px] font-medium text-ink-deep">
-                  Password
+          {mode === "password" && (
+            <form onSubmit={onSubmit} className={social ? "space-y-4" : "mt-8 space-y-4"} noValidate data-testid="login-form">
+              <div>
+                <Label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-ink-deep">
+                  Email
                 </Label>
-                <Link
-                  href="/legal/privacy"
-                  className="text-[12px] text-lapis underline underline-offset-2 hover:decoration-2"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative">
                 <Input
-                  id="password"
-                  name="password"
-                  type={showPw ? "text" : "password"}
-                  autoComplete="current-password"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
-                  onKeyDown={(e) => setCapsLock(e.getModifierState("CapsLock"))}
-                  className="pr-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-deep"
-                >
-                  {showPw ? <EyeOff className="size-4" strokeWidth={1.5} /> : <Eye className="size-4" strokeWidth={1.5} />}
-                </button>
               </div>
-              {capsLock ? (
-                <p className="mt-2 flex items-center gap-1.5 text-[12px] text-caution" role="alert">
-                  <AlertTriangle className="size-3.5" strokeWidth={1.5} />
-                  Caps Lock is on.
+
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <Label htmlFor="password" className="text-[13px] font-medium text-ink-deep">
+                    Password
+                  </Label>
+                  <Link
+                    href="/legal/privacy"
+                    className="text-[12px] text-lapis underline underline-offset-2 hover:decoration-2"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPw ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                    onKeyDown={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                    className="pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-deep"
+                  >
+                    {showPw ? <EyeOff className="size-4" strokeWidth={1.5} /> : <Eye className="size-4" strokeWidth={1.5} />}
+                  </button>
+                </div>
+                {capsLock ? (
+                  <p className="mt-2 flex items-center gap-1.5 text-[12px] text-caution" role="alert">
+                    <AlertTriangle className="size-3.5" strokeWidth={1.5} />
+                    Caps Lock is on.
+                  </p>
+                ) : null}
+              </div>
+
+              {error ? (
+                <p
+                  role="alert"
+                  className="rounded-[10px] border border-sindoor/30 bg-sindoor-soft px-3 py-2 text-[13px] text-sindoor"
+                >
+                  {error}
+                  {retrySeconds > 0 ? (
+                    <span className="ml-2 font-mono tabular-nums">{retrySeconds}s</span>
+                  ) : null}
                 </p>
               ) : null}
-            </div>
 
-            {error ? (
-              <p
-                role="alert"
-                className="rounded-[10px] border border-sindoor/30 bg-sindoor-soft px-3 py-2 text-[13px] text-sindoor"
+              <Button
+                type="submit"
+                loading={submitting}
+                disabled={retrySeconds > 0}
+                className="w-full"
+                size="lg"
               >
-                {error}
-                {retrySeconds > 0 ? (
-                  <span className="ml-2 font-mono tabular-nums">{retrySeconds}s</span>
-                ) : null}
+                Sign in
+              </Button>
+
+              {magicLink ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("magic-link");
+                    setError(null);
+                    setPassword("");
+                  }}
+                  className="block w-full text-center text-[12px] text-lapis underline underline-offset-2 hover:decoration-2"
+                >
+                  Or email me a sign-in link
+                </button>
+              ) : null}
+            </form>
+          )}
+
+          {mode === "magic-link" && (
+            <div className={social ? "space-y-5" : "mt-8 space-y-5"}>
+              <p className="text-[13px] text-ink-muted">
+                We&apos;ll send a one-tap sign-in link to your email.
               </p>
-            ) : null}
+              <div>
+                <Label htmlFor="email-link" className="mb-1.5 block text-[13px] font-medium text-ink-deep">
+                  Email
+                </Label>
+                <Input
+                  id="email-link"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              {error ? (
+                <p role="alert" className="rounded-[10px] border border-sindoor/30 bg-sindoor-soft px-3 py-2 text-[13px] text-sindoor">
+                  {error}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                onClick={onSendLink}
+                loading={submitting}
+                disabled={email.length < 3}
+                className="w-full"
+                size="lg"
+              >
+                Send sign-in link
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("password");
+                  setError(null);
+                }}
+                className="block w-full text-center text-[12px] text-ink-muted hover:text-ink-deep"
+              >
+                Use password instead
+              </button>
+            </div>
+          )}
 
-            <Button
-              type="submit"
-              loading={submitting}
-              disabled={retrySeconds > 0}
-              className="w-full"
-              size="lg"
-            >
-              Sign in
-            </Button>
-          </form>
+          {mode === "magic-sent" && (
+            <div className="mt-8 space-y-5">
+              <p className="text-[13px] text-ink-muted">
+                We sent a sign-in link to{" "}
+                <span className="font-medium text-ink-deep">{email}</span>. Open
+                it from this device to finish signing in.
+              </p>
+              {error ? (
+                <p role="alert" className="rounded-[10px] border border-sindoor/30 bg-sindoor-soft px-3 py-2 text-[13px] text-sindoor">
+                  {error}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={onResendLink}
+                disabled={resendCooldown > 0}
+                className="block w-full text-center text-[13px] text-lapis underline underline-offset-2 disabled:text-ink-subtle disabled:no-underline"
+              >
+                {resendCooldown > 0 ? `Resend link in ${resendCooldown}s` : "Resend link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("password");
+                  setError(null);
+                }}
+                className="block w-full text-center text-[12px] text-ink-muted hover:text-ink-deep"
+              >
+                Use a different email
+              </button>
+            </div>
+          )}
 
-          {showDemo ? (
+          {showDemo && mode === "password" ? (
             <div className="mt-6">
               <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
                 Demo · dev only
