@@ -280,5 +280,11 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client
           PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c "CREATE EXTENSION IF NOT EXISTS vector"
 
+      - name: Migration drift check
+        run: |
+          cd backend
+          alembic upgrade head
+          alembic check
+
       - name: Run DB-backed integration tests
         run: pytest backend/tests/integration -q
