@@ -4,10 +4,14 @@
 **Branch:** `s94/frontend-design-pass` (off `s93/auth-tier-1`)
 **Plan:** `~/.claude/plans/synthetic-popping-avalanche.md` (frontend design pass: patch P0/P1/P2 audit findings + 3 competitor features)
 
+## Commits this session (branch `s94/frontend-design-pass`)
+- `c602006` — Phase 1/2/3-core: competitor features + P1 fixes (29 files)
+- `58d41e4` — Phase 4 motion polish (5 files)
+
 ## Gate status (this session)
 - `bunx --bun tsc --noEmit` — clean
 - `bun run build` — green (41 routes, clean build from wiped `.next`)
-- `bun run lint` — re-run after final edits (green earlier this session)
+- `bun run lint` — green (exit 0, after final Phase 4 edits)
 - `bun run audit:emoji` — clean (0 banned emoji, 133 files)
 - `bun run audit:public` — could NOT run: harness Playwright launches system Chrome, which timed out at launch (60s) in this env. Not a copy failure — checks never executed. Manual em-dash + emoji sweeps done instead.
 - Browser verification (bundled chromium via `frontend/scripts/capture_phase12.py`, `capture_phase3.py`, `crop_rail.py`): landing + login at 375/768/1440, pricing + password-meter states. 0 console errors. Screenshots in `frontend/audit-out/phase12/`.
@@ -43,9 +47,13 @@
 - Live AUTHED surface re-capture still blocked: `AUTH_PROVIDER=clerk`, seeded accounts have null `clerk_user_id`, `.env` lockdown prevents toggling to local mode. Admin/mentor/student shells (Sidebar/TopBar/role-mixing) verified by tsc + shape, not live render.
 - `audit:public` harness can't launch system Chrome in this env (60s timeout).
 
+### Phase 4 (P2 motion polish) — DONE + verified
+Scroll-driven progress bar on landing (progressive `@supports (animation-timeline: scroll())` + reduced-motion gate; verified scaleX(0.59) at 55% scroll, 0 console errors), CTA trailing-arrow nudge (`.arrow-nudge`, `@media (hover:hover)`), search `/`-hint `peer-focus:opacity-0`, sidebar shortcut-kbd now `opacity-0 group-hover:opacity-100` (no display-toggle layout shift). New CSS in `globals.css`.
+
 ## In progress / next steps
-- **Phase 3 remaining (lower-value P1) + Phase 4 (P2 polish):** skeleton→content crossfade (`@starting-style`), scroll-progress bar, hover micro-motions (arrow nudge / card lift gated `@media(hover)`), kbd-hint opacity fades, FAQ answer-preview + topic chips, footer refresh-chip framing, sidebar kbd always-render fade. (Plan's "2px lapis active rail" intentionally SKIPPED — conflicts with impeccable side-stripe ban; kept `bg-lapis-soft` active fill.)
-- **Phase 5:** final lint+tsc+build, manual viewport matrix, CLAUDE.md S94 row (added).
+- **Remaining P2 nits (optional):** skeleton→content crossfade (`@starting-style`), FAQ answer-preview + topic chips, footer refresh-chip framing. Lower value; safe to defer.
+- **Phase 5:** manual viewport matrix walk at 375/768/1024/1440 (public surfaces captured; authed surfaces blocked by clerk). CLAUDE.md S94 row + this file updated.
+- (Plan's "2px lapis active rail" intentionally SKIPPED — conflicts with impeccable side-stripe ban; kept `bg-lapis-soft` active fill.)
 
 ## Environment notes
 - Backend container `scholarai-platform-backend-1` was "Up (unhealthy)"/hung → `docker restart` revived it (livez 200 after 30s). Postgres/Redis healthy. Public `/scholarships` returns 18 published items.
