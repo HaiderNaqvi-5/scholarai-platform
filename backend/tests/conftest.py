@@ -44,26 +44,6 @@ requires_db = pytest.mark.skipif(
 )
 
 
-def _deduplicate_metadata_indexes(metadata) -> None:
-    """Remove duplicate index objects from SQLAlchemy metadata tables.
-
-    Some models define index=True on a column AND also list the same index
-    name in __table_args__, producing two Index objects with the same name.
-    Postgres raises DuplicateTableError when create_all tries to issue both
-    CREATE INDEX statements.  We deduplicate in-memory (no app code touched).
-    """
-    for table in metadata.tables.values():
-        seen: set[str] = set()
-        dupes: list = []
-        for idx in list(table.indexes):
-            if idx.name in seen:
-                dupes.append(idx)
-            else:
-                seen.add(idx.name)
-        for idx in dupes:
-            table.indexes.discard(idx)
-
-
 # Fallback isolation strategy: per-test create_all / drop_all.
 # The transactional savepoint recipe is incompatible with pytest-asyncio 1.3.0
 # when session-scoped and function-scoped fixtures use different event loops.
@@ -71,7 +51,6 @@ def _deduplicate_metadata_indexes(metadata) -> None:
 
 @pytest_asyncio.fixture
 async def db_session():
-    _deduplicate_metadata_indexes(Base.metadata)
     engine = create_async_engine(TEST_DATABASE_URL, future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

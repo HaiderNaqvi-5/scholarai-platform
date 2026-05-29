@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date as sa_Date,
     DateTime,
     Enum,
@@ -296,6 +297,13 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    __table_args__ = (
+        CheckConstraint(
+            "plan IN ('free', 'pro', 'elite', 'institution')",
+            name="ck_users_plan_allowed",
+        ),
+    )
+
 
 class Capability(Base):
     __tablename__ = "capabilities"
@@ -506,6 +514,26 @@ class StudentProfile(Base):
     lead_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lead_score_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # --- B2B data expansion (migration 0019) -----------------------------
+    current_university_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "universities.id",
+            ondelete="SET NULL",
+            name="fk_student_profiles_current_university",
+        ),
+        nullable=True,
+    )
+    target_university_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        postgresql.ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default=text("ARRAY[]::uuid[]"),
+        default=list,
+    )
+    gmat_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sat_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    budget_pkr_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -523,6 +551,24 @@ class StudentProfile(Base):
     __table_args__ = (
         Index("ix_student_profiles_target_country", "target_country_code"),
         Index("ix_student_profiles_target_field", "target_field"),
+        Index("ix_student_profiles_current_university_id", "current_university_id"),
+        Index(
+            "ix_student_profiles_target_university_ids",
+            "target_university_ids",
+            postgresql_using="gin",
+        ),
+        CheckConstraint(
+            "gmat_score IS NULL OR (gmat_score BETWEEN 200 AND 800)",
+            name="ck_student_profiles_gmat_range",
+        ),
+        CheckConstraint(
+            "sat_score IS NULL OR (sat_score BETWEEN 400 AND 1600)",
+            name="ck_student_profiles_sat_range",
+        ),
+        CheckConstraint(
+            "budget_pkr_max IS NULL OR budget_pkr_max >= 0",
+            name="ck_student_profiles_budget_nonneg",
+        ),
     )
 
 
@@ -1252,7 +1298,6 @@ class DocumentKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_document_kpi_snapshots_user_created_at", "user_id", "created_at"),
-        Index("ix_document_kpi_snapshots_document_id", "document_id"),
     )
 
 
@@ -1288,7 +1333,6 @@ class InterviewKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
-        Index("ix_interview_kpi_snapshots_session_id", "session_id"),
     )
 
 
