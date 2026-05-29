@@ -11,6 +11,7 @@
  */
 
 import { AuthenticateWithRedirectCallback } from "@clerk/nextjs";
+import { clerkEnabled } from "@/lib/auth/clerkAdapter";
 
 export default function SSOCallbackPage() {
   return (
@@ -23,10 +24,17 @@ export default function SSOCallbackPage() {
           Verifying your account
         </p>
       </div>
-      <AuthenticateWithRedirectCallback
-        signInFallbackRedirectUrl="/feed"
-        signUpFallbackRedirectUrl="/onboarding"
-      />
+      {/* Only mount the Clerk callback when Clerk is enabled. Without a
+          publishable key the layout omits <ClerkProvider>, so rendering this
+          component would throw — and break static prerender at build time
+          (CI builds with no key). Mirrors the clerkEnabled gate used in
+          AuthProvider / login / signup. */}
+      {clerkEnabled && (
+        <AuthenticateWithRedirectCallback
+          signInFallbackRedirectUrl="/feed"
+          signUpFallbackRedirectUrl="/onboarding"
+        />
+      )}
     </div>
   );
 }
