@@ -16,8 +16,6 @@ from app.models import (
 from app.schemas.interviews import InterviewAnswerFeedback, InterviewAnswerRequest, InterviewRubricDimension
 from app.services.interview import InterviewSessionService
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeResult:
     def __init__(self, rows):

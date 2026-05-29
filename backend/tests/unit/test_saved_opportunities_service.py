@@ -8,8 +8,6 @@ from fastapi import HTTPException
 from app.models import ApplicationStatus, RecordState
 from app.services.saved_opportunities import SavedOpportunityService
 
-pytestmark = pytest.mark.asyncio
-
 
 class ScalarResult:
     def __init__(self, one=None, all_items=None):

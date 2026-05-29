@@ -2,8 +2,6 @@ import pytest
 
 from app.services.recommendations.service import RecommendationService
 
-pytestmark = pytest.mark.asyncio
-
 
 async def test_pgvector_candidate_retrieval_reports_rules_only_fallback_when_embeddings_are_missing(monkeypatch):
     service = RecommendationService(db=None)
