@@ -99,11 +99,11 @@ export function TopBar() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search scholarships"
             aria-keyshortcuts="/"
-            className="h-10 w-full rounded-[10px] border border-[var(--color-border)] bg-paper-white pl-10 pr-12 text-[14px] text-ink-deep placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+            className="peer h-10 w-full rounded-[10px] border border-[var(--color-border)] bg-paper-white pl-10 pr-12 text-[14px] text-ink-deep placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
           />
           <kbd
             aria-hidden
-            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--color-border)] bg-paper-warm px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle"
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--color-border)] bg-paper-warm px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle transition-opacity duration-[var(--motion-micro)] peer-focus:opacity-0"
           >
             /
           </kbd>

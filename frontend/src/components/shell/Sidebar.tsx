@@ -176,7 +176,7 @@ export function Sidebar() {
                         />
                         <span className="flex-1">{item.label}</span>
                         {item.shortcut ? (
-                          <kbd className="hidden font-mono text-[10px] text-ink-subtle group-hover:inline">
+                          <kbd className="font-mono text-[10px] text-ink-subtle opacity-0 transition-opacity duration-[var(--motion-micro)] group-hover:opacity-100">
                             {item.shortcut}
                           </kbd>
                         ) : null}

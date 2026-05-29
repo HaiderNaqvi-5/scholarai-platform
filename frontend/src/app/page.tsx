@@ -141,6 +141,7 @@ const PROBLEMS = [
 export default function Landing() {
   return (
     <div className="min-h-screen bg-ivory">
+      <div aria-hidden className="scroll-progress" />
       {/* ─── LandingNav (§3.2). Sticky after 80px scroll handled by Tailwind sticky. ─── */}
       <header className="sticky top-0 z-30 border-b border-[var(--color-border-quiet)] bg-ivory/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-4 md:px-16 md:py-5">
@@ -189,7 +190,7 @@ export default function Landing() {
                 context, no consultant required.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Button asChild size="lg">
+                <Button asChild size="lg" className="arrow-nudge">
                   <Link href="/signup">
                     See my matches <ArrowRight className="size-4" strokeWidth={1.5} />
                   </Link>
@@ -526,7 +527,7 @@ export default function Landing() {
               </table>
             </div>
             <div className="mt-6 flex justify-center">
-              <Button asChild size="md">
+              <Button asChild size="md" className="arrow-nudge">
                 <Link href="/signup">
                   Show scholarships I qualify for{" "}
                   <ArrowRight className="size-4" strokeWidth={1.5} />
@@ -611,7 +612,7 @@ export default function Landing() {
               the visa rehearsals start paying off.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="arrow-nudge">
                 <Link href="/signup">
                   Show scholarships I qualify for{" "}
                   <ArrowRight className="size-4" strokeWidth={1.5} />
