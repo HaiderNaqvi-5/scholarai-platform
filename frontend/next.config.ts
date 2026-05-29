@@ -52,6 +52,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Hide the on-screen dev route indicator (the floating badge). Build and
+  // runtime errors still surface; production never rendered it.
+  devIndicators: false,
   async headers() {
     return [
       {

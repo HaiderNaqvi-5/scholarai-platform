@@ -29,6 +29,19 @@ export function hasRole(user: { role: Role } | null, group: RoleGroup): boolean 
   return ROLE_GROUPS[group].includes(user.role);
 }
 
+/**
+ * The single nav section group a user belongs to, derived from their one
+ * true role. `hasRole` answers access (admin/owner inherit every group);
+ * this answers *display* — so an admin sees the Admin nav, not the union
+ * of student + mentor + partner + admin. Used by the sidebar / mobile drawer.
+ */
+export function primaryGroup(role: Role): RoleGroup {
+  if (role === "university") return "partner";
+  if (role === "mentor") return "mentor";
+  if (role === "admin" || role === "owner") return "admin";
+  return "student";
+}
+
 export function RoleGuard({
   group,
   children,

@@ -16,6 +16,7 @@ import { StatChip } from "@/components/ui/stat-chip";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { RotatingDegree } from "@/components/marketing/RotatingDegree";
 import { StickySubNav } from "@/components/marketing/StickySubNav";
+import { ScholarshipsRail } from "@/components/marketing/ScholarshipsRail";
 
 /**
  * Marketing landing (Front-upgrade §6.1).
@@ -79,7 +80,7 @@ const FAQS = [
   },
   {
     q: "How accurate is the match score?",
-    a: "The score is an Estimated Scholarship Fit Score — a structured comparison of your profile against the published eligibility rules, weighted by CGPA, target country, field, and language test. It is never an acceptance prediction. Every match shows the rule it matched, so you can audit the score yourself.",
+    a: "The score is an Estimated Scholarship Fit Score: a structured comparison of your profile against the published eligibility rules, weighted by CGPA, target country, field, and language test. It is never an acceptance prediction. Every match shows the rule it matched, so you can audit the score yourself.",
   },
   {
     q: "What happens to my data?",
@@ -87,7 +88,35 @@ const FAQS = [
   },
   {
     q: "When do I have to pay?",
-    a: "Never if you stay on Explorer. Pro and Elite are currently on a waitlist — we open seats in cohorts and email you when one is yours. When billing opens we accept JazzCash, Easypaisa, and IBAN bank transfer in PKR; cards in GBP, EUR, AED, and USD.",
+    a: "Never if you stay on Explorer. Pro and Elite are currently on a waitlist. We open seats in cohorts and email you when one is yours. When billing opens we accept JazzCash, Easypaisa, and IBAN bank transfer in PKR; cards in GBP, EUR, AED, and USD.",
+  },
+];
+
+const COMPARISON_ROWS = [
+  {
+    label: "Cost",
+    consultant: "PKR 40,000–150,000",
+    aidwise: "Free to start, PKR 2,999–6,000/mo for Pro/Elite",
+  },
+  {
+    label: "Turnaround",
+    consultant: "2–4 weeks per draft",
+    aidwise: "Matches in seconds, SOP draft in minutes",
+  },
+  {
+    label: "Coverage",
+    consultant: "Same 6–10 universities per client",
+    aidwise: "20 live scholarships, 47 universities across 5 countries",
+  },
+  {
+    label: "SOP authorship",
+    consultant: "Templated, generic, often recycled",
+    aidwise: "You stay the author, grounded in your real profile",
+  },
+  {
+    label: "Transparency",
+    consultant: "No reasoning shown",
+    aidwise: "Every match names the rule it matched",
   },
 ];
 
@@ -135,7 +164,7 @@ export default function Landing() {
               <Link href="/login">Sign in</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/signup">Get started</Link>
+              <Link href="/signup">See my matches</Link>
             </Button>
           </nav>
         </div>
@@ -157,12 +186,12 @@ export default function Landing() {
                 {BRAND_DISPLAY_NAME} matches Pakistani students with fully-funded
                 scholarships in the UK, US, Canada, Germany, and Australia. We
                 ground every match in your CGPA, target field, and household
-                context — no consultant required.
+                context, no consultant required.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Button asChild size="lg">
                   <Link href="/signup">
-                    Get started — free <ArrowRight className="size-4" strokeWidth={1.5} />
+                    See my matches <ArrowRight className="size-4" strokeWidth={1.5} />
                   </Link>
                 </Button>
                 <Button asChild variant="secondary" size="lg">
@@ -182,7 +211,7 @@ export default function Landing() {
             {/* Editorial preview — visible at lg+. Shows real provider output
                 so the hero anchors visually without a stock illustration. */}
             <aside
-              aria-label="Live this week — provider preview"
+              aria-label="Live this week, provider preview"
               className="hidden lg:col-span-5 lg:block"
             >
               <div className="rounded-[28px] border border-[var(--color-border)] bg-paper-warm p-7">
@@ -220,6 +249,35 @@ export default function Landing() {
                 </div>
               </div>
             </aside>
+
+            {/* Condensed live-this-week strip for <lg, where the aside is hidden. */}
+            <div className="lg:hidden">
+              <div className="rounded-[20px] border border-[var(--color-border)] bg-paper-warm p-5">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-lapis">
+                    Live this week
+                  </p>
+                  <Badge tone="validated">3 new</Badge>
+                </div>
+                <div className="mt-4 flex items-baseline justify-between gap-3">
+                  <p className="font-display text-[18px] italic font-[450] text-ink-deep">
+                    {PROVIDERS[0].name}
+                  </p>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
+                    {PROVIDERS[0].country}
+                  </p>
+                </div>
+                <p className="mt-1 text-[13px] leading-[1.5] text-ink-muted">
+                  {PROVIDERS[0].funding}
+                </p>
+                <Link
+                  href="/discover"
+                  className="mt-4 inline-block font-mono text-[11px] uppercase tracking-[0.06em] text-lapis underline-offset-2 hover:underline"
+                >
+                  +{PROVIDERS.length - 1} more live →
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -303,31 +361,9 @@ export default function Landing() {
                 </Link>
               </Button>
             </div>
-            <ul
-              role="list"
-              className="mt-10 grid gap-px overflow-hidden rounded-[22px] border border-[var(--color-border)] bg-[var(--color-border)] md:grid-cols-2 lg:grid-cols-3"
-            >
-              {PROVIDERS.map((p) => (
-                <li
-                  key={p.name}
-                  className="group bg-paper-white p-6 transition-colors duration-[var(--motion-micro)] ease-[var(--ease-out)] hover:bg-paper-warm/40"
-                >
-                  <div className="flex items-start justify-between">
-                    <h3 className="text-[20px] font-display italic font-[450] leading-tight text-ink-deep">
-                      {p.name}
-                    </h3>
-                    <Badge tone="validated">Live</Badge>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
-                    {p.country}
-                  </p>
-                  <p className="mt-4 text-[14px] leading-[1.55] text-ink-muted">{p.funding}</p>
-                </li>
-              ))}
-            </ul>
-            <Button asChild variant="link" className="mt-6 md:hidden">
-              <Link href="/discover">Browse all scholarships →</Link>
-            </Button>
+            <div className="mt-10">
+              <ScholarshipsRail />
+            </div>
           </div>
         </section>
 
@@ -366,7 +402,7 @@ export default function Landing() {
               <p className="mt-5 text-[16px] leading-[1.55] text-ink-muted">
                 The visa officer at the UK High Commission asks specific things in
                 a specific order. We rehearse the genuine-student narrative, the
-                financial-context probe, and the return-intent question — country
+                financial-context probe, and the return-intent question, country
                 by country, in study or exam mode.
               </p>
               <ul className="mt-6 space-y-3 text-[14px] text-ink-muted">
@@ -435,6 +471,71 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* ─── Comparison table: consultant vs AidwiseAI (Phase 2) ─── */}
+        <section className="border-b border-[var(--color-border-quiet)]">
+          <div className="mx-auto max-w-[1200px] px-6 py-20 md:px-16 md:py-24">
+            <div className="md:flex md:items-end md:justify-between md:gap-12">
+              <div className="md:max-w-[42ch]">
+                <CardEyebrow className="text-lapis">Why not a consultant?</CardEyebrow>
+                <h2 className="mt-3 font-display text-[32px] leading-[1.2] tracking-[-0.02em] text-ink-deep md:text-[40px]">
+                  One costs PKR 150,000. One is free.
+                </h2>
+              </div>
+              <p className="mt-4 max-w-[52ch] text-[15px] leading-[1.6] text-ink-muted md:mt-0">
+                A Lahore or Karachi consultant writes the same SOP for every client and
+                recommends the same six universities. {BRAND_DISPLAY_NAME} shows its working,
+                names the rule it matched, and never charges for the first result.
+              </p>
+            </div>
+            <div className="mt-10 overflow-hidden rounded-[20px] border border-[var(--color-border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--color-border)] bg-paper-warm/60">
+                    <th className="w-[38%] px-5 py-4 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink-subtle">
+                      What you get
+                    </th>
+                    <th className="px-5 py-4 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink-muted">
+                      Lahore consultant
+                    </th>
+                    <th className="px-5 py-4 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-lapis">
+                      {BRAND_DISPLAY_NAME}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border-quiet)]">
+                  {COMPARISON_ROWS.map((row) => (
+                    <tr
+                      key={row.label}
+                      className="bg-paper-white transition-colors hover:bg-paper-warm/30"
+                    >
+                      <td className="px-5 py-4 font-medium text-ink-deep">{row.label}</td>
+                      <td className="px-5 py-4 text-ink-muted">{row.consultant}</td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center gap-2 font-medium text-ink-deep">
+                          <CheckCircle2
+                            className="size-4 shrink-0 text-validated"
+                            strokeWidth={1.5}
+                            aria-hidden
+                          />
+                          {row.aidwise}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <Button asChild size="md">
+                <Link href="/signup">
+                  Show scholarships I qualify for{" "}
+                  <ArrowRight className="size-4" strokeWidth={1.5} />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
         {/* ─── §6.1 Pricing teaser — 3 PricingCards (Explorer/Pro/Elite) ─── */}
         <section className="border-b border-[var(--color-border-quiet)] bg-paper-warm/40">
           <div className="mx-auto max-w-[1200px] px-6 py-20 md:px-16 md:py-24">
@@ -476,6 +577,7 @@ export default function Landing() {
                 price="PKR 6,000"
                 period="per month"
                 italic
+                drench
                 features={[
                   "12 matches + provenance trail",
                   "10 SOP drafts + line-by-line feedback",
@@ -511,7 +613,8 @@ export default function Landing() {
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg">
                 <Link href="/signup">
-                  Create account <ArrowRight className="size-4" strokeWidth={1.5} />
+                  Show scholarships I qualify for{" "}
+                  <ArrowRight className="size-4" strokeWidth={1.5} />
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="lg">
@@ -532,7 +635,7 @@ export default function Landing() {
                 {BRAND_DISPLAY_NAME}
               </p>
               <p className="mt-3 max-w-[34ch] text-[14px] leading-[1.6] text-paper-white/70">
-                {BRAND_DISPLAY_NAME} — built for Pakistani applicants. Pakistan-priced.
+                {BRAND_DISPLAY_NAME}, built for Pakistani applicants. Pakistan-priced.
                 PDPB-aligned. No consultant fees.
               </p>
               <div className="mt-6 flex items-center gap-2 text-[13px] text-paper-white/60">
@@ -593,6 +696,7 @@ function PricingTeaser({
   ctaHref,
   italic,
   badge,
+  drench,
 }: {
   tier: string;
   price: string;
@@ -602,34 +706,53 @@ function PricingTeaser({
   ctaHref: string;
   italic?: boolean;
   badge?: string;
+  drench?: boolean;
 }) {
   return (
-    <div className="flex flex-col bg-paper-white p-6 md:p-8">
+    <div className={`flex flex-col p-6 md:p-8 ${drench ? "bg-ink-deep" : "bg-paper-white"}`}>
       <div className="flex items-center justify-between">
         <h3
-          className={`font-display text-[24px] leading-tight text-ink-deep ${
-            italic ? "italic font-[450]" : "font-[500]"
-          }`}
+          className={`font-display text-[24px] leading-tight ${
+            drench ? "text-paper-white" : "text-ink-deep"
+          } ${italic ? "italic font-[450]" : "font-[500]"}`}
         >
           {tier}
         </h3>
-        {badge ? <Badge tone="lapis">{badge}</Badge> : null}
+        {badge ? <Badge tone={drench ? "gold" : "lapis"}>{badge}</Badge> : null}
       </div>
       <div className="mt-4 flex items-baseline gap-2">
-        <span className="font-mono text-[28px] font-semibold tabular-nums text-ink-deep">
+        <span
+          className={`font-mono text-[28px] font-semibold tabular-nums ${
+            drench ? "text-paper-white" : "text-ink-deep"
+          }`}
+        >
           {price}
         </span>
-        <span className="text-[13px] text-ink-subtle">{period}</span>
+        <span className={`text-[13px] ${drench ? "text-paper-white/55" : "text-ink-subtle"}`}>
+          {period}
+        </span>
       </div>
-      <ul className="mt-6 space-y-2.5 text-[14px] text-ink-muted">
+      <ul
+        className={`mt-6 space-y-2.5 text-[14px] ${
+          drench ? "text-paper-white/85" : "text-ink-muted"
+        }`}
+      >
         {features.map((f) => (
           <li key={f} className="flex gap-2.5">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.5} />
+            <CheckCircle2
+              className={`mt-0.5 size-4 shrink-0 ${drench ? "text-gold-soft" : "text-validated"}`}
+              strokeWidth={1.5}
+            />
             <span>{f}</span>
           </li>
         ))}
       </ul>
-      <Button asChild variant="secondary" size="md" className="mt-8 w-full">
+      <Button
+        asChild
+        variant={drench ? "gold" : "secondary"}
+        size="md"
+        className="mt-8 w-full"
+      >
         <Link href={ctaHref}>{cta}</Link>
       </Button>
     </div>

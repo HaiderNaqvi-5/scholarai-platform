@@ -63,6 +63,7 @@ type Draft = {
   gpa_scale: string;
   degree_level: "BS" | "MS" | "PHD";
   field_tags: string[];
+  field_other: string;
 };
 
 const STEPS = [
@@ -71,6 +72,20 @@ const STEPS = [
   { h1: "Your test scores.", helper: "Skip if you haven't tested yet — we'll match without scores." },
   { h1: "Your goal.", helper: "Target country and field steer every match." },
 ] as const;
+
+/**
+ * Client-side approximate normalization to a 4.0 scale, shown as live
+ * feedback so a student catches a wrong scale/value before submitting.
+ * The backend `utils/cgpa_converter` remains authoritative on submit.
+ */
+function gpaToFourPoint(value: string, scale: string): string | null {
+  const v = Number(value);
+  const s = Number(scale);
+  if (!value || Number.isNaN(v) || Number.isNaN(s) || s <= 0 || v <= 0) return null;
+  const normalized = (v / s) * 4;
+  if (normalized > 4.05) return null;
+  return normalized.toFixed(1);
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -88,6 +103,7 @@ export default function OnboardingPage() {
     gpa_scale: "4.0",
     degree_level: "MS",
     field_tags: ["Data Science"],
+    field_other: "",
   });
 
   useEffect(() => {
@@ -122,7 +138,12 @@ export default function OnboardingPage() {
     if (step === 0) return draft.full_name.trim().length > 1;
     if (step === 1) return true;
     if (step === 2) return draft.citizenship.length > 0;
-    if (step === 3) return draft.field_tags.length > 0 && !!draft.degree_level;
+    if (step === 3)
+      return (
+        draft.field_tags.length > 0 &&
+        !!draft.degree_level &&
+        (!draft.field_tags.includes("Other") || draft.field_other.trim().length > 0)
+      );
     return false;
   };
 
@@ -140,7 +161,11 @@ export default function OnboardingPage() {
         citizenship_country_code: cc,
         gpa_value: draft.gpa ? Number(draft.gpa) : null,
         gpa_scale: draft.gpa_scale ? Number(draft.gpa_scale) : 4.0,
-        target_field: draft.field_tags.join(", ") || "Data Science",
+        target_field:
+          draft.field_tags
+            .map((t) => (t === "Other" ? draft.field_other.trim() : t))
+            .filter(Boolean)
+            .join(", ") || "Data Science",
         target_degree_level: draft.degree_level,
         target_country_code: draft.target_country,
         language_test_type: draft.language_test !== "NONE" ? draft.language_test : null,
@@ -160,6 +185,7 @@ export default function OnboardingPage() {
   }
 
   const current = STEPS[step];
+  const gpaPreview = gpaToFourPoint(draft.gpa, draft.gpa_scale);
 
   return (
     <div className="min-h-screen bg-ivory">
@@ -241,6 +267,11 @@ export default function OnboardingPage() {
                   <option value="100">100 scale</option>
                 </select>
               </div>
+              {gpaPreview && draft.gpa_scale !== "4.0" ? (
+                <p className="mt-2 font-mono text-[12px] text-ink-subtle" aria-live="polite">
+                  ≈ {gpaPreview} / 4.0 (approximate; we recompute on submit)
+                </p>
+              ) : null}
             </Field>
           )}
 
@@ -355,6 +386,16 @@ export default function OnboardingPage() {
                     );
                   })}
                 </div>
+                {draft.field_tags.includes("Other") ? (
+                  <Input
+                    value={draft.field_other}
+                    onChange={(e) => update("field_other", e.target.value)}
+                    placeholder="Name your field"
+                    autoFocus
+                    className="mt-3"
+                    aria-label="Specify your field"
+                  />
+                ) : null}
               </Field>
             </>
           )}

@@ -17,7 +17,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -183,9 +183,38 @@ function LoginInner({
         </div>
       </header>
 
-      <main id="main" className="flex flex-1 items-center justify-center px-6 py-16">
-        <div className="w-full max-w-[380px]">
-          <h1 className="font-display text-[32px] italic font-[400] leading-tight tracking-[-0.02em] text-ink-deep">
+      <main id="main" className="mx-auto grid max-w-[1200px] gap-12 px-6 py-12 md:grid-cols-12 md:gap-16 md:px-12 md:py-20">
+        {/* Editorial copy (md+) */}
+        <section className="hidden md:col-span-5 md:block">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-subtle">
+            Welcome back
+          </p>
+          <h1 className="mt-4 font-display text-[48px] italic font-[400] leading-[1.05] tracking-[-0.02em] text-ink-deep">
+            Your matches<br />are waiting.
+          </h1>
+          <p className="mt-5 max-w-[34ch] text-[16px] leading-[1.55] text-ink-muted">
+            Sign back in to pick up your tracker, SOP drafts, and visa
+            practice exactly where you left them.
+          </p>
+          <ul className="mt-10 space-y-4 text-[14px] text-ink-muted">
+            <li className="flex gap-3">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.5} />
+              <span>Matches refresh against new scholarships every cycle.</span>
+            </li>
+            <li className="flex gap-3">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.5} />
+              <span>Your tracker, drafts, and rehearsals stay saved.</span>
+            </li>
+            <li className="flex gap-3">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.5} />
+              <span>PDPB-aligned. Your data stays yours.</span>
+            </li>
+          </ul>
+        </section>
+
+        {/* Form (full bleed on 375) */}
+        <section className="md:col-span-7 md:max-w-[440px]">
+          <h1 className="font-display text-[28px] italic font-[400] leading-tight tracking-[-0.02em] text-ink-deep md:hidden">
             Sign in
           </h1>
 
@@ -214,12 +243,19 @@ function LoginInner({
                   <Label htmlFor="password" className="text-[13px] font-medium text-ink-deep">
                     Password
                   </Label>
-                  <Link
-                    href="/legal/privacy"
-                    className="text-[12px] text-lapis underline underline-offset-2 hover:decoration-2"
-                  >
-                    Forgot password?
-                  </Link>
+                  {magicLink ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("magic-link");
+                        setError(null);
+                        setPassword("");
+                      }}
+                      className="text-[12px] text-lapis underline underline-offset-2 hover:decoration-2"
+                    >
+                      Forgot password?
+                    </button>
+                  ) : null}
                 </div>
                 <div className="relative">
                   <Input
@@ -405,7 +441,7 @@ function LoginInner({
               Create an account
             </Link>
           </p>
-        </div>
+        </section>
       </main>
     </div>
   );

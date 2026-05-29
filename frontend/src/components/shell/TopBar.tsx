@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Badge } from "@/components/ui/badge";
 import { hasRole } from "@/lib/auth/RoleGuard";
+import { cn } from "@/lib/utils";
+import { MobileNav } from "./MobileNav";
 import { endpoints } from "@/lib/api";
 import type { HealthResponse } from "@/lib/api";
 
@@ -80,6 +82,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-[60px] items-center gap-3 border-b border-[var(--color-border-quiet)] bg-paper-white/95 px-4 backdrop-blur-md md:px-6">
+      <MobileNav />
       <form onSubmit={onSubmit} className="flex flex-1 items-center" role="search">
         <label htmlFor="topbar-search" className="sr-only">
           Search scholarships
@@ -107,15 +110,20 @@ export function TopBar() {
         </div>
       </form>
 
-      {showAdmin && alertCount > 0 ? (
+      {showAdmin ? (
         <Button
           variant="ghost"
           size="sm"
-          aria-label={`${alertCount} health alerts`}
+          aria-label={alertCount > 0 ? `${alertCount} health alerts` : "No health alerts"}
           onClick={() => router.push("/admin")}
         >
-          <BellRing className="size-4 text-caution" strokeWidth={1.5} />
-          <span className="font-mono tabular-nums text-caution">{alertCount}</span>
+          <BellRing
+            className={cn("size-4", alertCount > 0 ? "text-caution" : "text-ink-subtle")}
+            strokeWidth={1.5}
+          />
+          {alertCount > 0 ? (
+            <span className="font-mono tabular-nums text-caution">{alertCount}</span>
+          ) : null}
         </Button>
       ) : null}
 

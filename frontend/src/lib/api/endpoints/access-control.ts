@@ -1,9 +1,9 @@
 import { api } from "../client";
-import type { Role, RoleChangeAudit, User } from "../types";
+import type { AccessControlManagedUser, Role, RoleChangeAudit } from "../types";
 
 export const accessControl = {
   listUsers: () =>
-    api.get<{ items: (User & { current_role: Role })[] }>("/access-control/users"),
+    api.get<{ items: AccessControlManagedUser[]; total: number }>("/access-control/users"),
 
   listRoleChanges: (filters: { target_user_id?: string; limit?: number } = {}) =>
     api.get<{ items: RoleChangeAudit[] }>("/access-control/role-changes", { query: filters }),

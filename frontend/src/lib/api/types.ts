@@ -38,6 +38,17 @@ export type TokenResponse = {
   expires_in: number;
 };
 
+/** Mirrors backend `AccessControlManagedUser` (schemas/access_control.py). */
+export type AccessControlManagedUser = {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: Role;
+  is_active: boolean;
+  auth_token_version: number;
+  effective_capabilities: string[];
+};
+
 /**
  * StudentProfile — mirrors backend `StudentProfileResponse`
  * (backend/app/schemas/students.py). Backend allowed values are enforced
@@ -119,6 +130,31 @@ export type Scholarship = {
   requirements?: string[];
   description?: string | null;
   published_at?: string | null;
+};
+
+/**
+ * Lean list-row shape returned by `GET /scholarships` — mirrors backend
+ * `ScholarshipListItem` (schemas/scholarships.py). The public catalog
+ * endpoint returns ONLY these fields; rich fields (funding, field_tags,
+ * description) live on the detail endpoint (`ScholarshipDetailResponse`).
+ */
+export type ScholarshipListItem = {
+  scholarship_id: string;
+  title: string;
+  provider_name: string | null;
+  country_code: string;
+  deadline_at: string | null;
+  record_state: string;
+};
+
+/** Mirrors backend `ScholarshipListResponse` (schemas/scholarships.py). */
+export type ScholarshipListItemResponse = {
+  items: ScholarshipListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+  applied_filters: Record<string, unknown>;
 };
 
 export type Paginated<T> = {
@@ -244,15 +280,18 @@ export type CurationRecord = {
   published_at?: string | null;
 };
 
+/** Mirrors backend `AccessControlRoleChangeItem` (schemas/access_control.py). */
 export type RoleChangeAudit = {
   audit_id: string;
   target_user_id: string;
-  actor_user_id: string;
-  from_role: Role;
-  to_role: Role;
-  reason: string;
+  actor_user_id: string | null;
+  action: string;
+  previous_role: Role;
+  next_role: Role;
+  reason: string | null;
   changed_at: string;
-  reverted_audit_id?: string | null;
+  reverted_by_audit_id: string | null;
+  is_reversible: boolean;
 };
 
 export type HealthResponse = {
@@ -262,17 +301,28 @@ export type HealthResponse = {
   kpi_alerts: { domain: string; severity: "info" | "warn" | "critical"; message: string }[];
 };
 
+export type KpiSnapshotTrendItem = {
+  metric_domain: string;
+  policy_version: string;
+  total_snapshots: number;
+  passed_snapshots: number;
+  failed_snapshots: number;
+  pass_rate: number;
+};
+
 export type PlatformAnalytics = {
   total_users: number;
   student_count: number;
   mentor_count: number;
   admin_count: number;
   total_scholarships: number;
-  applications_count: number;
-  documents_count: number;
-  interview_sessions_count: number;
-  ingestion_runs_recent: { status: IngestionRunStatus; count: number }[];
-  kpi_trends: Record<string, { points: { at: string; value: number }[] }>;
+  total_applications: number;
+  submitted_applications: number;
+  total_documents: number;
+  total_interview_sessions: number;
+  ingestion_runs_total: number;
+  ingestion_runs_failed: number;
+  kpi_trends: KpiSnapshotTrendItem[];
 };
 
 // ───────────────────────────────────────────────────────────────────────────

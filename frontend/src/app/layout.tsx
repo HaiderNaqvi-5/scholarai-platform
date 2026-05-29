@@ -1,13 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
+import { GlobalAuthNav } from "@/components/shell/GlobalAuthNav";
 import "./globals.css";
 
 const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -108,27 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <a href="#main" className="skip-to-content">
         Skip to content
       </a>
-      {CLERK_PUBLISHABLE_KEY && (
-        <header className="flex items-center justify-end gap-3 px-6 py-3 md:px-12">
-          <SignedOut>
-            <Link
-              href="/login"
-              className="text-[13px] text-ink-muted hover:text-ink-deep"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-[10px] bg-lapis px-3 py-1.5 text-[13px] font-medium text-paper-white hover:bg-ink-deep"
-            >
-              Create account
-            </Link>
-          </SignedOut>
-          <SignedIn>
-            <UserButton />
-          </SignedIn>
-        </header>
-      )}
+      {CLERK_PUBLISHABLE_KEY && <GlobalAuthNav />}
       <Providers>{children}</Providers>
     </>
   );

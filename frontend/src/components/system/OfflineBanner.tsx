@@ -58,7 +58,7 @@ export function OfflineBanner() {
       <div
         role="status"
         aria-live="polite"
-        className="fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-[var(--color-caution-soft)] px-4 py-2 text-[13px] text-ink-deep shadow-[var(--shadow-hairline)]"
+        className="slide-in-top fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-[var(--color-caution-soft)] px-4 py-2 text-[13px] text-ink-deep shadow-[var(--shadow-hairline)]"
       >
         <span>You&rsquo;re offline. Changes will sync when you reconnect.</span>
       </div>
@@ -68,7 +68,7 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-[var(--color-validated-soft)] px-4 py-2 text-[13px] text-ink-deep shadow-[var(--shadow-hairline)]"
+      className="slide-in-top fixed left-0 right-0 top-0 z-50 flex items-center justify-center bg-[var(--color-validated-soft)] px-4 py-2 text-[13px] text-ink-deep shadow-[var(--shadow-hairline)]"
     >
       <span>Back online.</span>
     </div>

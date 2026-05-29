@@ -1,56 +1,66 @@
 # progress.md — handoff
 
-**Date:** 2026-05-30
-**Branch:** `s93/auth-tier-1`
+**Date:** 2026-05-29
+**Branch:** `s94/frontend-design-pass` (off `s93/auth-tier-1`)
+**Plan:** `~/.claude/plans/synthetic-popping-avalanche.md` (frontend design pass: patch P0/P1/P2 audit findings + 3 competitor features)
 
-## Session: Clerk "why is it not working" audit + fixes
+## Gate status (this session)
+- `bunx --bun tsc --noEmit` — clean
+- `bun run build` — green (41 routes, clean build from wiped `.next`)
+- `bun run lint` — re-run after final edits (green earlier this session)
+- `bun run audit:emoji` — clean (0 banned emoji, 133 files)
+- `bun run audit:public` — could NOT run: harness Playwright launches system Chrome, which timed out at launch (60s) in this env. Not a copy failure — checks never executed. Manual em-dash + emoji sweeps done instead.
+- Browser verification (bundled chromium via `frontend/scripts/capture_phase12.py`, `capture_phase3.py`, `crop_rail.py`): landing + login at 375/768/1440, pricing + password-meter states. 0 console errors. Screenshots in `frontend/audit-out/phase12/`.
 
-Asked to check why Clerk is not working and make sure it works / is not doing anything wrong. Ran an exhaustive 6-dimension adversarially-verified audit (workflow), then fixed the real defects. Full report in `CLERK_AUDIT.md`.
+## Completed this session
 
-### Outcome
-Clerk is structurally correct (proxy.ts valid Next-16 middleware, client.ts uses Clerk token, ClerkProvider env-gated, dispatcher routes on AUTH_PROVIDER). The real problems were prod-only / test-masked bugs hidden behind a CI blind spot. All fixed + verified — **561 backend pass + 1 xfail** under the new all-dirs command; `compileall` clean.
+### Phase 1 (P0) — done prior session, verified this session
+12 P0 fixes (mobile nav drawer, login split, em-dash sweep, onboarding "Other"+GPA preview, admin type-drift, devIndicators, GlobalAuthNav, etc.). Build/tsc green.
 
-### Tasks completed (committed this session)
-1. `.github/workflows/ci.yml:29` — added `tests/integrations` + `api|core|db|services|scripts`. CI ran `tests/integration` (singular) and collected **0 of 42** Clerk/Resend tests; this gap masked everything below.
-2. `backend/tests/integrations/test_clerk_user_sync.py` — `AsyncMock`→`MagicMock` (sync SDK). 14/14 clerk tests green.
-3. `backend/app/integrations/resend/send.py` — `response.id`→`response["id"]` (SDK 2.5.1 returns dict; was a prod silent total-email outage swallowed by the best-effort wrapper). Mocks flipped to real dict in `test_resend_send.py`. (Closes the divergence noted in the prior Task-17 handoff.)
-4. `backend/scripts/clerk_bulk_import.py` + `clerk_seed_demo.py` — dropped `await` on sync `api.users.create()` (same class as df37604). Mock `AsyncMock`→`MagicMock` in `tests/scripts/test_clerk_bulk_import.py`.
-5. `backend/app/integrations/clerk/jwt_verify.py` — JWKS httpx error → `ClerkAuthError` (was raw 500 across the authed surface); removed dead `lru_cache` import; added **env-gated** `iss`/`azp` validation.
-6. `backend/app/core/config.py` — added `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES` (+ `clerk_authorized_parties` property). Empty default = OFF (back-compat).
-7. `backend/app/core/dependencies.py` — `_get_user_from_clerk_jwt` maps `ValueError` (no primary email)→401 not 500.
-8. `backend/tests/unit/test_auth_claim_enforcement.py` — autouse fixture pins `AUTH_PROVIDER=local` (ambient `backend/.env` is clerk; local-path tests were routing to the clerk path).
+### Phase 2 (competitor features) — DONE + browser-verified
+1. Outcome-framed CTAs: nav/hero "See my matches"; comparison + closing CTA "Show scholarships I qualify for".
+2. Comparison table (Lahore consultant vs AidwiseAI: cost/turnaround/coverage/SOP authorship/transparency) before pricing — `src/app/page.tsx`.
+3. Live scrollable scholarships rail — `src/components/marketing/ScholarshipsRail.tsx`. Real backend data (Edinburgh/Toronto/Melbourne/TU Delft…), horizontal scroll-snap, keyboard-focusable, edge-fade mask, **no autoplay**, skeleton while loading.
+- Reviewer-flagged fix: `RoleChangeAudit` type drift synced to backend `AccessControlRoleChangeItem` (`previous_role`/`next_role`/`action`/`is_reversible`/`reverted_by_audit_id`); `(admin)/admin/audit/page.tsx` updated.
+- `GlobalAuthNav` 44px tap targets.
 
-### In-progress / next step
-None active.
+### Phase 3 (P1) — core done (8 items) + 2 verified-already-satisfied
+1. Sidebar "Matches" icon `Sparkles`→`Target` (Sparkles reserved for 14px AI-partition badge per CLAUDE.md).
+2. `RotatingDegree`: `min-w-[5ch]`→`[10ch]` (no width jump on "bachelor's"), reduced-motion now fully static, blur-bridge cross-fade.
+3. `Button` loading: spinner is absolute-overlay + label held via `invisible` wrapper — no label jolt / width shift.
+4. `TopBar` alert-bell: persistent for admins (muted when 0, caution+count when >0) — no 60s-poll layout shift.
+5. Password meter (`signup/page.tsx`): renders only after first keystroke, scaleX bar fill, inline per-criterion check pills. `passwordScore` extended with `checks[]`.
+6. Role-mixing fix: new `primaryGroup(role)` in `RoleGuard.tsx`; Sidebar + MobileNav show ONLY the user's section group (admin/owner no longer see student+mentor+partner union).
+7. Banner enter motion: new `slide-in-top`/`slide-in-bottom` utilities in `globals.css`; OfflineBanner (top), CookieBanner + ConsentBar (bottom).
+8. Elite pricing-cell drench: `PricingTeaser` gains `drench` prop → ink-deep bg, paper-white text, gold-soft check pips, gold CTA. Breaks flat 3-cell grid.
+- Em-dash sweep extended: signup editorial copy + landing aria-label.
+- Verified already satisfied: ConnectedAccountsPanel tap targets (sm button carries `tap-target`=44×44); contrast tokens (globals already AA).
 
-### Open — need operator decision / value (NOT code bugs)
-- **Prod CSP**: `frontend/next.config.ts` allows only `*.clerk.accounts.dev`. A production custom Clerk domain (e.g. `clerk.aidwiseai.com`) is blocked on connect/script/frame-src → silent auth break in prod. Add the deployed Clerk FAPI host. **Need the prod Clerk domain.**
-- **Activate iss/azp**: set `CLERK_ISSUER` + `CLERK_AUTHORIZED_PARTIES` in prod env to enable the new binding (inert by default).
+## Discovered pre-existing bug (NOT fixed — flagged, separate ticket)
+`/discover` + `ScholarshipCard` read `s.id`/`s.provider`/`s.field_tags`, but `GET /scholarships` returns lean `ScholarshipListItem` (`scholarship_id`/`provider_name`/`deadline_at`/`record_state` only). `/discover` **crashes on live data** (`s.field_tags.length` on undefined). The rich card cannot be populated by the lean list endpoint. **DECISION (2026-05-29, user):** fix via **enriching the backend `GET /scholarships` list response** (add funding/field_tags/degree_levels/amount to `ScholarshipListItem`) — a BACKEND ticket, out of this FE pass. Do NOT rewrite `/discover` or `ScholarshipCard` here. Matches CLAUDE.md tracked "Outstanding drift" D-class. Marketing rail uses its own correctly-typed `scholarships.listPublic()` so it works regardless. New FE types: `ScholarshipListItem`, `ScholarshipListItemResponse` in `types.ts` (will need extending once backend enriches).
 
-### Deferred (lower severity — full list in CLERK_AUDIT.md)
-CSP `'unsafe-inline'`→nonce; no backend session-revocation (clerk sessions valid until natural expiry); zero frontend test infra (proxy.ts / client.ts clerk branch / sso-callback untested); `login/page.tsx` `?next=` open-redirect; IntegrityError first-login race; `clerk_webhook` blank-secret precheck; `.env.example` stale `RESEND_FROM_ADDRESS` + `AUTO_SEED_DEMO_DATA=true`.
+## Open bugs / blockers
+- Live AUTHED surface re-capture still blocked: `AUTH_PROVIDER=clerk`, seeded accounts have null `clerk_user_id`, `.env` lockdown prevents toggling to local mode. Admin/mentor/student shells (Sidebar/TopBar/role-mixing) verified by tsc + shape, not live render.
+- `audit:public` harness can't launch system Chrome in this env (60s timeout).
 
-### Files touched
-- `.github/workflows/ci.yml`
-- `backend/app/integrations/clerk/jwt_verify.py`
-- `backend/app/integrations/resend/send.py`
-- `backend/app/core/config.py`
-- `backend/app/core/dependencies.py`
-- `backend/scripts/clerk_bulk_import.py`, `backend/scripts/clerk_seed_demo.py`
-- `backend/tests/integrations/test_clerk_user_sync.py`, `test_resend_send.py`
-- `backend/tests/scripts/test_clerk_bulk_import.py`
-- `backend/tests/unit/test_auth_claim_enforcement.py`
-- `CLAUDE.md`, `CLERK_AUDIT.md` (new), `progress.md`
+## In progress / next steps
+- **Phase 3 remaining (lower-value P1) + Phase 4 (P2 polish):** skeleton→content crossfade (`@starting-style`), scroll-progress bar, hover micro-motions (arrow nudge / card lift gated `@media(hover)`), kbd-hint opacity fades, FAQ answer-preview + topic chips, footer refresh-chip framing, sidebar kbd always-render fade. (Plan's "2px lapis active rail" intentionally SKIPPED — conflicts with impeccable side-stripe ban; kept `bg-lapis-soft` active fill.)
+- **Phase 5:** final lint+tsc+build, manual viewport matrix, CLAUDE.md S94 row (added).
 
-### Commands to resume / verify
+## Environment notes
+- Backend container `scholarai-platform-backend-1` was "Up (unhealthy)"/hung → `docker restart` revived it (livez 200 after 30s). Postgres/Redis healthy. Public `/scholarships` returns 18 published items.
+- `bun run build` while `bun dev` runs corrupts `.next/dev/types` (TS1002 "Unterminated string literal") — stop dev + wipe `.next` before clean tsc/build.
+
+## Files touched (frontend)
+Modified: `next.config.ts`, `app/(admin)/admin/{page,users/page,audit/page}.tsx`, `app/globals.css`, `app/layout.tsx`, `app/login/page.tsx`, `app/onboarding/page.tsx`, `app/page.tsx`, `app/signup/page.tsx`, `components/consent/{ConsentBar,CookieBanner}.tsx`, `components/marketing/RotatingDegree.tsx`, `components/shell/{Sidebar,TopBar}.tsx`, `components/system/OfflineBanner.tsx`, `components/ui/button.tsx`, `lib/api/endpoints/{access-control,scholarships}.ts`, `lib/api/types.ts`, `lib/auth/RoleGuard.tsx`.
+New: `components/marketing/ScholarshipsRail.tsx`, `components/shell/{GlobalAuthNav,MobileNav}.tsx`, `scripts/{capture_phase12,capture_phase3,crop_rail}.py`.
+
+## Commands to resume
 ```
-cd backend && python -m pytest tests/unit tests/integration tests/integrations tests/api tests/core tests/db tests/services tests/scripts -q
-python -m compileall backend/app backend/scripts -q
-# frontend (untouched this session): cd frontend && bunx --bun tsc --noEmit && bun run lint && bun run build
+cd frontend
+bun dev                     # http://localhost:3000 (stop before build)
+bunx --bun tsc --noEmit
+bun run lint
+bun run build
+python scripts/capture_phase12.py   # public-surface capture (server must run)
 ```
-
-### Note on local test env
-`backend/.env` sets `AUTH_PROVIDER=clerk` (live wire-up from Task 17). CI has no such `.env` → default `local`. Tests asserting local-path behavior must pin `AUTH_PROVIDER=local` (done for `test_auth_claim_enforcement`).
-
----
-_Prior session handoff (Task-17 Clerk OAuth, branch s93/auth-tier-1, head df37604/83eb589) preserved in git history; superseded by this audit + fix pass._

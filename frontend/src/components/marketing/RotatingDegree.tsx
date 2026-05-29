@@ -21,12 +21,8 @@ export function RotatingDegree({ className }: { className?: string }) {
     const reduced =
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-    if (reduced) {
-      const tick = window.setInterval(() => {
-        setIndex((n) => (n + 1) % WORDS.length);
-      }, HOLD_MS + FADE_MS);
-      return () => window.clearInterval(tick);
-    }
+    // Reduced motion: no rotation at all. Show a single static word.
+    if (reduced) return;
 
     const tick = window.setInterval(() => {
       setVisible(false);
@@ -44,8 +40,8 @@ export function RotatingDegree({ className }: { className?: string }) {
       aria-live="polite"
       aria-atomic="true"
       className={cn(
-        "inline-block min-w-[5ch] transition-opacity ease-out",
-        visible ? "opacity-100" : "opacity-0",
+        "inline-block min-w-[10ch] transition-[opacity,filter] ease-out",
+        visible ? "opacity-100 blur-0" : "opacity-0 blur-[3px]",
         className,
       )}
       style={{ transitionDuration: `${FADE_MS}ms` }}

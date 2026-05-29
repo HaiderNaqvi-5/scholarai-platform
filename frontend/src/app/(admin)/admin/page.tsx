@@ -92,34 +92,36 @@ export default function AdminOverviewPage() {
             <Stat
               icon={<FileText className="size-4" strokeWidth={2} />}
               label="Documents"
-              value={platformQ.data.documents_count}
+              value={platformQ.data.total_documents}
             />
             <Stat
               icon={<MessageSquare className="size-4" strokeWidth={2} />}
               label="Interview sessions"
-              value={platformQ.data.interview_sessions_count}
+              value={platformQ.data.total_interview_sessions}
             />
             <Stat
               icon={<Activity className="size-4" strokeWidth={2} />}
               label="Applications"
-              value={platformQ.data.applications_count}
+              value={platformQ.data.total_applications}
             />
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent ingestion runs</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <ul className="space-y-1 text-sm">
-                {(platformQ.data.ingestion_runs_recent ?? []).map((r, i) => (
-                  <li key={i} className="flex items-center justify-between">
-                    <span className="text-ink">{r.status}</span>
-                    <span className="font-mono text-ink">{r.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardBody>
-          </Card>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Stat
+              icon={<Activity className="size-4" strokeWidth={2} />}
+              label="Submitted applications"
+              value={platformQ.data.submitted_applications}
+            />
+            <Stat
+              icon={<Activity className="size-4" strokeWidth={2} />}
+              label="Ingestion runs"
+              value={platformQ.data.ingestion_runs_total}
+            />
+            <Stat
+              icon={<AlertTriangle className="size-4" strokeWidth={2} />}
+              label="Ingestion runs failed"
+              value={platformQ.data.ingestion_runs_failed}
+            />
+          </div>
         </>
       ) : null}
     </div>
