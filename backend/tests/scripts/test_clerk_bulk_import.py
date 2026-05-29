@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -35,7 +35,8 @@ def user_no_clerk_id(db_session):
 @pytest.mark.asyncio
 async def test_import_user_skips_already_linked(db_session, user_with_clerk_id):
     api = MagicMock()
-    api.users.create = AsyncMock()
+    # clerk-backend-api 1.6.0 SDK is sync — mock with MagicMock, not AsyncMock.
+    api.users.create = MagicMock()
     result = await import_user(user_with_clerk_id, api=api, session=db_session)
     assert result == "skipped"
     api.users.create.assert_not_called()
@@ -44,7 +45,7 @@ async def test_import_user_skips_already_linked(db_session, user_with_clerk_id):
 @pytest.mark.asyncio
 async def test_import_user_creates_in_clerk_and_links(db_session, user_no_clerk_id):
     api = MagicMock()
-    api.users.create = AsyncMock(return_value=MagicMock(id="user_clerk_xyz"))
+    api.users.create = MagicMock(return_value=MagicMock(id="user_clerk_xyz"))
     result = await import_user(user_no_clerk_id, api=api, session=db_session)
     assert result == "imported"
     db_session.refresh(user_no_clerk_id)

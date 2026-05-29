@@ -65,4 +65,8 @@ def send_transactional(*, to: str, template: str, context: dict) -> str:
         "html": html,
         "text": text,
     })
+    # resend SDK 2.5.1 returns a dict ({"id": ...}); older/mocked shapes may
+    # expose `.id` as an attribute. Handle both so a real send does not raise.
+    if isinstance(response, dict):
+        return response["id"]
     return response.id

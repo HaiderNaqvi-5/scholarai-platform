@@ -149,6 +149,16 @@ class Settings(BaseSettings):
     CLERK_PUBLISHABLE_KEY: str = ""
     CLERK_JWKS_URL: str = ""
     CLERK_WEBHOOK_SECRET: str = ""
+    # Optional audience-binding for Clerk session JWTs. Clerk tokens usually
+    # omit `aud`, so binding is done via issuer + authorized-party (azp).
+    # Leave blank to skip (back-compat); set in prod to block cross-app token
+    # reuse. CLERK_AUTHORIZED_PARTIES is a comma-separated origin allowlist.
+    CLERK_ISSUER: str = ""
+    CLERK_AUTHORIZED_PARTIES: str = ""
+
+    @property
+    def clerk_authorized_parties(self) -> set[str]:
+        return {p.strip() for p in self.CLERK_AUTHORIZED_PARTIES.split(",") if p.strip()}
 
     RESEND_API_KEY: str = ""
     RESEND_FROM_ADDRESS: str = ""

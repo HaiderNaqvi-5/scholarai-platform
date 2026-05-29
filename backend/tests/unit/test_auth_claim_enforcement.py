@@ -4,10 +4,19 @@ from uuid import uuid4
 import pytest
 
 from app.core import dependencies
+from app.core.config import settings
 from app.models import UserRole
 from scholarai_common.errors import ScholarAIException
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(autouse=True)
+def _force_local_auth(monkeypatch):
+    # These tests exercise the local-JWT scope-claim path (decode_token is
+    # monkeypatched below). Pin AUTH_PROVIDER=local so an ambient .env with
+    # AUTH_PROVIDER=clerk does not route get_current_user to the Clerk path.
+    monkeypatch.setattr(settings, "AUTH_PROVIDER", "local")
 
 
 class _FakeResult:

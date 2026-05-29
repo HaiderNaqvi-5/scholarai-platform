@@ -151,7 +151,16 @@ async def _get_user_from_clerk_jwt(token: str, db: AsyncSession) -> User:
             status_code=status.HTTP_401_UNAUTHORIZED,
         ) from e
 
-    user = await ensure_local_user_async(claims.sub, session=db)
+    try:
+        user = await ensure_local_user_async(claims.sub, session=db)
+    except ValueError as e:
+        # e.g. Clerk user has no primary email — a bad/unsyncable token, not a
+        # server fault. Surface as 401, not a raw 500.
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_EXPIRED,
+            message=str(e),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        ) from e
     if not user.is_active:
         raise ScholarAIException(
             code=ErrorCode.AUTH_INACTIVE_ACCOUNT,

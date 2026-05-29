@@ -1,95 +1,56 @@
-# progress.md — scholarai-platform
+# progress.md — handoff
 
-**Date:** 2026-05-28
-**Branch:** `s93/auth-tier-1` (PR #102)
-**Head:** `df37604` (+ `83eb589` for narrowing)
-**Mergeable:** yes (5/5 CI green; required-review gate is the only block)
+**Date:** 2026-05-30
+**Branch:** `s93/auth-tier-1`
 
-## Session focus
+## Session: Clerk "why is it not working" audit + fixes
 
-Clerk OAuth + magic-link + connected-accounts shipped end-to-end. Google sign-in live in dev container. Three other providers (Microsoft / Facebook / LinkedIn) intentionally narrowed out of UI but strategy maps + brand SVGs kept on disk for one-line re-enable.
+Asked to check why Clerk is not working and make sure it works / is not doing anything wrong. Ran an exhaustive 6-dimension adversarially-verified audit (workflow), then fixed the real defects. Full report in `CLERK_AUDIT.md`.
 
-## Tasks completed this session
+### Outcome
+Clerk is structurally correct (proxy.ts valid Next-16 middleware, client.ts uses Clerk token, ClerkProvider env-gated, dispatcher routes on AUTH_PROVIDER). The real problems were prod-only / test-masked bugs hidden behind a CI blind spot. All fixed + verified — **561 backend pass + 1 xfail** under the new all-dirs command; `compileall` clean.
 
-| # | Commit | Summary |
-|---|--------|---------|
-| 1 | `334df4d` | Clerk OAuth + magic-link + connected-accounts shipped. `clerkAdapter` adds `useClerkSocialLogin`/`useClerkSocialSignup`/`useClerkMagicLink`. `SocialAuthButtons` 2×2 grid above email form. `/sso-callback` mounts `<AuthenticateWithRedirectCallback />`. `/login` mode toggle (password / magic-link / magic-sent, 30s resend cooldown). `/signup` social row + Clerk Smart-CAPTCHA `<div id="clerk-captcha"/>`. `/settings → Connected accounts` panel. `proxy.ts` public-route += `/sso-callback`. `next.config.ts` CSP += `worker-src 'self' blob:` + `*.clerk.accounts.dev` hosts on connect-src/script-src/frame-src. |
-| 2 | `94fe605` | `<AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/feed" signUpFallbackRedirectUrl="/onboarding"/>` (post-OAuth landed on `/` because Clerk fell back to dashboard default). |
-| 3 | `6b3ab67` | CSP `worker-src 'self' blob:` (Clerk Web Workers were blocked, console-noise only — auth still functioned). |
-| 4 | `df37604` | **Backend bug**: `clerk-backend-api 1.6.0` SDK is sync — `api.users.get(...)` returns `User` directly. Both `ensure_local_user` + `ensure_local_user_async` were `await`-ing → `TypeError: object User can't be used in 'await' expression` → 500 on every /me. Tests passed (AsyncMock). Fix: drop `await`. |
-| 5 | `83eb589` | Narrow `SOCIAL_PROVIDERS` to `["google"]`. Microsoft/Facebook/LinkedIn strategy maps + brand SVGs kept; re-enable = one-line append. `ConnectedAccountsPanel.ALL_STRATEGIES` derived from same source — auto-narrows. |
+### Tasks completed (committed this session)
+1. `.github/workflows/ci.yml:29` — added `tests/integrations` + `api|core|db|services|scripts`. CI ran `tests/integration` (singular) and collected **0 of 42** Clerk/Resend tests; this gap masked everything below.
+2. `backend/tests/integrations/test_clerk_user_sync.py` — `AsyncMock`→`MagicMock` (sync SDK). 14/14 clerk tests green.
+3. `backend/app/integrations/resend/send.py` — `response.id`→`response["id"]` (SDK 2.5.1 returns dict; was a prod silent total-email outage swallowed by the best-effort wrapper). Mocks flipped to real dict in `test_resend_send.py`. (Closes the divergence noted in the prior Task-17 handoff.)
+4. `backend/scripts/clerk_bulk_import.py` + `clerk_seed_demo.py` — dropped `await` on sync `api.users.create()` (same class as df37604). Mock `AsyncMock`→`MagicMock` in `tests/scripts/test_clerk_bulk_import.py`.
+5. `backend/app/integrations/clerk/jwt_verify.py` — JWKS httpx error → `ClerkAuthError` (was raw 500 across the authed surface); removed dead `lru_cache` import; added **env-gated** `iss`/`azp` validation.
+6. `backend/app/core/config.py` — added `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES` (+ `clerk_authorized_parties` property). Empty default = OFF (back-compat).
+7. `backend/app/core/dependencies.py` — `_get_user_from_clerk_jwt` maps `ValueError` (no primary email)→401 not 500.
+8. `backend/tests/unit/test_auth_claim_enforcement.py` — autouse fixture pins `AUTH_PROVIDER=local` (ambient `backend/.env` is clerk; local-path tests were routing to the clerk path).
 
-## Env wire-up done this session (not commits — local state)
+### In-progress / next step
+None active.
 
-| Where | Change |
-|---|---|
-| `.env` (repo root, new file) | `ENV_FILE=backend/.env` — compose interpolates this so `env_file: ${ENV_FILE:-.env.example}` in `docker-compose.yml` resolves to the real Clerk-keyed file. |
-| `backend/.env` | `AUTH_PROVIDER=clerk`; `CLERK_SECRET_KEY=sk_test_…`; `CLERK_PUBLISHABLE_KEY=pk_test_…`; `CLERK_JWKS_URL=https://open-kid-75.clerk.accounts.dev/.well-known/jwks.json`. **DB/Redis URLs** swapped from `@localhost` to docker service hostnames `@postgres:5432` / `redis://redis:6379`. |
-| `frontend/.env.local` | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_…`; `CLERK_SECRET_KEY=sk_test_…`. |
-| Docker container | Recreate after env edits — `docker compose up -d --force-recreate --no-deps backend` (compose `restart` does NOT reload `env_file`). |
-| Postgres | `docker compose exec backend alembic upgrade head` → `20260526_0029` applied, `users.clerk_user_id` column + index + unique constraint live. |
-| Clerk dashboard | Google SSO configured for instance `open-kid-75.clerk.accounts.dev` with custom credentials (own Google Cloud OAuth client). Redirect URI pasted into Google Cloud Console authorised list. |
+### Open — need operator decision / value (NOT code bugs)
+- **Prod CSP**: `frontend/next.config.ts` allows only `*.clerk.accounts.dev`. A production custom Clerk domain (e.g. `clerk.aidwiseai.com`) is blocked on connect/script/frame-src → silent auth break in prod. Add the deployed Clerk FAPI host. **Need the prod Clerk domain.**
+- **Activate iss/azp**: set `CLERK_ISSUER` + `CLERK_AUTHORIZED_PARTIES` in prod env to enable the new binding (inert by default).
 
-## Verified end-to-end
+### Deferred (lower severity — full list in CLERK_AUDIT.md)
+CSP `'unsafe-inline'`→nonce; no backend session-revocation (clerk sessions valid until natural expiry); zero frontend test infra (proxy.ts / client.ts clerk branch / sso-callback untested); `login/page.tsx` `?next=` open-redirect; IntegrityError first-login race; `clerk_webhook` blank-secret precheck; `.env.example` stale `RESEND_FROM_ADDRESS` + `AUTO_SEED_DEMO_DATA=true`.
 
-- `/login` → click Google → consent screen → `/sso-callback` (Fraunces "Signing you in…") → `/feed` renders user dashboard.
-- Backend log: `ensure_local_user_async` creates new `users` row with `clerk_user_id=user_3EHV…` on first sign-in.
-- `/me` returns 200 + populated `UserResponse` JSON.
-- Reload `/feed` → still authenticated (Clerk `__session` cookie restores).
-- `/sign-in` + `/sign-up` legacy Clerk-default routes → 404 (deleted).
-- `/booth/air-university` → `redirect("/")` (Air U cohort retired).
+### Files touched
+- `.github/workflows/ci.yml`
+- `backend/app/integrations/clerk/jwt_verify.py`
+- `backend/app/integrations/resend/send.py`
+- `backend/app/core/config.py`
+- `backend/app/core/dependencies.py`
+- `backend/scripts/clerk_bulk_import.py`, `backend/scripts/clerk_seed_demo.py`
+- `backend/tests/integrations/test_clerk_user_sync.py`, `test_resend_send.py`
+- `backend/tests/scripts/test_clerk_bulk_import.py`
+- `backend/tests/unit/test_auth_claim_enforcement.py`
+- `CLAUDE.md`, `CLERK_AUDIT.md` (new), `progress.md`
 
-## Open items
-
-- **Microsoft / Facebook / LinkedIn**: dashboard + provider-side OAuth apps not yet configured. Code-ready. To enable each: add provider strategy to `SOCIAL_PROVIDERS` array in `frontend/src/lib/auth/clerkAdapter.ts`, configure provider in Clerk dashboard, paste credentials, paste Clerk redirect URI into provider OAuth whitelist.
-- **`POST /api/v1/profile/onboarding-prefs`** backend route: PDPB consent + marketing flags collected in clerk-mode signup but not yet persisted (console.warn flags the gap). Track for follow-up PR.
-- **Webhook**: `CLERK_WEBHOOK_SECRET` still empty in `backend/.env`. Wire only if/when we need user.deleted soft-delete from Clerk dashboard ops. Code path exists at `/api/v1/webhooks/clerk`.
-- **Docker backend build** failed mid-session (`pip install torch` exit 2). Workaround used `docker compose cp` to patch `user_sync.py` live. Full rebuild deferred — image still has the bug baked in; recreate without `--build` keeps the patched-via-cp file in place until container is destroyed.
-
-## Known production-vs-test divergences (unchanged)
-
-- `resend.Emails.send(params)` in SDK 2.5.x returns `dict` (`{"id": ...}`). `send.py:send_transactional` reads `response.id` (attribute). Tests use `MagicMock(id=...)`. Verify on first staging send.
-- `clerk-backend-api` SDK is sync (Task-17 bugfix above). Mocking with `AsyncMock` masks real-SDK behaviour — prefer `MagicMock` for new tests.
-
-## Files touched (committed)
-
-- frontend: `lib/auth/clerkAdapter.ts`, `components/auth/SocialAuthButtons.tsx`, `components/settings/ConnectedAccountsPanel.tsx`, `app/sso-callback/page.tsx`, `app/login/page.tsx`, `app/signup/page.tsx`, `app/(student)/settings/page.tsx`, `proxy.ts`, `next.config.ts`
-- backend: `app/integrations/clerk/user_sync.py`
-- docs: `CLAUDE.md`, `progress.md`
-
-## Files touched (env / local-only, NOT in git)
-
-- `.env` (repo root)
-- `backend/.env`
-- `frontend/.env.local`
-
-## Commands to resume
-
-```powershell
-# Branch state
-cd C:\Users\HP\scholarai-platform
-git status
-gh pr checks 102
-
-# Container sanity (should show clerk + real JWKS)
-docker compose exec backend printenv | Select-String "AUTH_PROVIDER|CLERK_"
-
-# Migration head
-docker compose exec backend alembic current   # 20260526_0029 (head)
-
-# Backend logs while you hit /me from browser
-docker compose logs -f backend
-
-# Frontend dev (Docker frontend container has stale build; prefer bare bun)
-docker compose stop frontend
-cd frontend && bun dev
-
-# Re-enable a social provider
-# 1. frontend/src/lib/auth/clerkAdapter.ts: append "microsoft" (or other) to SOCIAL_PROVIDERS
-# 2. Clerk dashboard → SSO Connections → enable + paste creds
-# 3. Provider dashboard → paste Clerk's redirect URI
+### Commands to resume / verify
+```
+cd backend && python -m pytest tests/unit tests/integration tests/integrations tests/api tests/core tests/db tests/services tests/scripts -q
+python -m compileall backend/app backend/scripts -q
+# frontend (untouched this session): cd frontend && bunx --bun tsc --noEmit && bun run lint && bun run build
 ```
 
-## Plan reference
+### Note on local test env
+`backend/.env` sets `AUTH_PROVIDER=clerk` (live wire-up from Task 17). CI has no such `.env` → default `local`. Tests asserting local-path behavior must pin `AUTH_PROVIDER=local` (done for `test_auth_claim_enforcement`).
 
-`~/.claude/plans/parallel-percolating-sifakis.md` — full round 1/2/3/3b/3c history.
+---
+_Prior session handoff (Task-17 Clerk OAuth, branch s93/auth-tier-1, head df37604/83eb589) preserved in git history; superseded by this audit + fix pass._

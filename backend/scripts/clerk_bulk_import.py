@@ -22,7 +22,9 @@ async def import_user(user: User, *, api, session) -> str:
     """
     if user.clerk_user_id:
         return "skipped"
-    created = await api.users.create({
+    # clerk-backend-api 1.6.0 SDK is sync — do NOT await (same class as the
+    # df37604 fix on api.users.get).
+    created = api.users.create({
         "email_address": [user.email],
         "first_name": user.full_name.split(" ", 1)[0] if user.full_name else None,
         "last_name": user.full_name.split(" ", 1)[1] if user.full_name and " " in user.full_name else None,

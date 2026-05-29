@@ -17,7 +17,9 @@ async def main() -> None:
     api = clerk_client()
     for acc in DEMO_ACCOUNTS:
         try:
-            created = await api.users.create({
+            # clerk-backend-api 1.6.0 SDK is sync — do NOT await (same class
+            # as the df37604 fix on api.users.get).
+            created = api.users.create({
                 "email_address": [acc["email"]],
                 "password": "strongpass1",
                 "first_name": acc["first"],

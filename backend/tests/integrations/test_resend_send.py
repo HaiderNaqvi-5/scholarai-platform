@@ -27,7 +27,9 @@ def test_rejects_unknown_template(monkeypatch):
 def test_send_calls_resend_with_params(mock_resend, monkeypatch):
     monkeypatch.setenv("RESEND_API_KEY", "re_test")
     monkeypatch.setenv("RESEND_FROM_ADDRESS", "noreply@grantpath.app")
-    mock_resend.Emails.send.return_value = MagicMock(id="msg_123")
+    # resend 2.5.1 returns a dict, not an object — mock the real shape so the
+    # send.py response["id"] path is exercised (was masked by MagicMock(id=...)).
+    mock_resend.Emails.send.return_value = {"id": "msg_123"}
     result = send_transactional(
         to="user@x.com", template="welcome", context={"name": "Alice"},
     )
@@ -169,6 +171,6 @@ def test_send_transactional_accepts_all_templates(monkeypatch):
         }),
     ]:
         with patch("app.integrations.resend.send.resend") as mock_resend:
-            mock_resend.Emails.send.return_value = MagicMock(id=f"msg_{name}")
+            mock_resend.Emails.send.return_value = {"id": f"msg_{name}"}
             result = send_transactional(to="u@x.com", template=name, context=ctx)
             assert result == f"msg_{name}"

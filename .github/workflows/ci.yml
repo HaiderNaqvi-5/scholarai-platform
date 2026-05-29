@@ -26,7 +26,10 @@ jobs:
         run: python -m compileall backend/app backend/tests
 
       - name: Run backend sanity tests
-        run: pytest backend/tests/unit backend/tests/integration -q
+        # All test dirs — note tests/integration (singular) and tests/integrations
+        # (plural, Clerk) are different trees; api/core/db/services/scripts hold
+        # the Clerk + Resend suites that were previously never collected by CI.
+        run: pytest backend/tests/unit backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts -q
 
       # S14 — Supply-chain audit. pip-audit cross-references installed
       # versions against the PyPI advisory DB. --strict fails on any vuln;
