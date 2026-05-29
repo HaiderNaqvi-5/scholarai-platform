@@ -15,8 +15,6 @@ from app.services.recommendations.service import (
     _distance_to_similarity,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeRowsResult:
     def __init__(self, rows):

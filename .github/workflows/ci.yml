@@ -5,6 +5,13 @@ on:
     branches: ["main"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend-sanity:
     runs-on: ubuntu-latest
@@ -16,11 +23,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
 
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
 
       - name: Compile backend sources
         run: python -m compileall backend/app backend/tests
@@ -29,7 +38,7 @@ jobs:
         # All test dirs — note tests/integration (singular) and tests/integrations
         # (plural, Clerk) are different trees; api/core/db/services/scripts hold
         # the Clerk + Resend suites that were previously never collected by CI.
-        run: pytest backend/tests/unit backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts -q
+        run: pytest backend/tests/unit backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts --cov=app --cov-fail-under=72 -q
 
       # S14 — Supply-chain audit. pip-audit cross-references installed
       # versions against the PyPI advisory DB. --strict fails on any vuln;
@@ -53,11 +62,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
 
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
 
       - name: Run KPI regression gate tests
         run: |
@@ -162,7 +173,7 @@ jobs:
       - name: Install backend and smoke dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
 
       - name: Install Playwright browser
         run: python -m playwright install chromium
@@ -225,3 +236,55 @@ jobs:
           cat /tmp/scholarai-backend.log || true
           echo "=== frontend ==="
           cat /tmp/scholarai-frontend.log || true
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: scholarai_test
+          POSTGRES_USER: scholarai
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scholarai -d scholarai_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql+asyncpg://scholarai:password@localhost:5432/scholarai_test
+      TEST_DATABASE_URL: postgresql+asyncpg://scholarai:password@localhost:5432/scholarai_test
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Enable pgvector extension
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+
+      - name: Migration drift check
+        run: |
+          cd backend
+          alembic upgrade head
+          alembic check
+
+      - name: Run DB-backed integration tests
+        run: pytest backend/tests/integration -q

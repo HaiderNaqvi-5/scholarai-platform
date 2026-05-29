@@ -20,8 +20,6 @@ from app.services.ingestion.service import (
     retry_async,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeSession:
     def __init__(self):

@@ -6,8 +6,6 @@ import pytest
 from app.services.kpi_snapshot_service import KPISnapshotService
 
 
-pytestmark = pytest.mark.asyncio
-
 
 class _Result:
     def __init__(self, rows):
