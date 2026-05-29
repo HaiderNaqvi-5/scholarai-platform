@@ -31,6 +31,7 @@ import { ApiError } from "@/lib/api";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { clerkEnabled, useClerkSignupFlow } from "@/lib/auth/clerkAdapter";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
 
@@ -292,6 +293,17 @@ function SignupInner({
               >
                 <X className="size-4" strokeWidth={1.5} />
               </button>
+            </div>
+          ) : null}
+
+          {step === "create" && clerkEnabled ? (
+            <div className="mb-6">
+              <SocialAuthButtons mode="signup" />
+              {/* Clerk Smart CAPTCHA mount point — required during signUp
+                  flows to silence "clerk-captcha DOM element not found"
+                  warning. Invisible by default; Clerk handles bot
+                  protection in the background. */}
+              <div id="clerk-captcha" />
             </div>
           ) : null}
 

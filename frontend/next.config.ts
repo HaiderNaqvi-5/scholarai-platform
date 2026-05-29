@@ -28,6 +28,10 @@ const csp = [
   // Tailwind 4 + Next.js inline runtime styles
   "style-src 'self' 'unsafe-inline'",
   "frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev",
+  // Clerk SDK spawns Web Workers from blob: URIs for telemetry + CAPTCHA.
+  // Without an explicit worker-src, browsers fall back to script-src which
+  // does not include blob: → workers blocked + console errors.
+  "worker-src 'self' blob:",
   // Next.js dev mode injects eval()-using HMR shim; tighten in prod build
   process.env.NODE_ENV === "production"
     ? "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com"

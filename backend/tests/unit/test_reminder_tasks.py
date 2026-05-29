@@ -78,26 +78,28 @@ def _patch_session(monkeypatch, results: list[list]):
 
 
 def _patch_channels(monkeypatch):
-    """Replace the channel sends with call-counting stubs.
+    """Replace the templated email helper + WhatsApp send with call-counters.
 
-    The reminder task imports ``fan_out_for_plan`` from
-    ``app.services.notifications``; that helper dispatches to
-    ``send_email`` / ``send_whatsapp`` inside ``notifications.channels``.
-    Patching at the channels module mirrors how fan_out_for_plan resolves
-    them and avoids touching real I/O or burn-cap accounting.
+    fan_out_for_plan now dispatches through send_templated_email_best_effort
+    for the email branch; WhatsApp remains send_whatsapp.
     """
-    email_calls: list[tuple] = []
+    email_calls: list[dict] = []
     whatsapp_calls: list[tuple] = []
 
-    async def _fake_send_email(user, message):
-        email_calls.append((user, message))
-        return True
+    def _fake_send_templated(*, to, template, context, source):
+        email_calls.append({
+            "to": to, "template": template, "context": context, "source": source,
+        })
+        return "msg_test"
 
     async def _fake_send_whatsapp(db, user, message):
         whatsapp_calls.append((db, user, message))
         return True
 
-    monkeypatch.setattr(notification_channels, "send_email", _fake_send_email)
+    monkeypatch.setattr(
+        notification_channels, "send_templated_email_best_effort",
+        _fake_send_templated,
+    )
     monkeypatch.setattr(notification_channels, "send_whatsapp", _fake_send_whatsapp)
     return email_calls, whatsapp_calls
 
@@ -111,6 +113,7 @@ def _user(plan="pro", *, account_age_days=5, phone="+923001234567"):
     return SimpleNamespace(
         id=uuid.uuid4(),
         email="student@example.com",
+        full_name="Test User",
         is_active=True,
         plan=plan,
         plan_currency="PKR",
@@ -138,13 +141,24 @@ def _item(user_id, days_out=5):
 async def test_fan_out_free_and_pro_send_email_only(monkeypatch):
     email_calls, whatsapp_calls = _patch_channels(monkeypatch)
     db = _FakeSession([])
-    free = SimpleNamespace(email="a@x.com", plan="free")
-    pro = SimpleNamespace(email="a@x.com", plan="pro")
+    free = SimpleNamespace(email="a@x.com", full_name="A", plan="free")
+    pro = SimpleNamespace(email="a@x.com", full_name="A", plan="pro")
 
-    await notification_channels.fan_out_for_plan(db, free, "msg")
-    await notification_channels.fan_out_for_plan(db, pro, "msg")
+    await notification_channels.fan_out_for_plan(
+        db, free,
+        email_template="deadline_reminder",
+        email_context={"name": "A", "upcoming": [], "dashboard_url": ""},
+        whatsapp_message="msg",
+    )
+    await notification_channels.fan_out_for_plan(
+        db, pro,
+        email_template="deadline_reminder",
+        email_context={"name": "A", "upcoming": [], "dashboard_url": ""},
+        whatsapp_message="msg",
+    )
 
     assert len(email_calls) == 2
+    assert all(c["template"] == "deadline_reminder" for c in email_calls)
     assert whatsapp_calls == []
 
 
@@ -152,9 +166,14 @@ async def test_fan_out_free_and_pro_send_email_only(monkeypatch):
 async def test_fan_out_elite_sends_email_and_whatsapp(monkeypatch):
     email_calls, whatsapp_calls = _patch_channels(monkeypatch)
     db = _FakeSession([])
-    elite = SimpleNamespace(email="a@x.com", plan="elite")
+    elite = SimpleNamespace(email="a@x.com", full_name="A", plan="elite")
 
-    await notification_channels.fan_out_for_plan(db, elite, "msg")
+    await notification_channels.fan_out_for_plan(
+        db, elite,
+        email_template="deadline_reminder",
+        email_context={"name": "A", "upcoming": [], "dashboard_url": ""},
+        whatsapp_message="msg",
+    )
 
     assert len(email_calls) == 1
     assert len(whatsapp_calls) == 1

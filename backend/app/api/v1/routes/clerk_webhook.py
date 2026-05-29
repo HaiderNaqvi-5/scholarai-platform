@@ -45,7 +45,30 @@ async def clerk_webhook(
     data = event.get("data", {})
 
     if event_type == "user.created":
-        await ensure_local_user_async(data["id"], session=db)
+        primary_id = data.get("primary_email_address_id")
+        primary_email = next(
+            (e["email_address"] for e in data.get("email_addresses", [])
+             if e.get("id") == primary_id),
+            None,
+        )
+        pre_existing = await _user_exists(
+            db, clerk_id=data["id"], email=primary_email
+        )
+        user = await ensure_local_user_async(data["id"], session=db)
+        if not pre_existing and primary_email:
+            from app.services.notifications.channels import (
+                send_templated_email_best_effort,
+            )
+            login_url = (
+                settings.FRONTEND_BASE_URL.rstrip("/") + "/login"
+                if settings.FRONTEND_BASE_URL else ""
+            )
+            send_templated_email_best_effort(
+                to=user.email,
+                template="welcome",
+                context={"name": user.full_name, "login_url": login_url},
+                source="welcome",
+            )
     elif event_type == "user.updated":
         await _sync_user_attrs(data, db)
     elif event_type == "user.deleted":
@@ -58,6 +81,21 @@ async def clerk_webhook(
             await db.commit()
 
     return {"status": "ok"}
+
+
+async def _user_exists(
+    db: AsyncSession, *, clerk_id: str, email: str | None
+) -> bool:
+    """True iff a User row already exists by clerk_user_id or by email."""
+    by_clerk = await db.execute(
+        select(User).where(User.clerk_user_id == clerk_id)
+    )
+    if by_clerk.scalar_one_or_none() is not None:
+        return True
+    if not email:
+        return False
+    by_email = await db.execute(select(User).where(User.email == email))
+    return by_email.scalar_one_or_none() is not None
 
 
 async def _sync_user_attrs(data: dict, db: AsyncSession) -> None:

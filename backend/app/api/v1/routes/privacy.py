@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.consent import (
     ALLOWED_CONSENT_TYPES,
     get_current_legal_doc,
@@ -16,6 +17,7 @@ from app.core.consent import (
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.models import LegalDocument
+from app.services.notifications.channels import send_templated_email_best_effort
 from app.schemas.privacy import (
     ConsentGrantRequest,
     ConsentRecordResponse,
@@ -174,6 +176,24 @@ async def schedule_account_deletion(
 ) -> DataDeletionRequestResponse:
     service = DeletionService(db)
     record = await service.schedule(current_user, reason=payload.reason)
+
+    cancel_url = (
+        settings.FRONTEND_BASE_URL.rstrip("/") + "/settings/privacy"
+        if settings.FRONTEND_BASE_URL else ""
+    )
+    scheduled_for = (
+        record.scheduled_for.date().isoformat() if record.scheduled_for else ""
+    )
+    send_templated_email_best_effort(
+        to=current_user.email,
+        template="account_deletion_scheduled",
+        context={
+            "name": current_user.full_name,
+            "scheduled_deletion_at": scheduled_for,
+            "cancel_url": cancel_url,
+        },
+        source="account_deletion_scheduled",
+    )
     return _serialise_deletion(record)
 
 
@@ -192,6 +212,13 @@ async def cancel_account_deletion(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No pending deletion request found",
         )
+
+    send_templated_email_best_effort(
+        to=current_user.email,
+        template="account_deletion_cancelled",
+        context={"name": current_user.full_name},
+        source="account_deletion_cancelled",
+    )
 
 
 def _serialise_deletion(record) -> DataDeletionRequestResponse:

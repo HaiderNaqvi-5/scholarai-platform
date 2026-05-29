@@ -22,7 +22,10 @@ async def ensure_local_user(
         return existing
 
     api = clerk_api if clerk_api is not None else clerk_client()
-    clerk_user = await api.users.get(user_id=clerk_user_id)
+    # clerk-backend-api 1.6.0 SDK is sync — do NOT await. Tests pass an
+    # AsyncMock so the await would survive there but raise TypeError in
+    # production against the real sync SDK.
+    clerk_user = api.users.get(user_id=clerk_user_id)
     primary_email = next(
         (e.email_address for e in clerk_user.email_addresses
          if e.id == clerk_user.primary_email_address_id),
@@ -74,7 +77,10 @@ async def ensure_local_user_async(
         return existing
 
     api = clerk_api if clerk_api is not None else clerk_client()
-    clerk_user = await api.users.get(user_id=clerk_user_id)
+    # clerk-backend-api 1.6.0 SDK is sync — do NOT await. Tests pass an
+    # AsyncMock so the await would survive there but raise TypeError in
+    # production against the real sync SDK.
+    clerk_user = api.users.get(user_id=clerk_user_id)
     primary_email = next(
         (e.email_address for e in clerk_user.email_addresses
          if e.id == clerk_user.primary_email_address_id),

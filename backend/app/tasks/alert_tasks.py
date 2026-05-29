@@ -110,6 +110,8 @@ async def _run_priority_scholarship_alerts_async() -> dict[str, int]:
         for user_id, scholarship_id in tracker_rows:
             tracked_by_user[str(user_id)].add(scholarship_id)
 
+        from app.core.config import settings as _settings  # local import
+
         users_notified = 0
         alerts_sent = 0
         for user in users:
@@ -129,13 +131,36 @@ async def _run_priority_scholarship_alerts_async() -> dict[str, int]:
             if not relevant:
                 continue
 
-            titles = ", ".join(s.title for s in relevant[:3])
-            body = (
-                f"{len(relevant)} scholarship deadline(s) you qualify for close "
-                f"within {ALERT_WINDOW_DAYS} days: {titles}. Add them to your "
-                "tracker so you do not miss them."
+            dashboard_url = (
+                _settings.FRONTEND_BASE_URL.rstrip("/") + "/feed"
+                if _settings.FRONTEND_BASE_URL else ""
             )
-            await fan_out_for_plan(session, user, body)
+            email_context = {
+                "name": user.full_name,
+                "scholarships": [
+                    {
+                        "title": s.title,
+                        "deadline_iso": s.deadline_at.date().isoformat() if s.deadline_at else "",
+                        "country": (s.country_code or "").upper(),
+                    }
+                    for s in relevant
+                ],
+                "dashboard_url": dashboard_url,
+            }
+            top_title = relevant[0].title
+            whatsapp_message = (
+                f"AidwiseAI: {len(relevant)} priority scholarship"
+                f"{'s' if len(relevant) != 1 else ''} closing in "
+                f"{ALERT_WINDOW_DAYS} days, top: {top_title}."
+            )
+
+            await fan_out_for_plan(
+                session,
+                user,
+                email_template="priority_alert",
+                email_context=email_context,
+                whatsapp_message=whatsapp_message,
+            )
             plan_key = (user.plan or "free").lower()
             channels = PLAN_CHANNELS.get(plan_key, ("email",))
             if channels:

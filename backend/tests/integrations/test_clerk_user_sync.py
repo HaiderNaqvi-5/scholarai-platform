@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from app.integrations.clerk.user_sync import ensure_local_user
 from app.models.models import User
@@ -22,7 +22,9 @@ async def test_existing_user_returned(db_session):
 @pytest.mark.asyncio
 async def test_missing_user_created_from_clerk(db_session):
     clerk_api = MagicMock()
-    clerk_api.users.get = AsyncMock(return_value=MagicMock(
+    # clerk-backend-api 1.6.0 SDK is sync — mock with MagicMock (not AsyncMock)
+    # so users.get() returns the object directly, matching production.
+    clerk_api.users.get = MagicMock(return_value=MagicMock(
         id="user_new",
         email_addresses=[MagicMock(email_address="new@x.com", id="e1")],
         primary_email_address_id="e1",
@@ -45,7 +47,7 @@ async def test_email_collision_links_existing(db_session):
     ))
     db_session.commit()
     clerk_api = MagicMock()
-    clerk_api.users.get = AsyncMock(return_value=MagicMock(
+    clerk_api.users.get = MagicMock(return_value=MagicMock(
         id="user_clerk_dup",
         email_addresses=[MagicMock(email_address="dup@x.com", id="e1")],
         primary_email_address_id="e1",

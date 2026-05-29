@@ -14,7 +14,26 @@
  */
 
 import { useSignIn, useSignUp, useClerk } from "@clerk/nextjs";
+import type { OAuthStrategy } from "@clerk/types";
 import { ApiError } from "@/lib/api";
+
+export type SocialProvider = "google" | "microsoft" | "facebook" | "linkedin";
+
+const PROVIDER_TO_STRATEGY: Record<SocialProvider, OAuthStrategy> = {
+  google: "oauth_google",
+  microsoft: "oauth_microsoft",
+  facebook: "oauth_facebook",
+  linkedin: "oauth_linkedin_oidc",
+};
+
+// Google only for now. Microsoft / Facebook / LinkedIn strategies still
+// mapped above so re-enabling means appending to this array; no other
+// code changes needed.
+export const SOCIAL_PROVIDERS: SocialProvider[] = ["google"];
+
+export function providerStrategy(p: SocialProvider): OAuthStrategy {
+  return PROVIDER_TO_STRATEGY[p];
+}
 
 type ClerkErrorEntry = { code: string; message: string; longMessage?: string };
 
@@ -119,6 +138,90 @@ export function useClerkLogout() {
   const { signOut } = useClerk();
   return async () => {
     await signOut();
+  };
+}
+
+/**
+ * Social OAuth sign-in. Calls signIn.authenticateWithRedirect — the browser
+ * leaves our origin, returns to /sso-callback, then settles at /feed.
+ */
+export function useClerkSocialLogin() {
+  const { signIn, isLoaded } = useSignIn();
+  return async (provider: SocialProvider) => {
+    if (!isLoaded || !signIn) {
+      throw new ApiError(503, "CLERK_NOT_READY", "Sign-in is still loading. Try again in a moment.");
+    }
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: PROVIDER_TO_STRATEGY[provider],
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/feed",
+      });
+    } catch (err) {
+      throw mapClerkError(err);
+    }
+  };
+}
+
+/**
+ * Social OAuth sign-up. Same shape but lands at /onboarding after the
+ * Clerk return. Clerk transparently routes signup-vs-signin when the
+ * external identity already maps to an existing Clerk user.
+ */
+export function useClerkSocialSignup() {
+  const { signUp, isLoaded } = useSignUp();
+  return async (provider: SocialProvider) => {
+    if (!isLoaded || !signUp) {
+      throw new ApiError(503, "CLERK_NOT_READY", "Sign-up is still loading. Try again in a moment.");
+    }
+    try {
+      await signUp.authenticateWithRedirect({
+        strategy: PROVIDER_TO_STRATEGY[provider],
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/onboarding",
+      });
+    } catch (err) {
+      throw mapClerkError(err);
+    }
+  };
+}
+
+/**
+ * Magic-link (email-link) sign-in. Creates a SignIn against the email,
+ * locates the email_link first-factor, primes it with /sso-callback as
+ * the return URL. User receives an email; clicking the link returns to
+ * /sso-callback where <AuthenticateWithRedirectCallback /> completes
+ * the session.
+ *
+ * Sign-IN only — Clerk's email_link on signUp conflicts with our
+ * two-step email-code flow (one verification per registration).
+ */
+export function useClerkMagicLink() {
+  const { signIn, isLoaded } = useSignIn();
+  return async (email: string) => {
+    if (!isLoaded || !signIn) {
+      throw new ApiError(503, "CLERK_NOT_READY", "Sign-in is still loading. Try again in a moment.");
+    }
+    try {
+      const created = await signIn.create({ identifier: email });
+      const emailFactor = created.supportedFirstFactors?.find(
+        (f) => f.strategy === "email_link",
+      );
+      if (!emailFactor || emailFactor.strategy !== "email_link") {
+        throw new ApiError(
+          400,
+          "EMAIL_LINK_NOT_AVAILABLE",
+          "Email-link sign-in isn't enabled for this account. Use password instead.",
+        );
+      }
+      await signIn.prepareFirstFactor({
+        strategy: "email_link",
+        emailAddressId: emailFactor.emailAddressId,
+        redirectUrl: `${window.location.origin}/sso-callback`,
+      });
+    } catch (err) {
+      throw mapClerkError(err);
+    }
   };
 }
 

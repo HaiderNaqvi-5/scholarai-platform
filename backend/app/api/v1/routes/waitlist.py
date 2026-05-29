@@ -14,6 +14,7 @@ from app.schemas.waitlist import (
     WaitlistJoinRequest,
     WaitlistJoinResponse,
 )
+from app.services.notifications.channels import send_templated_email_best_effort
 
 
 router = APIRouter()
@@ -140,6 +141,13 @@ async def join_waitlist(
     await db.flush()
     await db.refresh(row)
     await db.commit()
+
+    send_templated_email_best_effort(
+        to=row.email,
+        template="waitlist_confirmation",
+        context={"plan": row.plan, "currency": row.currency},
+        source="waitlist",
+    )
     return WaitlistJoinResponse(
         id=row.id,
         email=row.email,

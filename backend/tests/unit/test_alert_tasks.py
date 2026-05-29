@@ -76,6 +76,34 @@ def _patch_session(monkeypatch, results: list[list]):
     )
 
 
+def _patch_channels(monkeypatch):
+    """Replace templated email + WhatsApp with call-counting stubs.
+
+    Post-Phase-2: fan_out_for_plan dispatches through
+    send_templated_email_best_effort (template registry) for email and
+    send_whatsapp for WhatsApp.
+    """
+    email_calls: list[dict] = []
+    whatsapp_calls: list[tuple] = []
+
+    def _fake_send_templated(*, to, template, context, source):
+        email_calls.append({
+            "to": to, "template": template, "context": context, "source": source,
+        })
+        return "msg_test"
+
+    async def _fake_send_whatsapp(db, user, message):
+        whatsapp_calls.append((db, user, message))
+        return True
+
+    monkeypatch.setattr(
+        notification_channels, "send_templated_email_best_effort",
+        _fake_send_templated,
+    )
+    monkeypatch.setattr(notification_channels, "send_whatsapp", _fake_send_whatsapp)
+    return email_calls, whatsapp_calls
+
+
 # ---------------------------------------------------------------------------
 # Fixtures / builders
 # ---------------------------------------------------------------------------
@@ -100,6 +128,7 @@ def _user(plan="elite", *, target_countries=("GB",), phone="+923001234567"):
     return SimpleNamespace(
         id=uuid.uuid4(),
         email="student@example.com",
+        full_name="Test User",
         is_active=True,
         plan=plan,
         plan_currency="PKR",
@@ -162,31 +191,39 @@ async def test_free_user_filtered_at_sql_level(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pro_user_gets_email_only(monkeypatch):
+    email_calls, whatsapp_calls = _patch_channels(monkeypatch)
     scholarship = _scholarship("GB")
     pro_user = _user("pro")
-    # Order: scholarships → paid users → bulk tracker rows
     _patch_session(monkeypatch, [[scholarship], [pro_user], []])
     result = await alert_tasks._run_priority_scholarship_alerts_async()
     assert result["users_notified"] == 1
-    assert result["alerts_sent"] == 1  # email only
+    assert result["alerts_sent"] == 1
+    assert len(email_calls) == 1
+    assert email_calls[0]["template"] == "priority_alert"
+    assert email_calls[0]["context"]["scholarships"][0]["title"] == scholarship.title
+    assert whatsapp_calls == []
 
 
 @pytest.mark.asyncio
 async def test_elite_user_gets_email_and_whatsapp(monkeypatch):
     """Q1 retier: Elite = email + WhatsApp (SMS removed)."""
+    email_calls, whatsapp_calls = _patch_channels(monkeypatch)
     scholarship = _scholarship("GB")
     elite_user = _user("elite")
     _patch_session(monkeypatch, [[scholarship], [elite_user], []])
     result = await alert_tasks._run_priority_scholarship_alerts_async()
     assert result["users_notified"] == 1
-    assert result["alerts_sent"] == 2  # email + whatsapp (no sms)
+    assert result["alerts_sent"] == 2
+    assert len(email_calls) == 1
+    assert email_calls[0]["template"] == "priority_alert"
+    assert len(whatsapp_calls) == 1
 
 
 @pytest.mark.asyncio
 async def test_already_tracked_scholarship_is_excluded(monkeypatch):
+    _patch_channels(monkeypatch)
     scholarship = _scholarship("GB")
     elite_user = _user("elite")
-    # Bulk tracker rows are now tuples (user_id, scholarship_id).
     _patch_session(
         monkeypatch,
         [[scholarship], [elite_user], [(elite_user.id, scholarship.id)]],
@@ -197,7 +234,8 @@ async def test_already_tracked_scholarship_is_excluded(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_country_mismatch_is_excluded(monkeypatch):
-    scholarship = _scholarship("US")  # user targets GB only
+    _patch_channels(monkeypatch)
+    scholarship = _scholarship("US")
     elite_user = _user("elite", target_countries=("GB",))
     _patch_session(monkeypatch, [[scholarship], [elite_user], []])
     result = await alert_tasks._run_priority_scholarship_alerts_async()
@@ -228,6 +266,13 @@ async def test_send_whatsapp_records_usage_ledger_row():
 async def test_priority_alerts_records_whatsapp_ledger(monkeypatch):
     """Running the alerts task for an Elite user must record WhatsApp in the ledger."""
     from app.models import UsageLedger
+
+    # Stub templated email so it does not try Resend; keep send_whatsapp real
+    # so its UsageLedger row write goes through.
+    monkeypatch.setattr(
+        notification_channels, "send_templated_email_best_effort",
+        lambda **_: "msg_test",
+    )
 
     scholarship = _scholarship("GB")
     elite_user = _user("elite")
