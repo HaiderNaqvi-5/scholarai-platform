@@ -11,8 +11,6 @@ from app.services.documents import DocumentService
 from app.services.documents.grounding import retrieve_bounded_writing_guidance
 from app.services.documents import service as document_service_module
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeResult:
     def __init__(self, rows):

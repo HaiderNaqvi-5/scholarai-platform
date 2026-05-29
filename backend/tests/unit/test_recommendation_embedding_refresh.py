@@ -14,8 +14,6 @@ pytest.importorskip("celery")
 from app.tasks import recommendation_tasks
 
 
-pytestmark = pytest.mark.asyncio
-
 
 class ScalarResult:
     def __init__(self, all_items=None):

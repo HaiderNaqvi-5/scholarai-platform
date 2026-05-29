@@ -7,8 +7,6 @@ from app.schemas.auth import UserCreate, UserLogin
 from app.services.auth import AuthService
 from scholarai_common.errors import ScholarAIException, ErrorCode
 
-pytestmark = pytest.mark.asyncio
-
 
 class ScalarResult:
     def __init__(self, one=None, all_items=None):

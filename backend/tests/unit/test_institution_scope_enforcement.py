@@ -8,8 +8,6 @@ from app.models import UserRole
 from app.services.curation import CurationService
 from app.services.ingestion import IngestionService
 
-pytestmark = pytest.mark.asyncio
-
 
 class NoopSession:
     async def execute(self, _query):

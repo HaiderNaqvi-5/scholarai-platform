@@ -3,8 +3,6 @@ import pytest
 from app.services.kpi_snapshot_service import KPISnapshotService
 
 
-pytestmark = pytest.mark.asyncio
-
 
 class _RowsResult:
     def __init__(self, total: int, passed: int):

@@ -8,8 +8,6 @@ from app.core.config import settings
 from app.models import UserRole
 from scholarai_common.errors import ScholarAIException
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture(autouse=True)
 def _force_local_auth(monkeypatch):

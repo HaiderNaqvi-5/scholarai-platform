@@ -9,8 +9,6 @@ from app.models import RecordState, Scholarship, SourceRegistry, UserRole
 from app.schemas.curation import CurationActionRequest, CurationRawImportRequest
 from app.services.curation import CurationService
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeSession:
     def __init__(self):

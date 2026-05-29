@@ -13,8 +13,6 @@ import pytest
 
 from app.tasks.trial_tasks import expire_trial_plans
 
-pytestmark = pytest.mark.asyncio
-
 
 class _UpdateResult:
     """Matches the shape of an AsyncResult for an UPDATE statement."""
