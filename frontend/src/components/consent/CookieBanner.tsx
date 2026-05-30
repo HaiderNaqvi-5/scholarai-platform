@@ -75,7 +75,7 @@ export function CookieBanner() {
         <div
           role="region"
           aria-label="Cookie consent"
-          className="fade-up fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-paper-white shadow-[var(--shadow-raised)]"
+          className="slide-in-bottom fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-paper-white shadow-[var(--shadow-raised)]"
         >
           <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:gap-6 md:px-12 md:py-5">
             <div className="flex items-start gap-3 md:flex-1">

@@ -64,15 +64,15 @@ export default function AdminAuditPage() {
                   <td className="px-3 py-2 font-mono text-xs text-ink">{a.target_user_id}</td>
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-1.5 text-ink">
-                      <Badge tone="neutral">{a.from_role}</Badge>
+                      <Badge tone="neutral">{a.previous_role}</Badge>
                       <span className="text-ink-subtle">→</span>
-                      <Badge tone="validated">{a.to_role}</Badge>
+                      <Badge tone="validated">{a.next_role}</Badge>
                     </span>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-ink-muted">{a.actor_user_id}</td>
                   <td className="px-3 py-2 text-ink">{a.reason}</td>
                   <td className="px-3 py-2 text-right">
-                    {a.reverted_audit_id ? (
+                    {!a.is_reversible || a.reverted_by_audit_id ? (
                       <Badge tone="caution">reverted</Badge>
                     ) : (
                       <Button size="sm" variant="secondary" onClick={() => setTarget(a)}>
@@ -124,7 +124,7 @@ function RevertModal({
           <DialogTitle>Revert role change</DialogTitle>
           <DialogDescription>
             {audit
-              ? `Will set role back from ${audit.to_role} to ${audit.from_role}.`
+              ? `Will set role back from ${audit.next_role} to ${audit.previous_role}.`
               : ""}
           </DialogDescription>
         </DialogHeader>

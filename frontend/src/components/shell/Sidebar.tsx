@@ -19,24 +19,24 @@ import {
   KanbanSquare,
   ListChecks,
   Plane,
-  Sparkles,
+  Target,
   Building2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { hasRole } from "@/lib/auth/RoleGuard";
+import { primaryGroup } from "@/lib/auth/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { BRAND_DISPLAY_NAME } from "@/lib/brand";
 
-type NavItem = {
+export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   shortcut?: string;
 };
 
-type Section = {
+export type Section = {
   title: string;
   items: NavItem[];
   showFor: "student" | "mentor" | "admin" | "partner";
@@ -48,13 +48,13 @@ type Section = {
  * Discover, Saved, Profile, Settings. Footer cluster carries
  * TrialBanner + DemoBanner + Upgrade button.
  */
-const sections: Section[] = [
+export const sections: Section[] = [
   {
     title: "Apply",
     showFor: "student",
     items: [
       { href: "/feed", label: "Dashboard", icon: LayoutDashboard, shortcut: "G F" },
-      { href: "/dashboard/scholarships/match", label: "Matches", icon: Sparkles, shortcut: "G M" },
+      { href: "/dashboard/scholarships/match", label: "Matches", icon: Target, shortcut: "G M" },
       { href: "/tracker", label: "Tracker", icon: KanbanSquare, shortcut: "G T" },
       { href: "/discover", label: "Discover", icon: Compass, shortcut: "G D" },
       { href: "/saved", label: "Saved", icon: Bookmark, shortcut: "G S" },
@@ -145,7 +145,7 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Sections">
         {sections
-          .filter((s) => hasRole(user, s.showFor))
+          .filter((s) => user && s.showFor === primaryGroup(user.role))
           .map((section) => (
             <div key={section.title}>
               <p className="mb-1.5 px-3 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-subtle">
@@ -176,7 +176,7 @@ export function Sidebar() {
                         />
                         <span className="flex-1">{item.label}</span>
                         {item.shortcut ? (
-                          <kbd className="hidden font-mono text-[10px] text-ink-subtle group-hover:inline">
+                          <kbd className="font-mono text-[10px] text-ink-subtle opacity-0 transition-opacity duration-[var(--motion-micro)] group-hover:opacity-100">
                             {item.shortcut}
                           </kbd>
                         ) : null}

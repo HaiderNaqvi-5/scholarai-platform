@@ -117,7 +117,7 @@ export function ConsentBar() {
     <div
       role="region"
       aria-label="Consent action"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-paper-warm)] shadow-[var(--shadow-raised)]"
+      className="slide-in-bottom fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-paper-warm)] shadow-[var(--shadow-raised)]"
     >
       <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:gap-6 md:px-12 md:py-4">
         <p className="text-[13px] leading-[1.55] text-ink md:flex-1">

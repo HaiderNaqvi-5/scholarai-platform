@@ -247,3 +247,65 @@
 @utility price-fade {
   animation: price-crossfade 140ms ease-out both;
 }
+
+/* Banner entrances — top-anchored (offline) and bottom-anchored (consent) */
+@keyframes slide-in-top {
+  from { opacity: 0; transform: translateY(-100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility slide-in-top {
+  animation: slide-in-top var(--motion-enter, 180ms) var(--ease-out, ease-out) both;
+}
+@keyframes slide-in-bottom {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility slide-in-bottom {
+  animation: slide-in-bottom var(--motion-enter, 180ms) var(--ease-out, ease-out) both;
+}
+
+/* Scroll-progress bar — scroll-driven, progressive (hidden where unsupported
+   or when the user prefers reduced motion). */
+@keyframes scroll-progress-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 40;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: var(--color-lapis);
+  display: none;
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .scroll-progress {
+      display: block;
+      animation: scroll-progress-grow linear both;
+      animation-timeline: scroll(root);
+    }
+  }
+}
+
+/* Trailing-arrow nudge on hover (pointer devices only). */
+@media (hover: hover) {
+  .arrow-nudge svg:last-child {
+    transition: transform var(--motion-micro, 90ms) var(--ease-out, ease-out);
+  }
+  .arrow-nudge:hover svg:last-child {
+    transform: translateX(2px);
+  }
+}
+
+/* Skeleton→content crossfade (opacity-only; the global reduced-motion
+   block caps duration so reduced-motion users get a near-instant swap). */
+@keyframes content-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@utility content-fade-in {
+  animation: content-fade-in var(--motion-enter, 180ms) var(--ease-out, ease-out) both;
+}

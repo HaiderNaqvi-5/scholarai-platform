@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Badge } from "@/components/ui/badge";
 import { hasRole } from "@/lib/auth/RoleGuard";
+import { cn } from "@/lib/utils";
+import { MobileNav } from "./MobileNav";
 import { endpoints } from "@/lib/api";
 import type { HealthResponse } from "@/lib/api";
 
@@ -80,6 +82,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-[60px] items-center gap-3 border-b border-[var(--color-border-quiet)] bg-paper-white/95 px-4 backdrop-blur-md md:px-6">
+      <MobileNav />
       <form onSubmit={onSubmit} className="flex flex-1 items-center" role="search">
         <label htmlFor="topbar-search" className="sr-only">
           Search scholarships
@@ -96,26 +99,31 @@ export function TopBar() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search scholarships"
             aria-keyshortcuts="/"
-            className="h-10 w-full rounded-[10px] border border-[var(--color-border)] bg-paper-white pl-10 pr-12 text-[14px] text-ink-deep placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+            className="peer h-10 w-full rounded-[10px] border border-[var(--color-border)] bg-paper-white pl-10 pr-12 text-[14px] text-ink-deep placeholder:text-ink-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
           />
           <kbd
             aria-hidden
-            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--color-border)] bg-paper-warm px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle"
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--color-border)] bg-paper-warm px-1.5 py-0.5 font-mono text-[10px] text-ink-subtle transition-opacity duration-[var(--motion-micro)] peer-focus:opacity-0"
           >
             /
           </kbd>
         </div>
       </form>
 
-      {showAdmin && alertCount > 0 ? (
+      {showAdmin ? (
         <Button
           variant="ghost"
           size="sm"
-          aria-label={`${alertCount} health alerts`}
+          aria-label={alertCount > 0 ? `${alertCount} health alerts` : "No health alerts"}
           onClick={() => router.push("/admin")}
         >
-          <BellRing className="size-4 text-caution" strokeWidth={1.5} />
-          <span className="font-mono tabular-nums text-caution">{alertCount}</span>
+          <BellRing
+            className={cn("size-4", alertCount > 0 ? "text-caution" : "text-ink-subtle")}
+            strokeWidth={1.5}
+          />
+          {alertCount > 0 ? (
+            <span className="font-mono tabular-nums text-caution">{alertCount}</span>
+          ) : null}
         </Button>
       ) : null}
 

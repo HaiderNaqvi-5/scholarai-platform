@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { endpoints } from "@/lib/api";
-import type { Role, User } from "@/lib/api";
+import type { AccessControlManagedUser, Role } from "@/lib/api";
 
 const ROLES: Role[] = [
   "enduser_student",
@@ -37,7 +37,7 @@ export default function AdminUsersPage() {
     queryFn: endpoints.accessControl.listUsers,
   });
 
-  const [target, setTarget] = useState<(User & { current_role: Role }) | null>(null);
+  const [target, setTarget] = useState<AccessControlManagedUser | null>(null);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -69,14 +69,14 @@ export default function AdminUsersPage() {
             <tbody>
               {usersQ.data.items.map((u) => (
                 <tr
-                  key={u.id}
+                  key={u.user_id}
                   className="border-b border-[var(--color-border)] last:border-b-0 hover:bg-paper-warm/30"
                 >
                   <td className="px-3 py-2 text-ink">{u.email}</td>
-                  <td className="px-3 py-2 text-ink-muted">{u.full_name ?? "—"}</td>
+                  <td className="px-3 py-2 text-ink-muted">{u.full_name || "—"}</td>
                   <td className="px-3 py-2">
-                    <Badge tone={u.current_role === "owner" ? "validated" : "neutral"}>
-                      {u.current_role}
+                    <Badge tone={u.role === "owner" ? "validated" : "neutral"}>
+                      {u.role}
                     </Badge>
                   </td>
                   <td className="px-3 py-2 text-right">
@@ -100,16 +100,16 @@ function RoleModal({
   user,
   onClose,
 }: {
-  user: (User & { current_role: Role }) | null;
+  user: AccessControlManagedUser | null;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const [role, setRole] = useState<Role>(user?.current_role ?? "enduser_student");
+  const [role, setRole] = useState<Role>(user?.role ?? "enduser_student");
   const [reason, setReason] = useState("");
 
   const mut = useMutation({
     mutationFn: () =>
-      endpoints.accessControl.updateRole(user!.id, { role, reason: reason.trim() }),
+      endpoints.accessControl.updateRole(user!.user_id, { role, reason: reason.trim() }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["access-control"] });
       toast.success("Role updated.");
@@ -118,7 +118,7 @@ function RoleModal({
     onError: () => toast.error("Couldn't update role."),
   });
 
-  const valid = !!user && role !== user.current_role && reason.trim().length > 5;
+  const valid = !!user && role !== user.role && reason.trim().length > 5;
 
   return (
     <Dialog
@@ -129,7 +129,7 @@ function RoleModal({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          if (user) setRole(user.current_role);
+          if (user) setRole(user.role);
           setReason("");
         }}
       >

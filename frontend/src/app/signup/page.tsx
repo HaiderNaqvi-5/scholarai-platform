@@ -19,9 +19,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, X, ShieldCheck } from "lucide-react";
+import { Check, Eye, EyeOff, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,16 +35,30 @@ import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 
 const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
 
-function passwordScore(pw: string): { score: 0 | 1 | 2 | 3; label: string } {
-  if (pw.length < 12) return { score: 0, label: "Too short" };
+type PasswordCheck = { key: string; label: string; ok: boolean };
+
+function passwordScore(pw: string): {
+  score: 0 | 1 | 2 | 3;
+  label: string;
+  checks: PasswordCheck[];
+} {
+  const hasLen = pw.length >= 12;
   const hasLower = /[a-z]/.test(pw);
   const hasUpper = /[A-Z]/.test(pw);
   const hasDigit = /\d/.test(pw);
   const hasSpecial = PASSWORD_SPECIAL_RE.test(pw);
+  const checks: PasswordCheck[] = [
+    { key: "len", label: "12+ chars", ok: hasLen },
+    { key: "upper", label: "Upper", ok: hasUpper },
+    { key: "lower", label: "Lower", ok: hasLower },
+    { key: "number", label: "Number", ok: hasDigit },
+    { key: "symbol", label: "Symbol", ok: hasSpecial },
+  ];
+  if (!hasLen) return { score: 0, label: "Too short", checks };
   const passed = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length;
-  if (passed <= 1) return { score: 1, label: "Weak" };
-  if (passed <= 3) return { score: 2, label: "Add a symbol, upper, lower, and number" };
-  return { score: 3, label: "Strong" };
+  if (passed <= 1) return { score: 1, label: "Weak", checks };
+  if (passed <= 3) return { score: 2, label: "Almost there", checks };
+  return { score: 3, label: "Strong", checks };
 }
 
 function isBackendValidPassword(pw: string): boolean {
@@ -158,7 +172,6 @@ function SignupInner({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const meter = useMemo(() => passwordScore(password), [password]);
   const canSubmit =
     email.length > 3 && fullName.trim().length >= 2 && isBackendValidPassword(password) && pdpb;
 
@@ -249,7 +262,7 @@ function SignupInner({
           </h1>
           <p className="mt-5 max-w-[34ch] text-[16px] leading-[1.55] text-ink-muted">
             {step === "create"
-              ? `Set up your ${BRAND_DISPLAY_NAME} account. We match you against live scholarships immediately after onboarding — no consultant call.`
+              ? `Set up your ${BRAND_DISPLAY_NAME} account. We match you against live scholarships immediately after onboarding. No consultant call.`
               : `We sent a 6-digit code to confirm your email. It usually arrives in under a minute.`}
           </p>
           {step === "create" && (
@@ -264,7 +277,7 @@ function SignupInner({
               </li>
               <li className="flex gap-3">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-validated" strokeWidth={1.5} />
-                <span>Cancel anytime — even mid-trial — with one click in settings.</span>
+                <span>Cancel anytime, even mid-trial, with one click in settings.</span>
               </li>
             </ul>
           )}
@@ -358,7 +371,7 @@ function SignupInner({
                     {showPw ? <EyeOff className="size-4" strokeWidth={1.5} /> : <Eye className="size-4" strokeWidth={1.5} />}
                   </button>
                 </div>
-                <PasswordMeter score={meter.score} label={meter.label} id="signup-password-meter" />
+                <PasswordMeter password={password} id="signup-password-meter" />
               </div>
 
               <Checkbox
@@ -534,7 +547,13 @@ function Checkbox({
   );
 }
 
-function PasswordMeter({ score, label, id }: { score: 0 | 1 | 2 | 3; label: string; id: string }) {
+function PasswordMeter({ password, id }: { password: string; id: string }) {
+  // Render only after the first keystroke — no empty meter on a pristine field.
+  if (password.length === 0) return null;
+
+  const { score, label, checks } = passwordScore(password);
+  const fillColor =
+    score === 1 ? "bg-sindoor" : score === 2 ? "bg-caution" : score === 3 ? "bg-validated" : "bg-paper-edge";
   const tone =
     score === 0
       ? "text-ink-subtle"
@@ -543,26 +562,43 @@ function PasswordMeter({ score, label, id }: { score: 0 | 1 | 2 | 3; label: stri
         : score === 2
           ? "text-caution"
           : "text-validated";
+
   return (
     <div className="mt-2" id={id} aria-live="polite">
       <div className="flex gap-1">
         {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className={cn(
-              "h-1 flex-1 rounded-full transition-colors duration-[var(--motion-micro)]",
-              i < score
-                ? score === 1
-                  ? "bg-sindoor"
-                  : score === 2
-                    ? "bg-caution"
-                    : "bg-validated"
-                : "bg-paper-edge",
-            )}
-          />
+          <div key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-paper-edge">
+            <div
+              className={cn(
+                "h-full origin-left rounded-full transition-transform duration-[var(--motion-layout)] ease-[var(--ease-out)]",
+                fillColor,
+              )}
+              style={{ transform: `scaleX(${i < score ? 1 : 0})` }}
+            />
+          </div>
         ))}
       </div>
       <p className={cn("mt-1.5 font-mono text-[11px] uppercase tracking-[0.06em]", tone)}>{label}</p>
+      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Password requirements">
+        {checks.map((c) => (
+          <li
+            key={c.key}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.04em] transition-colors",
+              c.ok
+                ? "bg-validated-soft text-validated"
+                : "bg-paper-warm text-ink-subtle",
+            )}
+          >
+            {c.ok ? (
+              <Check className="size-3" strokeWidth={2.5} aria-hidden />
+            ) : (
+              <span className="size-1 rounded-full bg-current" aria-hidden />
+            )}
+            {c.label}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

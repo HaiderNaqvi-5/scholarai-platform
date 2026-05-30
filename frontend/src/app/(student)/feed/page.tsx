@@ -267,7 +267,7 @@ export default function FeedPage() {
         ) : null}
 
         {recsQ.data && recsQ.data.items.length > 0 ? (
-          <ul role="list" className="grid gap-3 md:grid-cols-3">
+          <ul role="list" className="content-fade-in grid gap-3 md:grid-cols-3">
             {recsQ.data.items.slice(0, 3).map((rec) => {
               const isSaved = savedSet.has(rec.scholarship.id);
               const deadline = rec.scholarship.deadline
