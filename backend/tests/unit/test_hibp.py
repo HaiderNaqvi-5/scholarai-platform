@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.core.hibp import is_pwned
 
 
@@ -22,3 +22,39 @@ async def test_not_pwned_when_suffix_absent():
 async def test_fail_open_on_network_error():
     with patch("app.core.hibp._fetch_range", AsyncMock(side_effect=TimeoutError())):
         assert await is_pwned("password") is False
+
+
+# --- register() wiring (gated by settings.HIBP_BREACH_CHECK_ENABLED) ---
+
+from app.core.config import settings
+from app.services.auth.service import AuthService
+from app.schemas import UserCreate
+from scholarai_common.errors import ScholarAIException
+
+_VALID = dict(email="new@example.com", password="Breached-Pass-123!", full_name="New User")
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_pwned_password_when_enabled(monkeypatch):
+    monkeypatch.setattr(settings, "HIBP_BREACH_CHECK_ENABLED", True)
+    svc = AuthService(db=AsyncMock())
+    with patch("app.services.auth.service.is_pwned", AsyncMock(return_value=True)):
+        with pytest.raises(ScholarAIException) as ei:
+            await svc.register(UserCreate(**_VALID))
+    assert ei.value.status_code == 400
+    svc.db.execute.assert_not_called()  # fail-fast before any DB work
+
+
+@pytest.mark.asyncio
+async def test_register_skips_breach_check_when_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "HIBP_BREACH_CHECK_ENABLED", False)
+    checker = AsyncMock(return_value=True)
+    svc = AuthService(db=AsyncMock())
+    # existing-email select returns a truthy row → register short-circuits.
+    svc.db.execute = AsyncMock(return_value=MagicMock())
+    with patch("app.services.auth.service.is_pwned", checker):
+        # Disabled → breach check skipped; existing-email select returns a
+        # truthy mock so register short-circuits to None (email "exists").
+        result = await svc.register(UserCreate(**_VALID))
+    checker.assert_not_called()
+    assert result is None

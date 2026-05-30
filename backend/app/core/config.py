@@ -142,6 +142,11 @@ class Settings(BaseSettings):
     AUTH_LOCKOUT_WINDOW_SECONDS: int = 900   # 15 min
     AUTH_LOCKOUT_DURATION_SECONDS: int = 900  # 15 min
     HIBP_TIMEOUT_SECONDS: float = 2.0
+    # Reject signup passwords found in the HaveIBeenPwned breach corpus
+    # (k-anonymity range query, fail-open on network error). Off by default so
+    # tests/CI stay offline-deterministic; enable per-deploy on the local
+    # AUTH_PROVIDER. No-op when AUTH_PROVIDER=clerk (register route 410s first).
+    HIBP_BREACH_CHECK_ENABLED: bool = False
 
     AUTH_PROVIDER: Literal["local", "clerk"] = "local"
 
