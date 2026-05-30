@@ -65,7 +65,7 @@ export default function AdminOverviewPage() {
           ))}
         </div>
       ) : platformQ.data ? (
-        <>
+        <div className="content-fade-in space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Stat
               icon={<Users className="size-4" strokeWidth={2} />}
@@ -122,7 +122,7 @@ export default function AdminOverviewPage() {
               value={platformQ.data.ingestion_runs_failed}
             />
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   );

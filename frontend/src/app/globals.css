@@ -299,3 +299,13 @@
     transform: translateX(2px);
   }
 }
+
+/* Skeleton→content crossfade (opacity-only; the global reduced-motion
+   block caps duration so reduced-motion users get a near-instant swap). */
+@keyframes content-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@utility content-fade-in {
+  animation: content-fade-in var(--motion-enter, 180ms) var(--ease-out, ease-out) both;
+}

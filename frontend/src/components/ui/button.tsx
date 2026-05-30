@@ -83,13 +83,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <span
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center motion-reduce:hidden"
             aria-hidden
           >
             <span className="size-[18px] animate-spin [animation-duration:700ms] rounded-full border-2 border-current border-t-transparent" />
           </span>
         ) : null}
-        <span className={cn("inline-flex items-center gap-2", loading && "invisible")}>
+        <span
+          className={cn("inline-flex items-center gap-2", loading && "motion-safe:invisible")}
+        >
           {children}
         </span>
       </button>

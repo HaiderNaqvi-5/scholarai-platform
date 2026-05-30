@@ -67,30 +67,42 @@ const STEPS = [
 
 const FAQS = [
   {
+    topic: "Pricing",
     q: "Is AidwiseAI really free?",
     a: "Yes. The Explorer tier stays free forever: 3 matches, 1 lifetime SOP, and 3 UK visa questions. Pro (PKR 2,999/mo) and Elite (PKR 6,000/mo) open the full match list, monthly SOPs, and all four country banks. No card needed to sign up.",
   },
   {
+    topic: "Vs consultants",
     q: "How is this different from a consultant?",
     a: "Consultants in Karachi or Lahore charge PKR 40,000–150,000 for a templated SOP and the same six universities they recommend to every client. We score every live scholarship against your real CGPA, target field, and household budget. You stay the author of every word. The recommendations show their working.",
   },
   {
+    topic: "Coverage",
     q: "Which scholarships and countries do you cover?",
     a: "20 active fully-funded scholarships and 47 universities across the UK, US, Canada, Germany, and Australia. Named providers include Chevening, Fulbright, DAAD, Commonwealth, HEC Overseas, and Erasmus Mundus. Listings are validated weekly and any change in deadline or funding gets re-verified.",
   },
   {
+    topic: "Accuracy",
     q: "How accurate is the match score?",
     a: "The score is an Estimated Scholarship Fit Score: a structured comparison of your profile against the published eligibility rules, weighted by CGPA, target country, field, and language test. It is never an acceptance prediction. Every match shows the rule it matched, so you can audit the score yourself.",
   },
   {
+    topic: "Privacy",
     q: "What happens to my data?",
     a: "We follow Pakistan's PDPB. We never collect religion, politics, or biometric categories. Profile snapshots are only shared with universities you explicitly opt into on a per-share basis, and never until the institution has signed a DPA. You can export or delete your account from Settings → Danger zone (30-day cancellable window).",
   },
   {
+    topic: "Billing",
     q: "When do I have to pay?",
     a: "Never if you stay on Explorer. Pro and Elite are currently on a waitlist. We open seats in cohorts and email you when one is yours. When billing opens we accept JazzCash, Easypaisa, and IBAN bank transfer in PKR; cards in GBP, EUR, AED, and USD.",
   },
 ];
+
+/** Single source for the "last updated" date shown on the hero preview and
+ * in the footer refresh chip. Keep this in sync with the next scholarship
+ * data refresh. */
+const LAST_UPDATED_ISO = "2026-05-29";
+const LAST_UPDATED_LABEL = "Updated 29 May 2026";
 
 const COMPARISON_ROWS = [
   {
@@ -239,7 +251,7 @@ export default function Landing() {
                 </ul>
                 <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border-quiet)] pt-4">
                   <p className="font-mono text-[11px] text-ink-subtle">
-                    Updated 2026-05-18
+                    {LAST_UPDATED_LABEL}
                   </p>
                   <Link
                     href="/discover"
@@ -455,7 +467,12 @@ export default function Landing() {
                 <li key={f.q} className="border-b border-[var(--color-border-quiet)] first:border-t">
                   <details className="group [&_summary::-webkit-details-marker]:hidden">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[16px] font-medium text-ink-deep transition-colors hover:text-lapis md:text-[17px]">
-                      {f.q}
+                      <span className="flex min-w-0 flex-1 items-center gap-3">
+                        <Badge tone="neutral" className="shrink-0">
+                          {f.topic}
+                        </Badge>
+                        <span>{f.q}</span>
+                      </span>
                       <Plus
                         className="size-4 shrink-0 text-ink-subtle transition-transform duration-[var(--motion-layout)] ease-[var(--ease-out)] group-open:rotate-45 group-open:text-lapis"
                         strokeWidth={1.5}
@@ -676,10 +693,13 @@ export default function Landing() {
               <p className="font-mono">
                 © {new Date().getFullYear()} {BRAND_DISPLAY_NAME}. All rights reserved.
               </p>
-              <p className="flex items-center gap-2 font-mono">
-                <CalendarRange className="size-3.5" strokeWidth={1.5} />
-                <span>Updated 2026-05-17</span>
-              </p>
+              <span
+                aria-label={`Last updated ${LAST_UPDATED_ISO}`}
+                className="inline-flex items-center gap-2 rounded-full bg-paper-white/10 px-3 py-1 font-mono text-[11px] text-paper-white/75"
+              >
+                <CalendarRange className="size-3.5" strokeWidth={1.5} aria-hidden />
+                <span>{LAST_UPDATED_LABEL}</span>
+              </span>
             </div>
           </div>
         </footer>

@@ -244,7 +244,7 @@ function DiscoverInner() {
         />
       ) : (
         <>
-          <ul className="space-y-3">
+          <ul className="content-fade-in space-y-3">
             {listQ.data.items.map((s) => (
               <li key={s.id}>
                 <ScholarshipCard
