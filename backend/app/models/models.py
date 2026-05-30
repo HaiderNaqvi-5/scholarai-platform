@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date as sa_Date,
     DateTime,
     Enum,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -197,10 +199,10 @@ class User(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     clerk_user_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, unique=True, index=True
+        String(64), nullable=True
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
@@ -294,6 +296,17 @@ class User(Base):
         foreign_keys="UserInstitutionAccess.user_id",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "plan IN ('free', 'pro', 'elite', 'institution')",
+            name="ck_users_plan_allowed",
+        ),
+        UniqueConstraint("email", name="users_email_key"),
+        Index("ix_users_email", "email", unique=True),
+        UniqueConstraint("clerk_user_id", name="uq_users_clerk_user_id"),
+        Index("ix_users_clerk_user_id", "clerk_user_id"),
     )
 
 
@@ -433,6 +446,10 @@ class UserInstitutionAccess(Base):
         back_populates="user_access_assignments",
     )
 
+    __table_args__ = (
+        Index("ix_user_institution_access_institution", "institution_id"),
+    )
+
 
 class StudentProfile(Base):
     __tablename__ = "student_profiles"
@@ -506,6 +523,26 @@ class StudentProfile(Base):
     lead_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lead_score_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # --- B2B data expansion (migration 0019) -----------------------------
+    current_university_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "universities.id",
+            ondelete="SET NULL",
+            name="fk_student_profiles_current_university",
+        ),
+        nullable=True,
+    )
+    target_university_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        postgresql.ARRAY(UUID(as_uuid=True)),
+        nullable=False,
+        server_default=text("ARRAY[]::uuid[]"),
+        default=list,
+    )
+    gmat_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sat_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    budget_pkr_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -523,6 +560,24 @@ class StudentProfile(Base):
     __table_args__ = (
         Index("ix_student_profiles_target_country", "target_country_code"),
         Index("ix_student_profiles_target_field", "target_field"),
+        Index("ix_student_profiles_current_university_id", "current_university_id"),
+        Index(
+            "ix_student_profiles_target_university_ids",
+            "target_university_ids",
+            postgresql_using="gin",
+        ),
+        CheckConstraint(
+            "gmat_score IS NULL OR (gmat_score BETWEEN 200 AND 800)",
+            name="ck_student_profiles_gmat_range",
+        ),
+        CheckConstraint(
+            "sat_score IS NULL OR (sat_score BETWEEN 400 AND 1600)",
+            name="ck_student_profiles_sat_range",
+        ),
+        CheckConstraint(
+            "budget_pkr_max IS NULL OR budget_pkr_max >= 0",
+            name="ck_student_profiles_budget_nonneg",
+        ),
     )
 
 
@@ -607,6 +662,7 @@ class SourceFeed(Base):
     __tablename__ = "source_feed"
     __table_args__ = (
         Index("ix_source_feed_source_id", "source_id"),
+        UniqueConstraint("source_id", "feed_url", name="uq_source_feed_source_url"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -1195,7 +1251,6 @@ class RecommendationKPISnapshot(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
     kpi_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -1232,7 +1287,6 @@ class DocumentKPISnapshot(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -1252,7 +1306,6 @@ class DocumentKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_document_kpi_snapshots_user_created_at", "user_id", "created_at"),
-        Index("ix_document_kpi_snapshots_document_id", "document_id"),
     )
 
 
@@ -1268,7 +1321,6 @@ class InterviewKPISnapshot(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -1288,7 +1340,6 @@ class InterviewKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
-        Index("ix_interview_kpi_snapshots_session_id", "session_id"),
     )
 
 
@@ -1313,6 +1364,10 @@ class Waitlist(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_waitlist_email", "email", unique=True),
     )
 
 
@@ -1351,13 +1406,13 @@ class University(Base):
     accepts_hec_degrees: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     has_pakistani_alumni_network: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     offers_gta_gra: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    avg_visa_approval_rate_pk: Mapped[float | None] = mapped_column(Numeric(4, 3), nullable=True)
+    avg_visa_approval_rate_pk: Mapped[float | None] = mapped_column(Float, nullable=True)
     requires_gre: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     accepts_ielts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     accepts_toefl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    min_ielts_overall: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
-    min_ielts_each_band: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
-    min_cgpa: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    min_ielts_overall: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_ielts_each_band: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_cgpa: Mapped[float | None] = mapped_column(Float, nullable=True)
     application_fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     application_fee_waiver_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     intake_months: Mapped[list[str]] = mapped_column(
@@ -1496,6 +1551,11 @@ class ApplicationTrackerItem(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_tracker_user_deadline", "user_id", "deadline"),
+        Index("ix_tracker_user_stage", "user_id", "stage"),
     )
 
 
@@ -1649,6 +1709,7 @@ class LegalDocument(Base):
 
     __table_args__ = (
         Index("ix_legal_doc_slug_current", "slug", "is_current"),
+        UniqueConstraint("slug", "version", name="uq_legal_doc_slug_version"),
     )
 
 
@@ -1712,7 +1773,6 @@ class UsageLedger(Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     period_yyyymm: Mapped[str] = mapped_column(String(6), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -1728,6 +1788,10 @@ class UsageLedger(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_usage_ledger_user_period", "user_id", "period_yyyymm"),
     )
 
 

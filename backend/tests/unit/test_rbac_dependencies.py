@@ -10,8 +10,6 @@ from app.core.dependencies import require_capability
 from app.models import UserRole
 from scholarai_common.errors import ScholarAIException
 
-pytestmark = pytest.mark.asyncio
-
 
 async def test_require_capability_uses_token_claims_when_present():
     dependency = require_capability(Capability.CURATION_QUEUE_READ)

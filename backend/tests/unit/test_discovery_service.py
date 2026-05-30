@@ -7,8 +7,6 @@ from typing import Any
 import pytest
 
 
-pytestmark = pytest.mark.asyncio
-
 
 async def test_discover_new_sources_from_seed_homepage_via_llm(monkeypatch):
     """Crawl one level deep, classify outbound links via Claude, return high-confidence picks."""
