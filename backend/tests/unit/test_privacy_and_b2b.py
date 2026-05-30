@@ -229,7 +229,7 @@ def test_redact_email_keeps_domain_drops_local():
 
 def test_seed_includes_all_required_legal_docs():
     slugs = {doc["slug"] for doc in LEGAL_DOCUMENTS_V1}
-    assert slugs == {"terms", "privacy", "cookies", "b2b_data_use", "aup"}
+    assert slugs == {"terms", "privacy", "cookies", "dpa", "refund", "aup"}
 
 
 def test_seed_contains_liability_cap_and_no_guarantee_wording():
@@ -250,7 +250,7 @@ def test_privacy_doc_documents_consent_revocation_and_export_routes():
 
 
 def test_b2b_doc_requires_dpa_before_data_share():
-    b2b = next(doc for doc in LEGAL_DOCUMENTS_V1 if doc["slug"] == "b2b_data_use")
+    b2b = next(doc for doc in LEGAL_DOCUMENTS_V1 if doc["slug"] == "dpa")
     assert "dpa" in b2b["body_markdown"].lower()
     assert "snapshot" in b2b["body_markdown"].lower()
 

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import RecommendationEvaluationUser, RecommendationUser
+from app.core.rate_limit import RateLimiter
 from app.schemas import (
     RecommendationBenchmarkEvaluationResponse,
     RecommendationBenchmarkListResponse,
@@ -41,7 +42,12 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("", response_model=RecommendationListResponse)
+@router.post(
+    "",
+    response_model=RecommendationListResponse,
+    # H2: each call fans out to the LLM; cap at 20/hr per client to stop quota drain.
+    dependencies=[Depends(RateLimiter(requests_limit=20, window_seconds=3_600))],
+)
 async def build_recommendations(
     payload: RecommendationRequest,
     current_user: RecommendationUser,

@@ -79,13 +79,16 @@ async def test_fulfil_export_sends_data_export_ready_email(monkeypatch, tmp_path
     result = await svc.fulfil_export(request.id)
 
     assert result.status == "completed"
-    assert result.download_url and result.download_url.startswith("file:")
+    # H9: download_url is the auth-gated API route, never a file:// path.
+    assert result.download_url and "file:" not in result.download_url
+    assert result.download_url.endswith(f"/data-export/{request.id}/download")
     assert len(sent) == 1
     assert sent[0]["to"] == "exp@example.com"
     assert sent[0]["template"] == "data_export_ready"
     assert sent[0]["source"] == "data_export"
     assert sent[0]["context"]["name"] == "Exp User"
-    assert sent[0]["context"]["download_url"] == result.download_url
+    # Email links to the in-app privacy page (download is auth-gated), not the raw path.
+    assert "file:" not in sent[0]["context"]["download_url"]
 
 
 async def _async_none():

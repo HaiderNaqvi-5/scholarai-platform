@@ -84,7 +84,7 @@ export function CookieBanner() {
                 We use essential cookies to keep you signed in. With your permission,
                 we also measure how you use the app to improve matches.{" "}
                 <Link
-                  href="/legal/cookie"
+                  href="/legal/cookies"
                   className="text-lapis underline underline-offset-2 hover:decoration-2"
                 >
                   Cookie policy

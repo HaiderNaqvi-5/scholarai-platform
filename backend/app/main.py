@@ -123,12 +123,15 @@ def create_app() -> FastAPI:
     if settings.ALLOWED_HOSTS:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
+    # M25: with allow_credentials=True a wildcard header/method set is unsafe
+    # (and silently downgraded by Starlette). Pin to the verbs + headers the
+    # SPA actually sends so credentialed cross-origin requests are tightly scoped.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*", "X-Request-ID"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     )
 
     app.add_middleware(SecurityHeadersMiddleware)

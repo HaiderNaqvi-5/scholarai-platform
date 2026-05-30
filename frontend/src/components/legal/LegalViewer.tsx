@@ -10,7 +10,7 @@ const SLUG_TITLES: Record<string, string> = {
   terms: "Terms of Service",
   privacy: "Privacy Notice",
   dpa: "Data Processing Addendum",
-  cookie: "Cookie Policy",
+  cookies: "Cookie Policy",
   refund: "Refund Policy",
 };
 
