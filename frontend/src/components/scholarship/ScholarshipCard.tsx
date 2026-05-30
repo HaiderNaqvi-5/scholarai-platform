@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Scholarship } from "@/lib/api";
-import { formatAmount, formatDeadline } from "@/lib/utils";
+import { formatAmount, formatDeadline, safeHttpUrl } from "@/lib/utils";
 
 export function ScholarshipCard({
   scholarship: s,
@@ -92,9 +92,9 @@ export function ScholarshipCard({
           ) : (
             <span />
           )}
-          {s.source_url ? (
+          {safeHttpUrl(s.source_url) ? (
             <a
-              href={s.source_url}
+              href={safeHttpUrl(s.source_url)!}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-ink-subtle hover:text-ink"

@@ -16,26 +16,33 @@ const apiOrigin = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
 ).replace(/\/api\/v\d+\/?$/, "");
 
+// Clerk production instances serve from a custom Frontend API host
+// (e.g. https://clerk.aidwiseai.com), NOT *.clerk.accounts.dev. Without it in
+// connect/script/frame-src, prod auth silently breaks. Set NEXT_PUBLIC_CLERK_FAPI
+// to the deployed Clerk FAPI origin at build time; dev keeps *.clerk.accounts.dev.
+const clerkProd = process.env.NEXT_PUBLIC_CLERK_FAPI?.trim();
+const clerkHosts = ["https://*.clerk.accounts.dev", clerkProd].filter(Boolean).join(" ");
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `connect-src 'self' ${apiOrigin} https://*.clerk.accounts.dev https://clerk-telemetry.com`,
+  `connect-src 'self' ${apiOrigin} ${clerkHosts} https://clerk-telemetry.com`,
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   // Tailwind 4 + Next.js inline runtime styles
   "style-src 'self' 'unsafe-inline'",
-  "frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev",
+  `frame-src https://challenges.cloudflare.com ${clerkHosts}`,
   // Clerk SDK spawns Web Workers from blob: URIs for telemetry + CAPTCHA.
   // Without an explicit worker-src, browsers fall back to script-src which
   // does not include blob: → workers blocked + console errors.
   "worker-src 'self' blob:",
   // Next.js dev mode injects eval()-using HMR shim; tighten in prod build
   process.env.NODE_ENV === "production"
-    ? "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com"
-    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+    ? `script-src 'self' 'unsafe-inline' ${clerkHosts} https://challenges.cloudflare.com`
+    : `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkHosts} https://challenges.cloudflare.com`,
 ].join("; ");
 
 const SECURITY_HEADERS = [

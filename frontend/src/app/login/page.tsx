@@ -76,7 +76,14 @@ function LoginInner({
   const auth = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/feed";
+  // H14: only honor same-origin relative paths. Reject protocol-relative
+  // ("//evil.tld"), backslash ("/\\evil.tld") and absolute URLs so a crafted
+  // ?next= cannot bounce the user to an attacker domain after login.
+  const rawNext = params.get("next");
+  const next =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.startsWith("/\\")
+      ? rawNext
+      : "/feed";
 
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
