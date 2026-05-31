@@ -178,6 +178,7 @@ Full report: `CLERK_AUDIT.md` (25 confirmed findings, 6-dimension adversarially-
 **Open (need operator decisions / values, NOT done):**
 - **Prod CSP** — DONE (`fb069b2`, branch `s95/...wave2`): `frontend/next.config.ts` now adds `NEXT_PUBLIC_CLERK_FAPI` to connect/script/frame-src alongside `*.clerk.accounts.dev`. Operator must still **set `NEXT_PUBLIC_CLERK_FAPI`** to the deployed Clerk FAPI origin (e.g. `https://clerk.aidwiseai.com`) at build time; unset → dev-only hosts (no behavior change).
 - **Activate iss/azp**: set `CLERK_ISSUER` + `CLERK_AUTHORIZED_PARTIES` in prod env to turn on the new binding.
+- **FE `authorizedParties`** — DONE (2026-06-01): `frontend/src/proxy.ts` `clerkMiddleware` now passes `{ authorizedParties }` env-gated on new `NEXT_PUBLIC_APP_ORIGIN` (comma-separated; blank = unrestricted, no dev change). Closes Clerk prod-deploy CSRF/subdomain-leak guidance gap. Operator must **set `NEXT_PUBLIC_APP_ORIGIN`** (e.g. `https://aidwiseai.com`) at build time. `frontend/.env.example` documents `NEXT_PUBLIC_APP_ORIGIN` + `NEXT_PUBLIC_CLERK_FAPI` (both blank placeholders). tsc clean.
 - **`login/page.tsx` `?next=` open-redirect** — DONE (`fb069b2`): only same-origin relative paths honored; protocol-relative/backslash/absolute rejected.
 - **`ScholarshipCard` external `source_url`** — DONE (`fb069b2`): `safeHttpUrl()` (new in `lib/utils.ts`) gates anchor href to http(s) only; blocks `javascript:`/`data:`/`blob:` from feeds. (Also repaired dangling ref — `safeHttpUrl` was used but undefined, build was broken.)
 - Deferred lower-sev: CSP `'unsafe-inline'`→nonce; no backend session-revocation (clerk sessions honored until exp); frontend has zero test infra (proxy.ts/client.ts clerk branch/sso-callback untested); IntegrityError first-login race; `.env.example` stale `RESEND_FROM_ADDRESS` + `AUTO_SEED_DEMO_DATA=true`.
@@ -203,3 +204,27 @@ Sticky knowns (do not re-investigate):
 - **Dev mode port conflict:** `docker compose up` binds frontend on :3000. While that container runs, `bun dev` cannot bind the port. Symptom: edits appear ignored because container serves stale build. Always `docker compose stop frontend` before `bun dev`. Backend container can stay up.
 - **Turbopack cache fragility:** running `bun run build` while `bun dev` is also active corrupts `.next/turbopack` to a 0-byte file. Symptom: stale chunks served, runtime crashes on shape mismatches. Don't mix; wipe `.next/` if observed.
 - **Frontend types are hand-synced** to backend Pydantic. `frontend/src/lib/api/types.ts` drifts every backend schema change. Run `bunx --bun tsc --noEmit` after touching `backend/app/schemas/`. Long-term fix tracked as `security-audit.md` D7 (OpenAPI codegen + CI diff gate).
+
+## gstack (REQUIRED — global install)
+
+**Before doing ANY work, verify gstack is installed:**
+
+```bash
+test -d ~/.claude/skills/gstack/bin && echo "GSTACK_OK" || echo "GSTACK_MISSING"
+```
+
+If GSTACK_MISSING: STOP. Do not proceed. Tell the user:
+
+> gstack is required for all AI-assisted work in this repo.
+> Install it:
+> ```bash
+> git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+> cd ~/.claude/skills/gstack && ./setup --team
+> ```
+> Then restart your AI coding tool.
+
+Do not skip skills, ignore gstack errors, or work around missing gstack.
+
+Using gstack skills: After install, skills like /qa, /ship, /review, /investigate,
+and /browse are available. Use /browse for all web browsing.
+Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
