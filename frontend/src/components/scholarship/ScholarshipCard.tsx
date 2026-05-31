@@ -5,7 +5,7 @@ import { Bookmark, BookmarkCheck, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Scholarship } from "@/lib/api";
+import type { ScholarshipListItem } from "@/lib/api";
 import { formatAmount, formatDeadline, safeHttpUrl } from "@/lib/utils";
 
 export function ScholarshipCard({
@@ -14,26 +14,29 @@ export function ScholarshipCard({
   onToggleSave,
   saving,
 }: {
-  scholarship: Scholarship;
+  scholarship: ScholarshipListItem;
   saved?: boolean;
   onToggleSave?: () => void;
   saving?: boolean;
 }) {
-  const dl = s.deadline ? formatDeadline(s.deadline) : null;
+  const dl = s.deadline_at ? formatDeadline(s.deadline_at) : null;
+  const degree = s.degree_levels?.[0];
+  const tags = s.field_tags ?? [];
+  const funding = s.funding_summary ?? formatAmount(s.funding_amount_max ?? s.funding_amount_min);
   return (
     <Card className="hover:border-ink-muted">
       <CardHeader className="flex-row items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <CardTitle className="break-words">
             <Link
-              href={`/scholarships/${s.id}`}
+              href={`/scholarships/${s.scholarship_id}`}
               className="hover:underline underline-offset-4"
             >
               {s.title}
             </Link>
           </CardTitle>
           <p className="mt-1 text-sm text-ink-muted">
-            {s.provider} · {s.country_code} · {s.degree_level}
+            {[s.provider_name, s.country_code, degree].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
@@ -50,26 +53,24 @@ export function ScholarshipCard({
               {dl.label}
             </Badge>
           ) : null}
-          <span className="font-mono text-sm text-ink">
-            {formatAmount(s.amount_max ?? s.amount_min, s.currency || "CAD")}
-          </span>
+          <span className="font-mono text-sm text-ink">{funding}</span>
         </div>
       </CardHeader>
       <CardBody className="space-y-3">
-        {s.field_tags.length > 0 ? (
+        {tags.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            {s.field_tags.slice(0, 4).map((t) => (
+            {tags.slice(0, 4).map((t) => (
               <Badge key={t} tone="neutral">
                 {t}
               </Badge>
             ))}
-            {s.field_tags.length > 4 ? (
-              <Badge tone="neutral">+{s.field_tags.length - 4}</Badge>
+            {tags.length > 4 ? (
+              <Badge tone="neutral">+{tags.length - 4}</Badge>
             ) : null}
           </div>
         ) : null}
-        {s.description ? (
-          <p className="line-clamp-2 text-sm text-ink-muted">{s.description}</p>
+        {s.summary ? (
+          <p className="line-clamp-2 text-sm text-ink-muted">{s.summary}</p>
         ) : null}
         <div className="flex items-center justify-between gap-2">
           {onToggleSave ? (

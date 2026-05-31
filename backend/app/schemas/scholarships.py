@@ -12,6 +12,16 @@ class ScholarshipListItem(BaseModel):
     country_code: str
     deadline_at: datetime | None
     record_state: str
+    # Card fields — needed by the /discover ScholarshipCard. Optional/defaulted
+    # so this stays additive over the prior lean shape (public-catalog tests
+    # assert only title + applied_filters, not an exact key set).
+    summary: str | None = None
+    funding_summary: str | None = None
+    funding_amount_min: float | None = None
+    funding_amount_max: float | None = None
+    source_url: str | None = None
+    field_tags: list[str] = Field(default_factory=list)
+    degree_levels: list[str] = Field(default_factory=list)
 
 
 class ScholarshipAppliedFilters(BaseModel):

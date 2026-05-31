@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { endpoints } from "@/lib/api";
-import type { CurationRecord, CurationState } from "@/lib/api";
+import type { CurationRecord } from "@/lib/api";
 
-const TONE: Record<CurationState, "neutral" | "validated" | "caution"> = {
+const TONE: Record<string, "neutral" | "validated" | "caution"> = {
   raw: "caution",
   validated: "neutral",
   published: "validated",
@@ -77,10 +77,25 @@ export default function CurationDetailPage({
   }
 
   const r = recordQ.data;
-  const canApprove = r.state === "raw";
-  const canReject = r.state === "raw";
-  const canPublish = r.state === "validated";
-  const canUnpublish = r.state === "published";
+  const canApprove = r.record_state === "raw";
+  const canReject = r.record_state === "raw";
+  const canPublish = r.record_state === "validated";
+  const canUnpublish = r.record_state === "published";
+
+  // Backend CurationRecordDetail has no `fields` blob — assemble the editable
+  // facts from the typed columns for the read-only viewer.
+  const fields = {
+    provider_name: r.provider_name,
+    country_code: r.country_code,
+    summary: r.summary,
+    funding_summary: r.funding_summary,
+    field_tags: r.field_tags,
+    degree_levels: r.degree_levels,
+    citizenship_rules: r.citizenship_rules,
+    min_gpa_value: r.min_gpa_value,
+    source_url: r.source_url,
+    source_document_ref: r.source_document_ref,
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -100,12 +115,12 @@ export default function CurationDetailPage({
             {r.record_id}
           </p>
         </div>
-        <Badge tone={TONE[r.state]}>{r.state}</Badge>
+        <Badge tone={TONE[r.record_state] ?? "neutral"}>{r.record_state}</Badge>
       </header>
 
-      {r.rejection_reason ? (
+      {r.review_notes ? (
         <div className="rounded-[12px] border border-danger/40 bg-danger-soft px-4 py-2 text-sm text-danger">
-          <strong>Rejection reason:</strong> {r.rejection_reason}
+          <strong>Review notes:</strong> {r.review_notes}
         </div>
       ) : null}
 
@@ -115,7 +130,7 @@ export default function CurationDetailPage({
         </CardHeader>
         <CardBody>
           <pre className="max-h-96 overflow-auto rounded-[8px] bg-paper-warm/40 p-3 font-mono text-xs text-ink">
-            {JSON.stringify(r.fields, null, 2)}
+            {JSON.stringify(fields, null, 2)}
           </pre>
         </CardBody>
       </Card>
@@ -174,36 +189,6 @@ export default function CurationDetailPage({
               <EyeOff className="size-4" strokeWidth={2} /> Unpublish
             </Button>
           </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Audit log</CardTitle>
-        </CardHeader>
-        <CardBody>
-          {r.audit_log.length === 0 ? (
-            <p className="text-sm text-ink-subtle">No actions yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {r.audit_log.map((a, i) => (
-                <li
-                  key={i}
-                  className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] pb-2 text-sm last:border-b-0 last:pb-0"
-                >
-                  <div>
-                    <p className="text-ink">
-                      <strong>{a.action}</strong> by {a.actor}
-                    </p>
-                    {a.note ? <p className="text-ink-muted">{a.note}</p> : null}
-                  </div>
-                  <span className="whitespace-nowrap font-mono text-xs text-ink-subtle">
-                    {new Date(a.at).toLocaleString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
         </CardBody>
       </Card>
     </div>
