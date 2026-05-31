@@ -7,7 +7,7 @@ import "./print.css";
 
 export const dynamic = "force-dynamic";
 
-const SLUGS = ["terms", "privacy", "dpa", "cookie", "refund"];
+const SLUGS = ["terms", "privacy", "dpa", "cookies", "refund"];
 
 export function generateStaticParams() {
   return SLUGS.map((slug) => ({ slug }));

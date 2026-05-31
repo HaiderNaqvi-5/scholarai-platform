@@ -16,6 +16,8 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 from bs4 import BeautifulSoup, Tag
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -1236,27 +1238,34 @@ class IngestionService:
         r = await safe_get(feed_url, timeout=15.0, user_agent=user_agent)
         if r.status_code != 200:
             return set()
-        soup = BeautifulSoup(r.text, "xml")
+        # C2: parse RSS/Atom with defusedxml — it forbids DTDs and entity
+        # expansion, blocking XXE (file:// reads) and billion-laughs DoS that
+        # the lxml-backed BeautifulSoup "xml" parser is vulnerable to. Feeds
+        # come from admin-registered external sources, i.e. untrusted XML.
         out: set[str] = set()
-        # RSS: <item><link>...</link></item>
-        for item in soup.find_all("item"):
-            link_tag = item.find("link") if isinstance(item, Tag) else None
-            if link_tag is None:
+        try:
+            root = DefusedET.fromstring(r.text.encode("utf-8", "replace"))
+        except (DefusedXmlException, DefusedET.ParseError):
+            # Malformed XML or a blocked entity/DTD attack → no URLs discovered.
+            return out
+
+        def _local(tag: object) -> str:
+            return tag.rsplit("}", 1)[-1].lower() if isinstance(tag, str) else ""
+
+        # RSS: <item><link>url</link></item>; Atom: <entry><link href="url"/></entry>.
+        # Match by namespace-stripped local name so both feed dialects work.
+        for element in root.iter():
+            if len(out) >= max_urls:
+                break
+            if _local(element.tag) not in {"item", "entry"}:
                 continue
-            link_text = link_tag.text.strip() if link_tag.text else ""
-            if link_text and in_scope(link_text):
-                out.add(link_text)
-            if len(out) >= max_urls:
-                break
-        # Atom: <entry><link href="..."/></entry>
-        for entry in soup.find_all("entry"):
-            if len(out) >= max_urls:
-                break
-            link_tag = entry.find("link") if isinstance(entry, Tag) else None
-            if isinstance(link_tag, Tag):
-                href = link_tag.get("href") or ""
-                if href and in_scope(href):
-                    out.add(href)
+            for child in element:
+                if _local(child.tag) != "link":
+                    continue
+                candidate = (child.get("href") or (child.text or "")).strip()
+                if candidate and in_scope(candidate):
+                    out.add(candidate)
+                    break
         return out
 
     async def _capture_source_with_pagination(

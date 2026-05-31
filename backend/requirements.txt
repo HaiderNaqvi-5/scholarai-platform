@@ -24,6 +24,7 @@ qrcode[pil]==7.4.2
 sentry-sdk[fastapi]==2.18.0
 beautifulsoup4==4.12.3
 lxml==5.3.0
+defusedxml==0.7.1
 orjson==3.10.7
 shap==0.44.0
 xgboost==2.0.3

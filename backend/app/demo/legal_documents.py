@@ -236,9 +236,17 @@ Manage preferences any time via the cookie banner or "Settings → Privacy".
 """,
     },
     {
-        "slug": "b2b_data_use",
+        "slug": "dpa",
         "version": "1.0",
-        "body_markdown": """# B2B Data Use Policy v1.0
+        "body_markdown": """# Data Processing Addendum (DPA) v1.0
+
+**What this means in 60 seconds**
+- This addendum governs how we, and any university or partner you choose to
+  share with, process personal data.
+- We act as data controller for your account; partners who receive your data
+  act as independent controllers under a signed DPA.
+- No partner receives anything until they sign this DPA and you switch on the
+  B2B share consent. Each share is a point-in-time snapshot, never a live feed.
 
 This policy applies to universities, schools, and recruitment partners that
 receive student lead data from ScholarAI.
@@ -272,6 +280,72 @@ You agree not to:
 - impersonate another user or an admissions officer.
 
 Breach of this policy may result in account suspension or termination.
+""",
+    },
+    {
+        "slug": "refund",
+        "version": "1.0",
+        "body_markdown": """# Refund & Cancellation Policy v1.0
+
+**What this means in 60 seconds**
+- The Explorer tier is free forever — nothing to refund.
+- Paid plans (Pro, Elite, Institution) renew until you cancel. Cancel any time
+  from "Settings → Billing"; you keep access until the end of the paid period.
+- We do not refund for dissatisfaction with AI-generated matches, SOPs, or
+  rubric scores — these are clearly labelled estimates you must verify.
+- EU/UK consumers get a 14-day cooling-off refund on a first paid subscription.
+- Extended downtime on a paid tier is refunded pro-rata.
+
+## 1. Free tier
+The Explorer tier is provided at no cost. There is no charge and therefore no
+refund associated with it.
+
+## 2. Paid subscriptions
+Pro, Elite, and Institution are recurring subscriptions billed in advance in
+PKR by default (or GBP, EUR, AED, USD based on your billing country). Each
+billing period renews automatically until you cancel.
+
+## 3. Cancellation
+You may cancel at any time from "Settings → Billing". Cancellation stops the
+next renewal; you retain paid features until the end of the period already
+paid for. We do not pro-rate a partially used period on voluntary
+cancellation, except where local consumer law requires it.
+
+## 4. Cooling-off (EU / UK consumers)
+If you are a consumer in the EU or UK, you may cancel a **first** paid
+subscription within 14 days of purchase for a full refund, unless you have
+substantially consumed metered features (for example, generated your SOP
+quota or completed Elite interview feedback) within that window. Requesting
+immediate access waives the unused-service portion to the extent permitted by
+law.
+
+## 5. What we do not refund
+- Dissatisfaction with AI-generated content. Matches, SOPs, professor emails,
+  and rubric scores are estimates produced by automated systems and are
+  labelled as such. You must review and verify them before any real use.
+- Outcomes decided by third parties — admission, scholarship award, or visa
+  approval. We make no guarantee of any outcome (see Terms §6).
+- Charges older than the current and immediately preceding billing period.
+
+## 6. Service downtime
+For Pro and Elite, the sole remedy for extended downtime (as defined in Terms
+§10) is a pro-rata refund of the affected period. The Explorer tier carries no
+uptime commitment.
+
+## 7. Price changes
+We may change prices on 30 days' notice. If you do not accept a new price you
+may cancel before it takes effect; amounts already paid are not refunded for
+periods already served.
+
+## 8. How to request a refund
+Email **billing@scholarai.pk** from your account email with your invoice
+reference. Eligible refunds are issued to the original payment method within
+14 days of approval. Currency-conversion differences and payment-processor
+fees are not refundable.
+
+## 9. Chargebacks
+Please contact us before raising a chargeback. A chargeback raised without
+first contacting us may result in account suspension pending resolution.
 """,
     },
 ]

@@ -20,3 +20,16 @@ export function formatAmount(amount: number | null | undefined, currency = "CAD"
   if (amount == null) return "Amount varies";
   return new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
 }
+
+// Returns url only if it parses as an http(s) URL, else null. Guards against
+// javascript:/data:/blob: and malformed source_url values from external feeds
+// being rendered into anchor href attributes.
+export function safeHttpUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}

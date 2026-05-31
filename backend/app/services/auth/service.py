@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core import account_lockout
+from app.core.hibp import is_pwned
 from app.core.authorization import get_role_capabilities
 from app.core.security import (
     create_access_token,
@@ -27,6 +28,16 @@ class AuthService:
         self.db = db
 
     async def register(self, payload: UserCreate) -> User | None:
+        # Reject known-breached passwords before any DB work. Fail-fast and
+        # email-agnostic (does not reveal whether the address already exists).
+        # Gated off by default; fail-open inside is_pwned on network error.
+        if settings.HIBP_BREACH_CHECK_ENABLED and await is_pwned(payload.password):
+            raise ScholarAIException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="This password has appeared in a known data breach. Choose a different one.",
+                status_code=400,
+            )
+
         existing = await self.db.execute(select(User).where(User.email == payload.email))
         if existing.scalar_one_or_none():
             return None

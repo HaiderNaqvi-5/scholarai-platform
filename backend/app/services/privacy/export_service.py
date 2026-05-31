@@ -19,6 +19,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models import (
     ApplicationTrackerItem,
     ConsentAuditLog,
@@ -42,6 +43,16 @@ class ExportService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
+    @staticmethod
+    def bundle_path(request_id: uuid.UUID) -> Path:
+        """On-disk location of an export bundle, keyed by request id.
+
+        Keyed by the (unguessable) request UUID rather than a predictable
+        user-id+timestamp, and served only via the auth-gated download
+        endpoint — never as a file:// path in an API response. (H9.)
+        """
+        return EXPORT_ROOT / f"export-{request_id}.zip"
+
     async def request_export(self, user: User) -> DataExportRequest:
         record = DataExportRequest(user_id=user.id, status="pending")
         self.db.add(record)
@@ -63,20 +74,29 @@ class ExportService:
 
         bundle_bytes = await self._build_bundle(user)
         EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
-        filename = f"user-{user.id}-{int(datetime.now(timezone.utc).timestamp())}.zip"
-        path = EXPORT_ROOT / filename
+        path = self.bundle_path(record.id)
         path.write_bytes(bundle_bytes)
 
         record.status = "completed"
         record.completed_at = datetime.now(timezone.utc)
-        record.download_url = path.as_uri()
+        # H9: expose the auth-gated API download route, never a file:// path.
+        record.download_url = (
+            f"{settings.API_V1_PREFIX}/privacy/data-export/{record.id}/download"
+        )
         record.expires_at = record.completed_at + EXPORT_TTL
         await self.db.flush()
 
+        # The download requires the user's own bearer token, so the email links
+        # to the in-app privacy page rather than embedding a direct file link.
+        settings_url = (
+            settings.FRONTEND_BASE_URL.rstrip("/") + "/settings/privacy"
+            if settings.FRONTEND_BASE_URL
+            else ""
+        )
         send_templated_email_best_effort(
             to=user.email,
             template="data_export_ready",
-            context={"name": user.full_name, "download_url": record.download_url},
+            context={"name": user.full_name, "download_url": settings_url},
             source="data_export",
         )
         return record
