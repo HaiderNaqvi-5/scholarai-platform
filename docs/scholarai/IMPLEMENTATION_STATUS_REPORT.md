@@ -1,7 +1,17 @@
 # ScholarAI Implementation Status Report
 
+> **⚠️ UPDATE (2026-05-30) — read first; body below is a pre-pivot snapshot (~May 18).**
+> The product **pivoted from Canada-first to Pakistan-first** (display brand **AidwiseAI**): Pakistani students applying to **UK / US / CA / DE / AU**. The Pakistan PRD (`D:/Downloads/SCHOLARAI_PAKISTAN_PRD.md`) is the canonical scope; live state of record is root `CLAUDE.md` + `progress.md`. Material changes NOT reflected in the body below:
+> - **Scope:** Pakistan origin + 5 destination countries; DAAD/Germany now in scope; 20 PK scholarships / 30 universities / 70 visa questions seeded; CGPA→GPA/UK-class converter.
+> - **Auth:** migrated to **Clerk** (`AUTH_PROVIDER=local|clerk`, default `local`) — JWKS RS256 verifier, dual-mode `get_current_user`, Svix webhook `POST /api/v1/webhooks/clerk`, OAuth (Google) + magic-link + connected-accounts. The "six-role bundle / capability-claim migration" narrative below is the local-JWT model, still present under `AUTH_PROVIDER=local`.
+> - **Email:** **Resend** transactional (`app/integrations/resend/`), 7-template registry, best-effort dispatch. Mailgun removed.
+> - **Ingestion:** capture is **Firecrawl Cloud** + SSRF guard (`app/utils/url_safety.py`); Playwright/Chromium dropped from prod Docker + capture (test-only now). 10-day cadence.
+> - **Monetization:** plan tiers `free < pro < elite < institution`, burn-cap (`core/burn_cap.py`), usage ledger, PKR/multi-currency pricing, premium paywall.
+> - **Tests:** **561 backend pass + 1 xfail**; alembic head **`20260526_0029`** (body cites `_0001`/`_0002`/`_0021`).
+> - **Frontend:** **Bun** toolchain; design passes S88 → S94 shipped, S95 Wave 2 in progress.
+
 ## Current Implementation Snapshot
-ScholarAI now has a real internal v0.1 SLC path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. Phase 2 now adds scholarship-grounded bounded guidance for Documents and Interviews with explicit separation of facts, retrieved guidance, generated guidance, and limitations while keeping Canada-first scope fixed. The largest remaining implementation gaps are broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
+ScholarAI now has a real internal v0.1 SLC path rather than only isolated slices. The repository supports public published-scholarship discovery and detail views, authenticated profile and recommendation flows, saved opportunities, document assistance, interview practice, curator review, source-registry ingestion runs, migration-driven bootstrap, and browser smoke coverage in CI. Phase 2 now adds scholarship-grounded bounded guidance for Documents and Interviews with explicit separation of facts, retrieved guidance, generated guidance, and limitations while keeping Canada-first scope fixed _(superseded — see Pakistan-pivot banner at top)_. The largest remaining implementation gaps are broader ingestion coverage, recommendation evaluation/tuning, and cleanup of intentionally thin non-core layers.
 
 ## Active Documentation-First Implementation Track
 The current implementation pass has started locally with a docs-first RBAC expansion covering:
@@ -55,7 +65,7 @@ Current local rollout status:
 | Document submission and scholarship-grounded bounded feedback | `backend/app/api/v1/routes/documents.py`, `backend/app/schemas/documents.py`, `backend/app/services/documents/service.py`, `frontend/src/components/documents/document-assistance-shell.tsx` |
 | Interview mode-aware sessions, adaptive rubric flow, and summary outputs | `backend/app/api/v1/routes/interview.py`, `backend/app/schemas/interviews.py`, `backend/app/services/interview/scoring.py`, `backend/app/services/interview/service.py`, `frontend/src/components/interview/interview-practice-shell.tsx` |
 
-### Phase 2 API Surface (Documents + Interviews, Canada-first Fixed)
+### Phase 2 API Surface (Documents + Interviews)
 | Endpoint | Phase 2 update |
 |---|---|
 | `POST /api/v1/documents` | Accepts optional scholarship grounding identifiers. |
@@ -136,7 +146,7 @@ Current local rollout status:
 ## Documentation Alignment Notes
 ### Where implementation matches docs
 - Modular monolith architecture is real.
-- Canada-first, MS-only, Fulbright-limited US scope is enforced in the active discovery and recommendation flow.
+- ~~Canada-first, MS-only, Fulbright-limited US scope~~ → **superseded by Pakistan-pivot scope** (PK origin → UK/US/CA/DE/AU; see top banner). The match/recommendation flow now enforces Pakistan-context eligibility.
 - Structured published data is the user-facing source of truth.
 - Document assistance and interview practice remain bounded, non-authoritative support tools.
 - Documents and interviews now expose explicit grounded-context separation and mode-aware API behavior for scholarship-linked preparation.

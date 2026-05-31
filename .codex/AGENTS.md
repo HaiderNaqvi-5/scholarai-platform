@@ -1,5 +1,7 @@
 ﻿# ScholarAI repository guidance
 
+> **⚠️ Current state (2026-05-30):** ScholarAI has **pivoted to a Pakistan-first product** (display brand **AidwiseAI**) — Pakistani students applying to UK / US / CA / DE / AU. Backend is feature-complete (**561 tests pass + 1 xfail**, alembic head `20260526_0029`). Auth migrated to **Clerk** (`AUTH_PROVIDER=local|clerk`, default `local`); transactional email via **Resend**; scholarship capture via **Firecrawl Cloud** (Playwright dropped from the prod path). Frontend on **Bun** (no `package-lock.json`). The "Canada MVP" data scope below is the original pre-pivot plan — superseded by the Pakistan PRD (`D:/Downloads/SCHOLARAI_PAKISTAN_PRD.md`). The MVP/working-mode/guardrail principles still hold. Live state of record: root `CLAUDE.md` + `progress.md`.
+
 ## Mission
 This repository contains the planning and implementation artifacts for ScholarAI, an AI-powered scholarship platform being built as:
 - a 16-week computer science FYP
@@ -28,7 +30,7 @@ This repository contains the planning and implementation artifacts for ScholarAI
 - Knowledge Graph Layer is mandatory as a logical layer, but MVP implementation may be:
   - a narrowly scoped Neo4j graph
   - a relationally derived graph abstraction if simpler and more feasible
-- Data ingestion = Playwright + Pandas + Pydantic
+- Data ingestion = **Firecrawl Cloud capture** (`app/services/ingestion/firecrawl_capture.py`) + SSRF guard (`app/utils/url_safety.py`) + Pandas + Pydantic. (Playwright/Chromium removed from prod Docker + capture path 2026-05-26; Playwright now test-only.)
 - Deployment = Docker Compose
 - Migrations = Alembic
 - CI/CD = GitHub Actions
@@ -41,18 +43,12 @@ This repository contains the planning and implementation artifacts for ScholarAI
 - AI coding tools may assist development, but they do not increase official team capacity
 - Do not propose architecture that depends on large ops overhead, distributed microservices, or expensive infrastructure for MVP
 
-## Data scope
-- Canada is the main MVP university and program corpus
-- USA is allowed only for:
-  - Fulbright-related provider information
-  - directly relevant funding rules
-  - narrowly scoped cross-border scholarship logic
-- General USA university discovery and broad USA scraping are not MVP by default
-- DAAD is deferred to Future Research Extensions
-- MVP programs:
-  - MS Data Science
-  - MS Artificial Intelligence
-  - MS Analytics
+## Data scope (Pakistan pivot — current)
+- **Origin:** Pakistani students. **Destinations:** UK / US / CA / DE / AU.
+- Seeded corpus: 20 PK scholarships (Chevening / Fulbright / DAAD / Commonwealth / HEC Overseas + tier 2 + GTA/GRA), 30 universities (10 UK + 8 US + 7 CA + 5 DE), 70 visa interview questions, 5 legal docs.
+- DAAD/Germany is **in scope** (was deferred pre-pivot).
+- `utils/cgpa_converter.py` maps Pakistani CGPA → US GPA / UK class tiers.
+- _Pre-pivot plan (historical, superseded):_ Canada-first MS-only corpus with Fulbright-limited US scope.
 
 ## Data and research guardrails
 - Do not invent datasets, APIs, legal guarantees, or performance numbers
