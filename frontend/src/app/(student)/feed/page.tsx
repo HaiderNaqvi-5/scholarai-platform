@@ -82,14 +82,23 @@ export default function FeedPage() {
       qc.setQueryData<{ items: SavedOpportunity[] } | undefined>(["saved"], (old) => {
         if (!old) return old;
         if (currentlySaved) return { items: old.items.filter((x) => x.scholarship_id !== id) };
-        const sch = recsQ.data?.items.find((r) => r.scholarship.id === id)?.scholarship;
-        if (!sch) return old;
+        const rec = recsQ.data?.items.find((r) => r.scholarship_id === id);
+        if (!rec) return old;
         return {
           items: [
             ...old.items,
             {
               scholarship_id: id,
-              scholarship: sch,
+              scholarship: {
+                id: rec.scholarship_id,
+                title: rec.title,
+                provider: rec.provider_name ?? "",
+                country_code: rec.country_code,
+                field_tags: [],
+                degree_level: "",
+                funding_type: "",
+                deadline: rec.deadline_at,
+              },
               status: "saved" as const,
               saved_at: new Date().toISOString(),
             },
@@ -269,22 +278,22 @@ export default function FeedPage() {
         {recsQ.data && recsQ.data.items.length > 0 ? (
           <ul role="list" className="content-fade-in grid gap-3 md:grid-cols-3">
             {recsQ.data.items.slice(0, 3).map((rec) => {
-              const isSaved = savedSet.has(rec.scholarship.id);
-              const deadline = rec.scholarship.deadline
-                ? formatDeadline(rec.scholarship.deadline)
+              const isSaved = savedSet.has(rec.scholarship_id);
+              const deadline = rec.deadline_at
+                ? formatDeadline(rec.deadline_at)
                 : null;
               return (
-                <li key={rec.scholarship.id}>
+                <li key={rec.scholarship_id}>
                   <Card hoverable className="flex h-full flex-col p-5">
                     <Link
-                      href={`/scholarships/${rec.scholarship.id}`}
+                      href={`/scholarships/${rec.scholarship_id}`}
                       className="flex flex-1 flex-col"
                     >
                       <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-subtle">
-                        {rec.scholarship.provider}
+                        {rec.provider_name}
                       </p>
                       <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-[1.35] text-ink-deep">
-                        {rec.scholarship.title}
+                        {rec.title}
                       </h3>
                       {deadline ? (
                         <p
@@ -305,7 +314,7 @@ export default function FeedPage() {
                         type="button"
                         onClick={() =>
                           toggleSave.mutate({
-                            id: rec.scholarship.id,
+                            id: rec.scholarship_id,
                             currentlySaved: isSaved,
                           })
                         }

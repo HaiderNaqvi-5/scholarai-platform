@@ -19,7 +19,7 @@ const STATES: { code: CurationState | ""; label: string }[] = [
   { code: "published", label: "Published" },
 ];
 
-const TONE: Record<CurationState, "neutral" | "validated" | "caution"> = {
+const TONE: Record<string, "neutral" | "validated" | "caution"> = {
   raw: "caution",
   validated: "neutral",
   published: "validated",
@@ -93,16 +93,13 @@ function CurationInner() {
                       <p className="mt-1 font-mono text-xs text-ink-subtle">{r.record_id}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge tone={TONE[r.state]}>{r.state}</Badge>
+                      <Badge tone={TONE[r.record_state] ?? "neutral"}>{r.record_state}</Badge>
                       <ArrowRight className="size-4 text-ink-subtle" strokeWidth={2} />
                     </div>
                   </CardHeader>
-                  {(r.audit_log ?? []).length > 0 ? (
+                  {r.review_notes ? (
                     <CardBody>
-                      <p className="text-xs text-ink-subtle">
-                        Last action: {(r.audit_log ?? []).at(-1)?.action} by{" "}
-                        {(r.audit_log ?? []).at(-1)?.actor}
-                      </p>
+                      <p className="text-xs text-ink-subtle">{r.review_notes}</p>
                     </CardBody>
                   ) : null}
                 </Card>

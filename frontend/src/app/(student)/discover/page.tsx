@@ -118,14 +118,27 @@ function DiscoverInner() {
         if (currentlySaved) {
           return { items: old.items.filter((s) => s.scholarship_id !== id) };
         }
-        const sch = listQ.data?.items.find((x) => x.id === id);
+        const sch = listQ.data?.items.find((x) => x.scholarship_id === id);
         if (!sch) return old;
         return {
           items: [
             ...old.items,
             {
               scholarship_id: id,
-              scholarship: sch,
+              scholarship: {
+                id: sch.scholarship_id,
+                title: sch.title,
+                provider: sch.provider_name ?? "",
+                country_code: sch.country_code,
+                field_tags: sch.field_tags ?? [],
+                degree_level: sch.degree_levels?.[0] ?? "",
+                funding_type: "",
+                amount_min: sch.funding_amount_min,
+                amount_max: sch.funding_amount_max,
+                deadline: sch.deadline_at,
+                source_url: sch.source_url,
+                description: sch.summary,
+              },
               status: "saved" as const,
               saved_at: new Date().toISOString(),
             },
@@ -246,13 +259,16 @@ function DiscoverInner() {
         <>
           <ul className="content-fade-in space-y-3">
             {listQ.data.items.map((s) => (
-              <li key={s.id}>
+              <li key={s.scholarship_id}>
                 <ScholarshipCard
                   scholarship={s}
-                  saved={savedSet.has(s.id)}
-                  saving={toggleSave.isPending && toggleSave.variables?.id === s.id}
+                  saved={savedSet.has(s.scholarship_id)}
+                  saving={toggleSave.isPending && toggleSave.variables?.id === s.scholarship_id}
                   onToggleSave={() =>
-                    toggleSave.mutate({ id: s.id, currentlySaved: savedSet.has(s.id) })
+                    toggleSave.mutate({
+                      id: s.scholarship_id,
+                      currentlySaved: savedSet.has(s.scholarship_id),
+                    })
                   }
                 />
               </li>

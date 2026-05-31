@@ -219,19 +219,10 @@ async def get_scholarship(
     _guard_premium_tier(scholarship, current_user)
 
     return ScholarshipDetailResponse(
+        # summary / funding_summary / funding_amount_* / source_url / field_tags /
+        # degree_levels now come from the enriched list item via model_dump().
         **_serialize_list_item(scholarship).model_dump(),
-        summary=scholarship.summary,
-        funding_summary=scholarship.funding_summary,
         funding_type=scholarship.funding_type,
-        funding_amount_min=float(scholarship.funding_amount_min)
-        if scholarship.funding_amount_min is not None
-        else None,
-        funding_amount_max=float(scholarship.funding_amount_max)
-        if scholarship.funding_amount_max is not None
-        else None,
-        source_url=scholarship.source_url,
-        field_tags=scholarship.field_tags,
-        degree_levels=scholarship.degree_levels,
         citizenship_rules=scholarship.citizenship_rules,
         min_gpa_value=float(scholarship.min_gpa_value)
         if scholarship.min_gpa_value is not None
@@ -319,6 +310,17 @@ def _serialize_list_item(scholarship: Scholarship) -> ScholarshipListItem:
         country_code=scholarship.country_code,
         deadline_at=scholarship.deadline_at,
         record_state=scholarship.record_state.value,
+        summary=scholarship.summary,
+        funding_summary=scholarship.funding_summary,
+        funding_amount_min=float(scholarship.funding_amount_min)
+        if scholarship.funding_amount_min is not None
+        else None,
+        funding_amount_max=float(scholarship.funding_amount_max)
+        if scholarship.funding_amount_max is not None
+        else None,
+        source_url=scholarship.source_url,
+        field_tags=scholarship.field_tags,
+        degree_levels=scholarship.degree_levels,
     )
 
 

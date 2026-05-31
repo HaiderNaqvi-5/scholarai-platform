@@ -145,6 +145,14 @@ export type ScholarshipListItem = {
   country_code: string;
   deadline_at: string | null;
   record_state: string;
+  // Card fields — enriched on backend ScholarshipListItem (schemas/scholarships.py).
+  summary?: string | null;
+  funding_summary?: string | null;
+  funding_amount_min?: number | null;
+  funding_amount_max?: number | null;
+  source_url?: string | null;
+  field_tags?: string[];
+  degree_levels?: string[];
 };
 
 /** Mirrors backend `ScholarshipListResponse` (schemas/scholarships.py). */
@@ -174,21 +182,44 @@ export type RecommendationStage = {
   detail?: string;
 };
 
+/**
+ * Mirrors backend `RecommendationItem` (schemas/recommendations.py) — a
+ * FLAT scholarship row plus ranking signals. There is no nested `scholarship`
+ * object; the scholarship fields live directly on the item.
+ */
 export type RecommendationItem = {
-  scholarship: Scholarship;
-  rank: number;
-  stages: RecommendationStage[];
-  supporting_factors: string[];
-  limiting_factors: string[];
-  /** Calibrated heuristic score; never shown to user as probability. */
-  score?: number;
+  scholarship_id: string;
+  title: string;
+  provider_name: string | null;
+  country_code: string;
+  deadline_at: string | null;
+  record_state: string;
+  estimated_fit_score: number;
+  fit_band: string;
+  match_summary: string;
+  matched_criteria: string[];
+  constraint_notes: string[];
+  top_reasons: string[];
+  warnings: string[];
+  retrieval_source: string;
+  semantic_similarity?: number | null;
+  rule_pass_count: number;
+  rule_total_count: number;
 };
 
+/** Mirrors backend `RecommendationResponseMeta`. */
+export type RecommendationResponseMeta = {
+  scope_policy: string;
+  allowed_country_codes: string[];
+  exception_policy: string;
+  pipeline_version: string;
+};
+
+/** Mirrors backend `RecommendationListResponse` — flat items + total + meta. */
 export type RecommendationListResponse = {
   items: RecommendationItem[];
-  scope_policy: string;
-  pipeline_version: string;
-  generated_at: string;
+  total: number;
+  meta?: RecommendationResponseMeta | null;
 };
 
 export type SavedStatus = "saved" | "in_progress" | "applied" | "closed";
@@ -270,15 +301,44 @@ export type IngestionRun = {
 
 export type CurationState = "raw" | "validated" | "published";
 
-export type CurationRecord = {
+/** Mirrors backend `CurationRecordSummary` (schemas/curation.py). */
+export type CurationRecordSummary = {
   record_id: string;
-  state: CurationState;
   title: string;
-  fields: Record<string, unknown>;
-  audit_log: { actor: string; action: string; at: string; note?: string }[];
-  rejection_reason?: string | null;
-  published_at?: string | null;
+  provider_name: string | null;
+  country_code: string;
+  record_state: string;
+  source_url: string;
+  source_type: string | null;
+  imported_at: string | null;
+  source_last_seen_at: string | null;
+  last_reviewed_at: string | null;
+  validated_at: string | null;
+  published_at: string | null;
+  review_notes: string | null;
 };
+
+/** Mirrors backend `CurationRecordDetail` (extends summary). */
+export type CurationRecordDetail = CurationRecordSummary & {
+  summary: string | null;
+  funding_summary: string | null;
+  field_tags: string[];
+  degree_levels: string[];
+  citizenship_rules: string[];
+  min_gpa_value: number | null;
+  source_document_ref: string | null;
+  provenance_payload: Record<string, unknown> | null;
+  reviewed_by_user_id: string | null;
+  validated_by_user_id: string | null;
+  published_by_user_id: string | null;
+  rejected_at: string | null;
+  unpublished_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Back-compat alias — detail is the richer shape used by the record page. */
+export type CurationRecord = CurationRecordDetail;
 
 /** Mirrors backend `AccessControlRoleChangeItem` (schemas/access_control.py). */
 export type RoleChangeAudit = {
