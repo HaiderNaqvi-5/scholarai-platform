@@ -212,3 +212,81 @@ async def test_refresh_task_invokes_async_pipeline(monkeypatch):
     )
 
     assert result == {"limit": 7, "status": "ok"}
+
+
+async def test_refresh_skips_when_document_hash_unchanged():
+    scholarship = make_scholarship()
+    # First run: no stored hash yet -> full embed, hash gets stamped on the object.
+    session = FakeSession([scholarship])
+    refresher = PublishedScholarshipEmbeddingRefresher(
+        session,
+        text_splitter=FakeSplitter(["alpha", "beta"]),
+        embedder=FakeEmbedder(),
+        retriever=FakeRetriever(),
+    )
+    first = await refresher.refresh_published_scholarships()
+    assert first["processed"] == 1
+    assert first["refreshed"] == 1
+    assert first["skipped_unchanged"] == 0
+    stamped = scholarship.embedding_source_hash
+    assert isinstance(stamped, str) and len(stamped) == 64
+
+    # Second run: same scholarship object already carries chunks + matching hash -> skip.
+    scholarship.chunks = list(session.added)  # chunks exist, so skip is safe
+    session2 = FakeSession([scholarship])
+    refresher2 = PublishedScholarshipEmbeddingRefresher(
+        session2,
+        text_splitter=FakeSplitter(["alpha", "beta"]),
+        embedder=FakeEmbedder(),
+        retriever=FakeRetriever(),
+    )
+    second = await refresher2.refresh_published_scholarships()
+    assert second["processed"] == 0
+    assert second["skipped_unchanged"] == 1
+    assert second["refreshed"] == 0
+    assert session2.deleted == []
+    assert session2.added == []
+    assert session2.commits == 0
+    assert scholarship.embedding_source_hash == stamped
+
+
+async def test_refresh_reembeds_when_document_text_changes():
+    scholarship = make_scholarship()
+    scholarship.embedding_source_hash = "0" * 64  # stale hash from a prior run
+    scholarship.chunks = [SimpleNamespace(id=uuid4())]  # had chunks, but text changed
+    session = FakeSession([scholarship])
+    refresher = PublishedScholarshipEmbeddingRefresher(
+        session,
+        text_splitter=FakeSplitter(["alpha", "beta"]),
+        embedder=FakeEmbedder(),
+        retriever=FakeRetriever(),
+    )
+    result = await refresher.refresh_published_scholarships()
+    assert result["processed"] == 1
+    assert result["refreshed"] == 1
+    assert result["skipped_unchanged"] == 0
+    assert len(session.deleted) == 1
+    assert len(session.added) == 2
+    assert scholarship.embedding_source_hash != "0" * 64
+
+
+async def test_refresh_reembeds_when_hash_matches_but_no_chunks_exist():
+    # Guards the cold-backfill case: hash present but chunk rows missing must NOT skip.
+    scholarship = make_scholarship()
+    session = FakeSession([scholarship])
+    text = PublishedScholarshipEmbeddingRefresher(
+        session, text_splitter=None, embedder=None, retriever=None
+    )._build_document_text(scholarship)
+    import hashlib
+    scholarship.embedding_source_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    scholarship.chunks = []  # matching hash but zero chunks -> must re-embed
+    refresher = PublishedScholarshipEmbeddingRefresher(
+        session,
+        text_splitter=FakeSplitter(["alpha", "beta"]),
+        embedder=FakeEmbedder(),
+        retriever=FakeRetriever(),
+    )
+    result = await refresher.refresh_published_scholarships()
+    assert result["processed"] == 1
+    assert result["skipped_unchanged"] == 0
+    assert len(session.added) == 2

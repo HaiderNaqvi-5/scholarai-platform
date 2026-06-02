@@ -795,6 +795,7 @@ class Scholarship(Base):
     min_gpa_value: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    embedding_source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     record_state: Mapped[RecordState] = mapped_column(
         Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
