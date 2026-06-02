@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import functools
 import logging
 import uuid
 from dataclasses import dataclass
+
+import anyio
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,20 @@ except ImportError:
     SentenceTransformer = None
 
 
+@functools.lru_cache(maxsize=1)
+def _get_shared_embedder():
+    """Load the SentenceTransformer once per process and share it across all
+    RecommendationService instances. Returns ``None`` when the model cannot be
+    loaded so callers fall back to rules-only ranking."""
+    if SentenceTransformer is None:
+        return None
+    try:
+        return SentenceTransformer("all-mpnet-base-v2")
+    except Exception as exc:  # noqa: BLE001 - log and degrade to rules-only
+        logger.warning("recommendation.embedding_init_failed error=%s", exc)
+        return None
+
+
 @dataclass(frozen=True)
 class RetrievedCandidate:
     scholarship: Scholarship
@@ -54,7 +71,6 @@ class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.logger = logging.getLogger(__name__)
-        self._embedder = None
 
     async def build_for_profile(
         self,
@@ -170,7 +186,7 @@ class RecommendationService:
         search_query: str,
         limit: int,
     ) -> tuple[list[RetrievedCandidate], str | None]:
-        query_embedding = self._encode_query(search_query)
+        query_embedding = await self._encode_query(search_query)
         if query_embedding is None:
             return [], "Embeddings are unavailable, so ranking fell back to published-rule heuristics only."
 
@@ -290,25 +306,22 @@ class RecommendationService:
             )
         return " | ".join(parts)
 
-    def _encode_query(self, search_query: str) -> list[float] | None:
-        if not search_query or SentenceTransformer is None:
+    async def _encode_query(self, search_query: str) -> list[float] | None:
+        if not search_query:
             return None
 
-        if self._embedder is None:
-            try:
-                self._embedder = SentenceTransformer("all-mpnet-base-v2")
-            except Exception as exc:
-                self.logger.warning("recommendation.embedding_init_failed error=%s", exc)
-                self._embedder = False
-
-        if not self._embedder:
+        embedder = _get_shared_embedder()
+        if embedder is None:
             return None
 
-        try:
-            return self._embedder.encode(
+        def _encode() -> list[float]:
+            return embedder.encode(
                 search_query,
                 normalize_embeddings=True,
             ).tolist()
+
+        try:
+            return await anyio.to_thread.run_sync(_encode)
         except Exception as exc:
             self.logger.warning("recommendation.embedding_encode_failed error=%s", exc)
             return None

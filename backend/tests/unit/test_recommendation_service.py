@@ -126,7 +126,10 @@ async def test_pgvector_candidate_retrieval_preserves_distance_order(monkeypatch
     )
     service = RecommendationService(db=session)
 
-    monkeypatch.setattr(service, "_encode_query", lambda _query: [0.25, 0.75])
+    async def _fake_encode(_query):
+        return [0.25, 0.75]
+
+    monkeypatch.setattr(service, "_encode_query", _fake_encode)
 
     async def fake_load_scholarships_by_ids(scholarship_ids):
         assert scholarship_ids == [second.id, first.id]
