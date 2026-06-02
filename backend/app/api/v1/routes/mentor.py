@@ -20,6 +20,7 @@ from app.models import (
     DocumentFeedback,
     DocumentProcessingStatus,
     DocumentRecord,
+    User,
 )
 from app.schemas.documents import (
     DocumentDetailResponse,
@@ -32,6 +33,23 @@ from app.services.documents.service import DocumentService
 router = APIRouter()
 
 HUMAN_MENTOR_LIMITATION_NOTICE = "Reviewed by a human mentor."
+
+
+def _mentor_scope_clause(current_user: User):
+    """Object-level ownership for mentor document access (H5-MENTOR-IDOR).
+
+    Institution-bound mentors may only touch documents whose owning student
+    shares their institution. Platform reviewers (admin / owner / dev / internal
+    mentor with no institution scope) are unrestricted. Returns a SQLAlchemy
+    boolean clause to AND into the DocumentRecord lookup, or None for no extra
+    restriction.
+    """
+    mentor_institution_id = getattr(current_user, "institution_id", None)
+    if mentor_institution_id is None:
+        return None
+    return DocumentRecord.user_id.in_(
+        select(User.id).where(User.institution_id == mentor_institution_id)
+    )
 
 
 @router.get("/pending-reviews", response_model=DocumentListResponse)
@@ -92,11 +110,15 @@ async def get_document_for_review(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DocumentDetailResponse:
     """Fetch a single student document for mentor review."""
-    result = await db.execute(
+    scope_clause = _mentor_scope_clause(current_user)
+    query = (
         select(DocumentRecord)
         .where(DocumentRecord.id == document_id)
         .options(selectinload(DocumentRecord.feedback_entries))
     )
+    if scope_clause is not None:
+        query = query.where(scope_clause)
+    result = await db.execute(query)
     document = result.scalar_one_or_none()
     if document is None:
         raise HTTPException(
@@ -140,7 +162,11 @@ async def submit_mentor_feedback(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> MentorFeedbackResponse:
     """Submit human mentor feedback on a student document."""
-    result = await db.execute(select(DocumentRecord).where(DocumentRecord.id == document_id))
+    scope_clause = _mentor_scope_clause(current_user)
+    query = select(DocumentRecord).where(DocumentRecord.id == document_id)
+    if scope_clause is not None:
+        query = query.where(scope_clause)
+    result = await db.execute(query)
     document = result.scalar_one_or_none()
     if document is None:
         raise HTTPException(

@@ -197,6 +197,154 @@ def test_mentor_submit_feedback_persists_human_review(app, client):
     assert limitations == ["Reviewed by a human mentor."]
 
 
+# --- H5-MENTOR-IDOR: object-level ownership on mentor document read + feedback ---
+
+
+def _build_owned_document(*, title: str, owner_institution_id):
+    document = _build_document(title=title, has_human_review=False)
+    document.owner_institution_id = owner_institution_id  # consumed by _ScopedFakeDB
+    return document
+
+
+class _ScopedFakeDB(_FakeDB):
+    """Mirror the post-fix query: a single-document lookup only matches when the
+    mentor's institution scope (passed in) equals the document owner's institution,
+    OR the mentor scope is None (platform reviewer => unrestricted)."""
+
+    def __init__(self, documents, mentor_institution_id):
+        super().__init__(documents)
+        self.mentor_institution_id = mentor_institution_id
+
+    async def execute(self, query):
+        query_text = str(query)
+        # Only institution-scoped lookups (the post-fix query) get filtered here.
+        # Detect the scope clause the fix adds: a user_id IN (SELECT users.id ...
+        # WHERE users.institution_id ...) subquery. An unscoped id-only lookup
+        # (the pre-fix query) falls through to the parent _FakeDB, which returns
+        # the document unconditionally -> the IDOR tests then fail (200 != 404),
+        # giving us a genuine red->green guard.
+        is_scoped_lookup = (
+            "WHERE documents.id" in query_text
+            and "users.institution_id" in query_text
+            and "documents.user_id IN" in query_text
+        )
+        if is_scoped_lookup:
+            doc = self.documents[0] if self.documents else None
+            if doc is None:
+                return _ExecuteResult([])
+            owner_inst = getattr(doc, "owner_institution_id", None)
+            # mentor_institution_id is None never reaches here: the fix omits the
+            # scope clause for platform reviewers, so the query is id-only and
+            # falls through to super().execute (unrestricted) below.
+            if owner_inst == self.mentor_institution_id:
+                return _ExecuteResult([doc])
+            return _ExecuteResult([])  # out-of-institution => not found
+        return await super().execute(query)
+
+
+def test_mentor_cannot_read_document_outside_their_institution(app, client):
+    mentor_inst = uuid4()
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=mentor_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"})
+        user.institution_id = mentor_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_mentor_can_read_document_within_their_institution(app, client):
+    shared_inst = uuid4()
+    document = _build_owned_document(title="In institution SOP", owner_institution_id=shared_inst)
+    db = _ScopedFakeDB([document], mentor_institution_id=shared_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"})
+        user.institution_id = shared_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(document.id)
+
+
+def test_platform_mentor_without_institution_reads_any_document(app, client):
+    document = _build_owned_document(title="Any student SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"})
+        user.institution_id = None  # platform reviewer (admin/owner/dev/internal mentor)
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+
+def test_mentor_cannot_submit_feedback_outside_their_institution(app, client):
+    mentor_inst = uuid4()
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=mentor_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.submit"})
+        user.institution_id = mentor_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.post(
+        f"/api/v1/mentor/documents/{document.id}/feedback",
+        json={
+            "summary": "A valid looking summary with sufficient length for schema requirements.",
+            "strengths": ["One"],
+            "revision_priorities": ["Two"],
+            "caution_notes": [],
+        },
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert db.committed is False
+
+
 def test_mentor_routes_return_403_without_mentor_capabilities(app, client):
     pending = _build_document(title="Restricted document", has_human_review=False)
     db = _FakeDB([pending])
