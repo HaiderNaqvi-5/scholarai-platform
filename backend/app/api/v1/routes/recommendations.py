@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import RecommendationEvaluationUser, RecommendationUser
+from app.core.dependencies import AdminUser, RecommendationEvaluationUser, RecommendationUser
 from app.core.rate_limit import RateLimiter
+from app.tasks.recommendation_tasks import refresh_published_scholarship_embeddings
 from app.schemas import (
     RecommendationBenchmarkEvaluationResponse,
     RecommendationBenchmarkListResponse,
@@ -74,6 +75,19 @@ async def build_recommendations(
             pipeline_version="recommendations.phase1.v1",
         ),
     )
+
+
+@router.post("/refresh-embeddings", status_code=202)
+async def refresh_recommendation_embeddings(current_user: AdminUser) -> dict[str, str]:
+    """Enqueue a rebuild of published-scholarship pgvector embeddings on the worker.
+
+    Matching ranks via ``scholarship_chunks`` cosine distance; new/changed
+    scholarships have no embeddings until this runs. Admin-only, on-demand.
+    """
+    del current_user
+    task = refresh_published_scholarship_embeddings.delay()
+    logger.info("recommendation_embeddings_refresh_enqueued task_id=%s", task.id)
+    return {"status": "queued", "task_id": task.id}
 
 
 @router.post("/evaluate", response_model=RecommendationEvaluationResponse)
