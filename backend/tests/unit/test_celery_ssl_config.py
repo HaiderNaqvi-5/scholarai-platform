@@ -5,7 +5,7 @@ from app.tasks.celery_app import _rediss_ssl_options
 
 def test_rediss_url_requires_cert_reqs():
     assert _rediss_ssl_options("rediss://default:pw@host:6379") == {
-        "ssl_cert_reqs": ssl.CERT_NONE
+        "ssl_cert_reqs": ssl.CERT_REQUIRED
     }
 
 

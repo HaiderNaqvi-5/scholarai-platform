@@ -9,13 +9,13 @@ def _rediss_ssl_options(url: str | None) -> dict | None:
     """SSL options for a ``rediss://`` Redis URL (e.g. Upstash).
 
     Celery's Redis result backend raises ``ValueError`` at worker boot if a
-    ``rediss://`` URL has no ``ssl_cert_reqs``; the broker transport otherwise
-    silently defaults to insecure. Returns ``None`` for plain ``redis://``.
-    ``CERT_NONE`` keeps TLS encryption while skipping cert verification, which
-    matches Celery's prior implicit broker behaviour against Upstash.
+    ``rediss://`` URL has no ``ssl_cert_reqs``. Returns ``None`` for plain
+    ``redis://``. ``CERT_REQUIRED`` validates the cert chain + hostname against
+    the system trust store (Upstash uses publicly-trusted certs; the image
+    ships ``ca-certificates``), so TLS is both encrypted and verified.
     """
     if url and url.startswith("rediss://"):
-        return {"ssl_cert_reqs": ssl.CERT_NONE}
+        return {"ssl_cert_reqs": ssl.CERT_REQUIRED}
     return None
 
 
