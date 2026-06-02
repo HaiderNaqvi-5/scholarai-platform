@@ -188,18 +188,22 @@ export function useClerkSocialSignup() {
 
 /**
  * Magic-link (email-link) sign-in. Creates a SignIn against the email,
- * locates the email_link first-factor, primes it with /sso-callback as
- * the return URL. User receives an email; clicking the link returns to
- * /sso-callback where <AuthenticateWithRedirectCallback /> completes
- * the session.
+ * locates the email_link first-factor, then runs Clerk's email-link flow:
+ * `createEmailLinkFlow().startEmailLinkFlow()` sends the email AND polls
+ * until the link is clicked on this device. On `complete` it activates the
+ * session and redirects to /feed. (The previous `prepareFirstFactor` call
+ * only sent the email and never polled, so the session never completed.)
+ *
+ * The returned function resolves once the email is sent so the UI can show
+ * "link sent"; completion happens in the background poll on click.
  *
  * Sign-IN only — Clerk's email_link on signUp conflicts with our
  * two-step email-code flow (one verification per registration).
  */
 export function useClerkMagicLink() {
-  const { signIn, isLoaded } = useSignIn();
+  const { signIn, setActive, isLoaded } = useSignIn();
   return async (email: string) => {
-    if (!isLoaded || !signIn) {
+    if (!isLoaded || !signIn || !setActive) {
       throw new ApiError(503, "CLERK_NOT_READY", "Sign-in is still loading. Try again in a moment.");
     }
     try {
@@ -214,11 +218,23 @@ export function useClerkMagicLink() {
           "Email-link sign-in isn't enabled for this account. Use password instead.",
         );
       }
-      await signIn.prepareFirstFactor({
-        strategy: "email_link",
+      const { startEmailLinkFlow } = signIn.createEmailLinkFlow();
+      // Sends the email + polls until the link is clicked on this device.
+      // Don't await the full poll — return so the UI shows "link sent";
+      // finish the session when the poll resolves.
+      void startEmailLinkFlow({
         emailAddressId: emailFactor.emailAddressId,
         redirectUrl: `${window.location.origin}/sso-callback`,
-      });
+      })
+        .then(async (res) => {
+          if (res.status === "complete" && res.createdSessionId) {
+            await setActive({ session: res.createdSessionId });
+            window.location.assign("/feed");
+          }
+        })
+        .catch(() => {
+          /* link expired or flow cancelled — the login page resend retries */
+        });
     } catch (err) {
       throw mapClerkError(err);
     }
