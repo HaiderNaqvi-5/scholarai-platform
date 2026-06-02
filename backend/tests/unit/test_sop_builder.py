@@ -93,12 +93,32 @@ class _FakeDB:
     def __init__(self, monthly_usage_row: Any = None):
         # _queue is consumed in order by SELECTs; non-SELECT statements skip it.
         self._queue: list[_FakeResult] = [_FakeResult(monthly_usage_row)]
+        # Pre-request bucket count for the atomic reserve upsert's RETURNING.
+        # None = no row yet (fresh period). A seeded row exposes ``sop_count``.
+        self._seed_count: int | None = (
+            getattr(monthly_usage_row, "sop_count", None)
+            if monthly_usage_row is not None
+            else None
+        )
         self.added: list[Any] = []
         self.flushed = 0
         self.refreshed: list[Any] = []
         self.non_select_calls: list[Any] = []
 
     async def execute(self, statement):
+        rendered = str(statement).lower()
+        # Atomic reserve upsert (INSERT ... ON CONFLICT ... RETURNING sop_count):
+        # yield the authoritative post-increment count so the at-cap reservation
+        # returns cap+1 and the gate raises 429. ``_seed_count`` is the bucket
+        # value before this request (None = fresh period -> reserves count 1).
+        if "insert into sop_monthly_usage" in rendered and "on conflict" in rendered:
+            self.non_select_calls.append(statement)
+            base = self._seed_count if self._seed_count is not None else 0
+            return _FakeResult(base + 1)
+        if "update sop_monthly_usage" in rendered:
+            # release decrement of an over-cap reservation: no-op result.
+            self.non_select_calls.append(statement)
+            return _FakeResult(None)
         if isinstance(statement, Select):
             if self._queue:
                 return self._queue.pop(0)
