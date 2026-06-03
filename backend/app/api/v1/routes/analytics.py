@@ -37,46 +37,49 @@ async def get_platform_analytics(
     """Return aggregate platform metrics for the admin dashboard."""
     kpi_snapshot_service = KPISnapshotService(db)
 
-    # ── User counts ───────────────────────────────────────────────────────
-    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
-    student_count = (
+    # ── User counts (single GROUP BY role, bucketed in Python) ────────────
+    student_roles = {UserRole.STUDENT, UserRole.ENDUSER_STUDENT}
+    mentor_roles = {UserRole.MENTOR, UserRole.INTERNAL_USER}
+    admin_roles = {UserRole.ADMIN, UserRole.DEV, UserRole.OWNER}
+
+    role_counts = (
         await db.execute(
-            select(func.count(User.id)).where(
-                User.role.in_([UserRole.STUDENT, UserRole.ENDUSER_STUDENT])
-            )
+            select(User.role, func.count(User.id)).group_by(User.role)
         )
-    ).scalar() or 0
-    mentor_count = (
-        await db.execute(
-            select(func.count(User.id)).where(
-                User.role.in_([UserRole.MENTOR, UserRole.INTERNAL_USER])
-            )
-        )
-    ).scalar() or 0
-    admin_count = (
-        await db.execute(
-            select(func.count(User.id)).where(
-                User.role.in_([UserRole.ADMIN, UserRole.DEV, UserRole.OWNER])
-            )
-        )
-    ).scalar() or 0
+    ).all()
+
+    total_users = 0
+    student_count = 0
+    mentor_count = 0
+    admin_count = 0
+    for role, count in role_counts:
+        count = count or 0
+        total_users += count
+        if role in student_roles:
+            student_count += count
+        elif role in mentor_roles:
+            mentor_count += count
+        elif role in admin_roles:
+            admin_count += count
 
     # ── Scholarship counts ────────────────────────────────────────────────
     total_scholarships = (
         await db.execute(select(func.count(Scholarship.id)))
     ).scalar() or 0
 
-    # ── Application counts ────────────────────────────────────────────────
-    total_applications = (
-        await db.execute(select(func.count(Application.id)))
-    ).scalar() or 0
-    submitted_applications = (
+    # ── Application counts (total + submitted in one aggregate) ───────────
+    application_totals = (
         await db.execute(
-            select(func.count(Application.id)).where(
-                Application.status == ApplicationStatus.SUBMITTED
+            select(
+                func.count(Application.id),
+                func.count(Application.id).filter(
+                    Application.status == ApplicationStatus.SUBMITTED
+                ),
             )
         )
-    ).scalar() or 0
+    ).one()
+    total_applications = application_totals[0] or 0
+    submitted_applications = application_totals[1] or 0
 
     # ── Document counts ───────────────────────────────────────────────────
     total_documents = (
@@ -88,17 +91,19 @@ async def get_platform_analytics(
         await db.execute(select(func.count(InterviewSession.id)))
     ).scalar() or 0
 
-    # ── Ingestion health ──────────────────────────────────────────────────
-    total_runs = (
-        await db.execute(select(func.count(IngestionRun.id)))
-    ).scalar() or 0
-    failed_runs = (
+    # ── Ingestion health (total + failed in one aggregate) ───────────────
+    ingestion_totals = (
         await db.execute(
-            select(func.count(IngestionRun.id)).where(
-                IngestionRun.status == IngestionRunStatus.FAILED
+            select(
+                func.count(IngestionRun.id),
+                func.count(IngestionRun.id).filter(
+                    IngestionRun.status == IngestionRunStatus.FAILED
+                ),
             )
         )
-    ).scalar() or 0
+    ).one()
+    total_runs = ingestion_totals[0] or 0
+    failed_runs = ingestion_totals[1] or 0
 
     recommendation_trends = await kpi_snapshot_service.recommendation_trends()
     document_trends = await kpi_snapshot_service.document_trends()
