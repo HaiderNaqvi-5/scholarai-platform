@@ -49,28 +49,27 @@ class _FakeSession:
         return _Result(rows)
 
 
-class _FakeCleanupSession:
-    def __init__(self):
-        self.execute_calls = 0
-        self.deleted = []
+class _FakeDeleteResult:
+    def __init__(self, rowcount):
+        self.rowcount = rowcount
 
-    async def execute(self, _query):
-        self.execute_calls += 1
-        if self.execute_calls == 1:
-            return _ScalarResult([uuid.uuid4(), uuid.uuid4()])
-        if self.execute_calls == 2:
-            return _ScalarResult([uuid.uuid4()])
-        if self.execute_calls == 3:
-            return _ScalarResult([])
-        return _ScalarResult([])
 
-    async def get(self, model, snapshot_id):
-        return {"model": model.__name__, "id": snapshot_id}
+class _FakePurgeSession:
+    """Records each set-based DELETE; one execute per table, no get()/delete()."""
 
-    async def delete(self, snapshot):
-        self.deleted.append(snapshot)
+    def __init__(self, rowcounts):
+        # rowcounts in call order: recommendation, document, interview
+        self._rowcounts = list(rowcounts)
+        self.executed = []
+        self.flushed = 0
+
+    async def execute(self, statement):
+        self.executed.append(statement)
+        rowcount = self._rowcounts[len(self.executed) - 1]
+        return _FakeDeleteResult(rowcount)
 
     async def flush(self):
+        self.flushed += 1
         return None
 
 
@@ -120,7 +119,15 @@ async def test_kpi_snapshot_service_builds_trend_items():
 
 
 async def test_kpi_snapshot_service_purges_old_snapshots():
-    fake_db = _FakeCleanupSession()
+    from sqlalchemy.sql.dml import Delete
+
+    from app.models import (
+        DocumentKPISnapshot,
+        InterviewKPISnapshot,
+        RecommendationKPISnapshot,
+    )
+
+    fake_db = _FakePurgeSession(rowcounts=[2, 1, 0])
     service = KPISnapshotService(cast(Any, fake_db))
 
     deleted = await service.purge_snapshots_older_than(retention_days=30)
@@ -129,4 +136,10 @@ async def test_kpi_snapshot_service_purges_old_snapshots():
     assert deleted["document_deleted"] == 1
     assert deleted["interview_deleted"] == 0
     assert deleted["total_deleted"] == 3
-    assert len(fake_db.deleted) == 3
+
+    # One set-based DELETE per table — NOT 1+2N per row.
+    assert len(fake_db.executed) == 3
+    assert all(isinstance(stmt, Delete) for stmt in fake_db.executed)
+    assert fake_db.executed[0].table.name == RecommendationKPISnapshot.__tablename__
+    assert fake_db.executed[1].table.name == DocumentKPISnapshot.__tablename__
+    assert fake_db.executed[2].table.name == InterviewKPISnapshot.__tablename__

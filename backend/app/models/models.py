@@ -1273,6 +1273,10 @@ class RecommendationKPISnapshot(Base):
             "ix_recommendation_kpi_snapshots_policy_version",
             "policy_version",
         ),
+        Index(
+            "ix_recommendation_kpi_snapshots_created_at",
+            "created_at",
+        ),
     )
 
 
@@ -1307,6 +1311,7 @@ class DocumentKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_document_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_document_kpi_snapshots_created_at", "created_at"),
     )
 
 
@@ -1341,6 +1346,7 @@ class InterviewKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_interview_kpi_snapshots_created_at", "created_at"),
     )
 
 
