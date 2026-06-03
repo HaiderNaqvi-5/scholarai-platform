@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import uuid
+from types import SimpleNamespace
+
 from app.demo.visa_questions import (
     VISA_INTERVIEW_QUESTION_BANK,
     VISA_TYPE_BY_COUNTRY,
 )
+from app.services.llm import AnthropicClient
 from app.services.visa_interview.evaluator import (
+    VISA_EVAL_SYSTEM_PROMPT,
+    evaluate_answer,
     evaluate_answer_deterministic,
     _normalise_rubric,
 )
@@ -114,3 +120,93 @@ def test_evaluator_returns_int_scores_in_range():
         assert isinstance(result[key], int)
         assert 1 <= result[key] <= 5
     assert result["used_llm"] is False
+
+
+class _BurnCapResult:
+    def scalar_one(self) -> int:
+        return 0
+
+
+class _CaptureDB:
+    """Async DB stub: burn-cap SUM returns 0; record_llm add/flush no-ops."""
+
+    def __init__(self) -> None:
+        self.added: list = []
+
+    async def execute(self, _statement):
+        return _BurnCapResult()
+
+    def add(self, obj) -> None:
+        self.added.append(obj)
+
+    async def flush(self) -> None:
+        return None
+
+
+def _user():
+    return SimpleNamespace(id=uuid.uuid4(), plan="elite", plan_currency="PKR")
+
+
+async def test_visa_evaluator_keeps_system_prompt_static_and_caches():
+    captured: list[dict] = []
+
+    rubric_json = (
+        '{"clarity_score": 4, "confidence_score": 4, "relevance_score": 4, '
+        '"overall_score": 4, "red_flags": [], "missing_elements": [], '
+        '"what_was_good": "ok", "ideal_answer_summary": "ok"}'
+    )
+    stub_message = SimpleNamespace(
+        content=[SimpleNamespace(text=rubric_json)],
+        usage=SimpleNamespace(input_tokens=120, output_tokens=40),
+    )
+
+    def _fake_raw_call(self, **kwargs):  # noqa: ANN001 - matches method shape
+        captured.append(kwargs)
+        return stub_message
+
+    llm = AnthropicClient()
+    llm._api_key = "test-key"  # noqa: SLF001 - force the live-SDK branch
+    AnthropicClient._raw_call = _fake_raw_call  # noqa: SLF001 - SDK seam swap
+
+    try:
+        await evaluate_answer(
+            db=_CaptureDB(),
+            user=_user(),
+            country="US",
+            question_text="Why this university?",
+            category="program",
+            answer_text="Because of Professor X's turbulence lab at MIT.",
+            llm=llm,
+        )
+        await evaluate_answer(
+            db=_CaptureDB(),
+            user=_user(),
+            country="GB",
+            question_text="What ties do you have to Pakistan?",
+            category="ties",
+            answer_text="My parents and sister live in Karachi.",
+            llm=llm,
+        )
+    finally:
+        del AnthropicClient._raw_call  # restore the real bound method
+
+    assert len(captured) == 2
+    first, second = captured
+
+    # System block is the static rubric constant verbatim — identical across
+    # both calls, so the ephemeral prompt cache can hit on the second call.
+    assert first["system_prompt"] == VISA_EVAL_SYSTEM_PROMPT
+    assert second["system_prompt"] == first["system_prompt"]
+
+    # The static block must NOT carry any per-call values.
+    assert "{country}" not in VISA_EVAL_SYSTEM_PROMPT
+    assert "US" not in VISA_EVAL_SYSTEM_PROMPT
+    assert "Karachi" not in VISA_EVAL_SYSTEM_PROMPT
+    assert "Professor X" not in VISA_EVAL_SYSTEM_PROMPT
+
+    # The per-call country/question/answer now live in the user prompt.
+    assert "US" in first["user_prompt"]
+    assert "Why this university?" in first["user_prompt"]
+    assert "Professor X" in first["user_prompt"]
+    assert "GB" in second["user_prompt"]
+    assert "Karachi" in second["user_prompt"]
