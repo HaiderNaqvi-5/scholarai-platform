@@ -222,18 +222,39 @@ class AnthropicClient:
 # ----------------------------------------------------------------------
 
 
+# Anthropic bills a cached ephemeral prefix at the cache-read rate, ~0.1x the
+# base input price, after the first call in the 5-minute window. The static
+# system prompt in `_raw_call` is always wrapped in a `_CachedSystemBlock`, so
+# the pre-flight projection must not charge it at full price (over-projecting
+# burn-cap cost trips the 429 earlier than real spend warrants).
+_CACHED_SYSTEM_DISCOUNT = 0.1
+
+
 def _estimate_input_tokens(system_prompt: str, user_prompt: str) -> int:
-    """Cheap upper-bound estimate: ~4 chars per token.
+    """Cheap pre-flight estimate: ~4 chars per token.
 
     Used pre-flight to decide whether the call would breach the burn cap.
-    Intentionally conservative — under-estimating here lets a call slip
-    through, then the post-call ``record_llm`` writes the real usage.
+    The system prompt is sent as a cached ephemeral block (see ``_raw_call``),
+    so it is discounted by ``_CACHED_SYSTEM_DISCOUNT`` (cache-read rate); only
+    the per-call user prompt is counted at full price. Intentionally
+    conservative — under-estimating here lets a call slip through, then the
+    post-call ``record_llm`` writes the real usage.
     """
-    blob = json.dumps(
+    full_blob = json.dumps(
         {"system": system_prompt or "", "user": user_prompt or ""},
         default=str,
     )
-    return max(1, len(blob) // 4)
+    # Isolate the JSON-escaped contribution of the system text by diffing the
+    # full blob against the same blob with an empty system value. Then keep
+    # only the cache-read fraction of those system chars; the user prompt and
+    # JSON framing stay at full price.
+    empty_system_blob = json.dumps(
+        {"system": "", "user": user_prompt or ""},
+        default=str,
+    )
+    system_chars = len(full_blob) - len(empty_system_blob)
+    discounted_chars = len(full_blob) - (1 - _CACHED_SYSTEM_DISCOUNT) * system_chars
+    return max(1, int(discounted_chars // 4))
 
 
 def _join_text_blocks(message) -> str:  # pragma: no cover - SDK-dependent
