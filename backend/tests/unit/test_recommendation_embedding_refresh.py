@@ -290,3 +290,93 @@ async def test_refresh_reembeds_when_hash_matches_but_no_chunks_exist():
     assert result["processed"] == 1
     assert result["skipped_unchanged"] == 0
     assert len(session.added) == 2
+
+
+async def test_refresh_skips_when_lock_already_held(monkeypatch):
+    session = object()
+
+    class FakeSessionContext:
+        async def __aenter__(self):
+            return session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class ShouldNotRunRefresher:
+        def __init__(self, db):  # pragma: no cover - must never be constructed
+            raise AssertionError("refresher must not run while the dedup lock is held")
+
+        async def refresh_published_scholarships(self, limit=None):  # pragma: no cover
+            raise AssertionError("refresh must not run while the dedup lock is held")
+
+    class FakeRedisLockHeld:
+        async def set(self, key, value, *, nx=False, ex=None):
+            # NX set fails (returns None) because another run already holds it.
+            return None
+
+        async def delete(self, *keys):
+            return 0
+
+    monkeypatch.setattr(
+        recommendation_tasks, "async_session_factory", lambda: FakeSessionContext()
+    )
+    monkeypatch.setattr(
+        recommendation_tasks,
+        "PublishedScholarshipEmbeddingRefresher",
+        ShouldNotRunRefresher,
+    )
+    monkeypatch.setattr(recommendation_tasks, "_redis_client", FakeRedisLockHeld())
+
+    result = await asyncio.to_thread(
+        recommendation_tasks.refresh_published_scholarship_embeddings
+    )
+
+    assert result == {"status": "skipped", "reason": "recent_run_present"}
+
+
+async def test_refresh_acquires_lock_runs_then_releases(monkeypatch):
+    session = object()
+    events = {"set": [], "deleted": []}
+
+    class FakeSessionContext:
+        async def __aenter__(self):
+            return session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeRefresher:
+        def __init__(self, db):
+            assert db is session
+
+        async def refresh_published_scholarships(self, limit=None):
+            return {"status": "ok", "limit": limit, "refreshed": 3}
+
+    class FakeRedisFree:
+        async def set(self, key, value, *, nx=False, ex=None):
+            events["set"].append((key, nx, ex))
+            return True  # NX set succeeds: lock acquired.
+
+        async def delete(self, *keys):
+            events["deleted"].extend(keys)
+            return len(keys)
+
+    monkeypatch.setattr(
+        recommendation_tasks, "async_session_factory", lambda: FakeSessionContext()
+    )
+    monkeypatch.setattr(
+        recommendation_tasks, "PublishedScholarshipEmbeddingRefresher", FakeRefresher
+    )
+    monkeypatch.setattr(recommendation_tasks, "_redis_client", FakeRedisFree())
+
+    result = await asyncio.to_thread(
+        recommendation_tasks.refresh_published_scholarship_embeddings,
+        limit=5,
+    )
+
+    assert result == {"status": "ok", "limit": 5, "refreshed": 3}
+    assert events["set"] == [
+        (recommendation_tasks._EMBEDDING_REFRESH_LOCK_KEY, True, recommendation_tasks.EMBEDDING_REFRESH_LOCK_TTL_SECONDS)
+    ]
+    # Lock released after a successful run so the next admin enqueue can proceed.
+    assert events["deleted"] == [recommendation_tasks._EMBEDDING_REFRESH_LOCK_KEY]
