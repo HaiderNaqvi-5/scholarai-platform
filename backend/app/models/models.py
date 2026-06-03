@@ -875,6 +875,15 @@ class Scholarship(Base):
         ),
         Index("ix_scholarships_funding_type", "funding_type"),
         Index(
+            "ix_scholarships_match_candidate",
+            "country_code",
+            "deadline_at",
+            "min_gpa_value",
+            postgresql_where=text(
+                "record_state = 'published'::scholarship_record_state"
+            ),
+        ),
+        Index(
             "ix_scholarships_description_embedding_published",
             "description_embedding",
             postgresql_using="ivfflat",

@@ -58,6 +58,13 @@ from app.schemas.scholarships_match import (
 _FREE_VISIBLE_LIMIT = 3
 _STRETCH_CGPA_TOLERANCE = 0.2
 
+# Over-fetch factor: the SQL gate handles scalar hard filters, but
+# degree-level / citizenship JSON-array rules are still applied in Python
+# (those columns are sa.JSON, not portable in WHERE). Pull a few times the
+# largest plan cap so the post-classify pool is never starved, while still
+# bounding the per-request scan instead of loading the whole table.
+_CANDIDATE_FETCH_MULTIPLIER = 8
+
 # Placeholder copy for locked rows. Kept neutral — no bucket/tier words.
 _LOCKED_PLACEHOLDER = "Reveal with upgrade"
 
@@ -178,7 +185,7 @@ class ScholarshipMatchService:
         criteria = self._resolve_criteria(profile, payload)
         include_premium = can_see_premium(user)
         scholarships = await self._fetch_published_scholarships(
-            include_premium=include_premium
+            criteria, include_premium=include_premium
         )
 
         eligible: list[ScholarshipMatchCard] = []
@@ -271,8 +278,37 @@ class ScholarshipMatchService:
         )
 
     async def _fetch_published_scholarships(
-        self, *, include_premium: bool = True
+        self,
+        criteria: "MatchCriteria",
+        *,
+        include_premium: bool = True,
     ) -> list[Scholarship]:
+        """Build the candidate query for classification.
+
+        Scalar hard filters are pushed into ``WHERE`` so Postgres prunes rows
+        before they cross the wire; the JSON-array rules (degree-level overlap,
+        citizenship containment) stay in ``_classify`` because the columns are
+        ``sa.JSON`` and not portable in SQL. A ``LIMIT`` bounds the per-request
+        scan — the cap over-fetches (``_CANDIDATE_FETCH_MULTIPLIER`` x the
+        largest plan cap) so the Python array-rule pass is never starved.
+
+        Each pushed filter is a TRUE hard prerequisite — a row it removes is
+        one ``_classify`` would also drop (return ``None``), never a row that
+        could land in eligible/partial/stretch:
+        - ``record_state == PUBLISHED`` and the ``tier`` gate are unchanged.
+        - ``country_code``: mirrors the ``_classify`` country gate exactly —
+          drop iff the student targets countries AND the row is country-tagged
+          (truthy, non-"ZZ") AND not in the target set. The "ZZ" / empty
+          carve-out is OR'd back in so country-agnostic rows still reach Python.
+        - ``min_gpa_value`` floor: ``_classify`` returns ``None`` when
+          ``criteria.cgpa < min_gpa - tolerance`` (i.e. ``min_gpa > cgpa +
+          tolerance``); rows above that ceiling are unreachable, so prune them.
+          NULL ``min_gpa`` rows always pass (no floor declared).
+
+        Fuzzy / scored criteria (fields, funding preference, IELTS/GRE) and the
+        JSON-array gates stay in Python — they demote or score rather than hard-
+        drop, so pushing them would risk losing legitimate matches.
+        """
         stmt = select(Scholarship).where(
             Scholarship.record_state == RecordState.PUBLISHED
         )
@@ -280,6 +316,37 @@ class ScholarshipMatchService:
             # Filter out higher-tier rows at the SQL boundary so they never
             # enter classification for callers who lack the upgraded plan.
             stmt = stmt.where(Scholarship.tier == ScholarshipTier.STANDARD)
+
+        # country_code IN (...) — only when the student targets countries.
+        # Country-agnostic rows ("ZZ" or empty) are kept by classification, not
+        # SQL, so OR them back in to preserve the existing _classify carve-out.
+        if criteria.countries:
+            stmt = stmt.where(
+                (Scholarship.country_code.in_(criteria.countries))
+                | (Scholarship.country_code == "ZZ")
+                | (Scholarship.country_code == "")
+            )
+
+        # min_gpa floor with the stretch tolerance band: a row whose floor is
+        # above (cgpa + tolerance) is unreachable in _classify (returns None),
+        # so prune it server-side. NULL min_gpa rows always pass.
+        if criteria.cgpa is not None:
+            ceiling = criteria.cgpa + _STRETCH_CGPA_TOLERANCE
+            stmt = stmt.where(
+                (Scholarship.min_gpa_value.is_(None))
+                | (Scholarship.min_gpa_value <= ceiling)
+            )
+
+        # Deterministic ordering before the cap so the bounded slice is the
+        # set most likely to survive classification (soonest live deadlines
+        # first; NULLs last), mirroring the Python _sort_key intent. The final
+        # returned order is still set by _sort_key per bucket — this only
+        # governs which rows survive the LIMIT.
+        stmt = stmt.order_by(
+            Scholarship.deadline_at.is_(None),
+            Scholarship.deadline_at.asc(),
+        ).limit(MATCH_CAP["elite"] * _CANDIDATE_FETCH_MULTIPLIER)
+
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 

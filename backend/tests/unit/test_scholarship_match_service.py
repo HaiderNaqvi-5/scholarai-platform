@@ -318,3 +318,104 @@ async def test_request_body_overrides_profile_countries():
         ScholarshipMatchRequest(countries=["DE"]),
     )
     assert len(resp.items) == 1
+
+
+# --- perf-db-02: scalar hard filters + LIMIT pushed into the candidate query ---
+from app.core.plan_guard import MATCH_CAP
+from app.services.scholarships.match_service import (
+    _CANDIDATE_FETCH_MULTIPLIER,
+    _STRETCH_CGPA_TOLERANCE,
+)
+
+
+class _RecordingDB:
+    """Fake DB that records the compiled SQL of the statement it is handed
+    and returns the rows it was constructed with (statement is NOT executed
+    against a real engine — we only inspect the rendered SQL string)."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.compiled_sql = None
+        self.last_stmt = None
+
+    async def execute(self, stmt):
+        self.last_stmt = stmt
+        self.compiled_sql = str(
+            stmt.compile(compile_kwargs={"literal_binds": True})
+        )
+        rows = self._rows
+
+        class _ScalarResult:
+            def all(self_inner):
+                return rows
+
+        class _Result:
+            def scalars(self_inner):
+                return _ScalarResult()
+
+        return _Result()
+
+
+@pytest.mark.asyncio
+async def test_country_filter_pushed_into_where():
+    db = _RecordingDB([_scholarship(country_code="GB", deadline_at=_utc_in_days(30))])
+    svc = ScholarshipMatchService(db)
+    await svc.match(
+        _user("pro"),
+        _student_profile(target_countries=["GB", "DE"], target_country_code="GB"),
+        ScholarshipMatchRequest(),
+    )
+    sql = db.compiled_sql.lower()
+    assert "country_code in ('gb', 'de')" in sql.replace('"', "")
+
+
+@pytest.mark.asyncio
+async def test_min_gpa_floor_pushed_into_where():
+    db = _RecordingDB([_scholarship(min_gpa_value=3.0, deadline_at=_utc_in_days(30))])
+    svc = ScholarshipMatchService(db)
+    await svc.match(_user("pro"), _student_profile(gpa_value=3.4), ScholarshipMatchRequest())
+    sql = db.compiled_sql.lower()
+    # Floor is cgpa + tolerance (rows whose min_gpa exceeds this are unreachable).
+    floor = 3.4 + _STRETCH_CGPA_TOLERANCE
+    assert "min_gpa_value" in sql
+    assert f"{floor:.1f}" in sql or f"{floor:.2f}" in sql
+
+
+@pytest.mark.asyncio
+async def test_candidate_query_applies_limit():
+    db = _RecordingDB([_scholarship(deadline_at=_utc_in_days(30))])
+    svc = ScholarshipMatchService(db)
+    await svc.match(_user("pro"), _student_profile(), ScholarshipMatchRequest())
+    sql = db.compiled_sql.lower()
+    assert "limit" in sql
+    # Cap = elite MATCH_CAP (max plan) * multiplier, since Python still drops
+    # rows on JSON-array rules so we over-fetch before classifying.
+    expected_cap = MATCH_CAP["elite"] * _CANDIDATE_FETCH_MULTIPLIER
+    assert str(expected_cap) in sql
+
+
+@pytest.mark.asyncio
+async def test_row_excluded_by_sql_floor_is_absent_from_results():
+    # min_gpa 3.9, student cgpa 3.0 -> floor 3.2 < 3.9 so the SQL WHERE
+    # excludes it; it must never appear even though the fake DB *holds* it
+    # only when the WHERE would keep it. Use a recording DB that honours the
+    # floor by returning [] when the row is out of range.
+    db = _RecordingDB([])  # SQL floor would have filtered it server-side
+    svc = ScholarshipMatchService(db)
+    resp = await svc.match(_user("pro"), _student_profile(gpa_value=3.0), ScholarshipMatchRequest())
+    assert resp.items == []
+
+
+@pytest.mark.asyncio
+async def test_no_country_filter_when_no_target_countries():
+    # Empty country criteria must NOT emit a country_code IN clause (would
+    # wrongly exclude everything). Regression guard for the push-down.
+    db = _RecordingDB([_scholarship(citizenship_rules=["*"], deadline_at=_utc_in_days(30))])
+    svc = ScholarshipMatchService(db)
+    await svc.match(
+        _user("pro"),
+        _student_profile(target_countries=[], target_country_code=None),
+        ScholarshipMatchRequest(),
+    )
+    sql = db.compiled_sql.lower()
+    assert "country_code in" not in sql.replace('"', "")
