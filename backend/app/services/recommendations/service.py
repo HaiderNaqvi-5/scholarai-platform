@@ -9,7 +9,7 @@ import anyio
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
@@ -180,6 +180,19 @@ class RecommendationService:
         )
         return recommendations[:limit]
 
+    def _build_pgvector_stmt(self, *, query_embedding: list[float], limit: int):
+        distance = Scholarship.description_embedding.cosine_distance(query_embedding)
+        return (
+            select(
+                Scholarship,
+                distance.label("distance"),
+            )
+            .where(Scholarship.record_state == RecordState.PUBLISHED)
+            .where(Scholarship.description_embedding.is_not(None))
+            .order_by(distance)
+            .limit(limit)
+        )
+
     async def _retrieve_pgvector_candidates(
         self,
         *,
@@ -190,44 +203,31 @@ class RecommendationService:
         if query_embedding is None:
             return [], "Embeddings are unavailable, so ranking fell back to published-rule heuristics only."
 
-        distance = ScholarshipChunk.embedding.cosine_distance(query_embedding)
-        stmt = (
-            select(
-                ScholarshipChunk.scholarship_id,
-                func.min(distance).label("best_distance"),
-            )
-            .join(Scholarship, Scholarship.id == ScholarshipChunk.scholarship_id)
-            .where(Scholarship.record_state == RecordState.PUBLISHED)
-            .where(ScholarshipChunk.embedding.is_not(None))
-            .group_by(ScholarshipChunk.scholarship_id)
-            .order_by(func.min(distance))
-            .limit(limit)
-        )
+        # Tune ANN recall for the ivfflat scan. Local to this transaction (SET LOCAL),
+        # so it does not leak to other pooled sessions.
+        await self.db.execute(text("SET LOCAL ivfflat.probes = 10"))
 
+        stmt = self._build_pgvector_stmt(query_embedding=query_embedding, limit=limit)
         rows = (await self.db.execute(stmt)).all()
         if not rows:
-            return [], "Published scholarships do not have usable chunk embeddings yet, so ranking used rules only."
-
-        scholarship_ids = [row.scholarship_id for row in rows]
-        scholarships = await self._load_scholarships_by_ids(scholarship_ids)
-        best_distance_by_id = {
-            row.scholarship_id: float(row.best_distance)
-            for row in rows
-            if row.best_distance is not None
-        }
+            return [], "Published scholarships do not have usable description embeddings yet, so ranking used rules only."
 
         candidates: list[RetrievedCandidate] = []
-        for scholarship_id in scholarship_ids:
-            scholarship = scholarships.get(scholarship_id)
+        for row in rows:
+            # Real SQLAlchemy keys the ORM entity by its mapped class name
+            # ("Scholarship"); the unit fake exposes it as "scholarship".
+            scholarship = getattr(row, "Scholarship", None) or getattr(
+                row, "scholarship", None
+            )
             if scholarship is None:
                 continue
-            best_distance = best_distance_by_id.get(scholarship_id)
+            distance = row.distance
             candidates.append(
                 RetrievedCandidate(
                     scholarship=scholarship,
-                    retrieval_source="pgvector_chunk_similarity",
-                    semantic_similarity=_distance_to_similarity(best_distance)
-                    if best_distance is not None
+                    retrieval_source="pgvector_scholarship_similarity",
+                    semantic_similarity=_distance_to_similarity(float(distance))
+                    if distance is not None
                     else None,
                 )
             )
