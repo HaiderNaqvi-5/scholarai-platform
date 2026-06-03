@@ -20,12 +20,15 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from app.core.burn_cap import (
     assert_within_burn_cap,
     llm_cost_pkr,
     record_llm,
+    release_reservation,
+    reserve_burn,
 )
 from app.core.config import settings
 
@@ -178,43 +181,59 @@ class AnthropicClient:
         kind = "llm_sonnet" if "sonnet" in (resolved_model or "").lower() else "llm_haiku"
         estimated_input = _estimate_input_tokens(system_prompt, user_prompt)
         projected = llm_cost_pkr(kind, estimated_input, max_tokens)
-        await assert_within_burn_cap(db, user, projected)
 
-        if not self.available:
-            # Deterministic-template path: record a synthetic ledger row so
-            # the burn-cap audit trail is consistent across online / offline
-            # runs, then raise so callers fall back to their template.
-            await record_llm(
-                db,
-                user.id,
-                kind,
-                estimated_input,
-                0,
-                endpoint,
-            )
-            raise LLMUnavailableError("Anthropic API key missing.")
-
+        # R10: reserve the projected cost atomically BEFORE the cap check so a
+        # concurrent caller sees this in-flight spend and cannot also slip
+        # through. assert_within_burn_cap is then called with a zero projection
+        # because the projected amount is already folded into the reservation
+        # that _reserved_micro reads back (avoids double-counting). The
+        # reservation is released once record_llm has written the durable
+        # usage_ledger row (or the call has failed) — see the finally block.
+        await reserve_burn(user, projected)
         try:
-            message = self._raw_call(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                model=resolved_model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-        except LLMUnavailableError:
-            await record_llm(db, user.id, kind, estimated_input, 0, endpoint)
-            raise
+            await assert_within_burn_cap(db, user, Decimal(0))
 
-        usage = getattr(message, "usage", None)
-        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
-        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
-        await record_llm(db, user.id, kind, input_tokens, output_tokens, endpoint)
+            if not self.available:
+                # Deterministic-template path: record a synthetic ledger row so
+                # the burn-cap audit trail is consistent across online / offline
+                # runs, then raise so callers fall back to their template.
+                await record_llm(
+                    db,
+                    user.id,
+                    kind,
+                    estimated_input,
+                    0,
+                    endpoint,
+                )
+                raise LLMUnavailableError("Anthropic API key missing.")
 
-        text = _join_text_blocks(message)
-        if json_mode:
-            return _extract_json_object(text)
-        return text
+            try:
+                message = self._raw_call(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=resolved_model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            except LLMUnavailableError:
+                await record_llm(db, user.id, kind, estimated_input, 0, endpoint)
+                raise
+
+            usage = getattr(message, "usage", None)
+            input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+            output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+            await record_llm(db, user.id, kind, input_tokens, output_tokens, endpoint)
+
+            text = _join_text_blocks(message)
+            if json_mode:
+                return _extract_json_object(text)
+            return text
+        finally:
+            # Release the in-flight reservation regardless of outcome: the
+            # durable usage_ledger row (written by record_llm on every path
+            # that proceeds past the cap check) is now the source of truth, and
+            # a failed/rejected call must not leave budget permanently held.
+            await release_reservation(user, projected)
 
 
 # ----------------------------------------------------------------------

@@ -8,17 +8,34 @@ nightly if FX drift becomes material.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Final
 
+import redis.asyncio as redis
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models import UsageLedger, User
 
+logger = logging.getLogger(__name__)
+
 PKR_PER_USD: Final[Decimal] = Decimal("280")
+
+# Per-(user, period) atomic reservation of in-flight projected LLM cost
+# (PKR x 1e6, integer micro-PKR). Mirrors the fail-open Redis pattern in
+# app/core/account_lockout.py: Redis errors fall back to the DB-only check
+# rather than blocking all callers.
+_RESERVE_KEY: Final[str] = "burn_reserve:{user_id}:{period}"
+# Reservations are short-lived (one in-flight call); the TTL is a safety net
+# so a crash between reserve and release cannot leak budget forever. Cleared
+# at the next period boundary regardless.
+_RESERVE_TTL_SECONDS: Final[int] = 600
+
+_redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 # (input_per_million_usd, output_per_million_usd)
 PRICING_USD_PER_MTOK: Final[dict[str, tuple[Decimal, Decimal]]] = {
@@ -72,19 +89,72 @@ async def month_to_date_pkr(db: AsyncSession, user_id) -> Decimal:
     return Decimal(int(micro)) / _MICRO
 
 
+async def _reserved_micro(user_id) -> int:
+    """Current in-flight reservation (micro-PKR) for the user this period.
+
+    Fail-open: a Redis outage returns 0 so the burn-cap check degrades to
+    the DB-only behavior rather than blocking everyone.
+    """
+    key = _RESERVE_KEY.format(user_id=user_id, period=_period())
+    try:
+        raw = await _redis_client.get(key)
+        return int(raw) if raw is not None else 0
+    except redis.RedisError as exc:
+        logger.warning("burn-cap reservation read failed for %s: %s", user_id, exc)
+        return 0
+
+
+async def reserve_burn(user: User, projected_pkr: Decimal) -> int:
+    """Atomically add `projected_pkr` to the user's in-flight reservation.
+
+    Returns the new reservation total in micro-PKR. Fail-open: returns 0 on
+    Redis error (no reservation held) so callers proceed under the legacy
+    DB-only check.
+    """
+    key = _RESERVE_KEY.format(user_id=user.id, period=_period())
+    amount = int(projected_pkr * _MICRO)
+    try:
+        new_total = await _redis_client.incrby(key, amount)
+        await _redis_client.expire(key, _RESERVE_TTL_SECONDS)
+        return int(new_total)
+    except redis.RedisError as exc:
+        logger.warning("burn-cap reservation failed for %s: %s", user.id, exc)
+        return 0
+
+
+async def release_reservation(user: User, projected_pkr: Decimal) -> None:
+    """Release a previously-held reservation (the ledger row is now durable).
+
+    Fail-open: swallows Redis errors. The TTL on the key bounds the leak if
+    this never runs.
+    """
+    key = _RESERVE_KEY.format(user_id=user.id, period=_period())
+    amount = int(projected_pkr * _MICRO)
+    try:
+        await _redis_client.decrby(key, amount)
+    except redis.RedisError as exc:
+        logger.warning("burn-cap reservation release failed for %s: %s", user.id, exc)
+
+
 async def assert_within_burn_cap(
     db: AsyncSession, user: User, projected_pkr: Decimal
 ) -> None:
-    """Raise 429 if the projected call would exceed the user's monthly budget."""
+    """Raise 429 if the projected call would exceed the user's monthly budget.
+
+    Counts both the durable DB month-to-date spend AND any in-flight Redis
+    reservation held by concurrent calls (R10), so two simultaneous requests
+    cannot both pass the pre-flight check and overshoot the budget.
+    """
     spent = await month_to_date_pkr(db, user.id)
+    reserved = Decimal(await _reserved_micro(user.id)) / _MICRO
     budget = tier_budget(user)
-    if spent + projected_pkr > budget:
+    if spent + reserved + projected_pkr > budget:
         plan = (user.plan or "free").lower()
         raise HTTPException(
             status_code=429,
             detail={
                 "error": "burn_cap_reached",
-                "spent_pkr": str(spent.quantize(Decimal("0.01"))),
+                "spent_pkr": str((spent + reserved).quantize(Decimal("0.01"))),
                 "budget_pkr": str(budget),
                 "upgrade_url": "/upgrade" if plan != "elite" else None,
                 "message": (
