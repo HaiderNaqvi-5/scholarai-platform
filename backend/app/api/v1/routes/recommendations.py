@@ -1,7 +1,7 @@
 from typing import Annotated
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -43,11 +43,21 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _attach_recommendation_subject(
+    request: Request, current_user: RecommendationUser
+) -> None:
+    """Expose the authenticated user to the RateLimiter so it keys on user id."""
+    request.state.current_user = current_user
+
+
 @router.post(
     "",
     response_model=RecommendationListResponse,
-    # H2: each call fans out to the LLM; cap at 20/hr per client to stop quota drain.
-    dependencies=[Depends(RateLimiter(requests_limit=20, window_seconds=3_600))],
+    # H2: each call fans out to the LLM; cap at 20/hr per authenticated user.
+    dependencies=[
+        Depends(_attach_recommendation_subject),
+        Depends(RateLimiter(requests_limit=20, window_seconds=3_600)),
+    ],
 )
 async def build_recommendations(
     payload: RecommendationRequest,

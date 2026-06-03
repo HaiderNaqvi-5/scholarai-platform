@@ -121,12 +121,22 @@ async def get_legal_document(
 # ---------------------------------------------------------------------
 
 
+async def _attach_privacy_subject(
+    request: Request, current_user: CurrentUser
+) -> None:
+    """Expose the authenticated user to the RateLimiter so it keys on user id."""
+    request.state.current_user = current_user
+
+
 @router.post(
     "/data-export",
     response_model=DataExportResponse,
     status_code=status.HTTP_201_CREATED,
-    # H2: exports are synchronous + PII-heavy; cap abuse at 3/day per client.
-    dependencies=[Depends(RateLimiter(requests_limit=3, window_seconds=86_400))],
+    # H2: exports are synchronous + PII-heavy; cap abuse at 3/day per authenticated user.
+    dependencies=[
+        Depends(_attach_privacy_subject),
+        Depends(RateLimiter(requests_limit=3, window_seconds=86_400)),
+    ],
 )
 async def request_data_export(
     current_user: CurrentUser,
