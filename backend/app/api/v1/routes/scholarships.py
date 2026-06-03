@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -99,21 +99,10 @@ async def list_scholarships(
             },
         )
 
-    statement = select(Scholarship).where(
-        Scholarship.record_state == RecordState.PUBLISHED
-    )
-    if current_user is None or not can_see_premium(current_user):
-        statement = statement.where(Scholarship.tier == ScholarshipTier.STANDARD)
-    if country_code:
-        statement = statement.where(Scholarship.country_code == country_code.upper())
-
-    result = await db.execute(statement)
-    scholarships = []
-
-    normalized_query = query.strip().lower() if query else None
-    normalized_field_tag = field_tag.strip().lower() if field_tag else None
+    normalized_query = query.strip() if query else None
+    normalized_field_tag = field_tag.strip() if field_tag else None
     normalized_degree_level = degree_level.strip().upper() if degree_level else None
-    normalized_provider = provider.strip().lower() if provider else None
+    normalized_provider = provider.strip() if provider else None
     normalized_funding_type = funding_type.strip().lower() if funding_type else None
     deadline_cutoff = (
         datetime.now(timezone.utc) + timedelta(days=deadline_within_days)
@@ -121,46 +110,103 @@ async def list_scholarships(
         else None
     )
 
-    for scholarship in result.scalars().all():
-        if not scholarship_in_scope(scholarship):
-            continue
-        if normalized_query and not matches_query(scholarship, normalized_query):
-            continue
-        if normalized_field_tag and not matches_field_tag(scholarship, normalized_field_tag):
-            continue
-        if normalized_degree_level and normalized_degree_level not in [
-            value.upper() for value in scholarship.degree_levels
-        ]:
-            continue
-        if normalized_provider and not matches_provider(scholarship, normalized_provider):
-            continue
-        if normalized_funding_type and (scholarship.funding_type or "").lower() != normalized_funding_type:
-            continue
-        if min_amount is not None or max_amount is not None:
-            if not matches_amount_window(scholarship, min_amount=min_amount, max_amount=max_amount):
-                continue
-        if has_deadline is not None and not matches_has_deadline(scholarship, has_deadline):
-            continue
-        if deadline_cutoff is not None and not matches_deadline_cutoff(scholarship, deadline_cutoff):
-            continue
-        if deadline_after is not None and not matches_deadline_after(scholarship, deadline_after):
-            continue
-        if deadline_before is not None and not matches_deadline_before(scholarship, deadline_before):
-            continue
-        scholarships.append(scholarship)
+    # Every filter below is pushed into the SQL WHERE clause so the database
+    # narrows the rowset before paginating. The legacy ``scholarship_in_scope``
+    # gate is intentionally NOT re-added: it returns a 3-tuple, so the old
+    # ``if not scholarship_in_scope(...)`` was always falsy (a non-empty tuple
+    # is truthy) and never filtered anything — preserving prior behavior means
+    # not reintroducing it.
+    filters = [Scholarship.record_state == RecordState.PUBLISHED]
+    if current_user is None or not can_see_premium(current_user):
+        filters.append(Scholarship.tier == ScholarshipTier.STANDARD)
+    if country_code:
+        filters.append(Scholarship.country_code == country_code.upper())
+    if normalized_funding_type:
+        filters.append(func.lower(Scholarship.funding_type) == normalized_funding_type)
+    if normalized_provider:
+        filters.append(Scholarship.provider_name.ilike(f"%{normalized_provider}%"))
+    if normalized_query:
+        like = f"%{normalized_query}%"
+        filters.append(
+            or_(
+                Scholarship.title.ilike(like),
+                Scholarship.provider_name.ilike(like),
+                Scholarship.summary.ilike(like),
+                Scholarship.funding_summary.ilike(like),
+                Scholarship.funding_type.ilike(like),
+                cast(Scholarship.field_tags, Text).ilike(like),
+            )
+        )
+    if normalized_field_tag:
+        # JSON column (not PG ARRAY): substring-match the serialized tag list.
+        filters.append(cast(Scholarship.field_tags, Text).ilike(f"%{normalized_field_tag}%"))
+    if normalized_degree_level:
+        filters.append(cast(Scholarship.degree_levels, Text).ilike(f"%{normalized_degree_level}%"))
+    if min_amount is not None:
+        # Row's available max must reach the requested floor.
+        filters.append(
+            func.coalesce(Scholarship.funding_amount_max, Scholarship.funding_amount_min) >= min_amount
+        )
+    if max_amount is not None:
+        # Row's available min must not exceed the requested ceiling.
+        filters.append(
+            func.coalesce(Scholarship.funding_amount_min, Scholarship.funding_amount_max) <= max_amount
+        )
+    if min_amount is not None or max_amount is not None:
+        # Match the prior Python contract: rows with no funding figures at all are excluded.
+        filters.append(
+            or_(
+                Scholarship.funding_amount_min.isnot(None),
+                Scholarship.funding_amount_max.isnot(None),
+            )
+        )
+    if has_deadline is not None:
+        filters.append(
+            Scholarship.deadline_at.isnot(None) if has_deadline else Scholarship.deadline_at.is_(None)
+        )
+    if deadline_cutoff is not None:
+        filters.append(Scholarship.deadline_at.isnot(None))
+        filters.append(Scholarship.deadline_at <= deadline_cutoff)
+    if deadline_after is not None:
+        filters.append(Scholarship.deadline_at.isnot(None))
+        filters.append(Scholarship.deadline_at >= deadline_after)
+    if deadline_before is not None:
+        filters.append(Scholarship.deadline_at.isnot(None))
+        filters.append(Scholarship.deadline_at <= deadline_before)
 
-    scholarships = sort_scholarships(scholarships, normalized_sort)
-    total = len(scholarships)
-    start = (page - 1) * page_size
-    end = start + page_size
-    items = [_serialize_list_item(scholarship) for scholarship in scholarships[start:end]]
+    if normalized_sort == "recent":
+        order_by = (Scholarship.created_at.desc(),)
+    elif normalized_sort == "title":
+        order_by = (func.lower(Scholarship.title).asc(),)
+    else:  # "deadline" — NULL deadlines last, then by deadline asc, then title.
+        order_by = (
+            Scholarship.deadline_at.is_(None).asc(),
+            Scholarship.deadline_at.asc(),
+            func.lower(Scholarship.title).asc(),
+        )
+
+    total = (
+        await db.execute(select(func.count()).select_from(Scholarship).where(*filters))
+    ).scalar_one()
+
+    offset = (page - 1) * page_size
+    page_stmt = (
+        select(Scholarship)
+        .where(*filters)
+        .order_by(*order_by)
+        .offset(offset)
+        .limit(page_size)
+    )
+    rows = (await db.execute(page_stmt)).scalars().all()
+    items = [_serialize_list_item(scholarship) for scholarship in rows]
+    has_more = offset + len(rows) < total
 
     return ScholarshipListResponse(
         items=items,
         total=total,
         page=page,
         page_size=page_size,
-        has_more=end < total,
+        has_more=has_more,
         applied_filters=ScholarshipAppliedFilters(
             country_code=country_code.upper() if country_code else None,
             query=query.strip() if query else None,

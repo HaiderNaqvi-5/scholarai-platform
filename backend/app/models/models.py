@@ -867,6 +867,12 @@ class Scholarship(Base):
         Index("ix_scholarships_record_state", "record_state"),
         Index("ix_scholarships_country_code", "country_code"),
         Index("ix_scholarships_deadline_at", "deadline_at"),
+        Index(
+            "ix_scholarships_catalog_filter",
+            "record_state",
+            "country_code",
+            "deadline_at",
+        ),
         Index("ix_scholarships_funding_type", "funding_type"),
         Index(
             "ix_scholarships_description_embedding_published",
