@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models import UsageLedger, User
+from app.models import UsageLedger, UsageLedgerMonthlySummary, User
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +80,27 @@ def tier_budget(user: User) -> Decimal:
 
 
 async def month_to_date_pkr(db: AsyncSession, user_id) -> Decimal:
-    """Sum of ledger cost in PKR for `user_id` in the current period."""
-    q = select(func.coalesce(func.sum(UsageLedger.cost_pkr_micro), 0)).where(
+    """Sum of ledger cost in PKR for `user_id` in the current period.
+
+    Reads live detail rows for the current period plus any rolled-up summary
+    row for the same period (the rollup never prunes the current period, so in
+    practice the summary term is 0 for the live month; it keeps the read
+    correct if a manual rollup ever folded the current period).
+    """
+    period = _period()
+    detail_q = select(func.coalesce(func.sum(UsageLedger.cost_pkr_micro), 0)).where(
         UsageLedger.user_id == user_id,
-        UsageLedger.period_yyyymm == _period(),
+        UsageLedger.period_yyyymm == period,
     )
-    micro = (await db.execute(q)).scalar_one()
-    return Decimal(int(micro)) / _MICRO
+    summary_q = select(
+        func.coalesce(func.sum(UsageLedgerMonthlySummary.cost_pkr_micro), 0)
+    ).where(
+        UsageLedgerMonthlySummary.user_id == user_id,
+        UsageLedgerMonthlySummary.period_yyyymm == period,
+    )
+    detail = int((await db.execute(detail_q)).scalar_one())
+    summary = int((await db.execute(summary_q)).scalar_one())
+    return Decimal(detail + summary) / _MICRO
 
 
 async def _reserved_micro(user_id) -> int:

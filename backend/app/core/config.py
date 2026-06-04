@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     KPI_SNAPSHOT_RETENTION_CRON_HOUR: int = 3
     KPI_SNAPSHOT_RETENTION_CRON_MINUTE: int = 30
 
+    USAGE_LEDGER_ROLLUP_ENABLED: bool = True
+    USAGE_LEDGER_RETENTION_MONTHS: int = 13
+    USAGE_LEDGER_ROLLUP_CRON_HOUR: int = 3
+    USAGE_LEDGER_ROLLUP_CRON_MINUTE: int = 45
+
     DATABASE_URL: str = (
         "postgresql+asyncpg://scholarai:password@localhost:5432/scholarai"
     )

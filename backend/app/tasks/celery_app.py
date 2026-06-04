@@ -30,6 +30,7 @@ celery_app = Celery(
         "app.tasks.alert_tasks",
         "app.tasks.reminder_tasks",
         "app.tasks.trial_tasks",
+        "app.tasks.usage_ledger_tasks",
     ],
 )
 
@@ -86,5 +87,14 @@ if settings.KPI_SNAPSHOT_RETENTION_ENABLED:
         "schedule": crontab(
             hour=settings.KPI_SNAPSHOT_RETENTION_CRON_HOUR,
             minute=settings.KPI_SNAPSHOT_RETENTION_CRON_MINUTE,
+        ),
+    }
+
+if settings.USAGE_LEDGER_ROLLUP_ENABLED:
+    celery_app.conf.beat_schedule["usage-ledger-rollup-prune"] = {
+        "task": "tasks.run_usage_ledger_rollup",
+        "schedule": crontab(
+            hour=settings.USAGE_LEDGER_ROLLUP_CRON_HOUR,
+            minute=settings.USAGE_LEDGER_ROLLUP_CRON_MINUTE,
         ),
     }

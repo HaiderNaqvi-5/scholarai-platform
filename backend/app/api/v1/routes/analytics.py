@@ -5,13 +5,14 @@ Provides aggregate platform metrics for the admin dashboard:
 user counts, scholarship stats, application statuses, and recent ingestion health.
 """
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import AdminAuditUser
+from app.core.dependencies import AdminAuditUser, AdminUser
 from app.models import (
     Application,
     ApplicationStatus,
@@ -124,3 +125,18 @@ async def get_platform_analytics(
         ingestion_runs_failed=failed_runs,
         kpi_trends=kpi_trends,
     )
+
+
+@router.post("/usage-ledger/reset")
+async def reset_usage_ledger(
+    user_id: UUID,
+    current_user: AdminUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, object]:
+    """Admin: clear a user's current-period burn-cap spend (escape hatch)."""
+    del current_user
+    from app.services.usage import UsageLedgerMaintenanceService
+
+    deleted = await UsageLedgerMaintenanceService(db).reset_user(user_id)
+    await db.commit()
+    return {"status": "reset", "user_id": str(user_id), "rows_deleted": deleted}

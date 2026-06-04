@@ -1841,6 +1841,41 @@ class UsageLedger(Base):
 
     __table_args__ = (
         Index("ix_usage_ledger_user_period", "user_id", "period_yyyymm"),
+        # R7: month_to_date_pkr also filters period-then-user during rollup;
+        # this index serves the prune/rollup scan and the summary read.
+        Index("ix_usage_ledger_period_user", "period_yyyymm", "user_id"),
+    )
+
+
+class UsageLedgerMonthlySummary(Base):
+    """Rolled-up burn-cap totals per user per period (one row per user/month).
+
+    Populated by ``tasks.run_usage_ledger_rollup``; lets ``month_to_date_pkr``
+    sum a single summary row for closed months instead of scanning every
+    detail row, and lets the detail table be pruned without losing history.
+    """
+
+    __tablename__ = "usage_ledger_monthly_summary"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), nullable=False)
+    cost_pkr_micro: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "period_yyyymm", name="uq_usage_summary_user_period"
+        ),
     )
 
 
