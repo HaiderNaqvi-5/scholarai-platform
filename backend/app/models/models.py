@@ -1785,6 +1785,33 @@ class SopMonthlyUsage(Base):
     )
 
 
+class TrackerMonthlyUsage(Base):
+    """Per-user monthly tracker-creation count for cap gating.
+
+    Logged on every successful tracker create so delete+recreate cannot reset
+    the monthly cap (TRACKER_CAP). Parallel to SopMonthlyUsage; period is the
+    YYYYMM string so a composite PK + upsert handles monthly rollover.
+    """
+
+    __tablename__ = "tracker_monthly_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), primary_key=True)
+    created_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class UsageLedger(Base):
     """Burn-cap accounting: LLM + WhatsApp cost per user per period, in PKR x 1e6 (BigInteger)."""
 
