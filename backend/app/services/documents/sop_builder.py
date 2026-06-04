@@ -399,7 +399,13 @@ class SOPBuilderService:
                 endpoint="documents.sop.line_feedback",
                 system_prompt=LINE_FEEDBACK_SYSTEM_PROMPT,
                 user_prompt=f"SOP draft:\n\n{draft_text}",
-                model=settings.ANTHROPIC_MODEL_DEEP,
+                # Line feedback is structured paragraph-level critique, not
+                # long-form generation, so it runs on the FAST (Haiku) model
+                # instead of re-spending a full DEEP (Sonnet) call on the
+                # already-generated draft. LINE_FEEDBACK_SYSTEM_PROMPT stays the
+                # only cached block; complete_with_accounting derives the
+                # llm_haiku ledger kind from this model name automatically.
+                model=settings.ANTHROPIC_MODEL_FAST,
                 max_tokens=1500,
                 temperature=0.2,
                 json_mode=True,
