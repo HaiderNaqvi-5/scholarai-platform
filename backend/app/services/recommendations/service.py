@@ -9,7 +9,7 @@ import anyio
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import case, func, select, text
+from sqlalchemy import case, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
@@ -53,6 +53,15 @@ class RetrievedCandidate:
     retrieval_source: str
     semantic_similarity: float | None
 
+
+# Per-chunk ANN over-fetch multiplier. The chunk ANN can return several chunks
+# belonging to the same scholarship, so we fetch ``limit * _CHUNK_FANOUT``
+# candidate chunks and dedupe to the best (smallest-distance) chunk per
+# scholarship before truncating to ``limit`` distinct scholarships. A fanout of
+# 5 keeps the window index-served while leaving ample headroom: even if every
+# scholarship contributed 4 near-duplicate chunks ahead of the next distinct
+# one, 5x still yields >= limit distinct scholarships in practice.
+_CHUNK_FANOUT = 5
 
 RERANK_POLICY_VERSION = "reco.rerank.v1"
 RERANK_FLOOR_SCORE = 0.3
@@ -181,16 +190,31 @@ class RecommendationService:
         return recommendations[:limit]
 
     def _build_pgvector_stmt(self, *, query_embedding: list[float], limit: int):
-        distance = Scholarship.description_embedding.cosine_distance(query_embedding)
+        # Per-CHUNK ANN. A plain ``ORDER BY embedding <=> :q LIMIT n`` over
+        # scholarship_chunks is what the ivfflat index
+        # ``ix_scholarship_chunks_embedding`` (vector_cosine_ops) can serve:
+        # there is NO func.min() and NO GROUP BY on the indexed column, so the
+        # planner uses the index instead of sequential-scanning every chunk.
+        #
+        # The published filter is expressed as a scalar subquery on
+        # scholarships.id (NOT a join), which keeps scholarship_chunks as the
+        # single FROM the planner orders by the indexed expression. We over-fetch
+        # ``limit * _CHUNK_FANOUT`` chunk rows; Python dedupe then collapses to
+        # the best chunk per scholarship (reproducing the old min-per-scholarship
+        # semantics) before truncating to ``limit`` distinct scholarships.
+        distance = ScholarshipChunk.embedding.cosine_distance(query_embedding)
+        published_ids = select(Scholarship.id).where(
+            Scholarship.record_state == RecordState.PUBLISHED
+        )
         return (
             select(
-                Scholarship,
+                ScholarshipChunk.scholarship_id,
                 distance.label("distance"),
             )
-            .where(Scholarship.record_state == RecordState.PUBLISHED)
-            .where(Scholarship.description_embedding.is_not(None))
+            .where(ScholarshipChunk.embedding.is_not(None))
+            .where(ScholarshipChunk.scholarship_id.in_(published_ids))
             .order_by(distance)
-            .limit(limit)
+            .limit(limit * _CHUNK_FANOUT)
         )
 
     async def _retrieve_pgvector_candidates(
@@ -210,24 +234,42 @@ class RecommendationService:
         stmt = self._build_pgvector_stmt(query_embedding=query_embedding, limit=limit)
         rows = (await self.db.execute(stmt)).all()
         if not rows:
-            return [], "Published scholarships do not have usable description embeddings yet, so ranking used rules only."
+            return [], "Published scholarships do not have usable chunk embeddings yet, so ranking used rules only."
+
+        # Dedupe to the BEST (smallest-distance) chunk per scholarship in Python,
+        # preserving ascending-distance order. Because ``rows`` arrives already
+        # sorted by distance (index ORDER BY), the FIRST time we see a
+        # scholarship_id it is that scholarship's minimum chunk distance — exactly
+        # the value the old ``func.min(distance) GROUP BY scholarship_id`` query
+        # produced. Keeping insertion order over a dict then reproduces the old
+        # best-chunk-per-scholarship ascending ordering, now served by the index.
+        best_distance_by_id: dict[uuid.UUID, float | None] = {}
+        for row in rows:
+            scholarship_id = row.scholarship_id
+            if scholarship_id in best_distance_by_id:
+                continue  # already captured this scholarship's best (closest) chunk
+            distance = row.distance
+            best_distance_by_id[scholarship_id] = (
+                float(distance) if distance is not None else None
+            )
+            if len(best_distance_by_id) >= limit:
+                break
+
+        ordered_ids = list(best_distance_by_id.keys())
+        scholarships = await self._load_scholarships_by_ids(ordered_ids)
 
         candidates: list[RetrievedCandidate] = []
-        for row in rows:
-            # Real SQLAlchemy keys the ORM entity by its mapped class name
-            # ("Scholarship"); the unit fake exposes it as "scholarship".
-            scholarship = getattr(row, "Scholarship", None) or getattr(
-                row, "scholarship", None
-            )
+        for scholarship_id in ordered_ids:
+            scholarship = scholarships.get(scholarship_id)
             if scholarship is None:
                 continue
-            distance = row.distance
+            best_distance = best_distance_by_id[scholarship_id]
             candidates.append(
                 RetrievedCandidate(
                     scholarship=scholarship,
-                    retrieval_source="pgvector_scholarship_similarity",
-                    semantic_similarity=_distance_to_similarity(float(distance))
-                    if distance is not None
+                    retrieval_source="pgvector_chunk_similarity",
+                    semantic_similarity=_distance_to_similarity(best_distance)
+                    if best_distance is not None
                     else None,
                 )
             )
