@@ -65,10 +65,10 @@ class _FakeDB:
         return None
 
 
-def _fake_user(capabilities: set[str]):
+def _fake_user(capabilities: set[str], role: UserRole = UserRole.MENTOR):
     return SimpleNamespace(
         id=uuid4(),
-        role=UserRole.MENTOR,
+        role=role,
         is_active=True,
         _token_capabilities=capabilities,
     )
@@ -291,13 +291,14 @@ def test_mentor_can_read_document_within_their_institution(app, client):
     assert response.json()["id"] == str(document.id)
 
 
-def test_platform_mentor_without_institution_reads_any_document(app, client):
+def test_platform_admin_without_institution_reads_any_document(app, client):
+    # Platform-review role (ADMIN) => unrestricted even with a null institution.
     document = _build_owned_document(title="Any student SOP", owner_institution_id=uuid4())
     db = _ScopedFakeDB([document], mentor_institution_id=None)
 
     async def override_current_user():
-        user = _fake_user({"document.mentor.review"})
-        user.institution_id = None  # platform reviewer (admin/owner/dev/internal mentor)
+        user = _fake_user({"document.mentor.review"}, role=UserRole.ADMIN)
+        user.institution_id = None  # platform reviewer (admin/owner/dev/internal)
         return user
 
     async def override_db():
@@ -312,6 +313,88 @@ def test_platform_mentor_without_institution_reads_any_document(app, client):
     app.dependency_overrides.clear()
 
     assert response.status_code == 200
+
+
+def test_internal_user_without_institution_reads_any_document(app, client):
+    # INTERNAL_USER is also a platform-review role => unrestricted with null institution.
+    document = _build_owned_document(title="Any student SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.INTERNAL_USER)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+
+def test_mentor_with_null_institution_cannot_read_real_institution_document(app, client):
+    # H5 residual: a plain MENTOR with institution_id=None must NOT be treated as
+    # an unrestricted platform reviewer. It is institution-scoped (to the null
+    # cohort), so a real-institution student's doc is invisible => 404.
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.MENTOR)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_mentor_with_null_institution_cannot_submit_feedback_on_real_institution_document(app, client):
+    # Same H5 residual on the write path: null-institution MENTOR cannot write
+    # feedback on a real-institution student's doc, and nothing is committed.
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.submit"}, role=UserRole.MENTOR)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.post(
+        f"/api/v1/mentor/documents/{document.id}/feedback",
+        json={
+            "summary": "A valid looking summary with sufficient length for schema requirements.",
+            "strengths": ["One"],
+            "revision_priorities": ["Two"],
+            "caution_notes": [],
+        },
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert db.committed is False
 
 
 def test_mentor_cannot_submit_feedback_outside_their_institution(app, client):
