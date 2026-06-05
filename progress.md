@@ -1,61 +1,48 @@
-# progress.md — handoff
+# progress.md — ScholarAI / AidwiseAI
 
-**Date:** 2026-05-31
-**Branch:** `s95/frontend-design-pass-wave2` (worktree root on `master`)
+**Date:** 2026-06-05
+**Branch:** `fix/rec-eval-contract` (cut from `fix/backend-remediation`)
 
-## Session: verify + FIX admin/curation/ingestion/recs/scholarships/matches/discover
+> Prior backend-remediation / perf-db handoff state is preserved in `CLAUDE.md` (perf-db-01..05, R7, AI-P2-05 sections).
 
-### Outcome
-Diagnosed (prior turn) then **fixed + runtime-verified** the 3 frontend contract crashes.
-All requested surfaces now work. Backend API layer was already healthy; breakage was
-FE type-drift + an infra outage (data-store containers were down — restarted).
+## This session — /admin/rec-eval benchmark crash fixed (FE-only)
 
-### Fixes shipped (uncommitted in working tree)
-1. **discover** — enriched backend `ScholarshipListItem` (additive optional fields:
-   `summary/funding_summary/funding_amount_min/max/source_url/field_tags/degree_levels`),
-   populated in `_serialize_list_item`; de-duplicated the detail builder (kwargs now via
-   `model_dump()`). FE: `ScholarshipListItem` type enriched, `ScholarshipCard` reads lean+enriched
-   (`scholarship_id`, guarded `field_tags`), `endpoints.scholarships.list` → `ScholarshipListItemResponse`,
-   `discover/page.tsx` uses `scholarship_id` + ListItem→Scholarship adapter for optimistic save.
-2. **recommendations (/feed)** — FE `RecommendationItem`/`RecommendationListResponse` flattened
-   (+`RecommendationResponseMeta`) to backend shape; `feed/page.tsx` reads `item.*`.
-3. **curation detail + list** — FE `CurationRecord`→`CurationRecordSummary`/`CurationRecordDetail`
-   (+alias) mirroring `schemas/curation.py`; pages read `record_state`/`review_notes`/typed fields;
-   removed dead audit-log card (backend detail has no `audit_log`).
-4. **Deleted** `frontend/src/components/scholarship/RecommendationCard.tsx` — 0 importers, obsolete
-   nested contract, broke under the reshape (flagged, not silent).
+**Symptom:** admin Recommendation-Evaluation page → click **Evaluate** → brief "Benchmark complete." toast → page blanks to error boundary; pass-rate badge flashed `NaN%`.
 
-### Files touched
-backend: `app/schemas/scholarships.py`, `app/api/v1/routes/scholarships.py`.
-frontend: `lib/api/types.ts`, `lib/api/endpoints/scholarships.ts`,
-`components/scholarship/ScholarshipCard.tsx`, `app/(student)/discover/page.tsx`,
-`app/(student)/feed/page.tsx`, `app/(admin)/admin/curation/[id]/page.tsx`,
-`app/(admin)/admin/curation/page.tsx`, **deleted** `components/scholarship/RecommendationCard.tsx`.
-docs: `CLAUDE.md` (curation note flipped to ✅ FIXED), `progress.md`.
+**Root cause:** frontend/backend contract drift (same hand-synced-type class as the 2026-05-31 cluster, memory obs `7092`).
+Backend `POST /recommendations/benchmarks/{id}/evaluate` (`response_model=RecommendationBenchmarkEvaluationResponse`, `schemas/recommendations.py:229`) returns a NESTED shape:
+- `aggregate.{pass_rate, case_count, pass_count, average_metrics[], gate_pass_rates[]}`
+- `case_results[].metrics[]` = list of `{k, precision_at_k, recall_at_k, ndcg_at_k, mrr_at_k}`
 
-### Verification (evidence)
-- `bunx --bun tsc --noEmit` → exit 0. `bun run lint` → exit 0.
-- Backend image rebuilt; live `GET /api/v1/scholarships` now returns `field_tags`,
-  `funding_summary` ("Partial: CAD 10,000–40,000."), `funding_amount_max:32000`.
-- Browser drive under temp local-auth (admin@example.com): **/discover** → 18 cards, no error;
-  **/feed** → dashboard + recent matches, no error; **/admin/curation/[id]** → full detail
-  (title + PUBLISHED badge + Review notes + Fields), no error. All previously crashed.
-- Matches (`/scholarships`) + admin overview/ingestion/users/audit/rec-eval were already passing.
+Frontend declared a FLAT type (`endpoints/recommendations.ts`) — top-level `pass_rate`, `aggregate`/`metrics` as `Record<string,number>` — and `rec-eval/page.tsx` called `.toFixed()` on those objects/arrays → `TypeError: v.toFixed is not a function`. TS missed it because the generic was hand-declared wrong.
 
-### State of system now (reverted)
-- Backend: **Clerk** mode (`/auth/login` → 410) on rebuilt image (enrichment fix baked in). Up :8000.
-- Frontend: **Clerk** mode (`bun dev` :3000, 80 clerk refs).
-- Data stores up: postgres/redis/neo4j/opensearch. `docker-compose.verify.yml` (temp local-auth override) deleted.
-- NOT committed. NOT a backend pytest run this session (verified via live API + tsc/lint + browser).
+**NOT the cause:** auth. `RecommendationEvaluationUser` (`dependencies.py:305`) accepts `RECOMMENDATION_EVALUATE` / `ADMIN_AUDIT_READ` / `OWNER_SYSTEM_READ`; ADMIN role holds the first two (`authorization.py:96`).
 
-### Next steps
-- Run backend test suite (`pytest tests/ -q`) to confirm the schema/route edits don't regress
-  (catalog tests assert only `title`+`applied_filters`, so additive fields should be safe).
-- Commit the fix batch (10 files) once tests green.
-- If a rich recommendation card is wanted later, rebuild it against the FLAT `RecommendationItem`.
+## Tasks completed
+- [x] Diagnosis (systematic-debugging): root cause confirmed across auth + contract boundaries.
+- [x] Plan: `docs/superpowers/plans/2026-06-05-rec-eval-contract-fix.md`.
+- [x] **T1** corrected `evaluateBenchmark` FE type → backend nested shape (+`BenchmarkMetric` alias). Commit `8ca7106`. (Intentionally left tsc RED — 4 errors at page.tsx:94/95/111/142 = reproduction.)
+- [x] **T2** rewrote result render with `metricEntries()` helper. Commit `39725fc`. tsc GREEN.
+- [x] Two-stage subagent review APPROVED (spec: FE type matched backend Pydantic field-by-field; quality: keys unique, edge cases degrade gracefully).
+- [x] Docs: CLAUDE.md note + this handoff.
 
-### Commands to resume
-- Infra: `docker compose -f docker-compose.yml up -d postgres redis neo4j opensearch`
-- Backend: container up :8000 (Clerk). Local-auth verify pass: temp override w/ `AUTH_PROVIDER: local` + `--force-recreate --no-deps backend`.
-- Frontend: `cd frontend && bun dev` (:3000). Local-auth drive: prefix `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""` + inject `grantpath.access_token`.
-- Checks: `cd frontend && bunx --bun tsc --noEmit && bun run lint`.
+## Files touched (this fix)
+- `frontend/src/lib/api/endpoints/recommendations.ts` (type)
+- `frontend/src/app/(admin)/admin/rec-eval/page.tsx` (render)
+- `CLAUDE.md`, `progress.md`, `docs/superpowers/plans/2026-06-05-rec-eval-contract-fix.md`
+
+## Verification
+- `cd frontend && bunx --bun tsc --noEmit` → 0 errors
+- `bun run lint` → 0; `bun run build` → green, 42 routes
+- Backend NOT changed
+- **Live click-through NOT exercised** — backend running in **Clerk auth mode** (local `/auth/login` → 410), no headless token. Render correctness is structural: `response_model=` makes FastAPI/Pydantic emit exactly the schema the FE type now mirrors.
+
+## Open / next step
+- **Optional live verify (operator):** `cd frontend && bun dev` (port 3000 free), sign in via Clerk hosted page as an admin, open `/admin/rec-eval`, click **Evaluate** on `core_rank_quality` → confirm result card renders real pass-rate %, aggregate rows, per-case table, 0 console errors.
+- **Not pushed.** On push: device rule §5 secret scan (diff is UI/type-only, no secret surface) + §7 graphify `--update` before push completes.
+- Pre-existing dead code (out of scope, noted only): `recommendations.evaluate()` (`/recommendations/evaluate`) type also drifted, **zero callers**.
+
+## Resume commands
+- Frontend: `cd frontend && bun dev` (http://localhost:3000) — `docker compose stop frontend` first if :3000 held.
+- Typecheck/lint/build: `cd frontend && bunx --bun tsc --noEmit && bun run lint && bun run build`
+- Backend (up this session): `docker compose up backend` or `cd backend && python -m uvicorn app.main:app --reload`
