@@ -21,6 +21,7 @@ from app.models import (
     DocumentProcessingStatus,
     DocumentRecord,
     User,
+    UserRole,
 )
 from app.schemas.documents import (
     DocumentDetailResponse,
@@ -35,18 +36,29 @@ router = APIRouter()
 HUMAN_MENTOR_LIMITATION_NOTICE = "Reviewed by a human mentor."
 
 
+_PLATFORM_REVIEW_ROLES = frozenset(
+    {UserRole.ADMIN, UserRole.OWNER, UserRole.DEV, UserRole.INTERNAL_USER}
+)
+
+
 def _mentor_scope_clause(current_user: User):
     """Object-level ownership for mentor document access (H5-MENTOR-IDOR).
 
-    Institution-bound mentors may only touch documents whose owning student
-    shares their institution. Platform reviewers (admin / owner / dev / internal
-    mentor with no institution scope) are unrestricted. Returns a SQLAlchemy
-    boolean clause to AND into the DocumentRecord lookup, or None for no extra
-    restriction.
+    Authorization keys on the user's ROLE, not on a null institution: only the
+    platform-review roles (ADMIN/OWNER/DEV/INTERNAL_USER) are unrestricted;
+    everyone else is institution-scoped. A MENTOR (or anything else reaching this
+    route via the MentorReviewUser capability) is bound to documents whose owning
+    student shares the mentor's institution. Note SQLAlchemy renders
+    ``== None`` as ``IS NULL``, so a null-institution MENTOR is scoped to the
+    null-institution cohort, NOT to every document — the intended safe default.
+
+    Returns a SQLAlchemy boolean clause to AND into the DocumentRecord lookup,
+    or None for no extra restriction (platform reviewers only).
     """
-    mentor_institution_id = getattr(current_user, "institution_id", None)
-    if mentor_institution_id is None:
+    role = getattr(current_user, "role", None)
+    if role in _PLATFORM_REVIEW_ROLES:
         return None
+    mentor_institution_id = getattr(current_user, "institution_id", None)
     return DocumentRecord.user_id.in_(
         select(User.id).where(User.institution_id == mentor_institution_id)
     )
