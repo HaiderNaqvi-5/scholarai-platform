@@ -116,26 +116,33 @@ async def test_recommendation_service_enforces_eligible_only_invariant(monkeypat
 
 
 async def test_pgvector_candidate_retrieval_preserves_distance_order(monkeypatch):
+    # perf-db-03 option (b): chunk-level ivfflat ANN. The DB returns per-CHUNK
+    # rows (scholarship_id + distance) already ordered by ascending cosine
+    # distance. The method must set ivfflat.probes first, run a single chunk ANN
+    # query (no func.min/GROUP BY on the indexed column), dedupe to the best
+    # chunk per scholarship in Python, then re-fetch the scholarship entities.
     first = make_scholarship(title="First scholarship")
     second = make_scholarship(title="Second scholarship")
+    # Multiple chunks per scholarship, ascending distance; second is closest.
     session = FakeQuerySession(
         [
-            SimpleNamespace(scholarship_id=second.id, best_distance=0.4),
-            SimpleNamespace(scholarship_id=first.id, best_distance=0.9),
+            SimpleNamespace(scholarship_id=second.id, distance=0.4),
+            SimpleNamespace(scholarship_id=first.id, distance=0.9),
+            SimpleNamespace(scholarship_id=second.id, distance=0.95),
         ]
     )
     service = RecommendationService(db=session)
 
-    monkeypatch.setattr(service, "_encode_query", lambda _query: [0.25, 0.75])
+    async def _fake_encode(_query):
+        return [0.25, 0.75]
 
-    async def fake_load_scholarships_by_ids(scholarship_ids):
-        assert scholarship_ids == [second.id, first.id]
-        return {
-            first.id: first,
-            second.id: second,
-        }
+    async def _fake_load(ids):
+        # Dedupe must hand us deduped ids in best-distance order.
+        assert list(ids) == [second.id, first.id]
+        return {first.id: first, second.id: second}
 
-    monkeypatch.setattr(service, "_load_scholarships_by_ids", fake_load_scholarships_by_ids)
+    monkeypatch.setattr(service, "_encode_query", _fake_encode)
+    monkeypatch.setattr(service, "_load_scholarships_by_ids", _fake_load)
 
     candidates, failure_reason = await service._retrieve_pgvector_candidates(
         search_query="target field Data Science | degree ms",
@@ -143,13 +150,24 @@ async def test_pgvector_candidate_retrieval_preserves_distance_order(monkeypatch
     )
 
     assert failure_reason is None
-    assert len(session.statements) == 1
+    # Two statements: SET LOCAL ivfflat.probes, then the chunk ANN query.
+    assert len(session.statements) == 2
+    probes_stmt = str(session.statements[0]).lower()
+    assert "set " in probes_stmt and "ivfflat.probes" in probes_stmt
+    ann_sql = str(session.statements[1]).lower()
+    assert "scholarship_chunks" in ann_sql
+    assert "min(" not in ann_sql
+    assert "group by" not in ann_sql
+    # Best-chunk-per-scholarship dedupe, ascending distance: second (0.4) then first (0.9).
     assert [candidate.scholarship.id for candidate in candidates] == [second.id, first.id]
     assert [candidate.semantic_similarity for candidate in candidates] == [
         _distance_to_similarity(0.4),
         _distance_to_similarity(0.9),
     ]
-    assert all(candidate.retrieval_source == "pgvector_chunk_similarity" for candidate in candidates)
+    assert all(
+        candidate.retrieval_source == "pgvector_chunk_similarity"
+        for candidate in candidates
+    )
 
 
 async def test_recommendation_service_keeps_heuristic_ranking_when_embeddings_are_unavailable(monkeypatch):

@@ -795,6 +795,7 @@ class Scholarship(Base):
     min_gpa_value: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    embedding_source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     record_state: Mapped[RecordState] = mapped_column(
         Enum(RecordState, name="scholarship_record_state", values_callable=enum_values),
         nullable=False,
@@ -866,7 +867,22 @@ class Scholarship(Base):
         Index("ix_scholarships_record_state", "record_state"),
         Index("ix_scholarships_country_code", "country_code"),
         Index("ix_scholarships_deadline_at", "deadline_at"),
+        Index(
+            "ix_scholarships_catalog_filter",
+            "record_state",
+            "country_code",
+            "deadline_at",
+        ),
         Index("ix_scholarships_funding_type", "funding_type"),
+        Index(
+            "ix_scholarships_match_candidate",
+            "country_code",
+            "deadline_at",
+            "min_gpa_value",
+            postgresql_where=text(
+                "record_state = 'published'::scholarship_record_state"
+            ),
+        ),
         Index(
             "ix_scholarships_description_embedding_published",
             "description_embedding",
@@ -1272,6 +1288,10 @@ class RecommendationKPISnapshot(Base):
             "ix_recommendation_kpi_snapshots_policy_version",
             "policy_version",
         ),
+        Index(
+            "ix_recommendation_kpi_snapshots_created_at",
+            "created_at",
+        ),
     )
 
 
@@ -1306,6 +1326,7 @@ class DocumentKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_document_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_document_kpi_snapshots_created_at", "created_at"),
     )
 
 
@@ -1340,6 +1361,7 @@ class InterviewKPISnapshot(Base):
 
     __table_args__ = (
         Index("ix_interview_kpi_snapshots_user_created_at", "user_id", "created_at"),
+        Index("ix_interview_kpi_snapshots_created_at", "created_at"),
     )
 
 
@@ -1763,6 +1785,33 @@ class SopMonthlyUsage(Base):
     )
 
 
+class TrackerMonthlyUsage(Base):
+    """Per-user monthly tracker-creation count for cap gating.
+
+    Logged on every successful tracker create so delete+recreate cannot reset
+    the monthly cap (TRACKER_CAP). Parallel to SopMonthlyUsage; period is the
+    YYYYMM string so a composite PK + upsert handles monthly rollover.
+    """
+
+    __tablename__ = "tracker_monthly_usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), primary_key=True)
+    created_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class UsageLedger(Base):
     """Burn-cap accounting: LLM + WhatsApp cost per user per period, in PKR x 1e6 (BigInteger)."""
 
@@ -1792,6 +1841,41 @@ class UsageLedger(Base):
 
     __table_args__ = (
         Index("ix_usage_ledger_user_period", "user_id", "period_yyyymm"),
+        # R7: month_to_date_pkr also filters period-then-user during rollup;
+        # this index serves the prune/rollup scan and the summary read.
+        Index("ix_usage_ledger_period_user", "period_yyyymm", "user_id"),
+    )
+
+
+class UsageLedgerMonthlySummary(Base):
+    """Rolled-up burn-cap totals per user per period (one row per user/month).
+
+    Populated by ``tasks.run_usage_ledger_rollup``; lets ``month_to_date_pkr``
+    sum a single summary row for closed months instead of scanning every
+    detail row, and lets the detail table be pruned without losing history.
+    """
+
+    __tablename__ = "usage_ledger_monthly_summary"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    period_yyyymm: Mapped[str] = mapped_column(String(6), nullable=False)
+    cost_pkr_micro: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "period_yyyymm", name="uq_usage_summary_user_period"
+        ),
     )
 
 

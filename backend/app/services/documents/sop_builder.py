@@ -175,13 +175,110 @@ async def _record_sop_use(db: AsyncSession, user: User) -> None:
     await db.execute(stmt)
 
 
+async def _release_sop_quota(db: AsyncSession, user: User, period: str) -> None:
+    """Undo one increment in the per-month bucket (failed/over-cap reservation).
+
+    Decrements ``sop_count`` by one, clamped at zero, for the (user, period)
+    row. Used to roll back an atomic reservation that overshot the cap so a
+    rejected attempt is never charged against the user's quota.
+    """
+    await db.execute(
+        update(SopMonthlyUsage)
+        .where(
+            SopMonthlyUsage.user_id == user.id,
+            SopMonthlyUsage.period_yyyymm == period,
+        )
+        .values(
+            sop_count=func.greatest(SopMonthlyUsage.sop_count - 1, 0),
+            updated_at=func.now(),
+        )
+    )
+
+
+async def _reserve_sop_quota(db: AsyncSession, user: User) -> int:
+    """Atomically check-and-increment the SOP quota; return the reserved count.
+
+    Folds the former ``_assert_sop_quota`` (SELECT) + ``_record_sop_use``
+    (upsert) into one race-free operation, closing the month-boundary TOCTOU.
+
+    - Free: in-memory lifetime gate on ``User.lifetime_sop_count``; raises 402
+      when the lifetime cap is reached, otherwise bumps the user counter.
+    - Pro/Elite: a single Postgres ``INSERT ... ON CONFLICT DO UPDATE ...
+      RETURNING sop_count`` reserves the slot atomically. The RETURNING value
+      is authoritative; if it exceeds the plan cap the reservation is released
+      (decremented) and 429 ``sop_quota_exhausted`` is raised.
+    - Institution / unknown / cap==0: no-op (returns 0), preserving prior
+      behaviour where those plans bypass the monthly bucket.
+    """
+    plan = (user.plan or "free").lower()
+    if plan == "free":
+        used = getattr(user, "lifetime_sop_count", 0) or 0
+        if used >= LIFETIME_FREE_SOP:
+            raise_plan_required(
+                user,
+                ["pro", "elite"],
+                message=(
+                    "Free plan includes 1 SOP. Upgrade for 5/month (Pro) or 10/month "
+                    "(Elite)."
+                ),
+            )
+        await db.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(lifetime_sop_count=(User.lifetime_sop_count + 1))
+        )
+        return used + 1
+
+    cap = MONTHLY_SOP_CAP.get(plan)
+    if cap is None or cap == 0:
+        return 0  # institution / unknown — bypasses the monthly bucket
+
+    period = _sop_period()
+    stmt = (
+        pg_insert(SopMonthlyUsage)
+        .values(user_id=user.id, period_yyyymm=period, sop_count=1)
+        .on_conflict_do_update(
+            index_elements=["user_id", "period_yyyymm"],
+            set_={
+                "sop_count": SopMonthlyUsage.sop_count + 1,
+                "updated_at": func.now(),
+            },
+        )
+        .returning(SopMonthlyUsage.sop_count)
+    )
+    reserved = (await db.execute(stmt)).scalar()
+    used = (reserved or 1) - 1  # count this attempt would have started from
+    if reserved is not None and reserved > cap:
+        # Over cap: undo the reservation so a rejected attempt is not charged.
+        await _release_sop_quota(db, user, period)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "sop_quota_exhausted",
+                "plan": plan,
+                "used": used,
+                "cap": cap,
+                "upgrade_url": "/upgrade" if plan == "pro" else None,
+                "message": (
+                    f"{cap} SOP drafts used this month. Resets next month."
+                    + (" Upgrade to Elite for 10/month." if plan == "pro" else "")
+                ),
+            },
+        )
+    return reserved or 0
+
+
 class SOPBuilderService:
     def __init__(self, db: AsyncSession, llm: AnthropicClient | None = None) -> None:
         self.db = db
         self.llm = llm or AnthropicClient()
 
     async def draft(self, user: User, payload: SOPDraftRequest) -> SOPDraftResponse:
-        await _assert_sop_quota(self.db, user)
+        # Atomic check-and-reserve up front: one INSERT ... ON CONFLICT ...
+        # RETURNING decides authoritatively before any generation work, closing
+        # the month-boundary TOCTOU. Both the draft and the optional Elite
+        # line-feedback are one user action and share this single reservation.
+        await _reserve_sop_quota(self.db, user)
 
         scholarship_context = await self._scholarship_context(payload.scholarship_id)
         draft_text, used_llm, model_used = await self._generate_draft(
@@ -223,11 +320,6 @@ class SOPBuilderService:
         line_feedback: list[SOPParagraphFeedback] | None = None
         if has_plan_at_least(user, "elite", "institution"):
             line_feedback = await self._generate_line_feedback(user, draft_text, paragraphs)
-
-        # Canonical quota accounting — runs once per draft() call. Both the
-        # draft and the optional Elite line-feedback share this same bucket
-        # because they execute together as a single user action.
-        await _record_sop_use(self.db, user)
 
         return SOPDraftResponse(
             document_id=document.id,
@@ -307,7 +399,13 @@ class SOPBuilderService:
                 endpoint="documents.sop.line_feedback",
                 system_prompt=LINE_FEEDBACK_SYSTEM_PROMPT,
                 user_prompt=f"SOP draft:\n\n{draft_text}",
-                model=settings.ANTHROPIC_MODEL_DEEP,
+                # Line feedback is structured paragraph-level critique, not
+                # long-form generation, so it runs on the FAST (Haiku) model
+                # instead of re-spending a full DEEP (Sonnet) call on the
+                # already-generated draft. LINE_FEEDBACK_SYSTEM_PROMPT stays the
+                # only cached block; complete_with_accounting derives the
+                # llm_haiku ledger kind from this model name automatically.
+                model=settings.ANTHROPIC_MODEL_FAST,
                 max_tokens=1500,
                 temperature=0.2,
                 json_mode=True,

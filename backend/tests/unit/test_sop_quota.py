@@ -102,7 +102,14 @@ class _FakeDB:
 
     async def execute(self, statement):  # noqa: ANN001 - SQL statement object
         self.executed.append(statement)
-        # The gate uses select(SopMonthlyUsage)... — return the row (or None).
+        rendered = str(statement).lower()
+        if "insert into sop_monthly_usage" in rendered and "on conflict" in rendered:
+            base = self._monthly_used if self._monthly_used is not None else 0
+            return _Result(base + 1)  # RETURNING sop_count after atomic +1
+        if "update sop_monthly_usage" in rendered:
+            return _Result(None)  # release decrement
+        # The gate's legacy select(SopMonthlyUsage) path (still used by the
+        # standalone _assert_sop_quota tests) returns the seeded row or None.
         row = _Row(self._monthly_used) if self._monthly_used is not None else None
         return _Result(row)
 
@@ -319,19 +326,20 @@ async def test_unknown_plan_treated_as_free_overrun():
 
 @pytest.mark.asyncio
 async def test_pro_draft_records_monthly_usage():
-    """End-to-end via SOPBuilderService: a Pro draft records exactly one use."""
+    """End-to-end via SOPBuilderService: a Pro draft records exactly one use.
+
+    Post R5-SOP-QUOTA-RACE the check-then-record split is folded into a single
+    atomic reserve, so the authoritative accounting is the upsert itself — no
+    separate read-only SELECT gate is issued by draft() anymore.
+    """
     db = _FakeDB(monthly_used=0)
     svc = SOPBuilderService(db)
     resp = await svc.draft(_user("pro"), _payload())
     assert resp.document_id is not None
-    # Statements observed: gate select + upsert insert (+ any optional extras).
     rendered = [str(stmt).lower() for stmt in db.executed]
-    assert any("sop_monthly_usage" in r and "select" in r for r in rendered), (
-        "expected gate select against sop_monthly_usage"
-    )
     assert any(
         "insert into sop_monthly_usage" in r and "on conflict" in r for r in rendered
-    ), "expected per-month upsert after successful draft"
+    ), "expected the atomic per-month reserve upsert during draft()"
 
 
 @pytest.mark.asyncio
@@ -352,3 +360,116 @@ async def test_elite_draft_records_monthly_usage_once_with_line_feedback():
     assert len(inserts) == 1, (
         f"Elite draft+feedback must share the bucket: saw {len(inserts)} inserts"
     )
+
+
+# --- R5-SOP-QUOTA-RACE: atomic reserve/release ---------------------------
+
+from app.services.documents.sop_builder import _reserve_sop_quota, _release_sop_quota
+
+
+class _AtomicFakeDB:
+    """DB stub whose upsert RETURNING yields the post-increment count.
+
+    ``start_count`` is the bucket value *before* this request. An upsert that
+    increments by 1 returns ``start_count + 1`` (the authoritative reserved
+    value). UPDATE/release statements are recorded but do not change the stub.
+    """
+
+    def __init__(self, start_count: int = 0) -> None:
+        self._start = start_count
+        self.executed: list[Any] = []
+        self.released = 0
+
+    async def execute(self, statement):  # noqa: ANN001
+        self.executed.append(statement)
+        rendered = str(statement).lower()
+        if "insert into sop_monthly_usage" in rendered and "on conflict" in rendered:
+            return _Result(self._start + 1)  # RETURNING sop_count after +1
+        if "update sop_monthly_usage" in rendered:
+            self.released += 1
+        return _Result(None)
+
+
+@pytest.mark.asyncio
+async def test_reserve_under_cap_returns_count_no_release():
+    """Pro at used=2 reserves the 3rd slot: returns 3, no release issued."""
+    db = _AtomicFakeDB(start_count=2)
+    count = await _reserve_sop_quota(db, _user("pro"))
+    assert count == 3
+    # Exactly one statement: the atomic upsert. No release.
+    assert db.released == 0
+    rendered = [str(s).lower() for s in db.executed]
+    assert any(
+        "insert into sop_monthly_usage" in r and "on conflict" in r for r in rendered
+    ), "reserve must use an atomic INSERT ... ON CONFLICT upsert"
+
+
+@pytest.mark.asyncio
+async def test_reserve_at_cap_raises_429_and_releases():
+    """Pro already at cap: the upsert reserves count=cap+1 (over), so the gate
+    raises 429 AND decrements the bucket back so the failed attempt is not
+    charged."""
+    cap = MONTHLY_SOP_CAP["pro"]
+    db = _AtomicFakeDB(start_count=cap)
+    with pytest.raises(HTTPException) as excinfo:
+        await _reserve_sop_quota(db, _user("pro"))
+    err = excinfo.value
+    assert err.status_code == 429
+    assert err.detail["error"] == "sop_quota_exhausted"
+    assert err.detail["plan"] == "pro"
+    assert err.detail["used"] == cap
+    assert err.detail["cap"] == cap
+    assert err.detail["upgrade_url"] == "/upgrade"
+    # The over-cap reservation was released back (no silent overshoot).
+    assert db.released == 1
+
+
+@pytest.mark.asyncio
+async def test_reserve_free_uses_lifetime_counter_in_memory():
+    """Free path stays in-memory on User.lifetime_sop_count; at cap -> 402."""
+    db = _AtomicFakeDB()
+    # Under lifetime cap: returns and records the lifetime bump (1 statement).
+    count = await _reserve_sop_quota(db, _user("free", lifetime_sop_count=0))
+    assert count == 1
+    rendered = [str(s).lower() for s in db.executed]
+    assert any("update" in r and "users" in r for r in rendered)
+    # At lifetime cap -> 402 plan_required, no UPDATE issued.
+    db2 = _AtomicFakeDB()
+    with pytest.raises(HTTPException) as excinfo:
+        await _reserve_sop_quota(db2, _user("free", lifetime_sop_count=LIFETIME_FREE_SOP))
+    assert excinfo.value.status_code == 402
+    assert excinfo.value.detail["error"] == "plan_required"
+    assert db2.executed == []  # no write when already over the lifetime cap
+
+
+@pytest.mark.asyncio
+async def test_draft_reserves_once_before_generation_for_pro():
+    """End-to-end: a Pro draft reserves exactly one slot via the atomic upsert
+    and issues no separate post-generation increment (reserve replaces the old
+    check-then-record split)."""
+    db = _FakeDB(monthly_used=0)
+    svc = SOPBuilderService(db)
+    resp = await svc.draft(_user("pro"), _payload())
+    assert resp.document_id is not None
+    inserts = [
+        s for s in db.executed
+        if "insert into sop_monthly_usage" in str(s).lower()
+        and "on conflict" in str(s).lower()
+    ]
+    assert len(inserts) == 1, (
+        f"draft() must reserve exactly once atomically; saw {len(inserts)} upserts"
+    )
+
+
+@pytest.mark.asyncio
+async def test_draft_at_cap_does_not_persist_document_for_pro():
+    """Pro at cap: draft() raises 429 before persisting a DocumentRecord."""
+    used_row = SimpleNamespace(sop_count=MONTHLY_SOP_CAP["pro"])
+    db = _FakeDB(monthly_used=MONTHLY_SOP_CAP["pro"])
+    svc = SOPBuilderService(db)
+    with pytest.raises(HTTPException) as excinfo:
+        await svc.draft(_user("pro"), _payload())
+    assert excinfo.value.status_code == 429
+    # No DocumentRecord should have been added when the quota gate fails.
+    from app.models import DocumentRecord as _DR
+    assert not any(isinstance(o, _DR) for o in db.added)

@@ -1,12 +1,13 @@
 from typing import Annotated
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import RecommendationEvaluationUser, RecommendationUser
+from app.core.dependencies import AdminUser, RecommendationEvaluationUser, RecommendationUser
 from app.core.rate_limit import RateLimiter
+from app.tasks.recommendation_tasks import refresh_published_scholarship_embeddings
 from app.schemas import (
     RecommendationBenchmarkEvaluationResponse,
     RecommendationBenchmarkListResponse,
@@ -42,11 +43,21 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _attach_recommendation_subject(
+    request: Request, current_user: RecommendationUser
+) -> None:
+    """Expose the authenticated user to the RateLimiter so it keys on user id."""
+    request.state.current_user = current_user
+
+
 @router.post(
     "",
     response_model=RecommendationListResponse,
-    # H2: each call fans out to the LLM; cap at 20/hr per client to stop quota drain.
-    dependencies=[Depends(RateLimiter(requests_limit=20, window_seconds=3_600))],
+    # H2: each call fans out to the LLM; cap at 20/hr per authenticated user.
+    dependencies=[
+        Depends(_attach_recommendation_subject),
+        Depends(RateLimiter(requests_limit=20, window_seconds=3_600)),
+    ],
 )
 async def build_recommendations(
     payload: RecommendationRequest,
@@ -74,6 +85,19 @@ async def build_recommendations(
             pipeline_version="recommendations.phase1.v1",
         ),
     )
+
+
+@router.post("/refresh-embeddings", status_code=202)
+async def refresh_recommendation_embeddings(current_user: AdminUser) -> dict[str, str]:
+    """Enqueue a rebuild of published-scholarship pgvector embeddings on the worker.
+
+    Matching ranks via ``scholarship_chunks`` cosine distance; new/changed
+    scholarships have no embeddings until this runs. Admin-only, on-demand.
+    """
+    del current_user
+    task = refresh_published_scholarship_embeddings.delay()
+    logger.info("recommendation_embeddings_refresh_enqueued task_id=%s", task.id)
+    return {"status": "queued", "task_id": task.id}
 
 
 @router.post("/evaluate", response_model=RecommendationEvaluationResponse)

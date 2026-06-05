@@ -6,6 +6,7 @@ No payment flow lives here — only the gate + the upgrade-prompt payload.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Callable, Iterable
 
@@ -36,7 +37,24 @@ def get_price_for_currency(currency: str | None) -> str:
     return PRICE_BY_CURRENCY.get((currency or "PKR").upper(), PRICE_BY_CURRENCY["PKR"])
 
 
+def _plan_is_expired(user: User) -> bool:
+    """True when the user's paid plan has a ``plan_expires_at`` in the past.
+
+    Treats a tz-naive timestamp as UTC. Returns False when no expiry is set,
+    so free / never-expiring plans are unaffected. Makes entitlement correct in
+    real time rather than only after the daily ``expire_trial_plans`` sweep.
+    """
+    expires_at = getattr(user, "plan_expires_at", None)
+    if expires_at is None:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at < datetime.now(timezone.utc)
+
+
 def user_plan_rank(user: User) -> int:
+    if _plan_is_expired(user):
+        return PLAN_RANK["free"]
     return PLAN_RANK.get((user.plan or "free").lower(), 0)
 
 
@@ -123,9 +141,13 @@ PREMIUM_VISIBLE_PLANS: frozenset[str] = frozenset({"pro", "elite", "institution"
 
 def can_reveal_best_fit(user: User) -> bool:
     """True when the user's plan exposes the eligible (best-fit) match bucket."""
+    if _plan_is_expired(user):
+        return False
     return (user.plan or "free").lower() in BEST_FIT_REVEAL_PLANS
 
 
 def can_see_premium(user: User) -> bool:
     """True when the user's plan can view premium-tier scholarships."""
+    if _plan_is_expired(user):
+        return False
     return (user.plan or "free").lower() in PREMIUM_VISIBLE_PLANS
