@@ -13,6 +13,22 @@ import { endpoints } from "@/lib/api";
 
 type EvalResult = Awaited<ReturnType<typeof endpoints.recommendations.evaluateBenchmark>>;
 
+function metricEntries(m: {
+  k: number;
+  precision_at_k: number;
+  recall_at_k: number;
+  ndcg_at_k: number;
+  mrr_at_k: number | null;
+}): [string, number][] {
+  const entries: [string, number][] = [
+    [`precision@${m.k}`, m.precision_at_k],
+    [`recall@${m.k}`, m.recall_at_k],
+    [`ndcg@${m.k}`, m.ndcg_at_k],
+  ];
+  if (m.mrr_at_k != null) entries.push([`mrr@${m.k}`, m.mrr_at_k]);
+  return entries;
+}
+
 export default function RecEvalPage() {
   const benchQ = useQuery({
     queryKey: ["recommendations", "benchmarks"],
@@ -91,23 +107,24 @@ export default function RecEvalPage() {
             <CardTitle>Result · {result.dataset_id}</CardTitle>
             <CardDescription>
               Pass rate:{" "}
-              <Badge tone={result.pass_rate >= 0.8 ? "validated" : "caution"}>
-                {Math.round(result.pass_rate * 100)}%
-              </Badge>
+              <Badge tone={result.aggregate.pass_rate >= 0.8 ? "validated" : "caution"}>
+                {Math.round(result.aggregate.pass_rate * 100)}%
+              </Badge>{" "}
+              · {result.aggregate.pass_count}/{result.aggregate.case_count} cases passed
             </CardDescription>
           </CardHeader>
           <CardBody className="space-y-4">
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-ink-subtle">
-                Aggregate
+                Aggregate (mean over cases)
               </p>
               <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-                {Object.entries(result.aggregate).map(([k, v]) => (
+                {result.aggregate.average_metrics.flatMap(metricEntries).map(([label, v]) => (
                   <li
-                    key={k}
+                    key={label}
                     className="flex items-center justify-between rounded-[8px] border border-[var(--color-border)] bg-paper-white px-3 py-1.5 font-mono text-sm"
                   >
-                    <span className="text-ink-muted">{k}</span>
+                    <span className="text-ink-muted">{label}</span>
                     <span className="text-ink">{v.toFixed(3)}</span>
                   </li>
                 ))}
@@ -123,11 +140,13 @@ export default function RecEvalPage() {
                   <thead className="bg-paper-warm/40 text-left text-xs uppercase tracking-wider text-ink-subtle">
                     <tr>
                       <th className="px-3 py-2">Case</th>
-                      {Object.keys(result.case_results[0]?.metrics ?? {}).map((m) => (
-                        <th key={m} className="px-3 py-2">
-                          {m}
-                        </th>
-                      ))}
+                      {(result.case_results[0]?.metrics ?? [])
+                        .flatMap(metricEntries)
+                        .map(([label]) => (
+                          <th key={label} className="px-3 py-2">
+                            {label}
+                          </th>
+                        ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -137,8 +156,8 @@ export default function RecEvalPage() {
                         className="border-t border-[var(--color-border)] hover:bg-paper-warm/30"
                       >
                         <td className="px-3 py-2 font-mono text-xs text-ink">{c.case_id}</td>
-                        {Object.values(c.metrics).map((v, i) => (
-                          <td key={i} className="px-3 py-2 font-mono text-ink">
+                        {c.metrics.flatMap(metricEntries).map(([label, v]) => (
+                          <td key={label} className="px-3 py-2 font-mono text-ink">
                             {v.toFixed(3)}
                           </td>
                         ))}
