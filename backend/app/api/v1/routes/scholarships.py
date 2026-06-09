@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user
+from scholarai_common.errors import ScholarAIException
 from app.core.plan_guard import can_see_premium, raise_plan_required
 from app.models import RecordState, Scholarship, ScholarshipRequirement, ScholarshipTier, User
 from app.schemas import (
@@ -35,10 +36,14 @@ async def get_optional_user(
 ) -> User | None:
     """Return the authenticated user when a valid bearer token is present.
 
-    Anonymous callers receive ``None`` so public endpoints can downgrade to
-    standard-tier-only views without forcing auth.  Any failure to decode the
-    token (missing header, malformed, expired) is swallowed — callers should
-    treat ``None`` as "anonymous", not "auth failed".
+    Anonymous callers (no header, or a genuinely invalid/expired token) receive
+    ``None`` so public endpoints can downgrade to standard-tier views without
+    forcing auth.
+
+    Only ``ScholarAIException`` — the specific auth-absence error raised by
+    ``get_current_user`` for missing/bad credentials — is caught and converted
+    to ``None``.  Infrastructure failures (DB down, JWKS network error, etc.)
+    propagate so callers see a 503 instead of a silent premium downgrade.
     """
     authorization = request.headers.get("Authorization") or request.headers.get("authorization")
     if not authorization:
@@ -48,8 +53,11 @@ async def get_optional_user(
         return None
     try:
         return await get_current_user(token=token, db=db)
-    except Exception:  # noqa: BLE001 — anon path swallows every auth failure
+    except ScholarAIException:
+        # Genuinely no/invalid credentials → treat as anonymous.
         return None
+    # Any other exception (DB OperationalError, JWKS network failure, etc.)
+    # propagates so callers see a 503 instead of a silent premium downgrade.
 
 
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]

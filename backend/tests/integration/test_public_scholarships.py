@@ -667,3 +667,67 @@ async def test_catalog_excludes_premium_for_anon_in_sql(db_session, app_client):
     titles = {item["title"] for item in resp.json()["items"]}
     assert "Std Award" in titles
     assert "Premium Award" not in titles
+
+
+# ---------------------------------------------------------------------------
+# P2-11 regression: get_optional_user must not swallow infra errors
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+class _FakeRequest:
+    """Minimal Request stand-in that provides only the headers dict."""
+
+    def __init__(self, authorization: str | None):
+        self.headers: dict[str, str] = {}
+        if authorization is not None:
+            self.headers["Authorization"] = authorization
+
+
+class _FakeDB:
+    """Minimal AsyncSession stand-in (get_optional_user doesn't call the DB directly)."""
+
+
+# Test 1: No token → returns None (anonymous), no exception raised.
+async def test_get_optional_user_no_token_returns_none():
+    """No Authorization header → anonymous, no error."""
+    request = _FakeRequest(authorization=None)
+    result = await get_optional_user(request=request, db=_FakeDB())
+    assert result is None
+
+
+# Test 2: Invalid/expired token (ScholarAIException) → returns None (anonymous).
+async def test_get_optional_user_auth_exception_returns_none(monkeypatch):
+    """ScholarAIException from get_current_user → treated as anonymous (None)."""
+    from scholarai_common.errors import ScholarAIException, ErrorCode
+    from app.api.v1.routes import scholarships as scholarships_module
+
+    async def _raise_auth(*args, **kwargs):
+        raise ScholarAIException(
+            code=ErrorCode.AUTH_TOKEN_EXPIRED,
+            message="token expired",
+            status_code=401,
+        )
+
+    monkeypatch.setattr(scholarships_module, "get_current_user", _raise_auth)
+
+    request = _FakeRequest(authorization="Bearer fake.expired.token")
+    result = await get_optional_user(request=request, db=_FakeDB())
+    assert result is None
+
+
+# Test 3: Infra error (non-auth exception) → propagates, does NOT return None.
+async def test_get_optional_user_infra_error_propagates(monkeypatch):
+    """DB/JWKS infra errors must propagate — NOT silently downgrade to anonymous."""
+    from sqlalchemy.exc import OperationalError
+    from app.api.v1.routes import scholarships as scholarships_module
+
+    async def _raise_infra(*args, **kwargs):
+        raise OperationalError("DB down", params=None, orig=None)
+
+    monkeypatch.setattr(scholarships_module, "get_current_user", _raise_infra)
+
+    request = _FakeRequest(authorization="Bearer valid.looking.token")
+    with pytest.raises(OperationalError):
+        await get_optional_user(request=request, db=_FakeDB())
