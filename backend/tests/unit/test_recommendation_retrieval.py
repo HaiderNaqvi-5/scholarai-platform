@@ -10,7 +10,6 @@ from app.models import RecordState
 from app.services.recommendations.service import (
     RecommendationService,
     _distance_to_similarity,
-    _get_shared_embedder,
 )
 from tests.conftest import requires_db
 
@@ -46,7 +45,7 @@ class _FakeEmbedder:
 
 
 async def test_embedder_is_a_process_wide_singleton_across_instances(monkeypatch):
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
     _FakeEmbedder.load_count = 0
     monkeypatch.setattr(service_module, "SentenceTransformer", _FakeEmbedder)
 
@@ -60,11 +59,11 @@ async def test_embedder_is_a_process_wide_singleton_across_instances(monkeypatch
     assert vec_b == [0.1, 0.2, 0.3]
     # Loaded once total, not once per RecommendationService instance.
     assert _FakeEmbedder.load_count == 1
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
 
 
 async def test_encode_query_runs_encode_off_the_event_loop(monkeypatch):
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
     _FakeEmbedder.load_count = 0
     monkeypatch.setattr(service_module, "SentenceTransformer", _FakeEmbedder)
 
@@ -76,16 +75,16 @@ async def test_encode_query_runs_encode_off_the_event_loop(monkeypatch):
     assert vec == [0.1, 0.2, 0.3]
     # .encode() must NOT run on the event-loop thread (threadpool offload).
     assert _FakeEmbedder.last_encode_thread is not loop_thread
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
 
 
 async def test_encode_query_returns_none_when_model_unavailable(monkeypatch):
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
     monkeypatch.setattr(service_module, "SentenceTransformer", None)
 
     service = RecommendationService(db=None)
     assert await service._encode_query("anything") is None
-    _get_shared_embedder.cache_clear()
+    service_module._SHARED_EMBEDDER = None
 
 
 async def test_pgvector_candidate_retrieval_reports_rules_only_fallback_when_embeddings_are_missing(monkeypatch):

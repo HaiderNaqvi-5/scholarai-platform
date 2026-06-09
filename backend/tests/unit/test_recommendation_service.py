@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+import app.services.recommendations.service as svc_module
 from app.models import DegreeLevel, RecordState
 from app.services.recommendations import RecommendationService
 from app.services.recommendations.eligibility import evaluate_match
@@ -349,3 +350,53 @@ async def test_recommendation_score_guardrail_applies_floor(monkeypatch):
     items = await service.build_for_profile(profile, limit=5)
     assert len(items) == 1
     assert items[0].estimated_fit_score >= 0.3
+
+
+def test_embedder_load_failure_is_not_cached(monkeypatch):
+    """P1-6: a transient SentenceTransformer init failure must NOT be memoized.
+    The first failing call returns None without caching; the second call retries
+    and, if the model loads, returns the model object."""
+    svc_module._SHARED_EMBEDDER = None  # reset
+    calls = {"n": 0}
+
+    class _Model:
+        pass
+
+    def flaky(_name):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("transient init failure")
+        return _Model()
+
+    monkeypatch.setattr(svc_module, "SentenceTransformer", flaky)
+
+    first = svc_module._get_shared_embedder()   # fails → None, NOT cached
+    second = svc_module._get_shared_embedder()  # retries → model
+
+    assert first is None
+    assert second is not None
+    assert calls["n"] == 2
+    svc_module._SHARED_EMBEDDER = None  # cleanup
+
+
+def test_embedder_successful_load_is_memoized(monkeypatch):
+    """A successful SentenceTransformer load must be memoized: repeated calls
+    return the same object without re-invoking the constructor."""
+    svc_module._SHARED_EMBEDDER = None  # reset
+    calls = {"n": 0}
+
+    class _Model:
+        pass
+
+    def counting(_name):
+        calls["n"] += 1
+        return _Model()
+
+    monkeypatch.setattr(svc_module, "SentenceTransformer", counting)
+
+    first = svc_module._get_shared_embedder()
+    second = svc_module._get_shared_embedder()
+
+    assert first is second
+    assert calls["n"] == 1  # constructor called exactly once
+    svc_module._SHARED_EMBEDDER = None  # cleanup

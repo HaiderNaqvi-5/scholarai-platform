@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 import uuid
 from dataclasses import dataclass
@@ -33,17 +32,23 @@ except ImportError:
     SentenceTransformer = None
 
 
-@functools.lru_cache(maxsize=1)
+_SHARED_EMBEDDER = None  # successfully-loaded model, or None until a successful load
+
+
 def _get_shared_embedder():
-    """Load the SentenceTransformer once per process and share it across all
-    RecommendationService instances. Returns ``None`` when the model cannot be
-    loaded so callers fall back to rules-only ranking."""
+    """Load the SentenceTransformer once per process. Only a *successful* load is
+    memoized — a failure returns None WITHOUT caching, so a later call retries
+    (one transient init failure must not permanently degrade to rules-only)."""
+    global _SHARED_EMBEDDER
+    if _SHARED_EMBEDDER is not None:
+        return _SHARED_EMBEDDER
     if SentenceTransformer is None:
         return None
     try:
-        return SentenceTransformer("all-mpnet-base-v2")
-    except Exception as exc:  # noqa: BLE001 - log and degrade to rules-only
-        logger.warning("recommendation.embedding_init_failed error=%s", exc)
+        _SHARED_EMBEDDER = SentenceTransformer("all-mpnet-base-v2")
+        return _SHARED_EMBEDDER
+    except Exception as exc:  # noqa: BLE001
+        logger.error("recommendation.embedding_init_failed error=%s", exc)
         return None
 
 
