@@ -79,9 +79,9 @@ async def build_recommendations(
         items=items,
         total=len(items),
         meta=RecommendationResponseMeta(
-            scope_policy="canada_first",
-            allowed_country_codes=["CA"],
-            exception_policy="US_fulbright_only",
+            scope_policy="target_country",
+            allowed_country_codes=[profile.target_country_code.upper()],
+            exception_policy="",
             pipeline_version="recommendations.phase1.v1",
         ),
     )

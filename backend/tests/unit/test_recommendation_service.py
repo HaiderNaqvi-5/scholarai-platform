@@ -34,7 +34,7 @@ class FakeQuerySession:
         return FakeRowsResult(self.rows)
 
 
-async def no_db_candidates(*, limit, exclude_ids):
+async def no_db_candidates(*, limit, exclude_ids, target_country_code=""):
     assert limit >= 0
     assert isinstance(exclude_ids, set)
     return []
@@ -99,7 +99,7 @@ async def test_recommendation_service_enforces_eligible_only_invariant(monkeypat
             RetrievedCandidate(citizenship_mismatch, "pgvector_chunk_similarity", 0.82),
         ], None
 
-    async def fake_db_candidates(*, limit, exclude_ids):
+    async def fake_db_candidates(*, limit, exclude_ids, target_country_code=""):
         assert limit == 58
         assert exclude_ids == {eligible.id, citizenship_mismatch.id}
         return [RetrievedCandidate(gpa_mismatch, "published_rules_db_fallback", None)]
@@ -200,7 +200,7 @@ async def test_recommendation_service_keeps_heuristic_ranking_when_embeddings_ar
         assert limit == 60
         return [], fallback_reason
 
-    async def fake_db_candidates(*, limit, exclude_ids):
+    async def fake_db_candidates(*, limit, exclude_ids, target_country_code=""):
         assert limit == 60
         assert exclude_ids == set()
         return [

@@ -99,6 +99,7 @@ class RecommendationService:
         fallback_candidates = await self._retrieve_db_candidates(
             limit=db_fill_limit,
             exclude_ids=seen_ids,
+            target_country_code=profile.target_country_code,
         )
 
         candidates = vector_candidates + fallback_candidates
@@ -280,14 +281,15 @@ class RecommendationService:
         *,
         limit: int,
         exclude_ids: set[uuid.UUID],
+        target_country_code: str = "",
     ) -> list[RetrievedCandidate]:
         if limit <= 0:
             return []
 
+        target = (target_country_code or "").upper()
         scope_priority = case(
-            (Scholarship.country_code == "CA", 0),
-            (Scholarship.country_code == "US", 1),
-            else_=2,
+            (Scholarship.country_code == target, 0),
+            else_=1,
         )
         stmt = (
             select(Scholarship)

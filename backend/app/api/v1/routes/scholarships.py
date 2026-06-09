@@ -23,7 +23,6 @@ from app.schemas.scholarships_match import (
     ScholarshipMatchResponse,
 )
 from app.services.ingestion import IngestionService
-from app.services.recommendations.eligibility import scholarship_in_scope
 from app.services.scholarships import ScholarshipMatchService
 from app.services.students import StudentService
 
@@ -111,11 +110,11 @@ async def list_scholarships(
     )
 
     # Every filter below is pushed into the SQL WHERE clause so the database
-    # narrows the rowset before paginating. The legacy ``scholarship_in_scope``
-    # gate is intentionally NOT re-added: it returns a 3-tuple, so the old
-    # ``if not scholarship_in_scope(...)`` was always falsy (a non-empty tuple
-    # is truthy) and never filtered anything — preserving prior behavior means
-    # not reintroducing it.
+    # narrows the rowset before paginating. The published-state filter already
+    # enforces visibility; no additional phase-scope gate is applied here.
+    # The legacy helper was removed because it returned a 3-tuple (always
+    # truthy), so the old conditional never filtered anything — preserving
+    # prior behavior means not reintroducing it.
     filters = [Scholarship.record_state == RecordState.PUBLISHED]
     if current_user is None or not can_see_premium(current_user):
         filters.append(Scholarship.tier == ScholarshipTier.STANDARD)
@@ -257,7 +256,7 @@ async def get_scholarship(
         .options(selectinload(Scholarship.requirements), selectinload(Scholarship.source_registry))
     )
     scholarship = result.scalar_one_or_none()
-    if scholarship is None or not scholarship_in_scope(scholarship):
+    if scholarship is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Published scholarship not found",

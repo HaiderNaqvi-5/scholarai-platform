@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship
 from app.services.documents.guidance_assets import DOCUMENT_GUIDANCE_LIBRARY
-from app.services.recommendations.eligibility import scholarship_in_scope
 
 MAX_GROUNDED_SCHOLARSHIPS = 3
 
@@ -87,9 +86,6 @@ async def validate_scholarship_grounding(
                 f"{scholarship.id} is not published and cannot be used for grounded guidance"
             )
             continue
-        in_scope, reason, _score = scholarship_in_scope(scholarship)
-        if not in_scope:
-            violations.append(f"{scholarship.id} is out of Phase 2 scope: {reason}")
 
     if violations:
         raise HTTPException(
