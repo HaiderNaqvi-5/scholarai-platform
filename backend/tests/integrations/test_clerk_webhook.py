@@ -302,6 +302,38 @@ def test_user_created_sends_welcome_email(webhook_app, webhook_client, monkeypat
     assert sent[0]["context"]["login_url"] == "https://aidwiseai.com/login"
 
 
+def test_webhook_returns_503_when_secret_not_configured(monkeypatch):
+    """When CLERK_WEBHOOK_SECRET is empty the endpoint must return 503 immediately,
+    before any Svix verification attempt."""
+    monkeypatch.setattr(settings, "CLERK_WEBHOOK_SECRET", "")
+    from app.main import create_app
+    from app.core.database import get_db
+
+    app = create_app()
+
+    async def override_db():
+        yield _FakeAsyncSession()
+
+    app.dependency_overrides[get_db] = override_db
+    client = TestClient(app)
+
+    # Send plausible-looking svix headers — the handler must bail before Svix
+    # ever touches them, so their validity is irrelevant.
+    response = client.post(
+        "/api/v1/webhooks/clerk",
+        content=json.dumps({"type": "user.created", "data": {"id": "user_x"}}),
+        headers={
+            "Content-Type": "application/json",
+            "svix-id": "msg_any",
+            "svix-timestamp": "1234567890",
+            "svix-signature": "v1,anything",
+        },
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 503, response.text
+
+
 def test_user_created_skips_welcome_when_user_already_exists(
     webhook_app, webhook_client, monkeypatch
 ):
