@@ -122,7 +122,7 @@ async def _get_user_from_clerk_jwt(token: str, db: AsyncSession) -> User:
     from app.core.authorization import get_role_capabilities
 
     try:
-        claims = verify_clerk_jwt(token)
+        claims = await verify_clerk_jwt(token)
     except ClerkAuthError as e:
         raise ScholarAIException(
             code=ErrorCode.AUTH_TOKEN_EXPIRED,
