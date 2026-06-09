@@ -11,8 +11,6 @@ from app.core.database import get_db
 from app.core.security import decode_token, oauth2_scheme
 from app.models import User, UserRole
 from scholarai_common.errors import ScholarAIException, ErrorCode
-from app.core.rate_limit import redis_client
-import json
 
 
 logger = logging.getLogger(__name__)
@@ -31,18 +29,6 @@ async def _get_user_from_local_jwt(token: str, db: AsyncSession) -> User:
             message="Token payload missing subject",
             status_code=status.HTTP_401_UNAUTHORIZED
         )
-
-    cache_key = f"user_session:{user_id_raw}"
-    try:
-        cached_user_json = await redis_client.get(cache_key)
-        if cached_user_json:
-            user_data = json.loads(cached_user_json)
-            # Create a mock-like object that behaves like a User model for the auth guards
-            # In a full-blown system, you might use a Pydantic model here.
-            # For now, we'll re-verify against DB if not found or corrupted.
-            pass
-    except Exception:
-        pass # Fallback to DB if Redis is down
 
     try:
         user_id = uuid.UUID(str(user_id_raw))
@@ -125,13 +111,6 @@ async def _get_user_from_local_jwt(token: str, db: AsyncSession) -> User:
     setattr(user, "_token_capabilities", token_capabilities)
     setattr(user, "_token_policy_version", token_policy_version)
     setattr(user, "_token_institution_scope", token_institution_scope)
-
-    # Cache the user identity (minimal fields) for 5 minutes to reduce DB load
-    try:
-        minimal_user = {"id": str(user.id), "email": user.email, "role": user.role.value, "is_active": user.is_active}
-        await redis_client.setex(cache_key, 300, json.dumps(minimal_user))
-    except Exception:
-        pass
 
     return user
 
