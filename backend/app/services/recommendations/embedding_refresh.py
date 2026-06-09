@@ -209,14 +209,7 @@ class PublishedScholarshipEmbeddingRefresher:
         if self.embedder is None or OpenSearchHybridRetriever is None:
             return None
 
-        try:
-            return OpenSearchHybridRetriever()
-        except Exception:
-            logger.warning(
-                "OpenSearch retriever unavailable; scholarship refresh will skip index sync.",
-                exc_info=True,
-            )
-            return None
+        return OpenSearchHybridRetriever.build_if_configured()
 
     def _split_document(self, document_text: str) -> list[str]:
         if self.text_splitter is None:

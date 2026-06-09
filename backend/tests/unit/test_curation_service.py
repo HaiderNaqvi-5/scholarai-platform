@@ -176,3 +176,61 @@ async def test_curation_service_import_raw_record_creates_internal_raw_state():
     assert result.review_notes == "Imported for curator review"
     assert result.reviewed_by_user_id == str(actor_user_id)
     assert any(getattr(item, "action", "") == "curation.import_raw" for item in session.added)
+
+
+def test_curation_service_retriever_is_none_when_opensearch_host_unset(monkeypatch):
+    """When OPENSEARCH_HOST is unset, build_if_configured() returns None and
+    CurationService.retriever must be None (not raise AttributeError later)."""
+    import unittest.mock as mock
+
+    from app.services.curation import CurationService
+
+    with mock.patch(
+        "app.services.recommendations.hybrid_retriever.OpenSearchHybridRetriever.build_if_configured",
+        return_value=None,
+    ):
+        session = FakeSession()
+        service = CurationService(session)
+
+    assert service.retriever is None
+
+
+async def test_publish_and_unpublish_with_none_retriever_do_not_raise():
+    """publish_record and unpublish_record must succeed without raising
+    AttributeError when self.retriever is None (OPENSEARCH_HOST unset)."""
+    import unittest.mock as mock
+
+    from app.services.curation import CurationService
+
+    with mock.patch(
+        "app.services.recommendations.hybrid_retriever.OpenSearchHybridRetriever.build_if_configured",
+        return_value=None,
+    ):
+        session = FakeSession()
+        service = CurationService(session)
+
+    assert service.retriever is None
+
+    record = make_record(RecordState.VALIDATED)
+    actor_user = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, institution_id=None)
+
+    async def fake_load_record(_record_id, _actor_user):
+        return record
+
+    service._load_record = fake_load_record  # type: ignore[method-assign]
+
+    # publish must not raise
+    published = await service.publish_record(
+        record.id,
+        CurationActionRequest(note="ok"),
+        actor_user,
+    )
+    assert published.record_state == "published"
+
+    # unpublish must not raise
+    unpublished = await service.unpublish_record(
+        record.id,
+        CurationActionRequest(note="ok"),
+        actor_user,
+    )
+    assert unpublished.record_state == "validated"
