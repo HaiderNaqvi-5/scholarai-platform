@@ -28,7 +28,6 @@ def _scholarship(**kwargs) -> Scholarship:
         funding_type=None,
         funding_amount_min=None,
         funding_amount_max=None,
-        description_embedding=None,
         tier="standard",
     )
     defaults.update(kwargs)

@@ -782,7 +782,6 @@ class Scholarship(Base):
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    description_embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -881,17 +880,6 @@ class Scholarship(Base):
             "min_gpa_value",
             postgresql_where=text(
                 "record_state = 'published'::scholarship_record_state"
-            ),
-        ),
-        Index(
-            "ix_scholarships_description_embedding_published",
-            "description_embedding",
-            postgresql_using="ivfflat",
-            postgresql_with={"lists": 100},
-            postgresql_ops={"description_embedding": "vector_cosine_ops"},
-            postgresql_where=text(
-                "record_state = 'published'::scholarship_record_state "
-                "AND description_embedding IS NOT NULL"
             ),
         ),
     )

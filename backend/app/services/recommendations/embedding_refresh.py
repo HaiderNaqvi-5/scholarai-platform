@@ -172,7 +172,6 @@ class PublishedScholarshipEmbeddingRefresher:
         await self.db.flush()
 
         scholarship_embedding = self._encode_text(document_text)
-        scholarship.description_embedding = scholarship_embedding
         if scholarship_embedding is None or self.retriever is None:
             return
 
