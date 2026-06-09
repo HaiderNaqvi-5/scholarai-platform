@@ -409,8 +409,9 @@ def _compose_recommendation_score(
 
 
 def _distance_to_similarity(distance: float) -> float:
+    # pgvector cosine distance d = 1 - cos_sim, so similarity = 1 - d.
     clamped = max(0.0, min(distance, 2.0))
-    return round(1.0 - (clamped / 2.0), 4)
+    return round(max(0.0, 1.0 - clamped), 4)
 
 
 def _fit_band(score: float) -> str:

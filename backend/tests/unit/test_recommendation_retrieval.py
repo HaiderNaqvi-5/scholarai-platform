@@ -281,3 +281,11 @@ async def test_chunk_ann_best_chunk_ordering_against_real_pgvector(db_session):
     assert all(c.retrieval_source == "pgvector_chunk_similarity" for c in candidates)
     # near chunk distance < mid chunk distance -> higher similarity first.
     assert candidates[0].semantic_similarity > candidates[1].semantic_similarity
+
+
+def test_distance_to_similarity_correct_cosine_conversion():
+    # pgvector cosine distance d = 1 - cos_sim, so similarity = 1 - d (not 1 - d/2).
+    assert _distance_to_similarity(0.0) == 1.0   # identical vectors
+    assert _distance_to_similarity(1.0) == 0.0   # orthogonal (was wrongly 0.5 before fix)
+    assert _distance_to_similarity(2.0) == 0.0   # opposite direction, clamped floor
+    assert _distance_to_similarity(0.2) == 0.8

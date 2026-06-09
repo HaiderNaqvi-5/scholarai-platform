@@ -231,7 +231,7 @@ class PublishedScholarshipEmbeddingRefresher:
             return None
 
         try:
-            encoded = self.embedder.encode(text)
+            encoded = self.embedder.encode(text, normalize_embeddings=True)
         except Exception:
             logger.warning("Embedding generation failed for scholarship chunk.", exc_info=True)
             return None
