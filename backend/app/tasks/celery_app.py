@@ -31,6 +31,7 @@ celery_app = Celery(
         "app.tasks.reminder_tasks",
         "app.tasks.trial_tasks",
         "app.tasks.usage_ledger_tasks",
+        "app.tasks.graph_sync_tasks",
     ],
 )
 
