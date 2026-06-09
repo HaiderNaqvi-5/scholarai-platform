@@ -1,4 +1,5 @@
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -173,18 +174,24 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM_ADDRESS: str = ""
 
+    @property
+    def is_production(self) -> bool:
+        env = self.ENVIRONMENT.strip().lower()
+        return env.startswith("prod") or env in {"staging"}
+
     def validate_production_settings(self):
-        env_name = self.ENVIRONMENT.strip().lower()
-        if env_name not in {"production", "staging"}:
+        if not self.is_production:
             return
 
         if self.SECRET_KEY == "change-me-in-production-min-32-chars!!" or len(self.SECRET_KEY) < 32:
             raise RuntimeError("PROD_ERROR: SECRET_KEY must be overridden with a 32+ char value.")
         if self.NEO4J_PASSWORD == "password":
             raise RuntimeError("PROD_ERROR: NEO4J_PASSWORD must be overridden in production/staging.")
-        if "password" in self.DATABASE_URL and "@localhost" not in self.DATABASE_URL:
+        _WEAK_DB_PASSWORDS = {"password", "postgres", "changeme", "admin", "root", ""}
+        db_password = urlparse(self.DATABASE_URL).password or ""
+        if db_password.lower() in _WEAK_DB_PASSWORDS and "@localhost" not in self.DATABASE_URL:
             raise RuntimeError(
-                "PROD_ERROR: DATABASE_URL appears to use default password in production/staging."
+                "PROD_ERROR: DATABASE_URL appears to use a weak/default password in production/staging."
             )
         if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
             raise RuntimeError("PROD_ERROR: REDIS_URL must not point to localhost in production/staging.")
