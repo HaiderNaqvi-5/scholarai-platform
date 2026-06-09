@@ -262,6 +262,10 @@ class AuthService:
                 status_code=401,
             )
 
+        # Rotate: invalidate the presented refresh token by advancing the version.
+        user.auth_token_version += 1
+        await self.db.flush()
+
         capabilities = await self._resolve_capabilities(user)
         token_data = {
             "sub": str(user.id),
@@ -269,7 +273,7 @@ class AuthService:
             "capabilities": capabilities,
             "policy_version": "rbac.v1",
             "institution_scope": str(user.institution_id) if user.institution_id else None,
-            "token_version": user.auth_token_version,
+            "token_version": user.auth_token_version,   # new (rotated) version
         }
         return TokenResponse(
             access_token=create_access_token(token_data),

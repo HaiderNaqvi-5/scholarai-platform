@@ -225,6 +225,55 @@ async def test_auth_service_refresh_session_rejects_token_version_mismatch():
     assert session.execute_count == 1
 
 
+async def test_refresh_rotates_token_version():
+    """P2-12: refresh_session must increment auth_token_version so the OLD
+    refresh token is rejected on a second call (stolen-token scenario)."""
+    user = SimpleNamespace(
+        id="user-5",
+        email="student@example.com",
+        password_hash=hash_password("correct-password"),
+        role=UserRole.STUDENT,
+        is_active=True,
+        institution_id=None,
+        auth_token_version=7,  # arbitrary baseline N=7
+    )
+    # First refresh_session: user lookup (1) + 2 capability queries (2+3).
+    # Second refresh_session (old token, should 401): user lookup only (4).
+    session = FakeSession(
+        [
+            ScalarResult(one=user),       # first refresh: user lookup
+            ScalarResult(all_items=[]),   # first refresh: role capabilities
+            ScalarResult(all_items=[]),   # first refresh: user capabilities
+            ScalarResult(one=user),       # second refresh attempt: user lookup
+        ]
+    )
+    service = AuthService(session)
+
+    # Build a refresh token carrying the CURRENT version (N=7).
+    from app.core.security import create_refresh_token
+    old_refresh_token = create_refresh_token(
+        {"sub": str(user.id), "role": user.role.value, "token_version": 7}
+    )
+
+    # First call succeeds and rotates the version.
+    result = await service.refresh_session(old_refresh_token)
+    assert result.access_token
+    assert result.refresh_token
+
+    # Version was bumped in-memory.
+    assert user.auth_token_version == 8, (
+        f"Expected auth_token_version=8 after rotation, got {user.auth_token_version}"
+    )
+
+    # Second call with the SAME (now-stale) old token must be rejected.
+    import pytest
+    with pytest.raises(ScholarAIException) as caught:
+        await service.refresh_session(old_refresh_token)
+
+    assert caught.value.code == ErrorCode.AUTH_TOKEN_EXPIRED
+    assert caught.value.status_code == 401
+
+
 async def test_auth_service_logout_increments_token_version():
     user = SimpleNamespace(
         id="user-4",
