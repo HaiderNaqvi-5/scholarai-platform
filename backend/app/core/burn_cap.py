@@ -108,13 +108,22 @@ async def _reserved_micro(user_id) -> int:
 
     Fail-open: a Redis outage returns 0 so the burn-cap check degrades to
     the DB-only behavior rather than blocking everyone.
+
+    On Redis outage the reservation fails open; concurrent in-flight LLM calls
+    for one user may overshoot the cap by up to (concurrent_calls × per_call_cost).
+    Emits burn_cap.reservation_degraded so operators can detect degraded mode.
     """
     key = _RESERVE_KEY.format(user_id=user_id, period=_period())
     try:
         raw = await _redis_client.get(key)
         return int(raw) if raw is not None else 0
     except redis.RedisError as exc:
-        logger.warning("burn-cap reservation read failed for %s: %s", user_id, exc)
+        logger.warning(
+            "burn_cap.reservation_degraded user=%s error=%s — "
+            "reservation unavailable, failing open (overshoot bounded by concurrent in-flight calls)",
+            user_id,
+            exc,
+        )
         return 0
 
 
