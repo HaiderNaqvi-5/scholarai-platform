@@ -41,6 +41,20 @@ async def share_student_lead(
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found")
 
+    # P1-2 IDOR fix: target must belong to the caller's institution.
+    # A null institution_id on the caller means they are not scoped to any
+    # institution and therefore cannot share ANY student (platform/owner
+    # accounts must use an institution-scoped account for B2B sharing).
+    caller_institution = getattr(current_user, "institution_id", None)
+    if caller_institution is None or target.institution_id != caller_institution:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "cross_institution_share_forbidden",
+                "message": "Target student is not part of your institution.",
+            },
+        )
+
     service = B2BShareService(db)
     lead = await service.share_profile(
         target_user=target,
