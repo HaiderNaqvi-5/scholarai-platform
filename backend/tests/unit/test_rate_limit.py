@@ -137,3 +137,62 @@ async def test_fail_closed_raises_503_on_redis_error(monkeypatch):
     with pytest.raises(ScholarAIException) as exc:
         await limiter(_request("/x"))
     assert exc.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+# ---------------------------------------------------------------------------
+# P2-10 — high-cost / security limiter instances must fail CLOSED
+# ---------------------------------------------------------------------------
+
+async def test_recommendations_limiter_fails_closed_on_redis_outage(monkeypatch):
+    """The 20/hr recommendations limiter (LLM cost endpoint) must DENY, not allow,
+    when Redis is unavailable.  Encodes the fix for P2-10."""
+    fake = _FakeRedis()
+    fake.fail = True
+    monkeypatch.setattr(rate_limit, "redis_client", fake)
+    # Mirror the exact constructor call in routes/recommendations.py
+    limiter = RateLimiter(requests_limit=20, window_seconds=3_600, fail_open=False)
+    with pytest.raises(ScholarAIException) as exc:
+        await limiter(_request("/api/v1/recommendations"))
+    assert exc.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc.value.code == ErrorCode.VALIDATION_ERROR
+
+
+async def test_data_export_limiter_fails_closed_on_redis_outage(monkeypatch):
+    """The 3/day data-export limiter (PII-heavy endpoint) must DENY, not allow,
+    when Redis is unavailable.  Encodes the fix for P2-10."""
+    fake = _FakeRedis()
+    fake.fail = True
+    monkeypatch.setattr(rate_limit, "redis_client", fake)
+    # Mirror the exact constructor call in routes/privacy.py
+    limiter = RateLimiter(requests_limit=3, window_seconds=86_400, fail_open=False)
+    with pytest.raises(ScholarAIException) as exc:
+        await limiter(_request("/api/v1/privacy/data-export"))
+    assert exc.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc.value.code == ErrorCode.VALIDATION_ERROR
+
+
+async def test_fail_closed_logs_degraded_mode(monkeypatch, caplog):
+    """Fail-closed path must emit a warning so operators see degraded mode."""
+    import logging
+    fake = _FakeRedis()
+    fake.fail = True
+    monkeypatch.setattr(rate_limit, "redis_client", fake)
+    limiter = RateLimiter(requests_limit=5, window_seconds=60, fail_open=False)
+    with caplog.at_level(logging.WARNING, logger="app.core.rate_limit"):
+        with pytest.raises(ScholarAIException):
+            await limiter(_request("/api/v1/recommendations"))
+    assert any("fail_closed" in r.message for r in caplog.records)
+
+
+async def test_fail_open_logs_degraded_mode(monkeypatch, caplog):
+    """Fail-open path must also emit a warning (different tag) so low-risk
+    limiters still surface Redis outages in operator logs."""
+    import logging
+    fake = _FakeRedis()
+    fake.fail = True
+    monkeypatch.setattr(rate_limit, "redis_client", fake)
+    limiter = RateLimiter(requests_limit=5, window_seconds=60, fail_open=True)
+    with caplog.at_level(logging.WARNING, logger="app.core.rate_limit"):
+        result = await limiter(_request("/api/v1/auth/login"))
+    assert result is None  # still allowed
+    assert any("fail_open" in r.message for r in caplog.records)

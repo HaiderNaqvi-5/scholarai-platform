@@ -56,7 +56,7 @@ async def _attach_recommendation_subject(
     # H2: each call fans out to the LLM; cap at 20/hr per authenticated user.
     dependencies=[
         Depends(_attach_recommendation_subject),
-        Depends(RateLimiter(requests_limit=20, window_seconds=3_600)),
+        Depends(RateLimiter(requests_limit=20, window_seconds=3_600, fail_open=False)),
     ],
 )
 async def build_recommendations(

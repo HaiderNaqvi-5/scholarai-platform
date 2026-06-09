@@ -135,7 +135,7 @@ async def _attach_privacy_subject(
     # H2: exports are synchronous + PII-heavy; cap abuse at 3/day per authenticated user.
     dependencies=[
         Depends(_attach_privacy_subject),
-        Depends(RateLimiter(requests_limit=3, window_seconds=86_400)),
+        Depends(RateLimiter(requests_limit=3, window_seconds=86_400, fail_open=False)),
     ],
 )
 async def request_data_export(

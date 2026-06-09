@@ -63,9 +63,14 @@ class RateLimiter:
                 _INCR_WITH_EXPIRE_LUA, 1, key, self.window_seconds
             )
         except redis.RedisError as exc:
-            logger.warning("Rate limiter unavailable for %s: %s", request.url.path, exc)
             if self.fail_open:
+                logger.warning("rate_limit.redis_unavailable_fail_open path=%s: %s", request.url.path, exc)
                 return
+            logger.warning(
+                "rate_limit.redis_unavailable_fail_closed path=%s — denying request (degraded mode): %s",
+                request.url.path,
+                exc,
+            )
             raise ScholarAIException(
                 code=ErrorCode.VALIDATION_ERROR,
                 message="Rate limiter is temporarily unavailable. Please retry shortly.",
