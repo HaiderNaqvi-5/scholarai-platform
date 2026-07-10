@@ -46,6 +46,31 @@ def _fake_httpx(json_payload: dict, *, raise_exc: Exception | None = None) -> Ma
     return factory
 
 
+def test_client_ip_ignores_xff_when_trusted_proxy_hops_zero(monkeypatch):
+    """TRUSTED_PROXY_HOPS=0 -> spoofed X-Forwarded-For is ignored; socket peer
+    (request.client.host) wins. Mirrors rate_limit.py:_client_ip gating."""
+    from app.api.v1.routes.geo import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 0)
+    request = MagicMock()
+    request.headers = {"x-forwarded-for": "203.0.113.42"}
+    request.client = MagicMock(host="10.0.0.5")
+    assert _client_ip(request) == "10.0.0.5"
+
+
+def test_client_ip_honors_xff_when_trusted_proxy_hops_positive(monkeypatch):
+    """TRUSTED_PROXY_HOPS>0 -> left-most X-Forwarded-For entry is trusted."""
+    from app.api.v1.routes.geo import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+    request = MagicMock()
+    request.headers = {"x-forwarded-for": "203.0.113.42, 10.0.0.1"}
+    request.client = MagicMock(host="10.0.0.5")
+    assert _client_ip(request) == "203.0.113.42"
+
+
 def test_geo_currency_missing_ip_returns_null(client):
     """No X-Forwarded-For, no client host -> currency=null, country=null.
     Frontend will then map via defaultCurrencyForCountry (-> PKR for null cc).
