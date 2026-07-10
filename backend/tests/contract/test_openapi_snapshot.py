@@ -30,11 +30,20 @@ def _current_schema_json() -> str:
     return json.dumps(schema, sort_keys=True, indent=2) + "\n"
 
 
+def _normalize_newlines(text: str) -> str:
+    # Line-ending-agnostic: git checkout (core.autocrlf) can hand us CRLF on
+    # Windows even though the schema content is unchanged. Compare on content,
+    # not on-disk line endings.
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def test_openapi_schema_matches_snapshot():
-    current = _current_schema_json()
+    current = _normalize_newlines(_current_schema_json())
 
     if os.environ.get("UPDATE_OPENAPI_SNAPSHOT") == "1":
-        SNAPSHOT_PATH.write_text(current, encoding="utf-8")
+        # newline="\n" pins the regenerated snapshot to LF on disk regardless
+        # of platform, so it stays byte-stable across OSes/checkouts.
+        SNAPSHOT_PATH.write_text(current, encoding="utf-8", newline="\n")
         return
 
     assert SNAPSHOT_PATH.exists(), (
@@ -42,7 +51,11 @@ def test_openapi_schema_matches_snapshot():
         f"  UPDATE_OPENAPI_SNAPSHOT=1 python -m pytest {__file__} -q"
     )
 
-    snapshot = SNAPSHOT_PATH.read_text(encoding="utf-8")
+    # newline="" disables universal-newline translation so we normalize
+    # explicitly ourselves instead of relying on implicit platform behavior.
+    snapshot = _normalize_newlines(
+        SNAPSHOT_PATH.read_text(encoding="utf-8", newline="")
+    )
     assert current == snapshot, (
         "OpenAPI schema drifted from the checked-in snapshot "
         f"({SNAPSHOT_PATH}). This means the backend API contract changed.\n"
