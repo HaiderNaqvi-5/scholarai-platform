@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     USAGE_LEDGER_ROLLUP_CRON_HOUR: int = 3
     USAGE_LEDGER_ROLLUP_CRON_MINUTE: int = 45
 
+    EXPORT_CLEANUP_ENABLED: bool = True
+    EXPORT_CLEANUP_CRON_HOUR: int = 4
+    EXPORT_CLEANUP_CRON_MINUTE: int = 15
+
     DATABASE_URL: str = (
         "postgresql+asyncpg://scholarai:password@localhost:5432/scholarai"
     )

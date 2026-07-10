@@ -32,6 +32,7 @@ celery_app = Celery(
         "app.tasks.trial_tasks",
         "app.tasks.usage_ledger_tasks",
         "app.tasks.graph_sync_tasks",
+        "app.tasks.export_cleanup_tasks",
     ],
 )
 
@@ -97,5 +98,14 @@ if settings.USAGE_LEDGER_ROLLUP_ENABLED:
         "schedule": crontab(
             hour=settings.USAGE_LEDGER_ROLLUP_CRON_HOUR,
             minute=settings.USAGE_LEDGER_ROLLUP_CRON_MINUTE,
+        ),
+    }
+
+if settings.EXPORT_CLEANUP_ENABLED:
+    celery_app.conf.beat_schedule["export-bundle-cleanup"] = {
+        "task": "tasks.run_export_cleanup",
+        "schedule": crontab(
+            hour=settings.EXPORT_CLEANUP_CRON_HOUR,
+            minute=settings.EXPORT_CLEANUP_CRON_MINUTE,
         ),
     }

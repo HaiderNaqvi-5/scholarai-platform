@@ -39,6 +39,34 @@ EXPORT_ROOT = Path(__file__).resolve().parents[3] / "runtime" / "exports"
 EXPORT_TTL = timedelta(days=7)
 
 
+def cleanup_expired_exports(root: Path | None = None) -> int:
+    """Delete on-disk export bundles older than ``EXPORT_TTL``.
+
+    Filesystem-only reaper for ``EXPORT_ROOT`` — called by the daily Celery
+    beat task. Independent of (and does not touch) the download-time TTL
+    check on ``DataExportRequest.expires_at``; this just stops expired zip
+    bundles from accumulating on disk after the DB already considers them
+    expired. Only touches files matching the ``bundle_path`` naming
+    convention (``export-<uuid>.zip``), never unrelated files in the dir.
+
+    Returns the number of bundles removed.
+    """
+    target = root or EXPORT_ROOT
+    if not target.exists():
+        return 0
+
+    now = datetime.now(timezone.utc)
+    removed = 0
+    for path in target.glob("export-*.zip"):
+        if not path.is_file():
+            continue
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        if now - mtime > EXPORT_TTL:
+            path.unlink()
+            removed += 1
+    return removed
+
+
 class ExportService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
