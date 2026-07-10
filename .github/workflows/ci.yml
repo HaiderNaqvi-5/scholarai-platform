@@ -299,4 +299,4 @@ jobs:
           alembic check
 
       - name: Run DB-backed integration tests
-        run: pytest backend/tests/integration -q
+        run: pytest backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts -q
