@@ -43,6 +43,9 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_default_queue="default",
+    # Celery 6 flips this default to False, which turns a broker hiccup at
+    # worker/beat boot into a hard crash instead of a retry loop.
+    broker_connection_retry_on_startup=True,
 )
 
 # Upstash exposes TLS-only ``rediss://`` endpoints; wire explicit SSL options so
