@@ -294,6 +294,7 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
         return {}
     match = _JSON_OBJECT_RE.search(raw)
     if not match:
+        logger.warning("anthropic.json_parse_failed raw_prefix=%s", raw[:200])
         return {}
     try:
         return json.loads(match.group(0))
