@@ -89,3 +89,73 @@ def test_recommendation_benchmark_not_found_returns_404(app, client):
         assert "not found" in response.json()["error"]["message"].lower()
     finally:
         app.dependency_overrides.clear()
+
+
+def test_recommendation_benchmark_vacuous_thresholds_do_not_inflate_pass_rate(app, client, monkeypatch):
+    """P2-18 followup: a dataset whose thresholds are all-None (nothing
+    configured to check) must not report cases as passed -- pass_count/
+    pass_rate must reflect 0 checked-and-passed cases, and each case's
+    kpi_passed must be None (unknown), never True."""
+    from app.schemas.recommendations import RecommendationBenchmarkDataset
+
+    vacuous_dataset = RecommendationBenchmarkDataset.model_validate(
+        {
+            "dataset_id": "vacuous-thresholds",
+            "version": "v1",
+            "title": "Vacuous thresholds fixture",
+            "k_values": [5],
+            "thresholds": [{"k": 5}],
+            "baseline_metrics": [],
+            "cases": [
+                {
+                    "case_id": "case-1",
+                    "predicted_ids": ["a", "b", "c"],
+                    "judged_relevance": {"a": 1, "b": 0, "c": 1},
+                },
+                {
+                    "case_id": "case-2",
+                    "predicted_ids": ["x", "y"],
+                    "judged_relevance": {"x": 1, "y": 1},
+                },
+            ],
+        }
+    )
+
+    class _FakeRegistry:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_dataset(self, dataset_id):
+            assert dataset_id == "vacuous-thresholds"
+            return vacuous_dataset
+
+    monkeypatch.setattr(
+        "app.api.v1.routes.recommendations.RecommendationBenchmarkRegistry",
+        _FakeRegistry,
+    )
+
+    async def override_current_user():
+        return _DummyCurrentUser()
+
+    async def override_db():
+        yield _NoOpDB()
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        response = client.post(
+            "/api/v1/recommendations/benchmarks/vacuous-thresholds/evaluate",
+            headers={"Authorization": "Bearer fake"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["aggregate"]["case_count"] == 2
+        assert payload["aggregate"]["pass_count"] == 0
+        assert payload["aggregate"]["pass_rate"] == 0.0
+        assert len(payload["case_results"]) == 2
+        for case in payload["case_results"]:
+            assert case["kpi_gates"] == []
+            assert case["kpi_passed"] is None
+    finally:
+        app.dependency_overrides.clear()
