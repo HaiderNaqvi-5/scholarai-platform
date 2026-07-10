@@ -5,7 +5,6 @@ Provides aggregate platform metrics for the admin dashboard:
 user counts, scholarship stats, application statuses, and recent ingestion health.
 """
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -24,7 +23,11 @@ from app.models import (
     User,
     UserRole,
 )
-from app.schemas.analytics import PlatformAnalyticsResponse
+from app.schemas.analytics import (
+    PlatformAnalyticsResponse,
+    UsageLedgerResetRequest,
+    UsageLedgerResetResponse,
+)
 from app.services.kpi_snapshot_service import KPISnapshotService
 
 router = APIRouter()
@@ -127,16 +130,18 @@ async def get_platform_analytics(
     )
 
 
-@router.post("/usage-ledger/reset")
+@router.post("/usage-ledger/reset", response_model=UsageLedgerResetResponse)
 async def reset_usage_ledger(
-    user_id: UUID,
+    payload: UsageLedgerResetRequest,
     current_user: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, object]:
+) -> UsageLedgerResetResponse:
     """Admin: clear a user's current-period burn-cap spend (escape hatch)."""
     del current_user
     from app.services.usage import UsageLedgerMaintenanceService
 
-    deleted = await UsageLedgerMaintenanceService(db).reset_user(user_id)
+    deleted = await UsageLedgerMaintenanceService(db).reset_user(payload.user_id)
     await db.commit()
-    return {"status": "reset", "user_id": str(user_id), "rows_deleted": deleted}
+    return UsageLedgerResetResponse(
+        status="reset", user_id=payload.user_id, rows_deleted=deleted
+    )
