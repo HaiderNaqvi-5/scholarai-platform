@@ -12,6 +12,7 @@ from app.models.models import (
     RoleCapability,
     Scholarship,
     ScholarshipChunk,
+    ReferralEnrollment,
     ScholarshipRequirement,
     UniversityLead,
 )
@@ -48,3 +49,13 @@ def test_all_listed_fks_have_a_single_column_index():
             assert col in single_col_indexed, (
                 f"{table.name}.{col} has no single-column index"
             )
+
+
+def test_referral_enrollment_university_fk():
+    """P2-8: ReferralEnrollment.university_id must have a ForeignKey + index."""
+    col = ReferralEnrollment.__table__.c.university_id
+    assert col.foreign_keys, "university_id must have a ForeignKey"
+    assert any(
+        "university_id" in tuple(c.name for c in ix.columns)
+        for ix in ReferralEnrollment.__table__.indexes
+    ), "university_id must be covered by an index"
