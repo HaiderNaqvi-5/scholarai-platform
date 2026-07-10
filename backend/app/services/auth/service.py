@@ -166,6 +166,9 @@ class AuthService:
             except Exception:
                 # Consent capture is best-effort at signup; the gated routes
                 # will re-prompt if the audit row is missing.
+                logger.warning(
+                    "auth.signup_consent_capture_failed type=%s", consent_type
+                )
                 continue
 
         if getattr(payload, "marketing_consent", False):
@@ -178,7 +181,9 @@ class AuthService:
                     granted=True,
                 )
             except Exception:
-                pass
+                logger.warning(
+                    "auth.signup_consent_capture_failed type=%s", "marketing"
+                )
 
     async def login(self, payload: UserLogin) -> TokenResponse:
         # S8 — Account lockout gate. Checked before any DB / hash work so a

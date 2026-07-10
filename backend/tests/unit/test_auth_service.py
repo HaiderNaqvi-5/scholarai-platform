@@ -467,3 +467,32 @@ async def test_register_without_invite_code_leaves_plan_free():
     assert user.plan is None or user.plan == "free"
     assert user.plan_expires_at is None
     assert user.redeemed_invite_code is None
+
+
+async def test_register_logs_warning_when_consent_capture_fails(monkeypatch, caplog):
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr("app.core.consent.record_consent", _boom)
+
+    session = FakeSession([ScalarResult(one=None)])
+    service = AuthService(session)
+
+    with caplog.at_level("WARNING"):
+        user = await service.register(
+            UserCreate(
+                email="consent-fail@x.com",
+                password="Strongpass1!",
+                full_name="Consent Fail",
+                terms_version="1.0",
+                privacy_version="1.0",
+                accepted=True,
+            )
+        )
+
+    # Signup must still succeed even though consent capture failed.
+    assert user is not None
+
+    warning_messages = [r.message for r in caplog.records if r.levelname == "WARNING"]
+    assert any("terms" in m for m in warning_messages)
+    assert any("privacy" in m for m in warning_messages)
