@@ -8960,8 +8960,8 @@
   },
   "info": {
     "description": "ScholarAI modular monolith MVP foundation",
-    "title": "AidWiseAI",
-    "version": "0.1.0"
+    "title": "<normalized-app-title>",
+    "version": "<normalized-app-version>"
   },
   "openapi": "3.1.0",
   "paths": {

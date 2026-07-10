@@ -14,6 +14,7 @@ commit the regenerated backend/tests/contract/openapi.snapshot.json.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 from pathlib import Path
@@ -22,10 +23,29 @@ from app.main import create_app
 
 SNAPSHOT_PATH = Path(__file__).parent / "openapi.snapshot.json"
 
+# info.title/info.version are read from Settings (APP_NAME/APP_VERSION),
+# which pydantic BaseSettings loads from backend/.env when cwd is backend/.
+# That makes them differ between "pytest from repo root" (.env not loaded,
+# config.py defaults win) and "pytest from backend/" (.env loaded) even
+# though the actual API contract (paths + components) hasn't changed. Pin
+# them to fixed placeholders so the snapshot gate only detects real drift.
+_NORMALIZED_TITLE = "<normalized-app-title>"
+_NORMALIZED_VERSION = "<normalized-app-version>"
+
+
+def _normalize_schema(schema: dict) -> dict:
+    schema = copy.deepcopy(schema)
+    info = schema.get("info", {})
+    if "title" in info:
+        info["title"] = _NORMALIZED_TITLE
+    if "version" in info:
+        info["version"] = _NORMALIZED_VERSION
+    return schema
+
 
 def _current_schema_json() -> str:
     app = create_app()
-    schema = app.openapi()
+    schema = _normalize_schema(app.openapi())
     # sort_keys + fixed indent => deterministic byte-for-byte output across runs.
     return json.dumps(schema, sort_keys=True, indent=2) + "\n"
 
