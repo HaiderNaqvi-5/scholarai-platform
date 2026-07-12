@@ -61,9 +61,11 @@ def test_openapi_schema_matches_snapshot():
     current = _normalize_newlines(_current_schema_json())
 
     if os.environ.get("UPDATE_OPENAPI_SNAPSHOT") == "1":
-        # newline="\n" pins the regenerated snapshot to LF on disk regardless
-        # of platform, so it stays byte-stable across OSes/checkouts.
-        SNAPSHOT_PATH.write_text(current, encoding="utf-8", newline="\n")
+        # write_bytes pins the regenerated snapshot to LF on disk regardless of
+        # platform (no universal-newline translation), so it stays byte-stable
+        # across OSes/checkouts. (Path.read_text/write_text gained newline= only
+        # in Python 3.13; CI runs 3.12, so avoid that kwarg.)
+        SNAPSHOT_PATH.write_bytes(current.encode("utf-8"))
         return
 
     assert SNAPSHOT_PATH.exists(), (
@@ -71,11 +73,9 @@ def test_openapi_schema_matches_snapshot():
         f"  UPDATE_OPENAPI_SNAPSHOT=1 python -m pytest {__file__} -q"
     )
 
-    # newline="" disables universal-newline translation so we normalize
-    # explicitly ourselves instead of relying on implicit platform behavior.
-    snapshot = _normalize_newlines(
-        SNAPSHOT_PATH.read_text(encoding="utf-8", newline="")
-    )
+    # _normalize_newlines collapses any CRLF a checkout introduced, so a plain
+    # read is enough (Path.read_text newline= is Python 3.13+, CI runs 3.12).
+    snapshot = _normalize_newlines(SNAPSHOT_PATH.read_text(encoding="utf-8"))
     assert current == snapshot, (
         "OpenAPI schema drifted from the checked-in snapshot "
         f"({SNAPSHOT_PATH}). This means the backend API contract changed.\n"

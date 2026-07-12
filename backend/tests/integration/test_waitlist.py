@@ -58,7 +58,7 @@ class _StubResult:
     def __init__(self, row):
         self._row = row
 
-    def scalar_one(self):
+    def one(self):
         return self._row
 
 

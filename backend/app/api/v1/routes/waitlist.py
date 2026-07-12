@@ -151,22 +151,26 @@ async def join_waitlist(
             index_elements=["email"],
             set_={"plan": payload.plan, "currency": payload.currency, "country": payload.country},
         )
-        .returning(Waitlist)
+        .returning(Waitlist.id, Waitlist.created_at)
     )
     result = await db.execute(stmt)
-    row = result.scalar_one()
+    # Read only DB-generated columns from RETURNING. plan/currency/email equal
+    # the payload (the upsert sets them), and reading a RETURNING *entity* would
+    # hand back a stale identity-map object on a duplicate join (plan not
+    # refreshed) — so build the response from payload + generated id/created_at.
+    row = result.one()
     await db.commit()
 
     send_templated_email_best_effort(
-        to=row.email,
+        to=payload.email,
         template="waitlist_confirmation",
-        context={"plan": row.plan, "currency": row.currency},
+        context={"plan": payload.plan, "currency": payload.currency},
         source="waitlist",
     )
     return WaitlistJoinResponse(
         id=row.id,
-        email=row.email,
-        plan=row.plan,
-        currency=row.currency,
+        email=payload.email,
+        plan=payload.plan,
+        currency=payload.currency,
         created_at=row.created_at,
     )
