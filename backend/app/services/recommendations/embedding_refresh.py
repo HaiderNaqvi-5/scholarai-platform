@@ -172,7 +172,6 @@ class PublishedScholarshipEmbeddingRefresher:
         await self.db.flush()
 
         scholarship_embedding = self._encode_text(document_text)
-        scholarship.description_embedding = scholarship_embedding
         if scholarship_embedding is None or self.retriever is None:
             return
 
@@ -210,14 +209,7 @@ class PublishedScholarshipEmbeddingRefresher:
         if self.embedder is None or OpenSearchHybridRetriever is None:
             return None
 
-        try:
-            return OpenSearchHybridRetriever()
-        except Exception:
-            logger.warning(
-                "OpenSearch retriever unavailable; scholarship refresh will skip index sync.",
-                exc_info=True,
-            )
-            return None
+        return OpenSearchHybridRetriever.build_if_configured()
 
     def _split_document(self, document_text: str) -> list[str]:
         if self.text_splitter is None:
@@ -231,7 +223,7 @@ class PublishedScholarshipEmbeddingRefresher:
             return None
 
         try:
-            encoded = self.embedder.encode(text)
+            encoded = self.embedder.encode(text, normalize_embeddings=True)
         except Exception:
             logger.warning("Embedding generation failed for scholarship chunk.", exc_info=True)
             return None

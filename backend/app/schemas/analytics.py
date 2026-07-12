@@ -1,4 +1,6 @@
 """Pydantic schemas for admin analytics dashboard."""
+import uuid
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -29,3 +31,17 @@ class KPISnapshotTrendItem(BaseModel):
     passed_snapshots: int = Field(ge=0)
     failed_snapshots: int = Field(ge=0)
     pass_rate: float = Field(ge=0.0, le=1.0)
+
+
+class UsageLedgerResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: uuid.UUID
+
+
+class UsageLedgerResetResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    user_id: uuid.UUID
+    rows_deleted: int

@@ -131,27 +131,6 @@ def field_alignment_score(target_field: str, field_tags: list[str]) -> float:
     return round(min(best_overlap, 1.0), 4)
 
 
-def scholarship_in_scope(scholarship: Scholarship) -> tuple[bool, str, float]:
-    haystack = " ".join(
-        [
-            getattr(scholarship, "title", "") or "",
-            getattr(scholarship, "provider_name", "") or "",
-            getattr(scholarship, "source_url", "") or "",
-            getattr(scholarship, "summary", "") or "",
-        ]
-    ).lower()
-
-    if "daad" in haystack:
-        return False, "DAAD records remain deferred in Phase 1.", 0.0
-
-    if getattr(scholarship, "country_code", "").upper() == "CA":
-        return True, "Canada remains the primary recommendation market in Phase 1.", 1.0
-
-    if getattr(scholarship, "country_code", "").upper() == "US" and "fulbright" in haystack:
-        return True, "US scope is limited to Fulbright-adjacent records while Canada stays first.", 0.82
-
-    return False, "Phase 1 scope keeps non-Canada records deferred unless they are Fulbright-related.", 0.0
-
 
 def deadline_urgency_score(deadline_at: datetime | None, *, now: datetime | None = None) -> float:
     if deadline_at is None:
@@ -199,22 +178,11 @@ def evaluate_match(
     if not published:
         return None
 
-    scope_allowed, scope_reason, country_alignment = scholarship_in_scope(scholarship)
-    rule_results.append(
-        EligibilityRuleResult(
-            key="phase_scope",
-            label="Phase 1 market scope",
-            status="pass" if scope_allowed else "fail",
-            hard=True,
-            student_value=profile.target_country_code.upper(),
-            scholarship_value=scholarship.country_code.upper(),
-            score=country_alignment,
-            reason=scope_reason,
-        )
-    )
-    if not scope_allowed:
-        return None
-    matched_criteria.append(scope_reason)
+    # The country_target hard rule below is the authoritative gate (returns None
+    # on mismatch). Country alignment is full when the destination matches the
+    # student's target country. No separate Phase-1 Canada-first scope gate.
+    # country_alignment is 1.0 because every survivor past the country_target hard gate is an exact target-country match; partial/regional proximity scoring is not implemented.
+    country_alignment = 1.0
 
     country_matches = scholarship.country_code.upper() == profile.target_country_code.upper()
     rule_results.append(

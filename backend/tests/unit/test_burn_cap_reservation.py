@@ -133,3 +133,35 @@ async def test_redis_outage_fails_open(monkeypatch):
     assert await burn_cap.reserve_burn(user, Decimal("10")) == 0
     await burn_cap.release_reservation(user, Decimal("10"))
     await burn_cap.assert_within_burn_cap(db, user, Decimal("5"))
+
+
+async def test_reserved_micro_emits_degraded_alert_on_redis_error(
+    monkeypatch, caplog
+):
+    """P2-9: _reserved_micro must return 0 AND emit burn_cap.reservation_degraded
+    at WARNING so operators can detect Redis-outage degraded mode."""
+    import logging
+
+    import redis.asyncio as redis
+
+    class _BrokenRedis:
+        async def get(self, *_a, **_k):
+            raise redis.RedisError("connection refused")
+
+    monkeypatch.setattr(burn_cap, "_redis_client", _BrokenRedis())
+
+    with caplog.at_level(logging.WARNING, logger="app.core.burn_cap"):
+        result = await burn_cap._reserved_micro("user-42")
+
+    # Fail-open semantics unchanged: must still return 0.
+    assert result == 0
+
+    # Distinct alert key must appear in the log record so operators can grep/alert on it.
+    degraded_records = [
+        r for r in caplog.records if "burn_cap.reservation_degraded" in r.message
+    ]
+    assert degraded_records, (
+        "Expected a WARNING log containing 'burn_cap.reservation_degraded' "
+        "but none was emitted"
+    )
+    assert degraded_records[0].levelno == logging.WARNING

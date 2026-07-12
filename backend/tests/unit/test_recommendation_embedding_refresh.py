@@ -65,7 +65,7 @@ class FakeSplitter:
 
 
 class FakeEmbedder:
-    def encode(self, text):
+    def encode(self, text, **kwargs):
         return [float(len(text))]
 
 
@@ -380,3 +380,30 @@ async def test_refresh_acquires_lock_runs_then_releases(monkeypatch):
     ]
     # Lock released after a successful run so the next admin enqueue can proceed.
     assert events["deleted"] == [recommendation_tasks._EMBEDDING_REFRESH_LOCK_KEY]
+
+
+async def test_encode_text_passes_normalize_embeddings_true():
+    """_encode_text must pass normalize_embeddings=True to match the query-side normalization."""
+    encode_kwargs = {}
+
+    class RecordingEmbedder:
+        def encode(self, text, **kwargs):
+            encode_kwargs.update(kwargs)
+            return [1.0]
+
+    scholarship = make_scholarship()
+    session = FakeSession([scholarship])
+
+    refresher = PublishedScholarshipEmbeddingRefresher(
+        session,
+        text_splitter=FakeSplitter(["chunk one"]),
+        embedder=RecordingEmbedder(),
+        retriever=FakeRetriever(),
+    )
+
+    await refresher.refresh_published_scholarships()
+
+    assert encode_kwargs.get("normalize_embeddings") is True, (
+        "encode() must receive normalize_embeddings=True so document embeddings "
+        "live in the same space as L2-normalized query embeddings"
+    )

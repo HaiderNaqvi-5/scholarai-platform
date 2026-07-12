@@ -72,13 +72,17 @@ async def list_pending_reviews(
 ) -> DocumentListResponse:
     """Return all student documents awaiting mentor review."""
     candidate_limit = min(limit * 4, 400)
-    result = await db.execute(
+    scope_clause = _mentor_scope_clause(current_user)
+    stmt = (
         select(DocumentRecord)
         .where(DocumentRecord.processing_status == DocumentProcessingStatus.COMPLETED)
         .options(selectinload(DocumentRecord.feedback_entries))
         .order_by(DocumentRecord.created_at.desc())
-        .limit(candidate_limit)
     )
+    if scope_clause is not None:
+        stmt = stmt.where(scope_clause)
+    stmt = stmt.limit(candidate_limit)
+    result = await db.execute(stmt)
     candidate_documents = result.scalars().all()
 
     items: list[DocumentRecordSummary] = []

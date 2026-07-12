@@ -48,9 +48,11 @@ async def grant_consent(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ConsentStateResponse:
-    doc = await get_current_legal_doc(db, payload.consent_type) if payload.consent_type in {
-        "terms", "privacy", "cookies", "dpa", "refund", "aup"
-    } else None
+    doc = (
+        await get_current_legal_doc(db, payload.consent_type)
+        if payload.consent_type in ALLOWED_CONSENT_TYPES
+        else None
+    )
     document_sha256 = doc.sha256_hash if doc else None
     await record_consent(
         db,
@@ -135,7 +137,7 @@ async def _attach_privacy_subject(
     # H2: exports are synchronous + PII-heavy; cap abuse at 3/day per authenticated user.
     dependencies=[
         Depends(_attach_privacy_subject),
-        Depends(RateLimiter(requests_limit=3, window_seconds=86_400)),
+        Depends(RateLimiter(requests_limit=3, window_seconds=86_400, fail_open=False)),
     ],
 )
 async def request_data_export(

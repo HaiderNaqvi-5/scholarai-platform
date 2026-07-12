@@ -18,6 +18,7 @@ from app.api.v1 import router as api_v1_router
 from app.api.v2 import router as api_v2_router
 from app.core.config import settings
 from app.core.database import async_session_factory
+from app.core.rate_limit import redis_client
 from app.demo import seed_demo_data_if_enabled
 from app.schemas import ErrorDetail, ErrorEnvelope, HealthResponse
 from scholarai_common.errors import ScholarAIException
@@ -240,13 +241,21 @@ def create_app() -> FastAPI:
 
     @app.get("/readyz", tags=["system"])
     async def readiness_probe() -> Response:
-        # Readiness gate: DB reachable. No analytics. Safe for load-balancer probes.
+        # Readiness gate: DB + Redis reachable. No analytics. Safe for
+        # load-balancer probes — LBs gate on the HTTP status code, not a
+        # body field, so any dependency failure must return a real 503.
         try:
             async with async_session_factory() as db:
                 await db.execute(text("SELECT 1"))
-            return JSONResponse({"status": "ready"}, status_code=200)
         except Exception:
-            return JSONResponse({"status": "not_ready"}, status_code=503)
+            return JSONResponse({"status": "not_ready", "reason": "db"}, status_code=503)
+
+        try:
+            await redis_client.ping()
+        except Exception:
+            return JSONResponse({"status": "not_ready", "reason": "redis"}, status_code=503)
+
+        return JSONResponse({"status": "ready"}, status_code=200)
 
     @app.get("/health", tags=["system"], response_model=HealthResponse)
     async def health_check() -> HealthResponse:

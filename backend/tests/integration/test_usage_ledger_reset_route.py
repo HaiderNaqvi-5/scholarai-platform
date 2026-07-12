@@ -44,7 +44,8 @@ def test_usage_ledger_reset_requires_admin(app, client):
     app.dependency_overrides[get_db] = override_db
     target = uuid4()
     response = client.post(
-        f"/api/v1/analytics/usage-ledger/reset?user_id={target}",
+        "/api/v1/analytics/usage-ledger/reset",
+        json={"user_id": str(target)},
         headers={"Authorization": "Bearer fake"},
     )
     app.dependency_overrides.clear()
@@ -67,7 +68,8 @@ def test_usage_ledger_reset_admin_clears_period(app, client):
     app.dependency_overrides[get_db] = override_db
     target = uuid4()
     response = client.post(
-        f"/api/v1/analytics/usage-ledger/reset?user_id={target}",
+        "/api/v1/analytics/usage-ledger/reset",
+        json={"user_id": str(target)},
         headers={"Authorization": "Bearer fake"},
     )
     app.dependency_overrides.clear()
@@ -76,3 +78,24 @@ def test_usage_ledger_reset_admin_clears_period(app, client):
     assert body["status"] == "reset"
     assert body["rows_deleted"] == 4
     assert fake_db.committed is True
+
+
+def test_usage_ledger_reset_rejects_query_param_only(app, client):
+    async def override_current_user():
+        return SimpleNamespace(
+            id=uuid4(), role=UserRole.ADMIN, is_active=True,
+            _token_capabilities=set(),
+        )
+
+    async def override_db():
+        yield _FakeDB()
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    target = uuid4()
+    response = client.post(
+        f"/api/v1/analytics/usage-ledger/reset?user_id={target}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+    assert response.status_code == 422

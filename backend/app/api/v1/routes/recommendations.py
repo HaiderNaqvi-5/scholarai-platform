@@ -56,7 +56,7 @@ async def _attach_recommendation_subject(
     # H2: each call fans out to the LLM; cap at 20/hr per authenticated user.
     dependencies=[
         Depends(_attach_recommendation_subject),
-        Depends(RateLimiter(requests_limit=20, window_seconds=3_600)),
+        Depends(RateLimiter(requests_limit=20, window_seconds=3_600, fail_open=False)),
     ],
 )
 async def build_recommendations(
@@ -79,9 +79,9 @@ async def build_recommendations(
         items=items,
         total=len(items),
         meta=RecommendationResponseMeta(
-            scope_policy="canada_first",
-            allowed_country_codes=["CA"],
-            exception_policy="US_fulbright_only",
+            scope_policy="target_country",
+            allowed_country_codes=[profile.target_country_code.upper()],
+            exception_policy="",
             pipeline_version="recommendations.phase1.v1",
         ),
     )
@@ -141,7 +141,10 @@ async def evaluate_recommendations(
         baseline_metrics=baseline_metric_results,
     )
 
-    kpi_passed = all(gate.all_passed for gate in kpi_gates) if threshold_models else None
+    # Empty kpi_gates means every submitted threshold was all-None (nothing
+    # to check) -- that is unknown, not a pass. Gate on kpi_gates, not
+    # threshold_models (which is never empty: falls back to defaults).
+    kpi_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else None
     policy_version = get_recommendation_kpi_policy_version()
 
     if kpi_passed is not None:
@@ -311,7 +314,11 @@ async def evaluate_recommendation_benchmark(
             thresholds=threshold_models,
             baseline_metrics=baseline_metrics,
         )
-        case_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else True
+        # Same reasoning as kpi_passed above: an empty kpi_gates means this
+        # case had nothing to check, so it is unknown, not a pass -- None keeps
+        # it falsy for `if case_passed: pass_count += 1` without wrongly
+        # asserting failure.
+        case_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else None
         if case_passed:
             pass_count += 1
         for gate in kpi_gates:

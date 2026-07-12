@@ -376,6 +376,8 @@ class RoleCapability(Base):
 
     capability: Mapped["Capability"] = relationship("Capability", back_populates="role_assignments")
 
+    __table_args__ = (Index("ix_role_capabilities_granted_by", "granted_by"),)
+
 
 class UserCapability(Base):
     __tablename__ = "user_capabilities"
@@ -754,6 +756,7 @@ class IngestionRun(Base):
     __table_args__ = (
         Index("ix_ingestion_runs_source_created_at", "source_registry_id", "created_at"),
         Index("ix_ingestion_runs_status", "status"),
+        Index("ix_ingestion_runs_triggered_by_user_id", "triggered_by_user_id"),
     )
 
 
@@ -782,7 +785,6 @@ class Scholarship(Base):
     country_code: Mapped[str] = mapped_column(String(2), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     funding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    description_embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     funding_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     funding_amount_min: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -883,17 +885,10 @@ class Scholarship(Base):
                 "record_state = 'published'::scholarship_record_state"
             ),
         ),
-        Index(
-            "ix_scholarships_description_embedding_published",
-            "description_embedding",
-            postgresql_using="ivfflat",
-            postgresql_with={"lists": 100},
-            postgresql_ops={"description_embedding": "vector_cosine_ops"},
-            postgresql_where=text(
-                "record_state = 'published'::scholarship_record_state "
-                "AND description_embedding IS NOT NULL"
-            ),
-        ),
+        Index("ix_scholarships_reviewed_by_user_id", "reviewed_by_user_id"),
+        Index("ix_scholarships_validated_by_user_id", "validated_by_user_id"),
+        Index("ix_scholarships_published_by_user_id", "published_by_user_id"),
+        Index("ix_scholarships_source_registry_id", "source_registry_id"),
     )
 
 
@@ -928,7 +923,10 @@ class ScholarshipRequirement(Base):
         back_populates="requirements",
     )
 
-    __table_args__ = (Index("ix_scholarship_requirements_type", "requirement_type"),)
+    __table_args__ = (
+        Index("ix_scholarship_requirements_type", "requirement_type"),
+        Index("ix_scholarship_requirements_scholarship_id", "scholarship_id"),
+    )
 
 
 class ScholarshipChunk(Base):
@@ -960,6 +958,7 @@ class ScholarshipChunk(Base):
 
     __table_args__ = (
         Index("ix_scholarship_chunks_embedding", "embedding", postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
+        Index("ix_scholarship_chunks_scholarship_id", "scholarship_id"),
     )
 
 
@@ -1006,6 +1005,7 @@ class Application(Base):
     __table_args__ = (
         Index("ix_applications_user_status", "user_id", "status"),
         Index("ix_applications_user_scholarship", "user_id", "scholarship_id", unique=True),
+        Index("ix_applications_scholarship_id", "scholarship_id"),
     )
 
 
@@ -1036,6 +1036,7 @@ class AuditLog(Base):
     __table_args__ = (
         Index("ix_audit_logs_entity", "entity_type", "entity_id"),
         Index("ix_audit_logs_created_at", "created_at"),
+        Index("ix_audit_logs_actor_user_id", "actor_user_id"),
     )
 
 
@@ -1106,6 +1107,7 @@ class DocumentRecord(Base):
     __table_args__ = (
         Index("ix_documents_user_created_at", "user_id", "created_at"),
         Index("ix_documents_processing_status", "processing_status"),
+        Index("ix_documents_scholarship_id", "scholarship_id"),
     )
 
 
@@ -1218,6 +1220,7 @@ class InterviewSession(Base):
     __table_args__ = (
         Index("ix_interview_sessions_user_created_at", "user_id", "created_at"),
         Index("ix_interview_sessions_status", "status"),
+        Index("ix_interview_sessions_scholarship_id", "scholarship_id"),
     )
 
 
@@ -1578,6 +1581,8 @@ class ApplicationTrackerItem(Base):
     __table_args__ = (
         Index("ix_tracker_user_deadline", "user_id", "deadline"),
         Index("ix_tracker_user_stage", "user_id", "stage"),
+        Index("ix_application_tracker_items_scholarship_id", "scholarship_id"),
+        Index("ix_application_tracker_items_university_id", "university_id"),
     )
 
 
@@ -1702,6 +1707,7 @@ class UniversityLead(Base):
 
     __table_args__ = (
         Index("ix_university_leads_university", "university_id"),
+        Index("ix_university_leads_consent_audit_log_id", "consent_audit_log_id"),
     )
 
 
@@ -1751,7 +1757,9 @@ class ReferralEnrollment(Base):
     )
     university_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
+        ForeignKey("universities.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fee_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)

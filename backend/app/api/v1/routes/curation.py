@@ -163,6 +163,18 @@ async def list_ingestion_runs(
     )
 
 
+@router.post("/ingestion-runs/bulk-retry", response_model=IngestionRunBulkRetryResponse)
+async def bulk_retry_ingestion_runs(
+    payload: IngestionRunBulkRetryRequest,
+    current_user: IngestionRunUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> IngestionRunBulkRetryResponse:
+    service = IngestionService(db)
+    response = await service.bulk_retry_runs(payload=payload, actor_user=current_user)
+    await db.commit()
+    return response
+
+
 @router.post("/ingestion-runs/{run_id}/retry", response_model=IngestionRunDetail)
 async def retry_ingestion_run(
     run_id: uuid.UUID,
@@ -227,18 +239,6 @@ async def assign_ingestion_run_queue(
     detail = await service.assign_review_queue(run_id, payload=payload, actor_user=current_user)
     await db.commit()
     return _with_run_diagnostics(detail)
-
-
-@router.post("/ingestion-runs/bulk-retry", response_model=IngestionRunBulkRetryResponse)
-async def bulk_retry_ingestion_runs(
-    payload: IngestionRunBulkRetryRequest,
-    current_user: IngestionRunUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> IngestionRunBulkRetryResponse:
-    service = IngestionService(db)
-    response = await service.bulk_retry_runs(payload=payload, actor_user=current_user)
-    await db.commit()
-    return response
 
 
 @router.get("/ingestion-runs/{run_id}", response_model=IngestionRunDetail)

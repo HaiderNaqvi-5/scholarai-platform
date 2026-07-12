@@ -1,61 +1,58 @@
-# progress.md — handoff
+# progress.md — ScholarAI backend
 
-**Date:** 2026-05-31
-**Branch:** `s95/frontend-design-pass-wave2` (worktree root on `master`)
+**Date:** 2026-07-11
+**Branch:** `fix/audit-2026-06-09-remediation` (HEAD `e01270a`, off `release/v1`)
 
-## Session: verify + FIX admin/curation/ingestion/recs/scholarships/matches/discover
+## This session — Backend Audit Remediation Phases 7–10 (Tasks 24–42) COMPLETE
 
-### Outcome
-Diagnosed (prior turn) then **fixed + runtime-verified** the 3 frontend contract crashes.
-All requested surfaces now work. Backend API layer was already healthy; breakage was
-FE type-drift + an infra outage (data-store containers were down — restarted).
+Executed the remaining 19 tasks of `docs/superpowers/plans/2026-06-09-backend-audit-remediation.md`
+(Tasks 0–23 / P0, P1, P2-1…13,19 were already committed before this session). Subagent-driven:
+one implementer + review per task, TDD (failing test → fix → verify → commit). 22 commits added.
 
-### Fixes shipped (uncommitted in working tree)
-1. **discover** — enriched backend `ScholarshipListItem` (additive optional fields:
-   `summary/funding_summary/funding_amount_min/max/source_url/field_tags/degree_levels`),
-   populated in `_serialize_list_item`; de-duplicated the detail builder (kwargs now via
-   `model_dump()`). FE: `ScholarshipListItem` type enriched, `ScholarshipCard` reads lean+enriched
-   (`scholarship_id`, guarded `field_tags`), `endpoints.scholarships.list` → `ScholarshipListItemResponse`,
-   `discover/page.tsx` uses `scholarship_id` + ListItem→Scholarship adapter for optimistic save.
-2. **recommendations (/feed)** — FE `RecommendationItem`/`RecommendationListResponse` flattened
-   (+`RecommendationResponseMeta`) to backend shape; `feed/page.tsx` reads `item.*`.
-3. **curation detail + list** — FE `CurationRecord`→`CurationRecordSummary`/`CurationRecordDetail`
-   (+alias) mirroring `schemas/curation.py`; pages read `record_state`/`review_notes`/typed fields;
-   removed dead audit-log card (backend detail has no `audit_log`).
-4. **Deleted** `frontend/src/components/scholarship/RecommendationCard.tsx` — 0 importers, obsolete
-   nested contract, broke under the reshape (flagged, not silent).
+**Test state:** baseline 637 passed → **673 passed, 7 skipped, 1 xfailed** (+36 tests, 0 regressions).
+Single alembic head `20260609_0040`. `compileall` exit 0. `graph_sync` imports (P1-3 closed).
+Final cross-task review: GO for merge.
 
-### Files touched
-backend: `app/schemas/scholarships.py`, `app/api/v1/routes/scholarships.py`.
-frontend: `lib/api/types.ts`, `lib/api/endpoints/scholarships.ts`,
-`components/scholarship/ScholarshipCard.tsx`, `app/(student)/discover/page.tsx`,
-`app/(student)/feed/page.tsx`, `app/(admin)/admin/curation/[id]/page.tsx`,
-`app/(admin)/admin/curation/page.tsx`, **deleted** `components/scholarship/RecommendationCard.tsx`.
-docs: `CLAUDE.md` (curation note flipped to ✅ FIXED), `progress.md`.
+### Finding → commit map (this session)
+- P2-14 analytics typed body+response_model → `730d0c5`
+- P2-15 documents upload/field caps (reused existing 255/12000/512KB/3 constants) → `12a04b1`
+- P2-16 waitlist rate-limit+forbid-extra+upsert (email already unique, no migration) → `92eda6f`
+- P2-17/18 eval requested-k + empty-gate; + route-aggregate vacuous-pass followup → `e68c7eb` + `fbb210a`
+- folded-P2 LLM json-parse warn → `5d23870`
+- folded-P2 export bundle reaper + beat → `7a80b8a` (amended to drop unrelated config removal)
+- folded-P2 signup consent logging → `4612908`
+- broken-#3 v2 alias isolation (middleware already scoped; added doc+test) → `4213ee1`
+- P2-7 FK indexes (15) + migration `20260609_0039` → `5002570`
+- P2-8 ReferralEnrollment.university_id FK + migration `20260609_0040` → `49927b0`
+- P3 password_hash sentinel (NO-OP: clerk sync already sets `clerk:` sentinel; regression test) → `60e6e87`
+- P3 local JWT → PyJWT with required claims (exception contract preserved) → `cd8ae6b` (amended to drop unrelated dep removals)
+- P3 geo XFF gated on TRUSTED_PROXY_HOPS (routes/geo.py) → `382c3c1`
+- P3 privacy ALLOWED_CONSENT_TYPES constant (drift found+fixed) → `4b6f430`
+- P3 celery broker_connection_retry_on_startup + alembic id (id already canonical) → `4ece708`
+- broken-#4 literal-before-param route ordering (interview/curation) → `b1f6d5f`
+- health `/readyz` returns 503 on DB/Redis; probe Redis → `5c6fe03`
+- CI runs all backend test dirs under Postgres → `d3d8d30`
+- OpenAPI snapshot contract gate (missing D7) + 2 followups (CRLF + env-derived info.title) → `69956d4` + `495b910` + `e01270a`
 
-### Verification (evidence)
-- `bunx --bun tsc --noEmit` → exit 0. `bun run lint` → exit 0.
-- Backend image rebuilt; live `GET /api/v1/scholarships` now returns `field_tags`,
-  `funding_summary` ("Partial: CAD 10,000–40,000."), `funding_amount_max:32000`.
-- Browser drive under temp local-auth (admin@example.com): **/discover** → 18 cards, no error;
-  **/feed** → dashboard + recent matches, no error; **/admin/curation/[id]** → full detail
-  (title + PUBLISHED badge + Review notes + Fields), no error. All previously crashed.
-- Matches (`/scholarships`) + admin overview/ingestion/users/audit/rec-eval were already passing.
+## In-progress / next step
+- **PR to `release/v1`** — branch pushed; open/merge PR with the finding→commit map above.
+- After merge: run Postgres-gated migration round-trip (`alembic upgrade head && downgrade -2 && upgrade head`)
+  on a live DB to exercise migrations `0039`/`0040` (skipped locally — `TEST_DATABASE_URL` unset).
 
-### State of system now (reverted)
-- Backend: **Clerk** mode (`/auth/login` → 410) on rebuilt image (enrichment fix baked in). Up :8000.
-- Frontend: **Clerk** mode (`bun dev` :3000, 80 clerk refs).
-- Data stores up: postgres/redis/neo4j/opensearch. `docker-compose.verify.yml` (temp local-auth override) deleted.
-- NOT committed. NOT a backend pytest run this session (verified via live API + tsc/lint + browser).
+## Open / not done (out of scope this session)
+- Task 43 Step 6 (blocked audit item): `EXPLAIN ANALYZE` the pgvector retrieval path on a seeded live DB.
+- Minor rollup (non-blocking, logged in `.superpowers/sdd/progress.md`): MAX_SUBMISSION_SCHOLARSHIP_IDS route/schema dup;
+  schemas/privacy.py `_ALLOWED_CONSENT_TYPES` duplicate literal; DocumentService._store_uploaded_file unbounded read on non-route path.
+- Latent: `verify_password` raises UnknownHashError on `clerk:` sentinel (clerk users 410 on local login → inert).
 
-### Next steps
-- Run backend test suite (`pytest tests/ -q`) to confirm the schema/route edits don't regress
-  (catalog tests assert only `title`+`applied_filters`, so additive fields should be safe).
-- Commit the fix batch (10 files) once tests green.
-- If a rich recommendation card is wanted later, rebuild it against the FLAT `RecommendationItem`.
+## Separate uncommitted effort (NOT part of this PR — left in working tree per user decision)
+2026-07-09 ponytail-audit cleanup: ~45 staged deletions (`backend/legacy/`, `ai_services/`, `setup/`) + unstaged
+`config.py`/`requirements.txt` dead-dep/config removals + Reticle frontend mods. Commits `7a80b8a`/`cd8ae6b` initially
+swept some in; amended to keep them separate. Review/commit independently. Plan: `~/.claude/plans/hazy-brewing-hickey.md`.
 
-### Commands to resume
-- Infra: `docker compose -f docker-compose.yml up -d postgres redis neo4j opensearch`
-- Backend: container up :8000 (Clerk). Local-auth verify pass: temp override w/ `AUTH_PROVIDER: local` + `--force-recreate --no-deps backend`.
-- Frontend: `cd frontend && bun dev` (:3000). Local-auth drive: prefix `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""` + inject `grantpath.access_token`.
-- Checks: `cd frontend && bunx --bun tsc --noEmit && bun run lint`.
+## Resume commands
+- Tests: `pytest backend/tests/unit backend/tests/integration -q`
+- Compile: `python -m compileall backend/app backend/tests`
+- Alembic head: `cd backend && python -m alembic heads` (expect single `20260609_0040`)
+- Contract gate: `python -m pytest backend/tests/contract/test_openapi_snapshot.py -q`
+- SDD ledger (per-task detail): `.superpowers/sdd/progress.md`

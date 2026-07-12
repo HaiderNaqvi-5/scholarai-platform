@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Request
 
+from app.core.config import settings
 from app.services.geo import resolve_currency
 
 router = APIRouter()
@@ -21,15 +22,17 @@ SUPPORTED = {"PKR", "GBP", "EUR", "AED", "USD"}
 
 
 def _client_ip(request: Request) -> Optional[str]:
-    """Pick the requester IP. Trusts X-Forwarded-For (left-most) when
-    a TRUSTED_PROXY_HOPS > 0 setting was applied to ProxyHeadersMiddleware
-    upstream (per S20). Otherwise uses the socket address.
+    """Pick the requester IP. Trusts X-Forwarded-For (left-most) only when
+    settings.TRUSTED_PROXY_HOPS > 0 (ProxyHeadersMiddleware upstream, per S20)
+    — mirrors app/core/rate_limit.py:_client_ip. Otherwise a spoofed XFF
+    header must not override the socket peer, so use request.client.host.
     """
-    fwd = request.headers.get("x-forwarded-for", "")
-    if fwd:
-        first = fwd.split(",")[0].strip()
-        if first:
-            return first
+    if settings.TRUSTED_PROXY_HOPS > 0:
+        fwd = request.headers.get("x-forwarded-for", "")
+        if fwd:
+            first = fwd.split(",")[0].strip()
+            if first:
+                return first
     if request.client:
         return request.client.host
     return None

@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, get_current_user
+from scholarai_common.errors import ScholarAIException
 from app.core.plan_guard import can_see_premium, raise_plan_required
 from app.models import RecordState, Scholarship, ScholarshipRequirement, ScholarshipTier, User
 from app.schemas import (
@@ -23,7 +24,6 @@ from app.schemas.scholarships_match import (
     ScholarshipMatchResponse,
 )
 from app.services.ingestion import IngestionService
-from app.services.recommendations.eligibility import scholarship_in_scope
 from app.services.scholarships import ScholarshipMatchService
 from app.services.students import StudentService
 
@@ -36,10 +36,14 @@ async def get_optional_user(
 ) -> User | None:
     """Return the authenticated user when a valid bearer token is present.
 
-    Anonymous callers receive ``None`` so public endpoints can downgrade to
-    standard-tier-only views without forcing auth.  Any failure to decode the
-    token (missing header, malformed, expired) is swallowed — callers should
-    treat ``None`` as "anonymous", not "auth failed".
+    Anonymous callers (no header, or a genuinely invalid/expired token) receive
+    ``None`` so public endpoints can downgrade to standard-tier views without
+    forcing auth.
+
+    Only ``ScholarAIException`` — the specific auth-absence error raised by
+    ``get_current_user`` for missing/bad credentials — is caught and converted
+    to ``None``.  Infrastructure failures (DB down, JWKS network error, etc.)
+    propagate so callers see a 503 instead of a silent premium downgrade.
     """
     authorization = request.headers.get("Authorization") or request.headers.get("authorization")
     if not authorization:
@@ -49,8 +53,11 @@ async def get_optional_user(
         return None
     try:
         return await get_current_user(token=token, db=db)
-    except Exception:  # noqa: BLE001 — anon path swallows every auth failure
+    except ScholarAIException:
+        # Genuinely no/invalid credentials → treat as anonymous.
         return None
+    # Any other exception (DB OperationalError, JWKS network failure, etc.)
+    # propagates so callers see a 503 instead of a silent premium downgrade.
 
 
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
@@ -111,11 +118,11 @@ async def list_scholarships(
     )
 
     # Every filter below is pushed into the SQL WHERE clause so the database
-    # narrows the rowset before paginating. The legacy ``scholarship_in_scope``
-    # gate is intentionally NOT re-added: it returns a 3-tuple, so the old
-    # ``if not scholarship_in_scope(...)`` was always falsy (a non-empty tuple
-    # is truthy) and never filtered anything — preserving prior behavior means
-    # not reintroducing it.
+    # narrows the rowset before paginating. The published-state filter already
+    # enforces visibility; no additional phase-scope gate is applied here.
+    # The legacy helper was removed because it returned a 3-tuple (always
+    # truthy), so the old conditional never filtered anything — preserving
+    # prior behavior means not reintroducing it.
     filters = [Scholarship.record_state == RecordState.PUBLISHED]
     if current_user is None or not can_see_premium(current_user):
         filters.append(Scholarship.tier == ScholarshipTier.STANDARD)
@@ -257,7 +264,7 @@ async def get_scholarship(
         .options(selectinload(Scholarship.requirements), selectinload(Scholarship.source_registry))
     )
     scholarship = result.scalar_one_or_none()
-    if scholarship is None or not scholarship_in_scope(scholarship):
+    if scholarship is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Published scholarship not found",

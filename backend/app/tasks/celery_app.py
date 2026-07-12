@@ -31,6 +31,8 @@ celery_app = Celery(
         "app.tasks.reminder_tasks",
         "app.tasks.trial_tasks",
         "app.tasks.usage_ledger_tasks",
+        "app.tasks.graph_sync_tasks",
+        "app.tasks.export_cleanup_tasks",
     ],
 )
 
@@ -41,6 +43,9 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_default_queue="default",
+    # Celery 6 flips this default to False, which turns a broker hiccup at
+    # worker/beat boot into a hard crash instead of a retry loop.
+    broker_connection_retry_on_startup=True,
 )
 
 # Upstash exposes TLS-only ``rediss://`` endpoints; wire explicit SSL options so
@@ -96,5 +101,14 @@ if settings.USAGE_LEDGER_ROLLUP_ENABLED:
         "schedule": crontab(
             hour=settings.USAGE_LEDGER_ROLLUP_CRON_HOUR,
             minute=settings.USAGE_LEDGER_ROLLUP_CRON_MINUTE,
+        ),
+    }
+
+if settings.EXPORT_CLEANUP_ENABLED:
+    celery_app.conf.beat_schedule["export-bundle-cleanup"] = {
+        "task": "tasks.run_export_cleanup",
+        "schedule": crontab(
+            hour=settings.EXPORT_CLEANUP_CRON_HOUR,
+            minute=settings.EXPORT_CLEANUP_CRON_MINUTE,
         ),
     }

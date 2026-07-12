@@ -31,6 +31,8 @@ async def clerk_webhook(
     db: AsyncSession = Depends(get_db),
 ):
     body = await request.body()
+    if not settings.CLERK_WEBHOOK_SECRET:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "webhook secret not configured")
     try:
         wh = Webhook(settings.CLERK_WEBHOOK_SECRET)
         event = wh.verify(body, {

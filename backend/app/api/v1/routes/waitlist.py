@@ -3,10 +3,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rate_limit import RateLimiter
 from app.models import Waitlist
 from app.schemas.waitlist import (
     PricingResponse,
@@ -15,6 +16,10 @@ from app.schemas.waitlist import (
     WaitlistJoinResponse,
 )
 from app.services.notifications.channels import send_templated_email_best_effort
+
+# P2-16: anti-abuse cap on the public join endpoint. IP-keyed (no auth on this
+# route) via app.core.rate_limit._subject's unauthenticated fallback.
+_WAITLIST_RATE_LIMIT = RateLimiter(requests_limit=5, window_seconds=3_600, fail_open=False)
 
 
 router = APIRouter()
@@ -125,33 +130,47 @@ async def get_pricing(
     return PricingResponse(currency=cur, tiers=tiers)
 
 
-@router.post("/waitlist", response_model=WaitlistJoinResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/waitlist",
+    response_model=WaitlistJoinResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_WAITLIST_RATE_LIMIT)],
+)
 async def join_waitlist(
     payload: WaitlistJoinRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> WaitlistJoinResponse:
-    result = await db.execute(select(Waitlist).where(Waitlist.email == payload.email))
-    row = result.scalar_one_or_none()
-    if row is None:
-        row = Waitlist(email=payload.email)
-        db.add(row)
-    row.plan = payload.plan
-    row.currency = payload.currency
-    row.country = payload.country
-    await db.flush()
-    await db.refresh(row)
+    # P2-16: select-then-insert raced two concurrent joins for the same email
+    # into an IntegrityError 500. ON CONFLICT DO UPDATE is atomic at the DB
+    # level, so a duplicate join is a race-free upsert, not a crash.
+    # (Waitlist has no updated_at column, so nothing else needs to be bumped.)
+    stmt = (
+        pg_insert(Waitlist)
+        .values(email=payload.email, plan=payload.plan, currency=payload.currency, country=payload.country)
+        .on_conflict_do_update(
+            index_elements=["email"],
+            set_={"plan": payload.plan, "currency": payload.currency, "country": payload.country},
+        )
+        .returning(Waitlist.id, Waitlist.created_at)
+    )
+    result = await db.execute(stmt)
+    # Read only DB-generated columns from RETURNING. plan/currency/email equal
+    # the payload (the upsert sets them), and reading a RETURNING *entity* would
+    # hand back a stale identity-map object on a duplicate join (plan not
+    # refreshed) — so build the response from payload + generated id/created_at.
+    row = result.one()
     await db.commit()
 
     send_templated_email_best_effort(
-        to=row.email,
+        to=payload.email,
         template="waitlist_confirmation",
-        context={"plan": row.plan, "currency": row.currency},
+        context={"plan": payload.plan, "currency": payload.currency},
         source="waitlist",
     )
     return WaitlistJoinResponse(
         id=row.id,
-        email=row.email,
-        plan=row.plan,
-        currency=row.currency,
+        email=payload.email,
+        plan=payload.plan,
+        currency=payload.currency,
         created_at=row.created_at,
     )

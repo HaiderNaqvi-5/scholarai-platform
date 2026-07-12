@@ -90,7 +90,13 @@ class RecommendationEvaluationService:
                 for value in (precision_pass, recall_pass, ndcg_pass, ndcg_delta_pass)
                 if value is not None
             ]
-            all_passed = all(checks) if checks else True
+            if not checks:
+                # No min fields configured on this threshold -> not a satisfied
+                # gate. Skip it rather than appending a vacuous True, which
+                # would inflate downstream pass_rate/gate_counts (both only
+                # count appended rows -- see routes/recommendations.py).
+                continue
+            all_passed = all(checks)
 
             results.append(
                 RecommendationKPIGateResult(
@@ -144,11 +150,14 @@ class RecommendationEvaluationService:
         return actual >= minimum
 
     def _normalize_k_values(self, k_values: list[int], prediction_count: int) -> list[int]:
+        # Report metrics under every requested k, even when there are fewer
+        # predictions than k. Per-k computation already slices
+        # predicted_ids[:k] safely, so no need to clamp k down to
+        # prediction_count here.
+        del prediction_count
         if not k_values:
             return [1, 3, 5, 10]
-        max_k = max(prediction_count, 1)
-        unique = sorted({min(max(k, 1), max_k) for k in k_values})
-        return unique
+        return sorted({max(k, 1) for k in k_values})
 
     def _precision_at_k(
         self,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 import uuid
 from dataclasses import dataclass
@@ -33,17 +32,23 @@ except ImportError:
     SentenceTransformer = None
 
 
-@functools.lru_cache(maxsize=1)
+_SHARED_EMBEDDER = None  # successfully-loaded model, or None until a successful load
+
+
 def _get_shared_embedder():
-    """Load the SentenceTransformer once per process and share it across all
-    RecommendationService instances. Returns ``None`` when the model cannot be
-    loaded so callers fall back to rules-only ranking."""
+    """Load the SentenceTransformer once per process. Only a *successful* load is
+    memoized — a failure returns None WITHOUT caching, so a later call retries
+    (one transient init failure must not permanently degrade to rules-only)."""
+    global _SHARED_EMBEDDER
+    if _SHARED_EMBEDDER is not None:
+        return _SHARED_EMBEDDER
     if SentenceTransformer is None:
         return None
     try:
-        return SentenceTransformer("all-mpnet-base-v2")
-    except Exception as exc:  # noqa: BLE001 - log and degrade to rules-only
-        logger.warning("recommendation.embedding_init_failed error=%s", exc)
+        _SHARED_EMBEDDER = SentenceTransformer("all-mpnet-base-v2")
+        return _SHARED_EMBEDDER
+    except Exception as exc:  # noqa: BLE001
+        logger.error("recommendation.embedding_init_failed error=%s", exc)
         return None
 
 
@@ -99,6 +104,7 @@ class RecommendationService:
         fallback_candidates = await self._retrieve_db_candidates(
             limit=db_fill_limit,
             exclude_ids=seen_ids,
+            target_country_code=profile.target_country_code,
         )
 
         candidates = vector_candidates + fallback_candidates
@@ -280,14 +286,15 @@ class RecommendationService:
         *,
         limit: int,
         exclude_ids: set[uuid.UUID],
+        target_country_code: str = "",
     ) -> list[RetrievedCandidate]:
         if limit <= 0:
             return []
 
+        target = (target_country_code or "").upper()
         scope_priority = case(
-            (Scholarship.country_code == "CA", 0),
-            (Scholarship.country_code == "US", 1),
-            else_=2,
+            (Scholarship.country_code == target, 0),
+            else_=1,
         )
         stmt = (
             select(Scholarship)
@@ -402,8 +409,9 @@ def _compose_recommendation_score(
 
 
 def _distance_to_similarity(distance: float) -> float:
+    # pgvector cosine distance d = 1 - cos_sim, so similarity = 1 - d.
     clamped = max(0.0, min(distance, 2.0))
-    return round(1.0 - (clamped / 2.0), 4)
+    return round(max(0.0, 1.0 - clamped), 4)
 
 
 def _fit_band(score: float) -> str:

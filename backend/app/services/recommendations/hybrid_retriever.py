@@ -1,26 +1,72 @@
 import os
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from app.models import Scholarship
 
 logger = logging.getLogger(__name__)
 
+
+def _is_configured() -> bool:
+    """Return True only when OPENSEARCH_HOST is explicitly set in the environment."""
+    return bool(os.getenv("OPENSEARCH_HOST"))
+
+
 class OpenSearchHybridRetriever:
+    """Hybrid BM25 + k-NN retriever backed by OpenSearch.
+
+    Construction is gated on ``OPENSEARCH_HOST`` being set.  If the env var is
+    absent, ``OpenSearchHybridRetriever()`` raises ``RuntimeError`` so callers
+    that construct unconditionally (e.g. ``CurationService.__init__``) will see
+    a clear error rather than silently connecting with default admin credentials.
+
+    Callers that want an optional retriever should use
+    ``OpenSearchHybridRetriever.build_if_configured()`` which returns ``None``
+    when OpenSearch is not configured.
+    """
+
     def __init__(self):
-        self.host = os.getenv("OPENSEARCH_HOST", "opensearch")
+        host = os.getenv("OPENSEARCH_HOST")
+        if not host:
+            raise RuntimeError(
+                "OPENSEARCH_HOST is not set — OpenSearchHybridRetriever cannot be constructed. "
+                "Set OPENSEARCH_HOST (and OPENSEARCH_USER / OPENSEARCH_PASS) to enable hybrid search."
+            )
+        self.host = host
         self.port = int(os.getenv("OPENSEARCH_PORT", 9200))
-        self.user = os.getenv("OPENSEARCH_USER", "admin")
-        self.password = os.getenv("OPENSEARCH_PASS", "admin")
-        
+        user = os.getenv("OPENSEARCH_USER")
+        password = os.getenv("OPENSEARCH_PASS")
+        if not user or not password:
+            raise RuntimeError(
+                "OPENSEARCH_USER and OPENSEARCH_PASS must both be set — "
+                "no default credentials are allowed."
+            )
+
+        use_ssl = os.getenv("OPENSEARCH_USE_SSL", "false").lower() in ("1", "true", "yes")
+        verify_certs = os.getenv("OPENSEARCH_VERIFY_CERTS", "false").lower() in ("1", "true", "yes")
+
         self.client = OpenSearch(
             hosts=[{'host': self.host, 'port': self.port}],
-            http_auth=(self.user, self.password),
-            use_ssl=False,
-            verify_certs=False,
+            http_auth=(user, password),
+            use_ssl=use_ssl,
+            verify_certs=verify_certs,
             connection_class=RequestsHttpConnection
         )
         self.index_name = "scholarships"
+
+    @classmethod
+    def build_if_configured(cls) -> "Optional[OpenSearchHybridRetriever]":
+        """Return a retriever instance if OPENSEARCH_HOST is set, else None."""
+        if not _is_configured():
+            return None
+        try:
+            return cls()
+        except Exception:
+            logger.warning(
+                "OpenSearch retriever unavailable; hybrid search disabled.",
+                exc_info=True,
+            )
+            return None
 
     async def hybrid_search(self, query: str, query_vector: List[float], limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -122,7 +168,7 @@ class OpenSearchHybridRetriever:
                         "dimension": 768, # Matches all-mpnet-base-v2
                         "method": {
                             "name": "hnsw",
-                            "space_type": "l2",
+                            "space_type": "cosinesimil",
                             "engine": "nmslib",
                             "parameters": {"ef_construction": 128, "m": 24}
                         }

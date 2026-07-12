@@ -1,6 +1,9 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from app.services.kpi_snapshot_service import KPISnapshotService
+from app.core.database import get_db
+from app.core.config import settings
 
 
 
@@ -79,6 +82,42 @@ async def test_kpi_alert_messages_skips_low_volume_domains():
     )
 
     assert alerts == []
+
+
+def test_api_v1_health_never_returns_kpi_alerts_when_observability_enabled(app, monkeypatch):
+    """P1-5 — GET /api/v1/health must never return KPI alert intelligence,
+    even when KPI_OBSERVABILITY_ENABLED=True.
+
+    The old code computed and returned kpi_alerts on this public, unauthenticated
+    route whenever the flag was on, leaking recommendation/document/interview
+    pass-rate signals.  The fix makes the route liveness-only: kpi_alerts is
+    always [].  This test encodes the fix: it monkeypatches the flag to True,
+    overrides get_db so the DB ping succeeds, and asserts kpi_alerts == [].
+    """
+
+    class _FakeDB:
+        async def execute(self, _query):
+            class _R:
+                pass
+            return _R()
+
+    async def _override_get_db():
+        yield _FakeDB()
+
+    monkeypatch.setattr(settings, "KPI_OBSERVABILITY_ENABLED", True)
+    app.dependency_overrides[get_db] = _override_get_db
+
+    client = TestClient(app)
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["kpi_alerts"] == [], (
+        "Public /api/v1/health must never expose KPI alert intelligence "
+        "regardless of KPI_OBSERVABILITY_ENABLED (P1-5)"
+    )
+    assert payload["status"] == "healthy"
+    assert payload["database"] == "ok"
 
 
 async def test_health_endpoint_does_not_leak_kpi_alerts(app, client, monkeypatch):
