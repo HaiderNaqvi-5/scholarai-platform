@@ -43,11 +43,55 @@ def _normalize_schema(schema: dict) -> dict:
     return schema
 
 
-def _current_schema_json() -> str:
-    app = create_app()
-    schema = _normalize_schema(app.openapi())
+def _canonicalize(schema: dict) -> dict:
+    """Strip pydantic/fastapi version-specific serialization noise so the gate
+    checks the real app contract (paths, fields, types, required) and not the
+    library's rendering of it. Absorbs the deltas between the pinned CI stack
+    (fastapi 0.115.0 / pydantic 2.10.6) and newer local versions:
+      - framework-generated validation-error schemas (ctx/input properties
+        appear only on newer pydantic),
+      - integral floats (2.10 emits ``0``; 2.12 emits ``0.0``),
+      - ``additionalProperties: true`` (emitted only by newer pydantic),
+      - the binary-upload indicator (``format: binary`` vs ``contentMediaType``
+        flips between fastapi versions).
+    None of these are contract-meaningful for the hand-synced frontend types,
+    so removing them keeps the gate loud on real drift and quiet on library bumps.
+    """
+    schema = copy.deepcopy(schema)
+    comps = schema.get("components", {}).get("schemas", {})
+    for name in ("ValidationError", "HTTPValidationError"):
+        comps.pop(name, None)
+
+    def walk(node):
+        if isinstance(node, dict):
+            node.pop("contentMediaType", None)
+            if node.get("format") == "binary":
+                node.pop("format", None)
+            if node.get("additionalProperties") is True:
+                node.pop("additionalProperties", None)
+            for key in list(node.keys()):
+                val = node[key]
+                if isinstance(val, float) and val.is_integer():
+                    node[key] = int(val)
+                walk(node[key])
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                if isinstance(item, float) and item.is_integer():
+                    node[i] = int(item)
+                walk(node[i])
+
+    walk(schema)
+    return schema
+
+
+def _schema_json(schema: dict) -> str:
+    canon = _canonicalize(_normalize_schema(schema))
     # sort_keys + fixed indent => deterministic byte-for-byte output across runs.
-    return json.dumps(schema, sort_keys=True, indent=2) + "\n"
+    return json.dumps(canon, sort_keys=True, indent=2) + "\n"
+
+
+def _current_schema_json() -> str:
+    return _schema_json(create_app().openapi())
 
 
 def _normalize_newlines(text: str) -> str:
@@ -73,9 +117,12 @@ def test_openapi_schema_matches_snapshot():
         f"  UPDATE_OPENAPI_SNAPSHOT=1 python -m pytest {__file__} -q"
     )
 
-    # _normalize_newlines collapses any CRLF a checkout introduced, so a plain
-    # read is enough (Path.read_text newline= is Python 3.13+, CI runs 3.12).
-    snapshot = _normalize_newlines(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    # Canonicalize the on-disk snapshot the same way as the live schema so a
+    # snapshot captured under a different fastapi/pydantic build still compares
+    # equal. _normalize_newlines collapses any CRLF a checkout introduced
+    # (Path.read_text newline= is Python 3.13+, CI runs 3.12).
+    raw = _normalize_newlines(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    snapshot = _normalize_newlines(_schema_json(json.loads(raw)))
     assert current == snapshot, (
         "OpenAPI schema drifted from the checked-in snapshot "
         f"({SNAPSHOT_PATH}). This means the backend API contract changed.\n"
