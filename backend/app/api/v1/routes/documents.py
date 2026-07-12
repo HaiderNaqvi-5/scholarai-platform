@@ -97,7 +97,7 @@ async def create_document(
 ) -> DocumentSubmissionResponse:
     if scholarship_ids and len(scholarship_ids) > MAX_SUBMISSION_SCHOLARSHIP_IDS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"scholarship_ids exceeds the {MAX_SUBMISSION_SCHOLARSHIP_IDS}-item limit",
         )
 
@@ -107,7 +107,7 @@ async def create_document(
             size += len(chunk)
             if size > MAX_FILE_SIZE_BYTES:
                 raise HTTPException(
-                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                     detail="Uploaded file exceeds the 512KB MVP limit",
                 )
         await file.seek(0)
