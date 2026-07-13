@@ -73,7 +73,7 @@ def test_protected_route_accepts_clerk_jwt(clerk_client_app, monkeypatch):
     fake_user.air_uni_dept = None
     fake_user.redeemed_invite_code = None
 
-    monkeypatch.setattr(jwt_verify, "verify_clerk_jwt", lambda t: fake_claims)
+    monkeypatch.setattr(jwt_verify, "verify_clerk_jwt", AsyncMock(return_value=fake_claims))
     monkeypatch.setattr(
         user_sync,
         "ensure_local_user_async",

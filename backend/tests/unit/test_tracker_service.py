@@ -219,3 +219,61 @@ def test_tracker_create_deadline_field_accepts_date():
         deadline=date(2026, 11, 5),
     )
     assert payload.deadline.year == 2026
+
+
+# --- R6-TRACKER-CAP: gate on per-(user,month) creation counter, not live rows ---
+
+
+@pytest.mark.asyncio
+async def test_create_gate_reads_monthly_count_not_live_rows():
+    """The cap gate must query the per-month creation counter, not count(*) of rows.
+
+    First queued execute() result is the monthly-usage scalar; when it is already
+    at the free cap the create is rejected even though zero rows currently exist.
+    """
+    user = _user("free")
+    db = _FakeDB(
+        results=[
+            _FakeResult(scalar=FREE_PLAN_ITEM_LIMIT),  # monthly creations this period
+            _FakeResult(scalar=5),                      # untracked-upcoming count
+        ]
+    )
+    svc = TrackerService(db)
+    with pytest.raises(HTTPException) as excinfo:
+        await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    err = excinfo.value
+    assert err.status_code == 402
+    assert err.detail["error"] == "plan_limit_reached"
+    assert err.detail["cap"] == FREE_PLAN_ITEM_LIMIT
+    assert err.detail["current_items"] == FREE_PLAN_ITEM_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_create_records_monthly_usage_increment():
+    """A successful create must increment the per-(user,month) counter via upsert."""
+    user = _user("free")
+    db = _FakeDB(results=[_FakeResult(scalar=0)])  # monthly creations this period
+    svc = TrackerService(db)
+    await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    # create() issues: (1) the count SELECT, then (2) the upsert INSERT after add/flush.
+    assert db.flushed >= 1
+    assert len(db.added) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_does_not_reset_monthly_quota():
+    """Delete+recreate must not free monthly capacity: once the counter is at cap,
+    creating again is rejected even with zero live rows (delete already happened)."""
+    user = _user("pro")
+    # delete() does not touch the counter; the next create sees the period count at cap.
+    db = _FakeDB(
+        results=[
+            _FakeResult(scalar=TRACKER_CAP["pro"]),  # monthly creations already at cap
+            _FakeResult(scalar=2),                   # untracked-upcoming count
+        ]
+    )
+    svc = TrackerService(db)
+    with pytest.raises(HTTPException) as excinfo:
+        await svc.create(user, TrackerItemCreateRequest(program_name="MS CS"))
+    assert excinfo.value.status_code == 402
+    assert excinfo.value.detail["cap"] == TRACKER_CAP["pro"]

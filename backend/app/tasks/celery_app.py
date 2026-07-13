@@ -1,6 +1,23 @@
+import ssl
+
 from celery import Celery
 from celery.schedules import crontab
 from app.core.config import settings
+
+
+def _rediss_ssl_options(url: str | None) -> dict | None:
+    """SSL options for a ``rediss://`` Redis URL (e.g. Upstash).
+
+    Celery's Redis result backend raises ``ValueError`` at worker boot if a
+    ``rediss://`` URL has no ``ssl_cert_reqs``. Returns ``None`` for plain
+    ``redis://``. ``CERT_REQUIRED`` validates the cert chain + hostname against
+    the system trust store (Upstash uses publicly-trusted certs; the image
+    ships ``ca-certificates``), so TLS is both encrypted and verified.
+    """
+    if url and url.startswith("rediss://"):
+        return {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+    return None
+
 
 celery_app = Celery(
     "scholarai",
@@ -13,6 +30,9 @@ celery_app = Celery(
         "app.tasks.alert_tasks",
         "app.tasks.reminder_tasks",
         "app.tasks.trial_tasks",
+        "app.tasks.usage_ledger_tasks",
+        "app.tasks.graph_sync_tasks",
+        "app.tasks.export_cleanup_tasks",
     ],
 )
 
@@ -23,7 +43,19 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_default_queue="default",
+    # Celery 6 flips this default to False, which turns a broker hiccup at
+    # worker/beat boot into a hard crash instead of a retry loop.
+    broker_connection_retry_on_startup=True,
 )
+
+# Upstash exposes TLS-only ``rediss://`` endpoints; wire explicit SSL options so
+# the worker/beat result backend boots instead of crashing on E_REDIS_SSL_CERT.
+_broker_ssl = _rediss_ssl_options(settings.CELERY_BROKER_URL)
+if _broker_ssl is not None:
+    celery_app.conf.broker_use_ssl = _broker_ssl
+_backend_ssl = _rediss_ssl_options(settings.CELERY_RESULT_BACKEND)
+if _backend_ssl is not None:
+    celery_app.conf.redis_backend_use_ssl = _backend_ssl
 
 celery_app.conf.beat_schedule = {
     # Every-10-day cadence (1st / 11th / 21st @ 02:00 UTC).
@@ -60,5 +92,23 @@ if settings.KPI_SNAPSHOT_RETENTION_ENABLED:
         "schedule": crontab(
             hour=settings.KPI_SNAPSHOT_RETENTION_CRON_HOUR,
             minute=settings.KPI_SNAPSHOT_RETENTION_CRON_MINUTE,
+        ),
+    }
+
+if settings.USAGE_LEDGER_ROLLUP_ENABLED:
+    celery_app.conf.beat_schedule["usage-ledger-rollup-prune"] = {
+        "task": "tasks.run_usage_ledger_rollup",
+        "schedule": crontab(
+            hour=settings.USAGE_LEDGER_ROLLUP_CRON_HOUR,
+            minute=settings.USAGE_LEDGER_ROLLUP_CRON_MINUTE,
+        ),
+    }
+
+if settings.EXPORT_CLEANUP_ENABLED:
+    celery_app.conf.beat_schedule["export-bundle-cleanup"] = {
+        "task": "tasks.run_export_cleanup",
+        "schedule": crontab(
+            hour=settings.EXPORT_CLEANUP_CRON_HOUR,
+            minute=settings.EXPORT_CLEANUP_CRON_MINUTE,
         ),
     }

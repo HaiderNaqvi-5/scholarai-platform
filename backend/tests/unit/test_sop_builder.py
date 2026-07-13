@@ -11,9 +11,11 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.sql import Select
 
+from app.core.config import settings
 from app.models import DocumentRecord, DocumentType
 from app.schemas.sop import SOPDraftRequest, SOPInputs
 from app.services.documents.sop_builder import (
+    LINE_FEEDBACK_SYSTEM_PROMPT,
     PARAGRAPH_LABELS,
     SOPBuilderService,
     _build_user_prompt,
@@ -93,12 +95,32 @@ class _FakeDB:
     def __init__(self, monthly_usage_row: Any = None):
         # _queue is consumed in order by SELECTs; non-SELECT statements skip it.
         self._queue: list[_FakeResult] = [_FakeResult(monthly_usage_row)]
+        # Pre-request bucket count for the atomic reserve upsert's RETURNING.
+        # None = no row yet (fresh period). A seeded row exposes ``sop_count``.
+        self._seed_count: int | None = (
+            getattr(monthly_usage_row, "sop_count", None)
+            if monthly_usage_row is not None
+            else None
+        )
         self.added: list[Any] = []
         self.flushed = 0
         self.refreshed: list[Any] = []
         self.non_select_calls: list[Any] = []
 
     async def execute(self, statement):
+        rendered = str(statement).lower()
+        # Atomic reserve upsert (INSERT ... ON CONFLICT ... RETURNING sop_count):
+        # yield the authoritative post-increment count so the at-cap reservation
+        # returns cap+1 and the gate raises 429. ``_seed_count`` is the bucket
+        # value before this request (None = fresh period -> reserves count 1).
+        if "insert into sop_monthly_usage" in rendered and "on conflict" in rendered:
+            self.non_select_calls.append(statement)
+            base = self._seed_count if self._seed_count is not None else 0
+            return _FakeResult(base + 1)
+        if "update sop_monthly_usage" in rendered:
+            # release decrement of an over-cap reservation: no-op result.
+            self.non_select_calls.append(statement)
+            return _FakeResult(None)
         if isinstance(statement, Select):
             if self._queue:
                 return self._queue.pop(0)
@@ -212,3 +234,85 @@ def test_grounded_context_carries_limitations_disclaimer():
     payload = _payload()
     text = _deterministic_draft(payload, ctx={"facts": ["Target: Chevening."]})
     assert "validated scholarship context" in text.lower()
+
+
+class _RecordingLLM:
+    """Fake AnthropicClient that records which model each endpoint used.
+
+    Mirrors the real ``complete_with_accounting`` keyword-only signature
+    (anthropic_client.py:147-159). ``available=True`` forces the live path
+    so we observe the model passed for line feedback instead of the
+    deterministic fallback.
+    """
+
+    available = True
+
+    def __init__(self):
+        self.calls: list[dict[str, Any]] = []
+
+    async def complete_with_accounting(
+        self,
+        *,
+        db,
+        user,
+        endpoint,
+        system_prompt,
+        user_prompt,
+        model=None,
+        max_tokens=1500,
+        temperature=0.4,
+        json_mode=False,
+    ):
+        self.calls.append(
+            {
+                "endpoint": endpoint,
+                "model": model,
+                "system_prompt": system_prompt,
+                "json_mode": json_mode,
+            }
+        )
+        if endpoint == "documents.sop.line_feedback":
+            return {
+                "paragraphs": [
+                    {
+                        "index": i,
+                        "strength": f"strength {i}",
+                        "weakness": f"weakness {i}",
+                        "suggestion": f"suggestion {i}",
+                    }
+                    for i in range(1, 7)
+                ]
+            }
+        # draft endpoint: return a 6-paragraph prose draft. Blank-line
+        # separators give _split_paragraphs six paragraphs (so all six
+        # line-feedback rows survive the rows[:len(paragraphs)] slice), and
+        # the total word count clears the >= 300-word live-draft gate.
+        paragraph = "this paragraph has plenty of filler words to clear the gate. " * 10
+        return "\n\n".join(paragraph for _ in range(6))
+
+
+@pytest.mark.asyncio
+async def test_elite_line_feedback_uses_fast_model_not_deep():
+    db = _FakeDB(monthly_usage_row=None)
+    llm = _RecordingLLM()
+    svc = SOPBuilderService(db, llm=llm)
+
+    response = await svc.draft(_user("elite"), _payload())
+
+    assert response.line_feedback is not None
+    assert len(response.line_feedback) == 6
+
+    feedback_calls = [c for c in llm.calls if c["endpoint"] == "documents.sop.line_feedback"]
+    assert len(feedback_calls) == 1, "Elite SOP must make exactly one line-feedback call"
+    fb = feedback_calls[0]
+    # The fix: line feedback runs on the FAST (Haiku) model, not DEEP (Sonnet).
+    assert fb["model"] == settings.ANTHROPIC_MODEL_FAST
+    assert fb["model"] != settings.ANTHROPIC_MODEL_DEEP
+    # The static critique prompt remains the (only) cacheable system block.
+    assert fb["system_prompt"] == LINE_FEEDBACK_SYSTEM_PROMPT
+    assert fb["json_mode"] is True
+
+    # The deep draft pass is untouched — still on the DEEP (Sonnet) model.
+    draft_calls = [c for c in llm.calls if c["endpoint"] == "documents.sop.draft"]
+    assert len(draft_calls) == 1
+    assert draft_calls[0]["model"] == settings.ANTHROPIC_MODEL_DEEP

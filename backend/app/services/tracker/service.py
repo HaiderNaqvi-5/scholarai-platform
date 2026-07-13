@@ -15,6 +15,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plan_guard import (
@@ -27,6 +28,7 @@ from app.models import (
     RecordState,
     Scholarship,
     TRACKER_STAGES,
+    TrackerMonthlyUsage,
     User,
     default_document_checklist,
 )
@@ -52,6 +54,11 @@ _UPGRADE_TARGETS: dict[str, list[str]] = {
 }
 
 
+def _tracker_period() -> str:
+    now = datetime.now(timezone.utc)
+    return f"{now.year:04d}{now.month:02d}"
+
+
 class TrackerService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -66,12 +73,35 @@ class TrackerService:
         return list(result.scalars().all())
 
     async def count_for_user(self, user_id: uuid.UUID) -> int:
+        """Tracker creations logged for this user in the current YYYYMM period.
+
+        Gating reads this counter (not live row count) so delete+recreate cannot
+        reset the monthly cap. Parallel to SopMonthlyUsage in sop_builder.py.
+        """
+        period = _tracker_period()
         result = await self.db.execute(
-            select(func.count())
-            .select_from(ApplicationTrackerItem)
-            .where(ApplicationTrackerItem.user_id == user_id)
+            select(TrackerMonthlyUsage.created_count).where(
+                TrackerMonthlyUsage.user_id == user_id,
+                TrackerMonthlyUsage.period_yyyymm == period,
+            )
         )
         return int(result.scalar() or 0)
+
+    async def _record_creation(self, user_id: uuid.UUID) -> None:
+        """Increment the per-(user, YYYYMM) tracker-creation counter via upsert."""
+        period = _tracker_period()
+        stmt = (
+            pg_insert(TrackerMonthlyUsage)
+            .values(user_id=user_id, period_yyyymm=period, created_count=1)
+            .on_conflict_do_update(
+                index_elements=["user_id", "period_yyyymm"],
+                set_={
+                    "created_count": TrackerMonthlyUsage.created_count + 1,
+                    "updated_at": func.now(),
+                },
+            )
+        )
+        await self.db.execute(stmt)
 
     async def create(
         self,
@@ -140,6 +170,7 @@ class TrackerService:
         self.db.add(item)
         await self.db.flush()
         await self.db.refresh(item)
+        await self._record_creation(user.id)
         return item
 
     async def update_stage(

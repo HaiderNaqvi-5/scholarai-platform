@@ -22,9 +22,9 @@ from app.services.llm import AnthropicClient, LLMUnavailableError
 logger = logging.getLogger(__name__)
 
 
-VISA_EVAL_SYSTEM_PROMPT = """You are a {country} visa officer evaluating a
-Pakistani student's interview answer. The question was: "{question}". The
-student answered: "{answer}".
+VISA_EVAL_SYSTEM_PROMPT = """You are a visa officer evaluating a Pakistani
+student's study-visa interview answer. The user message gives you the target
+country, the question asked, and the student's answer.
 
 Evaluate strictly but fairly. Pakistani students often struggle with:
 - Clearly articulating ties to Pakistan (family, job offer, property).
@@ -33,7 +33,7 @@ Evaluate strictly but fairly. Pakistani students often struggle with:
 - Avoiding phrases that sound memorized.
 
 Return strict JSON:
-{{
+{
   "clarity_score": 1-5,
   "confidence_score": 1-5,
   "relevance_score": 1-5,
@@ -42,7 +42,7 @@ Return strict JSON:
   "what_was_good": "brief praise",
   "ideal_answer_summary": "what a strong answer would include",
   "overall_score": 1-5
-}}
+}
 
 Do not include any prose outside of the JSON object."""
 
@@ -167,10 +167,13 @@ async def evaluate_answer(
             db=db,
             user=user,
             endpoint="interviews.visa.evaluator",
-            system_prompt=VISA_EVAL_SYSTEM_PROMPT.format(
-                country=country, question=question_text, answer=answer_text
+            system_prompt=VISA_EVAL_SYSTEM_PROMPT,
+            user_prompt=(
+                f"Target country: {country}\n"
+                f'Question: "{question_text}"\n'
+                f'Student answer: "{answer_text}"\n\n'
+                "Return only the JSON object specified."
             ),
-            user_prompt="Return only the JSON object specified.",
             model=settings.ANTHROPIC_MODEL_FAST,
             max_tokens=900,
             temperature=0.1,

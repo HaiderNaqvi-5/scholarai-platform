@@ -6,6 +6,7 @@ Resolves an IPv4/IPv6 address to (currency_code, country_code). Returns
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Optional, Tuple
 
@@ -24,15 +25,25 @@ CACHE_TTL_SECONDS = 3600  # 1h
 _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
+def _redact_ip(ip: str) -> str:
+    """Stable, non-reversible token for an IP (GEO-IP-LEAK).
+
+    Used for the cache key and log lines so the raw IP of an unauthenticated,
+    pre-consent visitor is never persisted in Redis or written to logs. Stable
+    per IP so the 1h cache still hits.
+    """
+    return hashlib.sha256(ip.encode("utf-8")).hexdigest()[:16]
+
+
 def _cache_key(ip: str) -> str:
-    return f"{CACHE_KEY_PREFIX}{ip}"
+    return f"{CACHE_KEY_PREFIX}{_redact_ip(ip)}"
 
 
 async def _read_cache(ip: str) -> Optional[Tuple[Optional[str], Optional[str]]]:
     try:
         cached = await _redis_client.get(_cache_key(ip))
     except redis.RedisError as exc:
-        log.warning("geo cache read failed for ip=%s: %s", ip, exc)
+        log.warning("geo cache read failed for ip=%s: %s", _redact_ip(ip), exc)
         return None
     if not cached:
         return None
@@ -52,7 +63,7 @@ async def _write_cache(ip: str, currency: Optional[str], country: Optional[str])
             ex=CACHE_TTL_SECONDS,
         )
     except redis.RedisError as exc:
-        log.warning("geo cache write failed for ip=%s: %s", ip, exc)
+        log.warning("geo cache write failed for ip=%s: %s", _redact_ip(ip), exc)
 
 
 async def resolve_currency(
@@ -75,7 +86,7 @@ async def resolve_currency(
             r = await client.get(IPWHO_URL.format(ip=ip))
             data = r.json()
     except (httpx.HTTPError, ValueError) as exc:
-        log.warning("geo lookup failed for ip=%s: %s", ip, exc)
+        log.warning("geo lookup failed for ip=%s: %s", _redact_ip(ip), exc)
         return None, None
 
     if not isinstance(data, dict) or not data.get("success"):

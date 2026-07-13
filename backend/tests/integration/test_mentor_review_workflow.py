@@ -65,10 +65,10 @@ class _FakeDB:
         return None
 
 
-def _fake_user(capabilities: set[str]):
+def _fake_user(capabilities: set[str], role: UserRole = UserRole.MENTOR):
     return SimpleNamespace(
         id=uuid4(),
-        role=UserRole.MENTOR,
+        role=role,
         is_active=True,
         _token_capabilities=capabilities,
     )
@@ -195,6 +195,437 @@ def test_mentor_submit_feedback_persists_human_review(app, client):
     assert persisted_feedback.limitation_notice == "Reviewed by a human mentor."
     limitations = persisted_feedback.feedback_payload["grounded_context_sections"]["limitations"]
     assert limitations == ["Reviewed by a human mentor."]
+
+
+# --- H5-MENTOR-IDOR: object-level ownership on mentor document read + feedback ---
+
+
+def _build_owned_document(*, title: str, owner_institution_id):
+    document = _build_document(title=title, has_human_review=False)
+    document.owner_institution_id = owner_institution_id  # consumed by _ScopedFakeDB
+    return document
+
+
+class _ScopedFakeDB(_FakeDB):
+    """Mirror the post-fix query: a single-document lookup only matches when the
+    mentor's institution scope (passed in) equals the document owner's institution,
+    OR the mentor scope is None (platform reviewer => unrestricted)."""
+
+    def __init__(self, documents, mentor_institution_id):
+        super().__init__(documents)
+        self.mentor_institution_id = mentor_institution_id
+
+    async def execute(self, query):
+        query_text = str(query)
+        # Only institution-scoped lookups (the post-fix query) get filtered here.
+        # Detect the scope clause the fix adds: a user_id IN (SELECT users.id ...
+        # WHERE users.institution_id ...) subquery. An unscoped id-only lookup
+        # (the pre-fix query) falls through to the parent _FakeDB, which returns
+        # the document unconditionally -> the IDOR tests then fail (200 != 404),
+        # giving us a genuine red->green guard.
+        is_scoped_lookup = (
+            "WHERE documents.id" in query_text
+            and "users.institution_id" in query_text
+            and "documents.user_id IN" in query_text
+        )
+        if is_scoped_lookup:
+            doc = self.documents[0] if self.documents else None
+            if doc is None:
+                return _ExecuteResult([])
+            owner_inst = getattr(doc, "owner_institution_id", None)
+            # mentor_institution_id is None never reaches here: the fix omits the
+            # scope clause for platform reviewers, so the query is id-only and
+            # falls through to super().execute (unrestricted) below.
+            if owner_inst == self.mentor_institution_id:
+                return _ExecuteResult([doc])
+            return _ExecuteResult([])  # out-of-institution => not found
+        return await super().execute(query)
+
+
+def test_mentor_cannot_read_document_outside_their_institution(app, client):
+    mentor_inst = uuid4()
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=mentor_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"})
+        user.institution_id = mentor_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_mentor_can_read_document_within_their_institution(app, client):
+    shared_inst = uuid4()
+    document = _build_owned_document(title="In institution SOP", owner_institution_id=shared_inst)
+    db = _ScopedFakeDB([document], mentor_institution_id=shared_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"})
+        user.institution_id = shared_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(document.id)
+
+
+def test_platform_admin_without_institution_reads_any_document(app, client):
+    # Platform-review role (ADMIN) => unrestricted even with a null institution.
+    document = _build_owned_document(title="Any student SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.ADMIN)
+        user.institution_id = None  # platform reviewer (admin/owner/dev/internal)
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+
+def test_internal_user_without_institution_reads_any_document(app, client):
+    # INTERNAL_USER is also a platform-review role => unrestricted with null institution.
+    document = _build_owned_document(title="Any student SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.INTERNAL_USER)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+
+def test_mentor_with_null_institution_cannot_read_real_institution_document(app, client):
+    # H5 residual: a plain MENTOR with institution_id=None must NOT be treated as
+    # an unrestricted platform reviewer. It is institution-scoped (to the null
+    # cohort), so a real-institution student's doc is invisible => 404.
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.MENTOR)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        f"/api/v1/mentor/documents/{document.id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+
+
+def test_mentor_with_null_institution_cannot_submit_feedback_on_real_institution_document(app, client):
+    # Same H5 residual on the write path: null-institution MENTOR cannot write
+    # feedback on a real-institution student's doc, and nothing is committed.
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.submit"}, role=UserRole.MENTOR)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.post(
+        f"/api/v1/mentor/documents/{document.id}/feedback",
+        json={
+            "summary": "A valid looking summary with sufficient length for schema requirements.",
+            "strengths": ["One"],
+            "revision_priorities": ["Two"],
+            "caution_notes": [],
+        },
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert db.committed is False
+
+
+def test_mentor_cannot_submit_feedback_outside_their_institution(app, client):
+    mentor_inst = uuid4()
+    document = _build_owned_document(title="Other institution SOP", owner_institution_id=uuid4())
+    db = _ScopedFakeDB([document], mentor_institution_id=mentor_inst)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.submit"})
+        user.institution_id = mentor_inst
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.post(
+        f"/api/v1/mentor/documents/{document.id}/feedback",
+        json={
+            "summary": "A valid looking summary with sufficient length for schema requirements.",
+            "strengths": ["One"],
+            "revision_priorities": ["Two"],
+            "caution_notes": [],
+        },
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert db.committed is False
+
+
+# --- P1-1 IDOR: list endpoint must respect institution scope ---
+
+
+class _ListScopedFakeDB(_FakeDB):
+    """Fake DB that simulates the post-fix list query.
+
+    The fix adds a WHERE clause that filters by institution:
+      documents.user_id IN (SELECT users.id WHERE users.institution_id == mentor_inst)
+
+    When `mentor_institution_id` is None the scope clause is omitted (platform
+    reviewer) so all documents are returned regardless of owner_institution_id.
+    When set, only documents whose owner_institution_id matches are returned.
+    """
+
+    def __init__(self, documents, mentor_institution_id):
+        super().__init__(documents)
+        self.mentor_institution_id = mentor_institution_id
+
+    async def execute(self, query):
+        query_text = str(query)
+        is_list_query = "FROM documents" in query_text and "WHERE documents.id" not in query_text
+        is_scoped_list = (
+            is_list_query
+            and "users.institution_id" in query_text
+            and "documents.user_id IN" in query_text
+        )
+        if is_scoped_list:
+            filtered = [
+                doc
+                for doc in self.documents
+                if getattr(doc, "owner_institution_id", None) == self.mentor_institution_id
+            ]
+            return _ExecuteResult(filtered)
+        # Unscoped list (platform reviewer) or detail lookup falls through.
+        return await super().execute(query)
+
+
+def test_mentor_list_does_not_return_documents_from_other_institution(app, client):
+    """P1-1 IDOR: mentor in institution A must NOT see documents owned by institution B."""
+    inst_a = uuid4()
+    inst_b = uuid4()
+    doc_a = _build_owned_document(title="Institution A SOP", owner_institution_id=inst_a)
+    doc_b = _build_owned_document(title="Institution B SOP", owner_institution_id=inst_b)
+    db = _ListScopedFakeDB([doc_a, doc_b], mentor_institution_id=inst_a)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.MENTOR)
+        user.institution_id = inst_a
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        "/api/v1/mentor/pending-reviews?limit=10",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = {item["id"] for item in payload["items"]}
+    assert str(doc_b.id) not in returned_ids, "cross-institution document leaked to mentor"
+
+
+def test_mentor_list_returns_documents_from_own_institution(app, client):
+    """P1-1 positive: mentor in institution A DOES see own-institution documents."""
+    inst_a = uuid4()
+    inst_b = uuid4()
+    doc_a = _build_owned_document(title="Institution A SOP", owner_institution_id=inst_a)
+    doc_b = _build_owned_document(title="Institution B SOP", owner_institution_id=inst_b)
+    db = _ListScopedFakeDB([doc_a, doc_b], mentor_institution_id=inst_a)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.MENTOR)
+        user.institution_id = inst_a
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        "/api/v1/mentor/pending-reviews?limit=10",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = {item["id"] for item in payload["items"]}
+    assert str(doc_a.id) in returned_ids, "own-institution document not visible to mentor"
+
+
+def test_platform_admin_list_returns_all_institutions(app, client):
+    """Platform-review role (ADMIN) gets unrestricted list — scope clause omitted."""
+    inst_a = uuid4()
+    inst_b = uuid4()
+    doc_a = _build_owned_document(title="Inst A SOP", owner_institution_id=inst_a)
+    doc_b = _build_owned_document(title="Inst B SOP", owner_institution_id=inst_b)
+    # mentor_institution_id=None simulates no scope clause (platform reviewer)
+    db = _ListScopedFakeDB([doc_a, doc_b], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.ADMIN)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        "/api/v1/mentor/pending-reviews?limit=10",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = {item["id"] for item in payload["items"]}
+    assert str(doc_a.id) in returned_ids
+    assert str(doc_b.id) in returned_ids
+
+
+# --- unit-level: assert scope clause is wired into the list statement ---
+
+from sqlalchemy import select as _sa_select
+from app.api.v1.routes.mentor import _mentor_scope_clause
+from app.models import DocumentRecord as _DR, User as _User
+
+
+def test_list_pending_reviews_stmt_includes_institution_scope_clause():
+    """Unit assertion: the WHERE clause produced by _mentor_scope_clause contains
+    the institution sub-select, so the fix cannot silently regress."""
+    from types import SimpleNamespace
+
+    mentor = SimpleNamespace(role=UserRole.MENTOR, institution_id=uuid4())
+    clause = _mentor_scope_clause(mentor)
+    assert clause is not None, "_mentor_scope_clause returned None for MENTOR role"
+
+    stmt = _sa_select(_DR).where(_DR.processing_status == DocumentProcessingStatus.COMPLETED)
+    stmt = stmt.where(clause)
+
+    compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+    assert "users.institution_id" in compiled, (
+        "institution scope sub-select missing from compiled statement"
+    )
+    assert "documents.user_id" in compiled
+
+
+def test_platform_reviewer_scope_clause_is_none():
+    """_mentor_scope_clause returns None for every platform-review role (unrestricted)."""
+    from types import SimpleNamespace
+
+    for role in (UserRole.ADMIN, UserRole.OWNER, UserRole.DEV, UserRole.INTERNAL_USER):
+        user = SimpleNamespace(role=role, institution_id=None)
+        assert _mentor_scope_clause(user) is None, f"Expected None for role {role}"
+
+
+def test_mentor_with_null_institution_list_does_not_return_real_institution_documents(app, client):
+    # H5 residual on the list path: a plain MENTOR with institution_id=None must NOT
+    # be treated as a platform reviewer. It is scoped to the null cohort, so a
+    # real-institution student's document must NOT appear in the pending-reviews list.
+    real_inst = uuid4()
+    document = _build_owned_document(
+        title="Real institution SOP", owner_institution_id=real_inst
+    )
+    # mentor_institution_id=None -> scope clause IS emitted (MENTOR role, not platform)
+    # -> only null-institution student docs match -> document is invisible.
+    db = _ListScopedFakeDB([document], mentor_institution_id=None)
+
+    async def override_current_user():
+        user = _fake_user({"document.mentor.review"}, role=UserRole.MENTOR)
+        user.institution_id = None
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_db] = override_db
+    response = client.get(
+        "/api/v1/mentor/pending-reviews?limit=10",
+        headers={"Authorization": "Bearer fake"},
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_ids = {item["id"] for item in payload["items"]}
+    assert str(document.id) not in returned_ids, (
+        "null-institution MENTOR must not see real-institution student documents in list"
+    )
 
 
 def test_mentor_routes_return_403_without_mentor_capabilities(app, client):

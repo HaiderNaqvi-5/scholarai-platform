@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -28,38 +29,55 @@ class ClerkClaims:
 
 _JWKS_TTL_SECONDS = 600
 _jwks_cache: dict[str, Any] = {"keys": {}, "fetched_at": 0.0}
+_jwks_lock = asyncio.Lock()
 
 
-def _get_jwks_keys() -> dict[str, bytes]:
+async def _get_jwks_keys() -> dict[str, bytes]:
+    """Fetch and cache JWKS public keys.
+
+    Uses double-checked locking with asyncio.Lock so only one coroutine
+    refreshes the cache at a time; all others await the lock and then
+    return the already-refreshed result.
+
+    PyJWT enforces nbf automatically when the claim is present — no
+    explicit option is needed and we do not disable it.
+    """
     now = time.time()
+    # Fast path: cache is warm — no lock needed.
     if now - _jwks_cache["fetched_at"] < _JWKS_TTL_SECONDS and _jwks_cache["keys"]:
         return _jwks_cache["keys"]
-    url = settings.CLERK_JWKS_URL
-    if not url:
-        raise ClerkAuthError("CLERK_JWKS_URL not configured")
-    # Map JWKS-endpoint failures (timeout, DNS, TLS, 5xx) to ClerkAuthError so
-    # they surface as 401, not a raw 500 across the whole authenticated surface.
-    try:
-        resp = httpx.get(url, timeout=5.0)
-        resp.raise_for_status()
-    except httpx.HTTPError as e:
-        raise ClerkAuthError(f"JWKS fetch failed: {e}") from e
-    keys: dict[str, bytes] = {}
-    for jwk in resp.json().get("keys", []):
-        kid = jwk.get("kid")
-        if not kid:
-            continue
-        public_key = RSAAlgorithm.from_jwk(jwk)
-        keys[kid] = public_key.public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-    _jwks_cache["keys"] = keys
-    _jwks_cache["fetched_at"] = now
-    return keys
+    async with _jwks_lock:
+        # Double-check: another coroutine may have refreshed while we awaited.
+        now = time.time()
+        if now - _jwks_cache["fetched_at"] < _JWKS_TTL_SECONDS and _jwks_cache["keys"]:
+            return _jwks_cache["keys"]
+        url = settings.CLERK_JWKS_URL
+        if not url:
+            raise ClerkAuthError("CLERK_JWKS_URL not configured")
+        # Map JWKS-endpoint failures (timeout, DNS, TLS, 5xx) to ClerkAuthError
+        # so they surface as 401, not a raw 500 across the whole authed surface.
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise ClerkAuthError(f"JWKS fetch failed: {e}") from e
+        keys: dict[str, bytes] = {}
+        for jwk in resp.json().get("keys", []):
+            kid = jwk.get("kid")
+            if not kid:
+                continue
+            public_key = RSAAlgorithm.from_jwk(jwk)
+            keys[kid] = public_key.public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        _jwks_cache["keys"] = keys
+        _jwks_cache["fetched_at"] = now
+        return keys
 
 
-def verify_clerk_jwt(token: str) -> ClerkClaims:
+async def verify_clerk_jwt(token: str) -> ClerkClaims:
     try:
         header = pyjwt.get_unverified_header(token)
     except pyjwt.DecodeError as e:
@@ -69,11 +87,12 @@ def verify_clerk_jwt(token: str) -> ClerkClaims:
     kid = header.get("kid")
     if not kid:
         raise ClerkAuthError("missing kid")
-    keys = _get_jwks_keys()
+    keys = await _get_jwks_keys()
     pub = keys.get(kid)
     if pub is None:
         raise ClerkAuthError("unknown kid")
     # Issuer is enforced only when configured (back-compat: blank = skip).
+    # PyJWT validates nbf automatically when present; we do not disable it.
     decode_kwargs: dict[str, Any] = {
         "algorithms": ["RS256", "RS384", "RS512"],
         "options": {"require": ["exp", "sub"]},

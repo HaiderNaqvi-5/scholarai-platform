@@ -104,6 +104,26 @@ const FAQS = [
 const LAST_UPDATED_ISO = "2026-05-29";
 const LAST_UPDATED_LABEL = "Updated 29 May 2026";
 
+/** Live published-scholarship count for the hero stat. Fetched server-side with
+ * hourly ISR so the landing auto-reflects newly published scholarships; falls
+ * back to a sane floor if the API is unreachable at render time. */
+const FALLBACK_SCHOLARSHIPS_LIVE = 103;
+const SCHOLARSHIPS_API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000/api/v1";
+
+async function getScholarshipsLive(): Promise<number> {
+  try {
+    const res = await fetch(`${SCHOLARSHIPS_API_BASE}/scholarships?page_size=1`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return FALLBACK_SCHOLARSHIPS_LIVE;
+    const data: { total?: number } = await res.json();
+    return typeof data.total === "number" && data.total > 0 ? data.total : FALLBACK_SCHOLARSHIPS_LIVE;
+  } catch {
+    return FALLBACK_SCHOLARSHIPS_LIVE;
+  }
+}
+
 const COMPARISON_ROWS = [
   {
     label: "Cost",
@@ -150,7 +170,8 @@ const PROBLEMS = [
   },
 ];
 
-export default function Landing() {
+export default async function Landing() {
+  const scholarshipsLive = await getScholarshipsLive();
   return (
     <div className="min-h-screen bg-ivory">
       <div aria-hidden className="scroll-progress" />
@@ -216,7 +237,7 @@ export default function Landing() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <StatChip value="47" label="universities" />
-                <StatChip value="20" label="scholarships live" />
+                <StatChip value={String(scholarshipsLive)} label="scholarships live" />
                 <StatChip value="70" label="visa questions" />
               </div>
             </div>
@@ -257,7 +278,7 @@ export default function Landing() {
                     href="/discover"
                     className="font-mono text-[11px] uppercase tracking-[0.06em] text-lapis underline-offset-2 hover:underline"
                   >
-                    See 17 more →
+                    See {Math.max(scholarshipsLive - 3, 0)} more →
                   </Link>
                 </div>
               </div>

@@ -8,17 +8,34 @@ nightly if FX drift becomes material.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Final
 
+import redis.asyncio as redis
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import UsageLedger, User
+from app.core.config import settings
+from app.models import UsageLedger, UsageLedgerMonthlySummary, User
+
+logger = logging.getLogger(__name__)
 
 PKR_PER_USD: Final[Decimal] = Decimal("280")
+
+# Per-(user, period) atomic reservation of in-flight projected LLM cost
+# (PKR x 1e6, integer micro-PKR). Mirrors the fail-open Redis pattern in
+# app/core/account_lockout.py: Redis errors fall back to the DB-only check
+# rather than blocking all callers.
+_RESERVE_KEY: Final[str] = "burn_reserve:{user_id}:{period}"
+# Reservations are short-lived (one in-flight call); the TTL is a safety net
+# so a crash between reserve and release cannot leak budget forever. Cleared
+# at the next period boundary regardless.
+_RESERVE_TTL_SECONDS: Final[int] = 600
+
+_redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 # (input_per_million_usd, output_per_million_usd)
 PRICING_USD_PER_MTOK: Final[dict[str, tuple[Decimal, Decimal]]] = {
@@ -63,28 +80,104 @@ def tier_budget(user: User) -> Decimal:
 
 
 async def month_to_date_pkr(db: AsyncSession, user_id) -> Decimal:
-    """Sum of ledger cost in PKR for `user_id` in the current period."""
-    q = select(func.coalesce(func.sum(UsageLedger.cost_pkr_micro), 0)).where(
+    """Sum of ledger cost in PKR for `user_id` in the current period.
+
+    Reads live detail rows for the current period plus any rolled-up summary
+    row for the same period (the rollup never prunes the current period, so in
+    practice the summary term is 0 for the live month; it keeps the read
+    correct if a manual rollup ever folded the current period).
+    """
+    period = _period()
+    detail_q = select(func.coalesce(func.sum(UsageLedger.cost_pkr_micro), 0)).where(
         UsageLedger.user_id == user_id,
-        UsageLedger.period_yyyymm == _period(),
+        UsageLedger.period_yyyymm == period,
     )
-    micro = (await db.execute(q)).scalar_one()
-    return Decimal(int(micro)) / _MICRO
+    summary_q = select(
+        func.coalesce(func.sum(UsageLedgerMonthlySummary.cost_pkr_micro), 0)
+    ).where(
+        UsageLedgerMonthlySummary.user_id == user_id,
+        UsageLedgerMonthlySummary.period_yyyymm == period,
+    )
+    detail = int((await db.execute(detail_q)).scalar_one())
+    summary = int((await db.execute(summary_q)).scalar_one())
+    return Decimal(detail + summary) / _MICRO
+
+
+async def _reserved_micro(user_id) -> int:
+    """Current in-flight reservation (micro-PKR) for the user this period.
+
+    Fail-open: a Redis outage returns 0 so the burn-cap check degrades to
+    the DB-only behavior rather than blocking everyone.
+
+    On Redis outage the reservation fails open; concurrent in-flight LLM calls
+    for one user may overshoot the cap by up to (concurrent_calls × per_call_cost).
+    Emits burn_cap.reservation_degraded so operators can detect degraded mode.
+    """
+    key = _RESERVE_KEY.format(user_id=user_id, period=_period())
+    try:
+        raw = await _redis_client.get(key)
+        return int(raw) if raw is not None else 0
+    except redis.RedisError as exc:
+        logger.warning(
+            "burn_cap.reservation_degraded user=%s error=%s — "
+            "reservation unavailable, failing open (overshoot bounded by concurrent in-flight calls)",
+            user_id,
+            exc,
+        )
+        return 0
+
+
+async def reserve_burn(user: User, projected_pkr: Decimal) -> int:
+    """Atomically add `projected_pkr` to the user's in-flight reservation.
+
+    Returns the new reservation total in micro-PKR. Fail-open: returns 0 on
+    Redis error (no reservation held) so callers proceed under the legacy
+    DB-only check.
+    """
+    key = _RESERVE_KEY.format(user_id=user.id, period=_period())
+    amount = int(projected_pkr * _MICRO)
+    try:
+        new_total = await _redis_client.incrby(key, amount)
+        await _redis_client.expire(key, _RESERVE_TTL_SECONDS)
+        return int(new_total)
+    except redis.RedisError as exc:
+        logger.warning("burn-cap reservation failed for %s: %s", user.id, exc)
+        return 0
+
+
+async def release_reservation(user: User, projected_pkr: Decimal) -> None:
+    """Release a previously-held reservation (the ledger row is now durable).
+
+    Fail-open: swallows Redis errors. The TTL on the key bounds the leak if
+    this never runs.
+    """
+    key = _RESERVE_KEY.format(user_id=user.id, period=_period())
+    amount = int(projected_pkr * _MICRO)
+    try:
+        await _redis_client.decrby(key, amount)
+    except redis.RedisError as exc:
+        logger.warning("burn-cap reservation release failed for %s: %s", user.id, exc)
 
 
 async def assert_within_burn_cap(
     db: AsyncSession, user: User, projected_pkr: Decimal
 ) -> None:
-    """Raise 429 if the projected call would exceed the user's monthly budget."""
+    """Raise 429 if the projected call would exceed the user's monthly budget.
+
+    Counts both the durable DB month-to-date spend AND any in-flight Redis
+    reservation held by concurrent calls (R10), so two simultaneous requests
+    cannot both pass the pre-flight check and overshoot the budget.
+    """
     spent = await month_to_date_pkr(db, user.id)
+    reserved = Decimal(await _reserved_micro(user.id)) / _MICRO
     budget = tier_budget(user)
-    if spent + projected_pkr > budget:
+    if spent + reserved + projected_pkr > budget:
         plan = (user.plan or "free").lower()
         raise HTTPException(
             status_code=429,
             detail={
                 "error": "burn_cap_reached",
-                "spent_pkr": str(spent.quantize(Decimal("0.01"))),
+                "spent_pkr": str((spent + reserved).quantize(Decimal("0.01"))),
                 "budget_pkr": str(budget),
                 "upgrade_url": "/upgrade" if plan != "elite" else None,
                 "message": (

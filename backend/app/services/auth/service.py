@@ -166,6 +166,9 @@ class AuthService:
             except Exception:
                 # Consent capture is best-effort at signup; the gated routes
                 # will re-prompt if the audit row is missing.
+                logger.warning(
+                    "auth.signup_consent_capture_failed type=%s", consent_type
+                )
                 continue
 
         if getattr(payload, "marketing_consent", False):
@@ -178,7 +181,9 @@ class AuthService:
                     granted=True,
                 )
             except Exception:
-                pass
+                logger.warning(
+                    "auth.signup_consent_capture_failed type=%s", "marketing"
+                )
 
     async def login(self, payload: UserLogin) -> TokenResponse:
         # S8 — Account lockout gate. Checked before any DB / hash work so a
@@ -262,6 +267,10 @@ class AuthService:
                 status_code=401,
             )
 
+        # Rotate: invalidate the presented refresh token by advancing the version.
+        user.auth_token_version += 1
+        await self.db.flush()
+
         capabilities = await self._resolve_capabilities(user)
         token_data = {
             "sub": str(user.id),
@@ -269,7 +278,7 @@ class AuthService:
             "capabilities": capabilities,
             "policy_version": "rbac.v1",
             "institution_scope": str(user.institution_id) if user.institution_id else None,
-            "token_version": user.auth_token_version,
+            "token_version": user.auth_token_version,   # new (rotated) version
         }
         return TokenResponse(
             access_token=create_access_token(token_data),

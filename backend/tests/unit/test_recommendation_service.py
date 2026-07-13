@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+import app.services.recommendations.service as svc_module
 from app.models import DegreeLevel, RecordState
 from app.services.recommendations import RecommendationService
 from app.services.recommendations.eligibility import evaluate_match
@@ -34,7 +35,7 @@ class FakeQuerySession:
         return FakeRowsResult(self.rows)
 
 
-async def no_db_candidates(*, limit, exclude_ids):
+async def no_db_candidates(*, limit, exclude_ids, target_country_code=""):
     assert limit >= 0
     assert isinstance(exclude_ids, set)
     return []
@@ -99,7 +100,7 @@ async def test_recommendation_service_enforces_eligible_only_invariant(monkeypat
             RetrievedCandidate(citizenship_mismatch, "pgvector_chunk_similarity", 0.82),
         ], None
 
-    async def fake_db_candidates(*, limit, exclude_ids):
+    async def fake_db_candidates(*, limit, exclude_ids, target_country_code=""):
         assert limit == 58
         assert exclude_ids == {eligible.id, citizenship_mismatch.id}
         return [RetrievedCandidate(gpa_mismatch, "published_rules_db_fallback", None)]
@@ -116,26 +117,33 @@ async def test_recommendation_service_enforces_eligible_only_invariant(monkeypat
 
 
 async def test_pgvector_candidate_retrieval_preserves_distance_order(monkeypatch):
+    # perf-db-03 option (b): chunk-level ivfflat ANN. The DB returns per-CHUNK
+    # rows (scholarship_id + distance) already ordered by ascending cosine
+    # distance. The method must set ivfflat.probes first, run a single chunk ANN
+    # query (no func.min/GROUP BY on the indexed column), dedupe to the best
+    # chunk per scholarship in Python, then re-fetch the scholarship entities.
     first = make_scholarship(title="First scholarship")
     second = make_scholarship(title="Second scholarship")
+    # Multiple chunks per scholarship, ascending distance; second is closest.
     session = FakeQuerySession(
         [
-            SimpleNamespace(scholarship_id=second.id, best_distance=0.4),
-            SimpleNamespace(scholarship_id=first.id, best_distance=0.9),
+            SimpleNamespace(scholarship_id=second.id, distance=0.4),
+            SimpleNamespace(scholarship_id=first.id, distance=0.9),
+            SimpleNamespace(scholarship_id=second.id, distance=0.95),
         ]
     )
     service = RecommendationService(db=session)
 
-    monkeypatch.setattr(service, "_encode_query", lambda _query: [0.25, 0.75])
+    async def _fake_encode(_query):
+        return [0.25, 0.75]
 
-    async def fake_load_scholarships_by_ids(scholarship_ids):
-        assert scholarship_ids == [second.id, first.id]
-        return {
-            first.id: first,
-            second.id: second,
-        }
+    async def _fake_load(ids):
+        # Dedupe must hand us deduped ids in best-distance order.
+        assert list(ids) == [second.id, first.id]
+        return {first.id: first, second.id: second}
 
-    monkeypatch.setattr(service, "_load_scholarships_by_ids", fake_load_scholarships_by_ids)
+    monkeypatch.setattr(service, "_encode_query", _fake_encode)
+    monkeypatch.setattr(service, "_load_scholarships_by_ids", _fake_load)
 
     candidates, failure_reason = await service._retrieve_pgvector_candidates(
         search_query="target field Data Science | degree ms",
@@ -143,13 +151,24 @@ async def test_pgvector_candidate_retrieval_preserves_distance_order(monkeypatch
     )
 
     assert failure_reason is None
-    assert len(session.statements) == 1
+    # Two statements: SET LOCAL ivfflat.probes, then the chunk ANN query.
+    assert len(session.statements) == 2
+    probes_stmt = str(session.statements[0]).lower()
+    assert "set " in probes_stmt and "ivfflat.probes" in probes_stmt
+    ann_sql = str(session.statements[1]).lower()
+    assert "scholarship_chunks" in ann_sql
+    assert "min(" not in ann_sql
+    assert "group by" not in ann_sql
+    # Best-chunk-per-scholarship dedupe, ascending distance: second (0.4) then first (0.9).
     assert [candidate.scholarship.id for candidate in candidates] == [second.id, first.id]
     assert [candidate.semantic_similarity for candidate in candidates] == [
         _distance_to_similarity(0.4),
         _distance_to_similarity(0.9),
     ]
-    assert all(candidate.retrieval_source == "pgvector_chunk_similarity" for candidate in candidates)
+    assert all(
+        candidate.retrieval_source == "pgvector_chunk_similarity"
+        for candidate in candidates
+    )
 
 
 async def test_recommendation_service_keeps_heuristic_ranking_when_embeddings_are_unavailable(monkeypatch):
@@ -182,7 +201,7 @@ async def test_recommendation_service_keeps_heuristic_ranking_when_embeddings_ar
         assert limit == 60
         return [], fallback_reason
 
-    async def fake_db_candidates(*, limit, exclude_ids):
+    async def fake_db_candidates(*, limit, exclude_ids, target_country_code=""):
         assert limit == 60
         assert exclude_ids == set()
         return [
@@ -331,3 +350,53 @@ async def test_recommendation_score_guardrail_applies_floor(monkeypatch):
     items = await service.build_for_profile(profile, limit=5)
     assert len(items) == 1
     assert items[0].estimated_fit_score >= 0.3
+
+
+def test_embedder_load_failure_is_not_cached(monkeypatch):
+    """P1-6: a transient SentenceTransformer init failure must NOT be memoized.
+    The first failing call returns None without caching; the second call retries
+    and, if the model loads, returns the model object."""
+    svc_module._SHARED_EMBEDDER = None  # reset
+    calls = {"n": 0}
+
+    class _Model:
+        pass
+
+    def flaky(_name):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("transient init failure")
+        return _Model()
+
+    monkeypatch.setattr(svc_module, "SentenceTransformer", flaky)
+
+    first = svc_module._get_shared_embedder()   # fails → None, NOT cached
+    second = svc_module._get_shared_embedder()  # retries → model
+
+    assert first is None
+    assert second is not None
+    assert calls["n"] == 2
+    svc_module._SHARED_EMBEDDER = None  # cleanup
+
+
+def test_embedder_successful_load_is_memoized(monkeypatch):
+    """A successful SentenceTransformer load must be memoized: repeated calls
+    return the same object without re-invoking the constructor."""
+    svc_module._SHARED_EMBEDDER = None  # reset
+    calls = {"n": 0}
+
+    class _Model:
+        pass
+
+    def counting(_name):
+        calls["n"] += 1
+        return _Model()
+
+    monkeypatch.setattr(svc_module, "SentenceTransformer", counting)
+
+    first = svc_module._get_shared_embedder()
+    second = svc_module._get_shared_embedder()
+
+    assert first is second
+    assert calls["n"] == 1  # constructor called exactly once
+    svc_module._SHARED_EMBEDDER = None  # cleanup

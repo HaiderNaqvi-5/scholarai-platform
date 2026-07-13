@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
@@ -53,6 +54,7 @@ class PublishedScholarshipEmbeddingRefresher:
             "failed": 0,
             "deferred_daad": 0,
             "skipped_missing_text": 0,
+            "skipped_unchanged": 0,
             "total_chunks": 0,
             "embedded_chunks": 0,
             "chunked_without_embeddings": 0,
@@ -76,6 +78,10 @@ class PublishedScholarshipEmbeddingRefresher:
                 summary["skipped_missing_text"] += 1
                 continue
 
+            if self._can_skip(scholarship, document_text):
+                summary["skipped_unchanged"] += 1
+                continue
+
             summary["processed"] += 1
             try:
                 await self._replace_chunks(
@@ -83,6 +89,7 @@ class PublishedScholarshipEmbeddingRefresher:
                     document_text=document_text,
                     summary=summary,
                 )
+                scholarship.embedding_source_hash = self._document_signature(document_text)
                 await self.db.commit()
                 summary["refreshed"] += 1
             except Exception:
@@ -165,7 +172,6 @@ class PublishedScholarshipEmbeddingRefresher:
         await self.db.flush()
 
         scholarship_embedding = self._encode_text(document_text)
-        scholarship.description_embedding = scholarship_embedding
         if scholarship_embedding is None or self.retriever is None:
             return
 
@@ -191,36 +197,19 @@ class PublishedScholarshipEmbeddingRefresher:
         )
 
     def _build_embedder(self) -> Any | None:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except Exception:
-            logger.warning(
-                "sentence-transformers is unavailable; scholarship refresh will store text-only chunks.",
-                exc_info=True,
-            )
-            return None
+        # Reuse the process-wide SentenceTransformer singleton from AI-P1-02
+        # instead of loading a second copy of all-mpnet-base-v2 per refresher.
+        # Returns None when sentence-transformers is unavailable / fails to load,
+        # so the text-only chunk fallback is preserved.
+        from app.services.recommendations.service import _get_shared_embedder
 
-        try:
-            return SentenceTransformer("all-mpnet-base-v2")
-        except Exception:
-            logger.warning(
-                "Embedding model could not be initialized; scholarship refresh will store text-only chunks.",
-                exc_info=True,
-            )
-            return None
+        return _get_shared_embedder()
 
     def _build_retriever(self) -> Any | None:
         if self.embedder is None or OpenSearchHybridRetriever is None:
             return None
 
-        try:
-            return OpenSearchHybridRetriever()
-        except Exception:
-            logger.warning(
-                "OpenSearch retriever unavailable; scholarship refresh will skip index sync.",
-                exc_info=True,
-            )
-            return None
+        return OpenSearchHybridRetriever.build_if_configured()
 
     def _split_document(self, document_text: str) -> list[str]:
         if self.text_splitter is None:
@@ -234,7 +223,7 @@ class PublishedScholarshipEmbeddingRefresher:
             return None
 
         try:
-            encoded = self.embedder.encode(text)
+            encoded = self.embedder.encode(text, normalize_embeddings=True)
         except Exception:
             logger.warning("Embedding generation failed for scholarship chunk.", exc_info=True)
             return None
@@ -243,6 +232,21 @@ class PublishedScholarshipEmbeddingRefresher:
             encoded = encoded.tolist()
 
         return list(encoded)
+
+    @staticmethod
+    def _document_signature(document_text: str) -> str:
+        return hashlib.sha256(document_text.encode("utf-8")).hexdigest()
+
+    def _can_skip(self, scholarship: Scholarship, document_text: str) -> bool:
+        stored = getattr(scholarship, "embedding_source_hash", None)
+        if not stored:
+            return False
+        if stored != self._document_signature(document_text):
+            return False
+        # Only skip when chunk rows already exist; a matching hash with zero
+        # chunks means a cold/partial backfill that still needs embedding.
+        existing_chunks = getattr(scholarship, "chunks", None) or []
+        return len(existing_chunks) > 0
 
     def _build_document_text(self, scholarship: Scholarship) -> str:
         text_parts = [

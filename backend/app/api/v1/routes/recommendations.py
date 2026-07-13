@@ -1,12 +1,13 @@
 from typing import Annotated
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import RecommendationEvaluationUser, RecommendationUser
+from app.core.dependencies import AdminUser, RecommendationEvaluationUser, RecommendationUser
 from app.core.rate_limit import RateLimiter
+from app.tasks.recommendation_tasks import refresh_published_scholarship_embeddings
 from app.schemas import (
     RecommendationBenchmarkEvaluationResponse,
     RecommendationBenchmarkListResponse,
@@ -42,11 +43,21 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _attach_recommendation_subject(
+    request: Request, current_user: RecommendationUser
+) -> None:
+    """Expose the authenticated user to the RateLimiter so it keys on user id."""
+    request.state.current_user = current_user
+
+
 @router.post(
     "",
     response_model=RecommendationListResponse,
-    # H2: each call fans out to the LLM; cap at 20/hr per client to stop quota drain.
-    dependencies=[Depends(RateLimiter(requests_limit=20, window_seconds=3_600))],
+    # H2: each call fans out to the LLM; cap at 20/hr per authenticated user.
+    dependencies=[
+        Depends(_attach_recommendation_subject),
+        Depends(RateLimiter(requests_limit=20, window_seconds=3_600, fail_open=False)),
+    ],
 )
 async def build_recommendations(
     payload: RecommendationRequest,
@@ -68,12 +79,25 @@ async def build_recommendations(
         items=items,
         total=len(items),
         meta=RecommendationResponseMeta(
-            scope_policy="canada_first",
-            allowed_country_codes=["CA"],
-            exception_policy="US_fulbright_only",
+            scope_policy="target_country",
+            allowed_country_codes=[profile.target_country_code.upper()],
+            exception_policy="",
             pipeline_version="recommendations.phase1.v1",
         ),
     )
+
+
+@router.post("/refresh-embeddings", status_code=202)
+async def refresh_recommendation_embeddings(current_user: AdminUser) -> dict[str, str]:
+    """Enqueue a rebuild of published-scholarship pgvector embeddings on the worker.
+
+    Matching ranks via ``scholarship_chunks`` cosine distance; new/changed
+    scholarships have no embeddings until this runs. Admin-only, on-demand.
+    """
+    del current_user
+    task = refresh_published_scholarship_embeddings.delay()
+    logger.info("recommendation_embeddings_refresh_enqueued task_id=%s", task.id)
+    return {"status": "queued", "task_id": task.id}
 
 
 @router.post("/evaluate", response_model=RecommendationEvaluationResponse)
@@ -117,7 +141,10 @@ async def evaluate_recommendations(
         baseline_metrics=baseline_metric_results,
     )
 
-    kpi_passed = all(gate.all_passed for gate in kpi_gates) if threshold_models else None
+    # Empty kpi_gates means every submitted threshold was all-None (nothing
+    # to check) -- that is unknown, not a pass. Gate on kpi_gates, not
+    # threshold_models (which is never empty: falls back to defaults).
+    kpi_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else None
     policy_version = get_recommendation_kpi_policy_version()
 
     if kpi_passed is not None:
@@ -287,7 +314,11 @@ async def evaluate_recommendation_benchmark(
             thresholds=threshold_models,
             baseline_metrics=baseline_metrics,
         )
-        case_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else True
+        # Same reasoning as kpi_passed above: an empty kpi_gates means this
+        # case had nothing to check, so it is unknown, not a pass -- None keeps
+        # it falsy for `if case_passed: pass_count += 1` without wrongly
+        # asserting failure.
+        case_passed = all(gate.all_passed for gate in kpi_gates) if kpi_gates else None
         if case_passed:
             pass_count += 1
         for gate in kpi_gates:

@@ -38,7 +38,7 @@ jobs:
         # All test dirs — note tests/integration (singular) and tests/integrations
         # (plural, Clerk) are different trees; api/core/db/services/scripts hold
         # the Clerk + Resend suites that were previously never collected by CI.
-        run: pytest backend/tests/unit backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts --cov=app --cov-fail-under=72 -q
+        run: pytest backend/tests/unit backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts backend/tests/contract --cov=app --cov-fail-under=72 -q
 
       # S14 — Supply-chain audit. pip-audit cross-references installed
       # versions against the PyPI advisory DB. --strict fails on any vuln;
@@ -191,6 +191,14 @@ jobs:
         run: bun run build
         working-directory: frontend
 
+      - name: Create Supabase roles
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          # RLS migration 0030 GRANT/REVOKEs to Supabase roles absent on a plain pgvector image (prod Supabase has them).
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai -c 'DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai -c 'DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai -c 'DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
+
       - name: Bootstrap database
         run: python scripts/bootstrap_local.py
         working-directory: backend
@@ -275,10 +283,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
-      - name: Enable pgvector extension
+      - name: Enable pgvector extension + Supabase roles
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
           PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          # RLS migration 0030 GRANT/REVOKEs to Supabase roles absent on a plain pgvector image (prod Supabase has them).
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c 'DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c 'DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
+          PGPASSWORD=password psql -h localhost -U scholarai -d scholarai_test -c 'DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;'
 
       - name: Migration drift check
         run: |
@@ -287,4 +299,4 @@ jobs:
           alembic check
 
       - name: Run DB-backed integration tests
-        run: pytest backend/tests/integration -q
+        run: pytest backend/tests/integration backend/tests/integrations backend/tests/api backend/tests/core backend/tests/db backend/tests/services backend/tests/scripts backend/tests/contract -q

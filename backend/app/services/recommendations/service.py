@@ -4,9 +4,11 @@ import logging
 import uuid
 from dataclasses import dataclass
 
+import anyio
+
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RecordState, Scholarship, StudentProfile
@@ -30,12 +32,41 @@ except ImportError:
     SentenceTransformer = None
 
 
+_SHARED_EMBEDDER = None  # successfully-loaded model, or None until a successful load
+
+
+def _get_shared_embedder():
+    """Load the SentenceTransformer once per process. Only a *successful* load is
+    memoized — a failure returns None WITHOUT caching, so a later call retries
+    (one transient init failure must not permanently degrade to rules-only)."""
+    global _SHARED_EMBEDDER
+    if _SHARED_EMBEDDER is not None:
+        return _SHARED_EMBEDDER
+    if SentenceTransformer is None:
+        return None
+    try:
+        _SHARED_EMBEDDER = SentenceTransformer("all-mpnet-base-v2")
+        return _SHARED_EMBEDDER
+    except Exception as exc:  # noqa: BLE001
+        logger.error("recommendation.embedding_init_failed error=%s", exc)
+        return None
+
+
 @dataclass(frozen=True)
 class RetrievedCandidate:
     scholarship: Scholarship
     retrieval_source: str
     semantic_similarity: float | None
 
+
+# Per-chunk ANN over-fetch multiplier. The chunk ANN can return several chunks
+# belonging to the same scholarship, so we fetch ``limit * _CHUNK_FANOUT``
+# candidate chunks and dedupe to the best (smallest-distance) chunk per
+# scholarship before truncating to ``limit`` distinct scholarships. A fanout of
+# 5 keeps the window index-served while leaving ample headroom: even if every
+# scholarship contributed 4 near-duplicate chunks ahead of the next distinct
+# one, 5x still yields >= limit distinct scholarships in practice.
+_CHUNK_FANOUT = 5
 
 RERANK_POLICY_VERSION = "reco.rerank.v1"
 RERANK_FLOOR_SCORE = 0.3
@@ -54,7 +85,6 @@ class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.logger = logging.getLogger(__name__)
-        self._embedder = None
 
     async def build_for_profile(
         self,
@@ -74,6 +104,7 @@ class RecommendationService:
         fallback_candidates = await self._retrieve_db_candidates(
             limit=db_fill_limit,
             exclude_ids=seen_ids,
+            target_country_code=profile.target_country_code,
         )
 
         candidates = vector_candidates + fallback_candidates
@@ -164,48 +195,81 @@ class RecommendationService:
         )
         return recommendations[:limit]
 
+    def _build_pgvector_stmt(self, *, query_embedding: list[float], limit: int):
+        # Per-CHUNK ANN. A plain ``ORDER BY embedding <=> :q LIMIT n`` over
+        # scholarship_chunks is what the ivfflat index
+        # ``ix_scholarship_chunks_embedding`` (vector_cosine_ops) can serve:
+        # there is NO func.min() and NO GROUP BY on the indexed column, so the
+        # planner uses the index instead of sequential-scanning every chunk.
+        #
+        # The published filter is expressed as a scalar subquery on
+        # scholarships.id (NOT a join), which keeps scholarship_chunks as the
+        # single FROM the planner orders by the indexed expression. We over-fetch
+        # ``limit * _CHUNK_FANOUT`` chunk rows; Python dedupe then collapses to
+        # the best chunk per scholarship (reproducing the old min-per-scholarship
+        # semantics) before truncating to ``limit`` distinct scholarships.
+        distance = ScholarshipChunk.embedding.cosine_distance(query_embedding)
+        published_ids = select(Scholarship.id).where(
+            Scholarship.record_state == RecordState.PUBLISHED
+        )
+        return (
+            select(
+                ScholarshipChunk.scholarship_id,
+                distance.label("distance"),
+            )
+            .where(ScholarshipChunk.embedding.is_not(None))
+            .where(ScholarshipChunk.scholarship_id.in_(published_ids))
+            .order_by(distance)
+            .limit(limit * _CHUNK_FANOUT)
+        )
+
     async def _retrieve_pgvector_candidates(
         self,
         *,
         search_query: str,
         limit: int,
     ) -> tuple[list[RetrievedCandidate], str | None]:
-        query_embedding = self._encode_query(search_query)
+        query_embedding = await self._encode_query(search_query)
         if query_embedding is None:
             return [], "Embeddings are unavailable, so ranking fell back to published-rule heuristics only."
 
-        distance = ScholarshipChunk.embedding.cosine_distance(query_embedding)
-        stmt = (
-            select(
-                ScholarshipChunk.scholarship_id,
-                func.min(distance).label("best_distance"),
-            )
-            .join(Scholarship, Scholarship.id == ScholarshipChunk.scholarship_id)
-            .where(Scholarship.record_state == RecordState.PUBLISHED)
-            .where(ScholarshipChunk.embedding.is_not(None))
-            .group_by(ScholarshipChunk.scholarship_id)
-            .order_by(func.min(distance))
-            .limit(limit)
-        )
+        # Tune ANN recall for the ivfflat scan. Local to this transaction (SET LOCAL),
+        # so it does not leak to other pooled sessions.
+        await self.db.execute(text("SET LOCAL ivfflat.probes = 10"))
 
+        stmt = self._build_pgvector_stmt(query_embedding=query_embedding, limit=limit)
         rows = (await self.db.execute(stmt)).all()
         if not rows:
             return [], "Published scholarships do not have usable chunk embeddings yet, so ranking used rules only."
 
-        scholarship_ids = [row.scholarship_id for row in rows]
-        scholarships = await self._load_scholarships_by_ids(scholarship_ids)
-        best_distance_by_id = {
-            row.scholarship_id: float(row.best_distance)
-            for row in rows
-            if row.best_distance is not None
-        }
+        # Dedupe to the BEST (smallest-distance) chunk per scholarship in Python,
+        # preserving ascending-distance order. Because ``rows`` arrives already
+        # sorted by distance (index ORDER BY), the FIRST time we see a
+        # scholarship_id it is that scholarship's minimum chunk distance — exactly
+        # the value the old ``func.min(distance) GROUP BY scholarship_id`` query
+        # produced. Keeping insertion order over a dict then reproduces the old
+        # best-chunk-per-scholarship ascending ordering, now served by the index.
+        best_distance_by_id: dict[uuid.UUID, float | None] = {}
+        for row in rows:
+            scholarship_id = row.scholarship_id
+            if scholarship_id in best_distance_by_id:
+                continue  # already captured this scholarship's best (closest) chunk
+            distance = row.distance
+            best_distance_by_id[scholarship_id] = (
+                float(distance) if distance is not None else None
+            )
+            if len(best_distance_by_id) >= limit:
+                break
+
+        ordered_ids = list(best_distance_by_id.keys())
+        scholarships = await self._load_scholarships_by_ids(ordered_ids)
 
         candidates: list[RetrievedCandidate] = []
-        for scholarship_id in scholarship_ids:
+        for scholarship_id in ordered_ids:
             scholarship = scholarships.get(scholarship_id)
             if scholarship is None:
                 continue
-            best_distance = best_distance_by_id.get(scholarship_id)
+            best_distance = best_distance_by_id[scholarship_id]
             candidates.append(
                 RetrievedCandidate(
                     scholarship=scholarship,
@@ -222,14 +286,15 @@ class RecommendationService:
         *,
         limit: int,
         exclude_ids: set[uuid.UUID],
+        target_country_code: str = "",
     ) -> list[RetrievedCandidate]:
         if limit <= 0:
             return []
 
+        target = (target_country_code or "").upper()
         scope_priority = case(
-            (Scholarship.country_code == "CA", 0),
-            (Scholarship.country_code == "US", 1),
-            else_=2,
+            (Scholarship.country_code == target, 0),
+            else_=1,
         )
         stmt = (
             select(Scholarship)
@@ -290,25 +355,22 @@ class RecommendationService:
             )
         return " | ".join(parts)
 
-    def _encode_query(self, search_query: str) -> list[float] | None:
-        if not search_query or SentenceTransformer is None:
+    async def _encode_query(self, search_query: str) -> list[float] | None:
+        if not search_query:
             return None
 
-        if self._embedder is None:
-            try:
-                self._embedder = SentenceTransformer("all-mpnet-base-v2")
-            except Exception as exc:
-                self.logger.warning("recommendation.embedding_init_failed error=%s", exc)
-                self._embedder = False
-
-        if not self._embedder:
+        embedder = _get_shared_embedder()
+        if embedder is None:
             return None
 
-        try:
-            return self._embedder.encode(
+        def _encode() -> list[float]:
+            return embedder.encode(
                 search_query,
                 normalize_embeddings=True,
             ).tolist()
+
+        try:
+            return await anyio.to_thread.run_sync(_encode)
         except Exception as exc:
             self.logger.warning("recommendation.embedding_encode_failed error=%s", exc)
             return None
@@ -347,8 +409,9 @@ def _compose_recommendation_score(
 
 
 def _distance_to_similarity(distance: float) -> float:
+    # pgvector cosine distance d = 1 - cos_sim, so similarity = 1 - d.
     clamped = max(0.0, min(distance, 2.0))
-    return round(1.0 - (clamped / 2.0), 4)
+    return round(max(0.0, 1.0 - clamped), 4)
 
 
 def _fit_band(score: float) -> str:

@@ -33,22 +33,14 @@ class _FakeDB:
         return _FakeResult(self._user)
 
 
-class _FakeRedis:
-    async def get(self, _key):
-        return None
-
-    async def setex(self, _key, _ttl, _payload):
-        return None
-
-
-def _user(role: UserRole, institution_id=None):
+def _user(role: UserRole, institution_id=None, auth_token_version=0):
     return SimpleNamespace(
         id=uuid4(),
         email="tester@example.com",
         role=role,
         institution_id=institution_id,
         is_active=True,
-        auth_token_version=0,
+        auth_token_version=auth_token_version,
     )
 
 
@@ -63,7 +55,6 @@ async def test_get_current_user_rejects_non_list_capabilities(monkeypatch):
             "token_version": user.auth_token_version,
         },
     )
-    monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
     with pytest.raises(ScholarAIException) as caught:
         await dependencies.get_current_user(token="fake", db=_FakeDB(user))
@@ -83,7 +74,6 @@ async def test_get_current_user_rejects_non_string_capabilities(monkeypatch):
             "token_version": user.auth_token_version,
         },
     )
-    monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
     with pytest.raises(ScholarAIException) as caught:
         await dependencies.get_current_user(token="fake", db=_FakeDB(user))
@@ -104,7 +94,6 @@ async def test_get_current_user_rejects_university_missing_scope_claim(monkeypat
             "token_version": user.auth_token_version,
         },
     )
-    monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
     with pytest.raises(ScholarAIException) as caught:
         await dependencies.get_current_user(token="fake", db=_FakeDB(user))
@@ -126,10 +115,94 @@ async def test_get_current_user_rejects_mismatched_scope_claim(monkeypatch):
             "token_version": user.auth_token_version,
         },
     )
-    monkeypatch.setattr(dependencies, "redis_client", _FakeRedis())
 
     with pytest.raises(ScholarAIException) as caught:
         await dependencies.get_current_user(token="fake", db=_FakeDB(user))
 
     assert caught.value.status_code == 403
     assert caught.value.code.value == "auth_scope_forbidden"
+
+
+# ── P2-1: dead Redis session cache removed ────────────────────────────────────
+
+class _RecordingFakeDB(_FakeDB):
+    """FakeDB that also records which queries were executed (for no-Redis assertion)."""
+    def __init__(self, user):
+        super().__init__(user)
+        self.executed = []
+
+    async def execute(self, query):
+        self.executed.append(query)
+        return _FakeResult(self._user)
+
+
+async def test_auth_dependency_makes_no_redis_calls(monkeypatch):
+    """After P2-1 removal the auth path must not call redis_client.get or .setex.
+
+    We install a sentinel redis_client on the module; if the dependency reaches
+    it, the test fails. Because redis_client is no longer imported by the module,
+    this test also verifies the import was cleaned up: patching a non-existent
+    attribute via monkeypatch will raise AttributeError — so we use setattr to
+    inject, then assert it was never touched.
+    """
+    user = _user(UserRole.STUDENT)
+    monkeypatch.setattr(
+        dependencies,
+        "decode_token",
+        lambda _token, expected_type="access": {
+            "sub": str(user.id),
+            "capabilities": [],
+            "token_version": user.auth_token_version,
+        },
+    )
+
+    calls: list[str] = []
+
+    class _SentinelRedis:
+        async def get(self, key):
+            calls.append(f"get:{key}")
+            return None
+
+        async def setex(self, key, ttl, payload):
+            calls.append(f"setex:{key}")
+
+    # Inject onto the module object (not via monkeypatch.setattr so we don't
+    # require the attribute to pre-exist on the module).
+    original = getattr(dependencies, "redis_client", None)
+    dependencies.redis_client = _SentinelRedis()  # type: ignore[attr-defined]
+    try:
+        result = await dependencies.get_current_user(token="fake", db=_RecordingFakeDB(user))
+    finally:
+        if original is None:
+            del dependencies.redis_client
+        else:
+            dependencies.redis_client = original
+
+    assert calls == [], (
+        f"Auth dependency called Redis after P2-1 removal: {calls}"
+    )
+    assert result is user
+
+
+async def test_auth_dependency_revokes_stale_token_version(monkeypatch):
+    """A token whose token_version != user.auth_token_version must be rejected 401.
+
+    This is the real revocation guard that the removed Redis cache could have
+    bypassed had its read path ever been completed.
+    """
+    user = _user(UserRole.STUDENT, auth_token_version=2)  # DB version = 2
+    monkeypatch.setattr(
+        dependencies,
+        "decode_token",
+        lambda _token, expected_type="access": {
+            "sub": str(user.id),
+            "capabilities": [],
+            "token_version": 1,  # stale — issued before last revocation
+        },
+    )
+
+    with pytest.raises(ScholarAIException) as caught:
+        await dependencies.get_current_user(token="fake", db=_FakeDB(user))
+
+    assert caught.value.status_code == 401
+    assert caught.value.code.value == "auth_token_expired"

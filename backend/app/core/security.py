@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -41,7 +41,12 @@ def create_refresh_token(data: dict) -> str:
 
 def decode_token(token: str, expected_type: str = "access") -> dict:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["exp", "sub", "type"]},
+        )
         token_type = payload.get("type")
         if token_type != expected_type:
             raise ScholarAIException(
@@ -50,7 +55,7 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
         return payload
-    except JWTError:
+    except jwt.PyJWTError:
         raise ScholarAIException(
             code=ErrorCode.AUTH_TOKEN_EXPIRED,
             message="Invalid or expired token",

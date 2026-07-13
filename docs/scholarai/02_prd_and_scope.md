@@ -1,5 +1,7 @@
 # ScholarAI PRD And Scope
 
+> **⚠️ Pivot note (2026-05-30):** this is the original **Canada-first** design-pack PRD. The product has since **pivoted to Pakistan-first** (brand **AidwiseAI**): Pakistani students applying to **UK / US / CA / DE / AU**. The authoritative scope is now the **Pakistan PRD** (`D:/Downloads/SCHOLARAI_PAKISTAN_PRD.md`); live state is root `CLAUDE.md`. Read the geography/program scope below as historical. The product-goal, user-roles, and governance framing still apply.
+
 ## Product Goal
 Build a focused scholarship operating system that helps students move from "I do not know where to start" to "I know what fits, why it fits, what is missing, and what to do next" within a constrained **v0.1 SLC** scope.
 

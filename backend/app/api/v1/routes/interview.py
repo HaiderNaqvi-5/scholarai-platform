@@ -54,28 +54,12 @@ async def get_interview_coaching_analytics(
     return await service.get_coaching_analytics(current_user.id)
 
 
-@router.get("/{session_id}", response_model=InterviewSessionSummaryResponse)
-async def get_interview_session(
-    session_id: uuid.UUID,
-    current_user: InterviewReadUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> InterviewSessionSummaryResponse:
-    service = InterviewSessionService(db)
-    return await service.get_session(current_user.id, session_id)
-
-
-@router.get("/{session_id}/question", response_model=InterviewCurrentQuestionResponse)
-async def get_interview_question(
-    session_id: uuid.UUID,
-    current_user: InterviewReadUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> InterviewCurrentQuestionResponse:
-    service = InterviewSessionService(db)
-    return await service.get_current_question(current_user.id, session_id)
-
-
 # ----------------------------------------------------------------------
 # Pakistan-pivot visa interview simulator (Feature 8, PRD §8)
+#
+# Registered BEFORE the generic /{session_id}* routes below: /visa/... is a
+# literal-prefixed path family and must be matched before any parameterized
+# single-segment route on this router (broken-#4 route-ordering fix).
 # ----------------------------------------------------------------------
 
 
@@ -130,6 +114,26 @@ async def get_visa_session_summary(
         return await service.summary(current_user, session_id)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.get("/{session_id}", response_model=InterviewSessionSummaryResponse)
+async def get_interview_session(
+    session_id: uuid.UUID,
+    current_user: InterviewReadUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewSessionSummaryResponse:
+    service = InterviewSessionService(db)
+    return await service.get_session(current_user.id, session_id)
+
+
+@router.get("/{session_id}/question", response_model=InterviewCurrentQuestionResponse)
+async def get_interview_question(
+    session_id: uuid.UUID,
+    current_user: InterviewReadUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> InterviewCurrentQuestionResponse:
+    service = InterviewSessionService(db)
+    return await service.get_current_question(current_user.id, session_id)
 
 
 @router.post("/{session_id}/responses", response_model=InterviewSessionSummaryResponse)

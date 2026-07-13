@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -17,11 +18,13 @@ from app.schemas.curation import (
 )
 from app.services.recommendations.hybrid_retriever import OpenSearchHybridRetriever
 
+logger = logging.getLogger(__name__)
+
 
 class CurationService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.retriever = OpenSearchHybridRetriever()
+        self.retriever = OpenSearchHybridRetriever.build_if_configured()
 
     async def import_raw_record(
         self,
@@ -248,16 +251,17 @@ class CurationService:
             record.review_notes = payload.note
 
         await self.db.flush()
-        
+
         # Trigger OpenSearch indexing
-        try:
-            # We need an embedding for the scholarship. 
-            # In a real system, this would be a background task.
-            embedding = [0.0] * 768 # Placeholder for MVP
-            await self.retriever.index_scholarship(record, embedding)
-        except Exception as e:
-            print(f"Failed to index scholarship into OpenSearch: {e}")
-            
+        if self.retriever is not None:
+            try:
+                # We need an embedding for the scholarship.
+                # In a real system, this would be a background task.
+                embedding = [0.0] * 768 # Placeholder for MVP
+                await self.retriever.index_scholarship(record, embedding)
+            except Exception:
+                logger.warning("curation.opensearch_index_failed scholarship=%s", record.id, exc_info=True)
+
         return self._build_detail(record)
 
     async def unpublish_record(
@@ -283,13 +287,14 @@ class CurationService:
             record.review_notes = payload.note
 
         await self.db.flush()
-        
+
         # Remove from OpenSearch index
-        try:
-            await self.retriever.delete_scholarship(str(record.id))
-        except Exception as e:
-            print(f"Failed to remove scholarship from OpenSearch: {e}")
-            
+        if self.retriever is not None:
+            try:
+                await self.retriever.delete_scholarship(str(record.id))
+            except Exception:
+                logger.warning("curation.opensearch_delete_failed scholarship=%s", record.id, exc_info=True)
+
         return self._build_detail(record)
 
     async def _load_record(self, record_id: uuid.UUID, actor_user: User) -> Scholarship:

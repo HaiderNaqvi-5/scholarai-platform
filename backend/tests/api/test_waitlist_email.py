@@ -16,32 +16,22 @@ class _FakeResult:
     def __init__(self, row):
         self._row = row
 
-    def scalar_one_or_none(self):
+    def one(self):
         return self._row
 
 
 class _FakeDB:
-    """Minimal async DB stub for the waitlist endpoint."""
+    """Minimal async DB stub for the waitlist upsert endpoint. The route reads
+    only the DB-generated id/created_at from RETURNING (plan/currency/email come
+    from the payload), so the stub just synthesizes those two columns."""
 
     def __init__(self, prior_row=None):
-        self._row = prior_row
         self._added = []
 
     async def execute(self, _stmt):
-        return _FakeResult(self._row)
-
-    def add(self, obj):
-        self._added.append(obj)
-        self._row = obj
-        # Populate the autogen fields that flush would normally fill.
-        obj.id = uuid.uuid4()
-        obj.created_at = datetime.now(timezone.utc)
-
-    async def flush(self):
-        pass
-
-    async def refresh(self, _obj):
-        pass
+        return _FakeResult(
+            SimpleNamespace(id=uuid.uuid4(), created_at=datetime.now(timezone.utc))
+        )
 
     async def commit(self):
         pass

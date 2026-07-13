@@ -46,6 +46,31 @@ def _fake_httpx(json_payload: dict, *, raise_exc: Exception | None = None) -> Ma
     return factory
 
 
+def test_client_ip_ignores_xff_when_trusted_proxy_hops_zero(monkeypatch):
+    """TRUSTED_PROXY_HOPS=0 -> spoofed X-Forwarded-For is ignored; socket peer
+    (request.client.host) wins. Mirrors rate_limit.py:_client_ip gating."""
+    from app.api.v1.routes.geo import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 0)
+    request = MagicMock()
+    request.headers = {"x-forwarded-for": "203.0.113.42"}
+    request.client = MagicMock(host="10.0.0.5")
+    assert _client_ip(request) == "10.0.0.5"
+
+
+def test_client_ip_honors_xff_when_trusted_proxy_hops_positive(monkeypatch):
+    """TRUSTED_PROXY_HOPS>0 -> left-most X-Forwarded-For entry is trusted."""
+    from app.api.v1.routes.geo import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_HOPS", 1)
+    request = MagicMock()
+    request.headers = {"x-forwarded-for": "203.0.113.42, 10.0.0.1"}
+    request.client = MagicMock(host="10.0.0.5")
+    assert _client_ip(request) == "203.0.113.42"
+
+
 def test_geo_currency_missing_ip_returns_null(client):
     """No X-Forwarded-For, no client host -> currency=null, country=null.
     Frontend will then map via defaultCurrencyForCountry (-> PKR for null cc).
@@ -106,3 +131,40 @@ def test_geo_currency_lookup_failure_returns_null(client):
     body = r.json()
     assert body["currency"] is None
     assert body["country"] is None
+
+
+# GEO-IP-LEAK: raw IP must not be persisted (Redis key) or logged pre-consent.
+def test_redact_ip_stable_and_irreversible():
+    from app.services.geo.ipwho_client import _redact_ip
+
+    ip = "203.0.113.42"
+    assert _redact_ip(ip) == _redact_ip(ip)  # stable -> cache still hits
+    assert ip not in _redact_ip(ip)
+    assert _redact_ip(ip) != _redact_ip("198.51.100.7")
+
+
+def test_cache_key_hashes_ip_no_raw_ip_leak():
+    from app.services.geo.ipwho_client import _cache_key, _redact_ip
+
+    ip = "203.0.113.42"
+    key = _cache_key(ip)
+    assert ip not in key
+    assert key == f"geo:currency:{_redact_ip(ip)}"
+
+
+def test_redis_cache_uses_hashed_key_not_raw_ip(client):
+    """Neither the cache read nor write may carry the raw IP as the key."""
+    fake_redis = _fake_redis_no_cache()
+    fake_httpx = _fake_httpx(
+        {"success": True, "country_code": "GB", "currency": {"code": "GBP"}}
+    )
+    ip = "81.137.0.99"
+    with patch("app.services.geo.ipwho_client._redis_client", fake_redis), patch(
+        "app.services.geo.ipwho_client.httpx.AsyncClient", fake_httpx
+    ):
+        r = client.get("/api/v1/geo/currency", headers={"X-Forwarded-For": ip})
+    assert r.status_code == 200
+    calls = list(fake_redis.get.await_args_list) + list(fake_redis.set.await_args_list)
+    assert calls, "expected redis get/set to be exercised"
+    for call in calls:
+        assert ip not in str(call)
